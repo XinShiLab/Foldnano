@@ -1,0 +1,19 @@
+{
+	"schemaVersion": 1,
+	"id": "side-panel-code-demo",
+	"name": "Side Panel Code Demo",
+	"version": "1.0.1",
+	"description": "Demo plugin that receives code from a host-rendered code editor side panel.",
+	"format": "foldnano_json",
+	"applyStrategy": "previewOnly",
+	"entrypointUrl": "/plugins/side_panel_code_demo/side_panel_code_demo.zip",
+	"sidePanel": {
+		"type": "codeEditor",
+		"title": "Script Lab Demo",
+		"icon": "code",
+		"codeEditor": {
+			"filename": "analysis.py",
+			"initialCode": "from foldnano.plugin import PluginContext\n\n\ndef run(ctx: PluginContext) -> None:\n    code = ctx.get_side_panel_code()\n    print(f\"Script length: {len(code)}\")\n"
+		}
+	}
+}

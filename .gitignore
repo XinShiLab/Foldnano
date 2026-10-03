@@ -1,0 +1,40 @@
+node_modules
+
+# Output
+.output
+.vercel
+.netlify
+.wrangler
+/.svelte-kit
+/build
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.*
+!.env.example
+!.env.test
+
+# Vite
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
+
+# python
+__pycache__/
+.venv/
+venv/
+
+# temporal reference files
+ref_*
+
+# oxDNA export test fixtures (generated outputs and tool clone)
+test_files/fixtures/oxdna_export/Foldnano/
+test_files/fixtures/oxdna_export/tacoxDNA/
+
+# Svelte-kit 
+.svelte-kit/
+# Generated plugin zips (built by scripts/build-plugins.mjs)
+static/plugins/*/*.zip

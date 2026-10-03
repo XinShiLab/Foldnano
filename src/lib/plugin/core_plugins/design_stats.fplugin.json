@@ -1,0 +1,11 @@
+{
+	"schemaVersion": 1,
+	"id": "design-stats",
+	"name": "Design Statistics",
+	"version": "1.0.1",
+	"format": "cadnano_json",
+	"applyStrategy": "previewOnly",
+	"entrypointUrl": "/plugins/design_stats/design_stats.zip",
+	"requirements": ["numpy"],
+	"description": "Analyses helix grid layout and strand occupancy using numpy. Produces a per-helix CSV report and structured statistics. Works without an open design (uses synthetic demo data)."
+}

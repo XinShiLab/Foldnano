@@ -1,0 +1,10 @@
+{
+	"schemaVersion": 1,
+	"id": "sequence-report",
+	"name": "Sequence Report",
+	"version": "1.0.1",
+	"format": "foldnano_json",
+	"applyStrategy": "previewOnly",
+	"entrypointUrl": "/plugins/sequence_report/sequence_report.zip",
+	"description": "Reads actual staple sequences from foldnano format. Reports GC content, homopolymer runs, modifications, and crossover count per oligo. Produces a downloadable CSV."
+}

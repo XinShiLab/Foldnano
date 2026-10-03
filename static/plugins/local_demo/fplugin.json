@@ -1,0 +1,9 @@
+{
+	"schemaVersion": 1,
+	"id": "local-demo",
+	"name": "Local Demo Plugin",
+	"version": "1.0.1",
+	"format": "cadnano_json",
+	"applyStrategy": "previewOnly",
+	"description": "Counts helices, bases, and scaffold occupancy. Installed from a local .zip — demonstrates offline plugin support."
+}

@@ -1,0 +1,10 @@
+{
+	"schemaVersion": 1,
+	"id": "crossover-analyzer",
+	"name": "Crossover Analyzer",
+	"version": "1.0.1",
+	"format": "cadnano_json",
+	"applyStrategy": "previewOnly",
+	"entrypointUrl": "/plugins/crossover_analyzer/crossover_analyzer.zip",
+	"description": "Counts scaffold and staple crossovers between every connected helix pair. Exports a CSV report. Demonstrates multi-file zip plugin bundling — three Python modules bundled into one zip."
+}

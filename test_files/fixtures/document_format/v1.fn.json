@@ -1,0 +1,777 @@
+{
+	"format": "foldnano",
+	"formatVersion": 1,
+	"savedWith": {
+		"app": "0.5.1",
+		"commit": "8e358c7"
+	},
+	"id": "fbe7b938-dcda-419d-84bd-cadc19c5dedd",
+	"name": "Untitled Document",
+	"parts": [
+		{
+			"name": "07cy3",
+			"id": "03efbf0b-3784-4c0e-8b6f-1f273e1b2d00",
+			"planes": [
+				{
+					"id": "7f642cad-4475-4403-a455-c0b81e5020c1",
+					"name": "Plane 1",
+					"origin": {
+						"x": 0,
+						"y": 0,
+						"z": 0
+					},
+					"u": {
+						"x": 1,
+						"y": 0,
+						"z": 0
+					},
+					"v": {
+						"x": 0,
+						"y": 1,
+						"z": 0
+					},
+					"normal": {
+						"x": 0,
+						"y": 0,
+						"z": 1
+					}
+				}
+			],
+			"regions": [
+				{
+					"id": "0ba46b29-429b-4094-b86e-a0e19c013698",
+					"name": "HONEYCOMB Region 1",
+					"kind": "HONEYCOMB",
+					"planeId": "7f642cad-4475-4403-a455-c0b81e5020c1",
+					"vhOrder": [
+						"a42b9431-6b2d-4ca9-a7f9-20e4344371f3",
+						"61d8d07a-fae9-4e4f-b2b1-cd91d2343b05"
+					],
+					"step": 21,
+					"turnsPerStep": 2,
+					"subStepSize": 7,
+					"twistOffset": 340,
+					"minBase": 0,
+					"maxBase": 84
+				}
+			],
+			"oligos": [
+				{
+					"id": "4827797e-404d-4734-bde6-06d27db75a6f",
+					"segments": [
+						{
+							"id": "4fda0bb5-889f-4491-950b-abfd42e3081c",
+							"inVirtualHelixIndex": 0,
+							"fivePrime": {
+								"segmentId": "4fda0bb5-889f-4491-950b-abfd42e3081c",
+								"isThreePrime": false,
+								"index": 24,
+								"connectedSegmentId": null,
+								"modification": null,
+								"isConstrained": false
+							},
+							"threePrime": {
+								"segmentId": "4fda0bb5-889f-4491-950b-abfd42e3081c",
+								"isThreePrime": true,
+								"index": 54,
+								"connectedSegmentId": null,
+								"modification": null,
+								"isConstrained": false
+							},
+							"sequence": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+							"slots": [
+								{
+									"bpIndex": 24,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 25,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 26,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 27,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 28,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 29,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 30,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 31,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 32,
+									"seq": ""
+								},
+								{
+									"bpIndex": 33,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 34,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 35,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 36,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 37,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 38,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 39,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 40,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 41,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 42,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 43,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 44,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 45,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 46,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 47,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 48,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 49,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 50,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 51,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 52,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 53,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 54,
+									"seq": "N"
+								}
+							]
+						}
+					],
+					"color": "#c58e8b",
+					"isScaffold": false,
+					"isSequenceLocked": false,
+					"name": ""
+				},
+				{
+					"id": "818741d3-1951-48fe-9e46-51cada2deaa7",
+					"segments": [
+						{
+							"id": "63d95f12-bb71-476f-8255-65f9cb504072",
+							"inVirtualHelixIndex": 1,
+							"fivePrime": {
+								"segmentId": "63d95f12-bb71-476f-8255-65f9cb504072",
+								"isThreePrime": false,
+								"index": 53,
+								"connectedSegmentId": null,
+								"modification": null,
+								"isConstrained": false
+							},
+							"threePrime": {
+								"segmentId": "63d95f12-bb71-476f-8255-65f9cb504072",
+								"isThreePrime": true,
+								"index": 24,
+								"connectedSegmentId": null,
+								"modification": null,
+								"isConstrained": false
+							},
+							"sequence": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+							"slots": [
+								{
+									"bpIndex": 53,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 52,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 51,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 50,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 49,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 48,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 47,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 46,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 45,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 44,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 43,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 42,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 41,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 40,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 39,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 38,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 37,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 36,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 35,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 34,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 33,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 32,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 31,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 30,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 29,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 28,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 27,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 26,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 25,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 24,
+									"seq": "N"
+								}
+							]
+						}
+					],
+					"color": "#00c069",
+					"isScaffold": false,
+					"isSequenceLocked": false,
+					"name": ""
+				},
+				{
+					"id": "bdc2d946-2977-42cc-863f-182aa45392cc",
+					"segments": [
+						{
+							"id": "1764b738-3072-4f5b-896d-d855e03ed996",
+							"inVirtualHelixIndex": 0,
+							"fivePrime": {
+								"segmentId": "1764b738-3072-4f5b-896d-d855e03ed996",
+								"isThreePrime": false,
+								"index": 54,
+								"connectedSegmentId": null,
+								"modification": null,
+								"isConstrained": false
+							},
+							"threePrime": {
+								"segmentId": "1764b738-3072-4f5b-896d-d855e03ed996",
+								"isThreePrime": true,
+								"index": 35,
+								"connectedSegmentId": "51259e38-7924-40ca-be4f-b88d7eddf53e",
+								"modification": null,
+								"isConstrained": true
+							},
+							"sequence": "NNNNNNNNNNNNNNNNNNNN",
+							"slots": [
+								{
+									"bpIndex": 54,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 53,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 52,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 51,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 50,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 49,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 48,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 47,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 46,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 45,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 44,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 43,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 42,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 41,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 40,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 39,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 38,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 37,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 36,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 35,
+									"seq": "N"
+								}
+							]
+						},
+						{
+							"id": "51259e38-7924-40ca-be4f-b88d7eddf53e",
+							"inVirtualHelixIndex": 1,
+							"fivePrime": {
+								"segmentId": "51259e38-7924-40ca-be4f-b88d7eddf53e",
+								"isThreePrime": false,
+								"index": 35,
+								"connectedSegmentId": "1764b738-3072-4f5b-896d-d855e03ed996",
+								"modification": null,
+								"isConstrained": true
+							},
+							"threePrime": {
+								"segmentId": "51259e38-7924-40ca-be4f-b88d7eddf53e",
+								"isThreePrime": true,
+								"index": 53,
+								"connectedSegmentId": null,
+								"modification": null,
+								"isConstrained": false
+							},
+							"sequence": "NNNNNNNNNNNNNNNNNNN",
+							"slots": [
+								{
+									"bpIndex": 35,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 36,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 37,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 38,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 39,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 40,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 41,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 42,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 43,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 44,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 45,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 46,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 47,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 48,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 49,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 50,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 51,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 52,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 53,
+									"seq": "N"
+								}
+							]
+						}
+					],
+					"color": "#ff5a3b",
+					"isScaffold": false,
+					"isSequenceLocked": false,
+					"name": ""
+				},
+				{
+					"id": "f4837102-1169-4a65-8437-0dc1a87a7ba8",
+					"segments": [
+						{
+							"id": "5f3886b4-75ce-4dca-b8c9-f4d712a9fa18",
+							"inVirtualHelixIndex": 1,
+							"fivePrime": {
+								"segmentId": "5f3886b4-75ce-4dca-b8c9-f4d712a9fa18",
+								"isThreePrime": false,
+								"index": 24,
+								"connectedSegmentId": null,
+								"modification": null,
+								"isConstrained": false
+							},
+							"threePrime": {
+								"segmentId": "5f3886b4-75ce-4dca-b8c9-f4d712a9fa18",
+								"isThreePrime": true,
+								"index": 34,
+								"connectedSegmentId": "819b9209-5339-43ef-a202-d44a15bfb239",
+								"modification": null,
+								"isConstrained": true
+							},
+							"sequence": "NNNNNNNNNNN",
+							"slots": [
+								{
+									"bpIndex": 24,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 25,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 26,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 27,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 28,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 29,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 30,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 31,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 32,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 33,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 34,
+									"seq": "N"
+								}
+							]
+						},
+						{
+							"id": "819b9209-5339-43ef-a202-d44a15bfb239",
+							"inVirtualHelixIndex": 0,
+							"fivePrime": {
+								"segmentId": "819b9209-5339-43ef-a202-d44a15bfb239",
+								"isThreePrime": false,
+								"index": 34,
+								"connectedSegmentId": "5f3886b4-75ce-4dca-b8c9-f4d712a9fa18",
+								"modification": null,
+								"isConstrained": true
+							},
+							"threePrime": {
+								"segmentId": "819b9209-5339-43ef-a202-d44a15bfb239",
+								"isThreePrime": true,
+								"index": 24,
+								"connectedSegmentId": null,
+								"modification": null,
+								"isConstrained": false
+							},
+							"sequence": "NNNNNNNNNN",
+							"slots": [
+								{
+									"bpIndex": 34,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 33,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 32,
+									"seq": ""
+								},
+								{
+									"bpIndex": 31,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 30,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 29,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 28,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 27,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 26,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 25,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 24,
+									"seq": "N"
+								}
+							]
+						}
+					],
+					"color": "#b79b5d",
+					"isScaffold": false,
+					"isSequenceLocked": false,
+					"name": ""
+				}
+			],
+			"virtualHelices": [
+				{
+					"id": "a42b9431-6b2d-4ca9-a7f9-20e4344371f3",
+					"index": 0,
+					"listRow": 0,
+					"regionId": "0ba46b29-429b-4094-b86e-a0e19c013698",
+					"latticeCoords": {
+						"row": 3,
+						"col": 21
+					},
+					"length": 84,
+					"strandSets": [
+						{
+							"strandIndex": 0,
+							"segmentIds": [
+								"c0111ed2-265e-492f-8b41-73d78b47df91",
+								"4fda0bb5-889f-4491-950b-abfd42e3081c"
+							]
+						},
+						{
+							"strandIndex": 1,
+							"segmentIds": [
+								"1764b738-3072-4f5b-896d-d855e03ed996",
+								"819b9209-5339-43ef-a202-d44a15bfb239"
+							]
+						}
+					]
+				},
+				{
+					"id": "75cf9f4f-de71-420f-8cb8-90edbfaa728b",
+					"index": 1,
+					"listRow": 1,
+					"regionId": "0ba46b29-429b-4094-b86e-a0e19c013698",
+					"latticeCoords": {
+						"row": 2,
+						"col": 21
+					},
+					"length": 84,
+					"strandSets": [
+						{
+							"strandIndex": 0,
+							"segmentIds": [
+								"5f3886b4-75ce-4dca-b8c9-f4d712a9fa18",
+								"51259e38-7924-40ca-be4f-b88d7eddf53e"
+							]
+						},
+						{
+							"strandIndex": 1,
+							"segmentIds": ["63d95f12-bb71-476f-8255-65f9cb504072"]
+						}
+					]
+				}
+			]
+		}
+	]
+}

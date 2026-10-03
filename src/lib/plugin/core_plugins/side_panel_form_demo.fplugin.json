@@ -1,0 +1,57 @@
+{
+	"schemaVersion": 1,
+	"id": "side-panel-form-demo",
+	"name": "Side Panel Form Demo",
+	"version": "1.0.1",
+	"description": "Demo plugin that uses a host-rendered form side panel.",
+	"format": "foldnano_json",
+	"applyStrategy": "previewOnly",
+	"entrypointUrl": "/plugins/side_panel_form_demo/side_panel_form_demo.zip",
+	"sidePanel": {
+		"type": "form",
+		"title": "Form Demo",
+		"icon": "analysis",
+		"form": {
+			"submitLabel": "Analyze",
+			"fields": [
+				{
+					"id": "label",
+					"label": "Run label",
+					"type": "string",
+					"default": "demo-run"
+				},
+				{
+					"id": "top_n",
+					"label": "Top N oligos",
+					"type": "number",
+					"default": 5,
+					"min": 1,
+					"max": 25,
+					"step": 1
+				},
+				{
+					"id": "include_sequences",
+					"label": "Include sequence preview",
+					"type": "boolean",
+					"default": false
+				},
+				{
+					"id": "report_mode",
+					"label": "Report mode",
+					"type": "select",
+					"default": "summary",
+					"options": [
+						{
+							"value": "summary",
+							"label": "Summary"
+						},
+						{
+							"value": "verbose",
+							"label": "Verbose"
+						}
+					]
+				}
+			]
+		}
+	}
+}

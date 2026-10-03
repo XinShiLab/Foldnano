@@ -1,0 +1,183 @@
+{
+	"cadnano": {
+		"commit": "ce6ff019b88ee7728de947bd86b35861cf57848d",
+		"dirty": true,
+		"modifiedFileSha256": {
+			"cadnano/part/nucleicacidpart.py": "bba71f56cef4c263311c5f6e005077a14271f87de4d526a5ba9c4a12910542f2",
+			"cadnano/views/pathview/pathstyles.py": "6ff7cb5e2fde0e0b503cfcab3fec24926eda8e80ab844c45a9dbe487cbb3707b"
+		},
+		"modifiedFiles": [
+			"cadnano/part/nucleicacidpart.py",
+			"cadnano/views/pathview/pathstyles.py"
+		],
+		"module": "ref_cadnano25/cadnano",
+		"source": "ref_cadnano25",
+		"version": "2.5.2.1"
+	},
+	"designs": {
+		"17. Krishnan_NatCommun2016_pin pore": {
+			"circularExcluded": 0,
+			"csvSha256": "088cde1e8b2cf9cbb0ee606e77f9827e3108edfb61ef0a7ac71405566357cd53",
+			"inclusionRule": "every linear oligo except the unique longest, which is taken as the scaffold",
+			"linearizedAt": null,
+			"oligoNt": 7810,
+			"oligos": 191,
+			"scaffoldCircular": false,
+			"scaffoldFile": "scaf8634.txt",
+			"scaffoldLength": 8634,
+			"scaffoldRouteLength": 7249,
+			"sourceSha256": "f407fcd6405e667e5335fcf18caa8d2061a729e432a0fcb27ff6be59c78546f9",
+			"unsequencedNt": 794
+		},
+		"4FSF_25_2b_complete_full_loopbackscaffold": {
+			"circularExcluded": 0,
+			"csvSha256": "1ae72389d487794290e47a7abaee150e72af39a8535b6f7750d3b33d504823ac",
+			"inclusionRule": "every linear oligo except the unique longest, which is taken as the scaffold",
+			"linearizedAt": {
+				"from": {
+					"bp": 93,
+					"vh": 95
+				},
+				"to": {
+					"bp": 103,
+					"vh": 0
+				}
+			},
+			"oligoNt": 6908,
+			"oligos": 208,
+			"scaffoldCircular": true,
+			"scaffoldFile": "scaf8634.txt",
+			"scaffoldLength": 8634,
+			"scaffoldRouteLength": 7247,
+			"sourceSha256": "6636365b6fa7e8c64225ce1d738f1044a1fee465ca68e83e0487f1baf7d2d8f0",
+			"unsequencedNt": 0
+		},
+		"8hb_2ab_8f": {
+			"circularExcluded": 0,
+			"csvSha256": "89b276ada146025950be40b36dcc6cd2d8373e358843ad28dd0e603fa8d0f021",
+			"inclusionRule": "every linear oligo except the unique longest, which is taken as the scaffold",
+			"linearizedAt": null,
+			"oligoNt": 1225,
+			"oligos": 32,
+			"scaffoldCircular": false,
+			"scaffoldFile": "scaf8634.txt",
+			"scaffoldLength": 8634,
+			"scaffoldRouteLength": 769,
+			"sourceSha256": "5fe6f87b5e714a0fd9429ee92d4cad92cbb3e5e840ef5784403831c7d1b74158",
+			"unsequencedNt": 456
+		},
+		"Force clamp": {
+			"circularExcluded": 0,
+			"csvSha256": "12f8faa495107c53ef80cd5cb251e4ef70103a690e508b64574461e2a601ee2f",
+			"inclusionRule": "every linear oligo except the unique longest, which is taken as the scaffold",
+			"linearizedAt": null,
+			"oligoNt": 8206,
+			"oligos": 229,
+			"scaffoldCircular": false,
+			"scaffoldFile": "scaf8634.txt",
+			"scaffoldLength": 8634,
+			"scaffoldRouteLength": 7686,
+			"sourceSha256": "645b745d2de189cb74cdd7c756569ad6382a0781c8aed9c85fb0d6320d7adaad",
+			"unsequencedNt": 520
+		},
+		"Hilbert": {
+			"circularExcluded": 0,
+			"csvSha256": "aea38e4a0ab0f850e14820b872a69fe6392564d17a46205878f69f80c32c3354",
+			"inclusionRule": "every linear oligo except the unique longest, which is taken as the scaffold",
+			"linearizedAt": null,
+			"oligoNt": 7392,
+			"oligos": 184,
+			"scaffoldCircular": false,
+			"scaffoldFile": "scaf8634.txt",
+			"scaffoldLength": 8634,
+			"scaffoldRouteLength": 7968,
+			"sourceSha256": "c9376e9f2bc70debb190e3481f1cc0d35ea5f4010b9b15097cb4554c578c99f2",
+			"unsequencedNt": 0
+		},
+		"LargeTetrascaffold-B-3": {
+			"circularExcluded": 0,
+			"csvSha256": "90c203675761dfe46ae950ee9b63bc374d0425f2a5dc94a47ff24134b3a7e50f",
+			"inclusionRule": "every linear oligo except the unique longest, which is taken as the scaffold",
+			"linearizedAt": null,
+			"oligoNt": 7182,
+			"oligos": 223,
+			"scaffoldCircular": false,
+			"scaffoldFile": "scaf8634.txt",
+			"scaffoldLength": 8634,
+			"scaffoldRouteLength": 6940,
+			"sourceSha256": "35da76feb262de35483ee0fff091c21fd3251828595a9b40946b66582d8e0ec0",
+			"unsequencedNt": 242
+		},
+		"NRs_antenna_Cadnano1_2_Staples_cut_colored_64_del_MOD20210922": {
+			"circularExcluded": 0,
+			"csvSha256": "53302471b02079b166ad4c111ac5689a121ba99b9523ca77ba7ff88266745a2a",
+			"inclusionRule": "every linear oligo except the unique longest, which is taken as the scaffold",
+			"linearizedAt": {
+				"from": {
+					"bp": 40,
+					"vh": 1
+				},
+				"to": {
+					"bp": 40,
+					"vh": 0
+				}
+			},
+			"oligoNt": 8113,
+			"oligos": 249,
+			"scaffoldCircular": true,
+			"scaffoldFile": "scaf8634.txt",
+			"scaffoldLength": 8634,
+			"scaffoldRouteLength": 7249,
+			"sourceSha256": "7b31a23053698626477168812a78b209bff7828f7525c405c5c5ff22520bfbc2",
+			"unsequencedNt": 864
+		},
+		"N_nanobase": {
+			"circularExcluded": 0,
+			"csvSha256": "51b8cfc7a4acccff8ac05b472218e0fab0443ef3f818a0e3af31b83aca06f820",
+			"inclusionRule": "every linear oligo except the unique longest, which is taken as the scaffold",
+			"linearizedAt": null,
+			"oligoNt": 8258,
+			"oligos": 209,
+			"scaffoldCircular": false,
+			"scaffoldFile": "scaf8634.txt",
+			"scaffoldLength": 8634,
+			"scaffoldRouteLength": 7560,
+			"sourceSha256": "4bb9b1d9fb9d4b459370f3f3dd01e2f71ab2ae29b8c57b686b1db7143b08b217",
+			"unsequencedNt": 756
+		},
+		"righthanded_turbine_only": {
+			"circularExcluded": 0,
+			"csvSha256": "aaaddb4442bdb13fc7a9a0dc78aa055d701b32d780d35e67da419f2356061439",
+			"inclusionRule": "every linear oligo except the unique longest, which is taken as the scaffold",
+			"linearizedAt": null,
+			"oligoNt": 7887,
+			"oligos": 187,
+			"scaffoldCircular": false,
+			"scaffoldFile": "scaf8634.txt",
+			"scaffoldLength": 8634,
+			"scaffoldRouteLength": 7560,
+			"sourceSha256": "681ea72e2b05ceb9f19e6e8a75116545644d0173292f70d9fd7fb5d5496c185c",
+			"unsequencedNt": 335
+		},
+		"slottedcross": {
+			"circularExcluded": 0,
+			"csvSha256": "b247d7a1d0dbb1cd1a3196240537b86b0ff9c819bd34b343997d6866807126cb",
+			"inclusionRule": "every linear oligo except the unique longest, which is taken as the scaffold",
+			"linearizedAt": null,
+			"oligoNt": 6786,
+			"oligos": 186,
+			"scaffoldCircular": false,
+			"scaffoldFile": "scaf8634.txt",
+			"scaffoldLength": 8634,
+			"scaffoldRouteLength": 8634,
+			"sourceSha256": "49eac0085a6281a46f87743eec3d6e35dad4e96b03bde5dea3c07a13c67c3985",
+			"unsequencedNt": 26
+		}
+	},
+	"generatorVersion": 3,
+	"inclusionRule": "every linear oligo except the unique longest, which is taken as the scaffold",
+	"python": "3.13.5",
+	"scaffoldSha256": "533a462b0fb6af196bfc3443e8afc0930d4872ba1ffea8b79281ba8dcd068758",
+	"sequenceSource": "cadnano Oligo.sequenceExport (NucleicAcidPart.getSequences)",
+	"unsequencedMarker": "?"
+}

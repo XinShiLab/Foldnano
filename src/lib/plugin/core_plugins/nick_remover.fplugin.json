@@ -1,0 +1,10 @@
+{
+	"schemaVersion": 1,
+	"id": "nick-remover",
+	"name": "Nick Remover",
+	"version": "1.0.1",
+	"format": "cadnano_json",
+	"applyStrategy": "replaceRegion",
+	"entrypointUrl": "/plugins/nick_remover/nick_remover.zip",
+	"description": "Joins all adjacent staple nicks (consecutive 3'/5' ends on the same helix). Topology changes fully within the active region; sequences are not preserved. Use Undo to restore."
+}

@@ -1,0 +1,287 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"title": "Foldnano design file, format version 1",
+	"description": "Shape of a Foldnano .fn.json document at formatVersion 1, including files saved before versioning (no header). Field meanings, units and conventions: Foldnano docs, Contributors > File Format.",
+	"type": "object",
+	"required": ["id", "name", "parts"],
+	"additionalProperties": false,
+	"properties": {
+		"format": { "const": "foldnano" },
+		"formatVersion": { "const": 1 },
+		"savedWith": {
+			"type": "object",
+			"required": ["app", "commit"],
+			"additionalProperties": false,
+			"properties": {
+				"app": { "type": "string" },
+				"commit": { "type": "string" }
+			}
+		},
+		"id": { "type": "string" },
+		"name": { "type": "string" },
+		"parts": { "type": "array", "items": { "$ref": "#/$defs/part" } }
+	},
+	"$defs": {
+		"vec3": {
+			"type": "object",
+			"required": ["x", "y", "z"],
+			"additionalProperties": false,
+			"properties": {
+				"x": { "type": "number" },
+				"y": { "type": "number" },
+				"z": { "type": "number" }
+			}
+		},
+		"bpIndex": { "type": "integer", "minimum": 0 },
+		"part": {
+			"type": "object",
+			"required": ["name", "id", "planes", "regions", "virtualHelices", "oligos"],
+			"additionalProperties": false,
+			"properties": {
+				"name": { "type": "string" },
+				"id": { "type": "string" },
+				"planes": { "type": "array", "items": { "$ref": "#/$defs/plane" } },
+				"regions": { "type": "array", "items": { "$ref": "#/$defs/region" } },
+				"virtualHelices": { "type": "array", "items": { "$ref": "#/$defs/virtualHelix" } },
+				"oligos": { "type": "array", "items": { "$ref": "#/$defs/oligo" } },
+				"customModifications": {
+					"type": "array",
+					"items": { "$ref": "#/$defs/modificationDef" }
+				},
+				"overlayPlacements": {
+					"type": "array",
+					"items": { "$ref": "#/$defs/overlayPlacement" }
+				},
+				"repeatGroups": { "type": "array", "items": { "$ref": "#/$defs/repeatGroup" } }
+			}
+		},
+		"plane": {
+			"type": "object",
+			"required": ["id", "name", "origin", "u", "v", "normal"],
+			"additionalProperties": false,
+			"properties": {
+				"id": { "type": "string" },
+				"name": { "type": "string" },
+				"origin": { "$ref": "#/$defs/vec3" },
+				"u": { "$ref": "#/$defs/vec3" },
+				"v": { "$ref": "#/$defs/vec3" },
+				"normal": { "$ref": "#/$defs/vec3" }
+			}
+		},
+		"region": {
+			"type": "object",
+			"required": [
+				"id",
+				"name",
+				"kind",
+				"planeId",
+				"vhOrder",
+				"step",
+				"turnsPerStep",
+				"subStepSize",
+				"twistOffset"
+			],
+			"anyOf": [{ "required": ["maxBase"] }, { "required": ["defaultMaxBase"] }],
+			"additionalProperties": false,
+			"properties": {
+				"id": { "type": "string" },
+				"name": { "type": "string" },
+				"kind": { "enum": ["HONEYCOMB", "SQUARE", "FREEFORM"] },
+				"planeId": { "type": "string" },
+				"vhOrder": { "type": "array", "items": { "type": "string" } },
+				"step": { "type": "integer", "minimum": 1 },
+				"turnsPerStep": { "type": "number", "exclusiveMinimum": 0 },
+				"subStepSize": { "type": "integer", "minimum": 1 },
+				"twistOffset": { "type": "number" },
+				"minBase": {
+					"$ref": "#/$defs/bpIndex",
+					"description": "Always written; older files may lack it and it defaults to 0."
+				},
+				"maxBase": { "$ref": "#/$defs/bpIndex" },
+				"defaultMaxBase": {
+					"$ref": "#/$defs/bpIndex",
+					"description": "Legacy name for maxBase; read only when maxBase is absent."
+				}
+			}
+		},
+		"virtualHelix": {
+			"type": "object",
+			"required": ["index", "listRow", "regionId", "length", "strandSets"],
+			"additionalProperties": false,
+			"properties": {
+				"id": {
+					"type": "string",
+					"description": "Always written; files from early development may lack it and get a new id on load."
+				},
+				"index": { "type": "integer", "minimum": 0 },
+				"listRow": { "type": "integer" },
+				"regionId": { "type": "string" },
+				"latticeCoords": {
+					"type": "object",
+					"required": ["row", "col"],
+					"additionalProperties": false,
+					"properties": {
+						"row": { "type": "integer" },
+						"col": { "type": "integer" }
+					}
+				},
+				"localFrame": {
+					"type": "object",
+					"required": ["origin", "axis", "radial0"],
+					"additionalProperties": false,
+					"properties": {
+						"origin": { "$ref": "#/$defs/vec3" },
+						"axis": { "$ref": "#/$defs/vec3" },
+						"radial0": { "$ref": "#/$defs/vec3" }
+					}
+				},
+				"length": { "type": "integer", "minimum": 0 },
+				"strandSets": {
+					"type": "array",
+					"minItems": 2,
+					"maxItems": 2,
+					"items": { "$ref": "#/$defs/strandSet" }
+				}
+			}
+		},
+		"strandSet": {
+			"type": "object",
+			"required": ["strandIndex", "segmentIds"],
+			"additionalProperties": false,
+			"properties": {
+				"strandIndex": { "enum": [0, 1] },
+				"segmentIds": { "type": "array", "items": { "type": "string" } }
+			}
+		},
+		"oligo": {
+			"type": "object",
+			"required": ["id", "segments", "color", "isScaffold", "isSequenceLocked", "name"],
+			"additionalProperties": false,
+			"properties": {
+				"id": { "type": "string" },
+				"segments": {
+					"type": "array",
+					"minItems": 1,
+					"items": { "$ref": "#/$defs/oligoSegment" }
+				},
+				"color": { "type": "string" },
+				"isScaffold": { "type": "boolean" },
+				"isSequenceLocked": { "type": "boolean" },
+				"name": { "type": "string" },
+				"repeatGroupId": { "type": "string" },
+				"mirrorOf": {
+					"type": "object",
+					"required": ["groupId", "instanceId", "sourceOligoId", "structure"],
+					"additionalProperties": false,
+					"properties": {
+						"groupId": { "type": "string" },
+						"instanceId": { "type": "string" },
+						"sourceOligoId": { "type": "string" },
+						"structure": { "type": "string" }
+					}
+				}
+			}
+		},
+		"oligoSegment": {
+			"type": "object",
+			"required": ["id", "inVirtualHelixIndex", "fivePrime", "threePrime"],
+			"additionalProperties": false,
+			"properties": {
+				"id": { "type": "string" },
+				"inVirtualHelixIndex": { "type": "integer", "minimum": 0 },
+				"fivePrime": { "$ref": "#/$defs/segmentEnd" },
+				"threePrime": { "$ref": "#/$defs/segmentEnd" },
+				"sequence": { "type": "string" },
+				"slots": {
+					"type": "array",
+					"items": {
+						"type": "object",
+						"required": ["bpIndex", "seq"],
+						"additionalProperties": false,
+						"properties": {
+							"bpIndex": { "$ref": "#/$defs/bpIndex" },
+							"seq": { "type": "string" }
+						}
+					}
+				}
+			}
+		},
+		"segmentEnd": {
+			"type": "object",
+			"required": ["segmentId", "isThreePrime", "index", "connectedSegmentId"],
+			"additionalProperties": false,
+			"properties": {
+				"segmentId": { "type": "string" },
+				"isThreePrime": { "type": "boolean" },
+				"index": { "$ref": "#/$defs/bpIndex" },
+				"connectedSegmentId": { "type": ["string", "null"] },
+				"modification": { "type": ["string", "null"] },
+				"isConstrained": {
+					"type": "boolean",
+					"description": "Derived from the design; written for reference and recomputed on load."
+				}
+			}
+		},
+		"modificationDef": {
+			"type": "object",
+			"required": ["name"],
+			"additionalProperties": false,
+			"properties": {
+				"name": { "type": "string" },
+				"color": { "type": "string" },
+				"symbol": {
+					"type": "string",
+					"description": "Legacy; files saved before modifications had colors. Ignored on load."
+				}
+			}
+		},
+		"overlayPlacement": {
+			"type": "object",
+			"required": ["id", "transform"],
+			"additionalProperties": false,
+			"properties": {
+				"id": { "type": "string" },
+				"sourceKey": { "type": "string" },
+				"transform": {
+					"type": "object",
+					"required": ["position", "quaternion"],
+					"additionalProperties": false,
+					"properties": {
+						"position": { "$ref": "#/$defs/vec3" },
+						"quaternion": {
+							"type": "array",
+							"minItems": 4,
+							"maxItems": 4,
+							"items": { "type": "number" }
+						}
+					}
+				}
+			}
+		},
+		"repeatGroup": {
+			"type": "object",
+			"required": ["id", "name", "instances"],
+			"additionalProperties": false,
+			"properties": {
+				"id": { "type": "string" },
+				"name": { "type": "string" },
+				"instances": {
+					"type": "array",
+					"items": {
+						"type": "object",
+						"required": ["id", "bpOffset"],
+						"additionalProperties": false,
+						"properties": {
+							"id": { "type": "string" },
+							"bpOffset": { "type": "integer" },
+							"vhMap": {
+								"type": "object",
+								"additionalProperties": { "type": "string" }
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}

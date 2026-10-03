@@ -1,0 +1,9 @@
+{
+	"schemaVersion": 1,
+	"id": "hello-world",
+	"name": "Hello World",
+	"version": "1.0.1",
+	"format": "cadnano_json",
+	"applyStrategy": "replaceRegionKeepAnnotationsWhereMatched",
+	"entrypointUrl": "/plugins/hello_world/hello_world.zip"
+}

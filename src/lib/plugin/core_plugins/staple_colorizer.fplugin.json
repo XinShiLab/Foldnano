@@ -1,0 +1,70 @@
+{
+	"schemaVersion": 1,
+	"id": "staple-colorizer",
+	"name": "Staple Colorizer",
+	"version": "1.1.1",
+	"format": "cadnano_json",
+	"applyStrategy": "replaceRegionKeepAnnotationsWhereMatched",
+	"entrypointUrl": "/plugins/staple_colorizer/staple_colorizer.zip",
+	"description": "Assigns an HSL color palette to all staple strands. Palette style, hue, saturation, and lightness are configurable.",
+	"parameters": [
+		{
+			"id": "palette",
+			"label": "Palette style",
+			"type": "select",
+			"options": [
+				{
+					"value": "golden_ratio",
+					"label": "Golden ratio (maximally distinct)"
+				},
+				{
+					"value": "rainbow",
+					"label": "Rainbow (evenly spaced)"
+				},
+				{
+					"value": "uniform",
+					"label": "Uniform (single hue)"
+				}
+			],
+			"default": "golden_ratio",
+			"description": "How hues are distributed across helices."
+		},
+		{
+			"id": "hue",
+			"label": "Base hue (°)",
+			"type": "number",
+			"default": 210,
+			"min": 0,
+			"max": 360,
+			"step": 1,
+			"description": "Starting hue in degrees. Acts as the single hue when palette is 'Uniform'."
+		},
+		{
+			"id": "saturation",
+			"label": "Saturation (%)",
+			"type": "number",
+			"default": 72,
+			"min": 0,
+			"max": 100,
+			"step": 1,
+			"description": "HSL saturation of the generated colors."
+		},
+		{
+			"id": "lightness",
+			"label": "Lightness (%)",
+			"type": "number",
+			"default": 52,
+			"min": 0,
+			"max": 100,
+			"step": 1,
+			"description": "HSL lightness of the generated colors."
+		},
+		{
+			"id": "colorize_scaffold",
+			"label": "Colorize scaffold",
+			"type": "boolean",
+			"default": false,
+			"description": "Also set a color on scaffold 5' ends (muted version of base hue)."
+		}
+	]
+}

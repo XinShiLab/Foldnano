@@ -1,0 +1,5 @@
+cadnano2_5_mini is a trimmed fork of cadnano 2.5 (BSD 3-Clause; LICENSE and AUTHORS ship inside
+the wheel's .dist-info/licenses/).
+
+Upstream: https://github.com/cadnano/cadnano2.5 (maintained: https://github.com/douglaslab/cadnano2.5)
+Fork:     https://github.com/xinshi-kul/cadnano2.5_mini

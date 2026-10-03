@@ -1,0 +1,5 @@
+# Load nvm when present so hooks use the project Node; harmless without it.
+[ -s "$HOME/.nvm/nvm.sh" ] && . "$HOME/.nvm/nvm.sh"
+pnpm lint-staged
+# Warning only: lists docs whose covered code is staged without them.
+node scripts/docs-check.ts --staged

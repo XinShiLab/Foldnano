@@ -1,0 +1,215 @@
+{
+	"name": "multi-region-test-part",
+	"id": "test-part-multi-001",
+	"latticeType": "HONEYCOMB",
+	"maxBase": 42,
+	"planes": [
+		{
+			"id": "plane-A",
+			"name": "Plane A",
+			"origin": { "x": 0, "y": 0, "z": 0 },
+			"u": { "x": 1, "y": 0, "z": 0 },
+			"v": { "x": 0, "y": 1, "z": 0 },
+			"normal": { "x": 0, "y": 0, "z": 1 }
+		},
+		{
+			"id": "plane-B",
+			"name": "Plane B",
+			"origin": { "x": 100, "y": 0, "z": 0 },
+			"u": { "x": 1, "y": 0, "z": 0 },
+			"v": { "x": 0, "y": 1, "z": 0 },
+			"normal": { "x": 0, "y": 0, "z": 1 }
+		}
+	],
+	"regions": [
+		{
+			"id": "region-honey",
+			"name": "Honey Region",
+			"kind": "HONEYCOMB",
+			"planeId": "plane-A",
+			"vhOrder": ["vh-id-0", "vh-id-1"],
+			"step": 21,
+			"turnsPerStep": 2,
+			"subStepSize": 7,
+			"twistOffset": 340,
+			"minBase": 0,
+			"defaultMaxBase": 42
+		},
+		{
+			"id": "region-square",
+			"name": "Square Region",
+			"kind": "SQUARE",
+			"planeId": "plane-A",
+			"vhOrder": ["vh-id-2"],
+			"step": 32,
+			"turnsPerStep": 3,
+			"subStepSize": 8,
+			"twistOffset": 195,
+			"minBase": 0,
+			"defaultMaxBase": 64
+		},
+		{
+			"id": "region-free",
+			"name": "Freeform Region",
+			"kind": "FREEFORM",
+			"planeId": "plane-B",
+			"vhOrder": ["vh-id-3"],
+			"step": 21,
+			"turnsPerStep": 2,
+			"subStepSize": 7,
+			"twistOffset": 0,
+			"minBase": 0,
+			"defaultMaxBase": 42
+		}
+	],
+	"virtualHelices": [
+		{
+			"id": "vh-id-0",
+			"index": 0,
+			"regionId": "region-honey",
+			"listRow": 0,
+			"latticeCoords": { "row": 0, "col": 0 },
+			"length": 42,
+			"strandSets": [{ "segmentIds": ["seg-A0"] }, { "segmentIds": [] }]
+		},
+		{
+			"id": "vh-id-1",
+			"index": 1,
+			"regionId": "region-honey",
+			"listRow": 1,
+			"latticeCoords": { "row": 0, "col": 1 },
+			"length": 42,
+			"strandSets": [{ "segmentIds": [] }, { "segmentIds": ["seg-A1"] }]
+		},
+		{
+			"id": "vh-id-2",
+			"index": 2,
+			"regionId": "region-square",
+			"listRow": 2,
+			"latticeCoords": { "row": 0, "col": 2 },
+			"length": 64,
+			"strandSets": [{ "segmentIds": ["seg-B0"] }, { "segmentIds": [] }]
+		},
+		{
+			"id": "vh-id-3",
+			"index": 3,
+			"regionId": "region-free",
+			"listRow": 3,
+			"localFrame": {
+				"origin": { "x": 0, "y": 0, "z": 0 },
+				"axis": { "x": 0, "y": 0, "z": 1 },
+				"radial0": { "x": 1, "y": 0, "z": 0 }
+			},
+			"length": 42,
+			"strandSets": [{ "segmentIds": ["seg-C0"] }, { "segmentIds": [] }]
+		}
+	],
+	"oligos": [
+		{
+			"id": "oligo-honey-only",
+			"color": "#0066cc",
+			"isScaffold": false,
+			"isSequenceLocked": false,
+			"name": "honey-staple",
+			"segments": [
+				{
+					"id": "seg-A0",
+					"inVirtualHelixIndex": 0,
+					"fivePrime": {
+						"segmentId": "seg-A0",
+						"isThreePrime": false,
+						"index": 0,
+						"connectedSegmentId": null,
+						"modification": null,
+						"isConstrained": false
+					},
+					"threePrime": {
+						"segmentId": "seg-A0",
+						"isThreePrime": true,
+						"index": 20,
+						"connectedSegmentId": "seg-A1",
+						"modification": null,
+						"isConstrained": false
+					},
+					"sequence": "ATCGATCGATCGATCGATCGA",
+					"slots": []
+				},
+				{
+					"id": "seg-A1",
+					"inVirtualHelixIndex": 1,
+					"fivePrime": {
+						"segmentId": "seg-A1",
+						"isThreePrime": false,
+						"index": 20,
+						"connectedSegmentId": "seg-A0",
+						"modification": null,
+						"isConstrained": false
+					},
+					"threePrime": {
+						"segmentId": "seg-A1",
+						"isThreePrime": true,
+						"index": 0,
+						"connectedSegmentId": null,
+						"modification": null,
+						"isConstrained": false
+					},
+					"sequence": "GATCGATCGATCGATCGATCG",
+					"slots": []
+				}
+			]
+		},
+		{
+			"id": "oligo-cross-region",
+			"color": "#ff0000",
+			"isScaffold": false,
+			"isSequenceLocked": false,
+			"name": "cross",
+			"segments": [
+				{
+					"id": "seg-B0",
+					"inVirtualHelixIndex": 2,
+					"fivePrime": {
+						"segmentId": "seg-B0",
+						"isThreePrime": false,
+						"index": 0,
+						"connectedSegmentId": null,
+						"modification": null,
+						"isConstrained": false
+					},
+					"threePrime": {
+						"segmentId": "seg-B0",
+						"isThreePrime": true,
+						"index": 31,
+						"connectedSegmentId": "seg-C0",
+						"modification": null,
+						"isConstrained": false
+					},
+					"sequence": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+					"slots": []
+				},
+				{
+					"id": "seg-C0",
+					"inVirtualHelixIndex": 3,
+					"fivePrime": {
+						"segmentId": "seg-C0",
+						"isThreePrime": false,
+						"index": 0,
+						"connectedSegmentId": "seg-B0",
+						"modification": null,
+						"isConstrained": false
+					},
+					"threePrime": {
+						"segmentId": "seg-C0",
+						"isThreePrime": true,
+						"index": 20,
+						"connectedSegmentId": null,
+						"modification": null,
+						"isConstrained": false
+					},
+					"sequence": "TTTTTTTTTTTTTTTTTTTTT",
+					"slots": []
+				}
+			]
+		}
+	]
+}

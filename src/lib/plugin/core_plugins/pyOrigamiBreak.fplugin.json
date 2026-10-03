@@ -1,0 +1,95 @@
+{
+	"schemaVersion": 1,
+	"id": "pyOrigamiBreak",
+	"name": "pyOrigamiBreak — Staple Auto-Break",
+	"version": "1.0.2",
+	"description": "Optimises staple break positions using thermodynamic (dG) scoring. Based on Mauthe et al. PNAS 2023.",
+	"format": "cadnano_json",
+	"applyStrategy": "replaceRegion",
+	"entrypointUrl": "/plugins/pyOrigamiBreak/pyOrigamiBreak.zip",
+	"requirements": ["cadnano2_5_mini", "numpy", "pandas", "matplotlib"],
+	"parameters": [
+		{
+			"id": "scaffold_sequence",
+			"label": "Scaffold sequence",
+			"type": "select",
+			"options": ["m13mp18", "p7308", "p8064", "p8634"],
+			"default": "m13mp18"
+		},
+		{
+			"id": "nsol",
+			"label": "No. of solutions",
+			"type": "number",
+			"default": 10,
+			"min": 1,
+			"max": 20
+		},
+		{
+			"id": "break_rules",
+			"label": "Break rules",
+			"type": "string",
+			"default": "xstap.all3",
+			"description": "Period-separated rules: xstap, all3, all2, 3f, 3r, long, xscaf"
+		},
+		{
+			"id": "scoring_function",
+			"label": "Scoring function",
+			"type": "select",
+			"options": [
+				{
+					"value": "dG:50",
+					"label": "dG 50°C"
+				},
+				{
+					"value": "dG:37",
+					"label": "dG 37°C"
+				},
+				{
+					"value": "Tm",
+					"label": "Tm"
+				},
+				{
+					"value": "length",
+					"label": "Length"
+				}
+			],
+			"default": "dG:50"
+		},
+		{
+			"id": "min_length_after_break",
+			"label": "Min staple length",
+			"type": "number",
+			"default": 21,
+			"min": 0,
+			"max": 60
+		},
+		{
+			"id": "max_length_after_break",
+			"label": "Max staple length",
+			"type": "number",
+			"default": 60,
+			"min": 20,
+			"max": 200
+		},
+		{
+			"id": "min_length_to_process",
+			"label": "Skip staples shorter than",
+			"type": "number",
+			"default": 0,
+			"min": 0
+		},
+		{
+			"id": "seed",
+			"label": "Random seed",
+			"type": "number",
+			"default": 0
+		},
+		{
+			"id": "read_only",
+			"label": "Score only (no breaks)",
+			"type": "boolean",
+			"default": false,
+			"description": "Evaluate existing break quality without modifying the design"
+		}
+	]
+}

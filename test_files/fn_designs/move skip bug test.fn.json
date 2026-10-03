@@ -1,0 +1,509 @@
+{
+	"id": "381d08d3-e1b5-463c-8b13-4b78adc1e71d",
+	"name": "move skip bug test",
+	"parts": [
+		{
+			"name": "6lta1",
+			"id": "fd551ebd-238e-4320-b9cc-dd3523a70007",
+			"planes": [
+				{
+					"id": "2fd0d248-6024-405b-befb-8bd6ee7229c9",
+					"name": "Plane 1",
+					"origin": { "x": 0, "y": 0, "z": 0 },
+					"u": { "x": 1, "y": 0, "z": 0 },
+					"v": { "x": 0, "y": 1, "z": 0 },
+					"normal": { "x": 0, "y": 0, "z": 1 }
+				}
+			],
+			"regions": [
+				{
+					"id": "0ad043d9-f9f1-4246-8e92-8be6d0cebcc1",
+					"name": "HONEYCOMB Region 1",
+					"kind": "HONEYCOMB",
+					"planeId": "2fd0d248-6024-405b-befb-8bd6ee7229c9",
+					"vhOrder": [
+						"92ea706a-e8b1-4011-b291-c2111d40fd11",
+						"2fa8af00-79da-49cf-9b55-088884694708",
+						"8ec016e0-b14b-4a4a-9b43-0ff47bbfdf34"
+					],
+					"step": 21,
+					"turnsPerStep": 2,
+					"subStepSize": 7,
+					"twistOffset": 340,
+					"minBase": 0,
+					"maxBase": 84
+				}
+			],
+			"oligos": [
+				{
+					"id": "e6025ced-9f3c-4d38-b4a8-0472794ddffa",
+					"segments": [
+						{
+							"id": "38dd4714-8710-4cc3-a5dc-a578671f3990",
+							"inVirtualHelixIndex": 0,
+							"fivePrime": {
+								"segmentId": "38dd4714-8710-4cc3-a5dc-a578671f3990",
+								"isThreePrime": false,
+								"index": 3,
+								"connectedSegmentId": null,
+								"modification": null,
+								"isConstrained": false
+							},
+							"threePrime": {
+								"segmentId": "38dd4714-8710-4cc3-a5dc-a578671f3990",
+								"isThreePrime": true,
+								"index": 40,
+								"connectedSegmentId": null,
+								"modification": null,
+								"isConstrained": false
+							},
+							"sequence": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+							"slots": [
+								{ "bpIndex": 3, "seq": "N" },
+								{ "bpIndex": 4, "seq": "N" },
+								{ "bpIndex": 5, "seq": "N" },
+								{ "bpIndex": 6, "seq": "N" },
+								{ "bpIndex": 7, "seq": "N" },
+								{ "bpIndex": 8, "seq": "N" },
+								{ "bpIndex": 9, "seq": "N" },
+								{ "bpIndex": 10, "seq": "N" },
+								{ "bpIndex": 11, "seq": "N" },
+								{ "bpIndex": 12, "seq": "" },
+								{ "bpIndex": 13, "seq": "N" },
+								{ "bpIndex": 14, "seq": "N" },
+								{ "bpIndex": 15, "seq": "N" },
+								{ "bpIndex": 16, "seq": "N" },
+								{ "bpIndex": 17, "seq": "N" },
+								{ "bpIndex": 18, "seq": "N" },
+								{ "bpIndex": 19, "seq": "N" },
+								{ "bpIndex": 20, "seq": "N" },
+								{ "bpIndex": 21, "seq": "N" },
+								{ "bpIndex": 22, "seq": "N" },
+								{ "bpIndex": 23, "seq": "N" },
+								{ "bpIndex": 24, "seq": "N" },
+								{ "bpIndex": 25, "seq": "N" },
+								{ "bpIndex": 26, "seq": "" },
+								{ "bpIndex": 27, "seq": "N" },
+								{ "bpIndex": 28, "seq": "N" },
+								{ "bpIndex": 29, "seq": "N" },
+								{ "bpIndex": 30, "seq": "N" },
+								{ "bpIndex": 31, "seq": "N" },
+								{ "bpIndex": 32, "seq": "N" },
+								{ "bpIndex": 33, "seq": "N" },
+								{ "bpIndex": 34, "seq": "N" },
+								{ "bpIndex": 35, "seq": "N" },
+								{ "bpIndex": 36, "seq": "N" },
+								{ "bpIndex": 37, "seq": "N" },
+								{ "bpIndex": 38, "seq": "N" },
+								{ "bpIndex": 39, "seq": "N" },
+								{ "bpIndex": 40, "seq": "N" }
+							]
+						}
+					],
+					"color": "#c59900",
+					"isScaffold": false,
+					"isSequenceLocked": false,
+					"name": ""
+				},
+				{
+					"id": "b201433b-d2eb-4be6-976f-04fd3a46f520",
+					"segments": [
+						{
+							"id": "b116e4b4-f47c-4de2-851c-a06e63230fd4",
+							"inVirtualHelixIndex": 1,
+							"fivePrime": {
+								"segmentId": "b116e4b4-f47c-4de2-851c-a06e63230fd4",
+								"isThreePrime": false,
+								"index": 39,
+								"connectedSegmentId": null,
+								"modification": null,
+								"isConstrained": false
+							},
+							"threePrime": {
+								"segmentId": "b116e4b4-f47c-4de2-851c-a06e63230fd4",
+								"isThreePrime": true,
+								"index": 1,
+								"connectedSegmentId": null,
+								"modification": null,
+								"isConstrained": false
+							},
+							"sequence": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN",
+							"slots": [
+								{ "bpIndex": 39, "seq": "N" },
+								{ "bpIndex": 38, "seq": "N" },
+								{ "bpIndex": 37, "seq": "N" },
+								{ "bpIndex": 36, "seq": "N" },
+								{ "bpIndex": 35, "seq": "N" },
+								{ "bpIndex": 34, "seq": "N" },
+								{ "bpIndex": 33, "seq": "N" },
+								{ "bpIndex": 32, "seq": "N" },
+								{ "bpIndex": 31, "seq": "N" },
+								{ "bpIndex": 30, "seq": "N" },
+								{ "bpIndex": 29, "seq": "N" },
+								{ "bpIndex": 28, "seq": "N" },
+								{ "bpIndex": 27, "seq": "N" },
+								{ "bpIndex": 26, "seq": "N" },
+								{ "bpIndex": 25, "seq": "N" },
+								{ "bpIndex": 24, "seq": "N" },
+								{ "bpIndex": 23, "seq": "N" },
+								{ "bpIndex": 22, "seq": "N" },
+								{ "bpIndex": 21, "seq": "N" },
+								{ "bpIndex": 20, "seq": "N" },
+								{ "bpIndex": 19, "seq": "N" },
+								{ "bpIndex": 18, "seq": "N" },
+								{ "bpIndex": 17, "seq": "N" },
+								{ "bpIndex": 16, "seq": "N" },
+								{ "bpIndex": 15, "seq": "N" },
+								{ "bpIndex": 14, "seq": "N" },
+								{ "bpIndex": 13, "seq": "N" },
+								{ "bpIndex": 12, "seq": "N" },
+								{ "bpIndex": 11, "seq": "N" },
+								{ "bpIndex": 10, "seq": "N" },
+								{ "bpIndex": 9, "seq": "N" },
+								{ "bpIndex": 8, "seq": "N" },
+								{ "bpIndex": 7, "seq": "N" },
+								{ "bpIndex": 6, "seq": "N" },
+								{ "bpIndex": 5, "seq": "N" },
+								{ "bpIndex": 4, "seq": "N" },
+								{ "bpIndex": 3, "seq": "N" },
+								{ "bpIndex": 2, "seq": "N" },
+								{ "bpIndex": 1, "seq": "N" }
+							]
+						}
+					],
+					"color": "#d98b00",
+					"isScaffold": false,
+					"isSequenceLocked": false,
+					"name": ""
+				},
+				{
+					"id": "723133f1-bf3a-41a2-90f1-8702433d39fe",
+					"segments": [
+						{
+							"id": "580edddf-e919-41c4-9ffb-295da4a7a8da",
+							"inVirtualHelixIndex": 0,
+							"fivePrime": {
+								"segmentId": "580edddf-e919-41c4-9ffb-295da4a7a8da",
+								"isThreePrime": false,
+								"index": 38,
+								"connectedSegmentId": null,
+								"modification": null,
+								"isConstrained": false
+							},
+							"threePrime": {
+								"segmentId": "580edddf-e919-41c4-9ffb-295da4a7a8da",
+								"isThreePrime": true,
+								"index": 14,
+								"connectedSegmentId": "583fa57c-cb0d-4148-8022-426b05ed778b",
+								"modification": null,
+								"isConstrained": true
+							},
+							"sequence": "NNNNNNNNNNNNNNNNNNNNNNNN",
+							"slots": [
+								{ "bpIndex": 38, "seq": "N" },
+								{ "bpIndex": 37, "seq": "N" },
+								{ "bpIndex": 36, "seq": "N" },
+								{ "bpIndex": 35, "seq": "N" },
+								{ "bpIndex": 34, "seq": "N" },
+								{ "bpIndex": 33, "seq": "N" },
+								{ "bpIndex": 32, "seq": "N" },
+								{ "bpIndex": 31, "seq": "N" },
+								{ "bpIndex": 30, "seq": "N" },
+								{ "bpIndex": 29, "seq": "N" },
+								{ "bpIndex": 28, "seq": "N" },
+								{ "bpIndex": 27, "seq": "N" },
+								{ "bpIndex": 26, "seq": "" },
+								{ "bpIndex": 25, "seq": "N" },
+								{ "bpIndex": 24, "seq": "N" },
+								{ "bpIndex": 23, "seq": "N" },
+								{ "bpIndex": 22, "seq": "N" },
+								{ "bpIndex": 21, "seq": "N" },
+								{ "bpIndex": 20, "seq": "N" },
+								{ "bpIndex": 19, "seq": "N" },
+								{ "bpIndex": 18, "seq": "N" },
+								{ "bpIndex": 17, "seq": "N" },
+								{ "bpIndex": 16, "seq": "N" },
+								{ "bpIndex": 15, "seq": "N" },
+								{ "bpIndex": 14, "seq": "N" }
+							]
+						},
+						{
+							"id": "583fa57c-cb0d-4148-8022-426b05ed778b",
+							"inVirtualHelixIndex": 1,
+							"fivePrime": {
+								"segmentId": "583fa57c-cb0d-4148-8022-426b05ed778b",
+								"isThreePrime": false,
+								"index": 14,
+								"connectedSegmentId": "580edddf-e919-41c4-9ffb-295da4a7a8da",
+								"modification": null,
+								"isConstrained": true
+							},
+							"threePrime": {
+								"segmentId": "583fa57c-cb0d-4148-8022-426b05ed778b",
+								"isThreePrime": true,
+								"index": 39,
+								"connectedSegmentId": null,
+								"modification": null,
+								"isConstrained": false
+							},
+							"sequence": "NNNNNNNNNNNNNNNNNNNNNNNNNN",
+							"slots": [
+								{ "bpIndex": 14, "seq": "N" },
+								{ "bpIndex": 15, "seq": "N" },
+								{ "bpIndex": 16, "seq": "N" },
+								{ "bpIndex": 17, "seq": "N" },
+								{ "bpIndex": 18, "seq": "N" },
+								{ "bpIndex": 19, "seq": "N" },
+								{ "bpIndex": 20, "seq": "N" },
+								{ "bpIndex": 21, "seq": "N" },
+								{ "bpIndex": 22, "seq": "N" },
+								{ "bpIndex": 23, "seq": "N" },
+								{ "bpIndex": 24, "seq": "N" },
+								{ "bpIndex": 25, "seq": "N" },
+								{ "bpIndex": 26, "seq": "N" },
+								{ "bpIndex": 27, "seq": "N" },
+								{ "bpIndex": 28, "seq": "N" },
+								{ "bpIndex": 29, "seq": "N" },
+								{ "bpIndex": 30, "seq": "N" },
+								{ "bpIndex": 31, "seq": "N" },
+								{ "bpIndex": 32, "seq": "N" },
+								{ "bpIndex": 33, "seq": "N" },
+								{ "bpIndex": 34, "seq": "N" },
+								{ "bpIndex": 35, "seq": "N" },
+								{ "bpIndex": 36, "seq": "N" },
+								{ "bpIndex": 37, "seq": "N" },
+								{ "bpIndex": 38, "seq": "N" },
+								{ "bpIndex": 39, "seq": "N" }
+							]
+						}
+					],
+					"color": "#998ff3",
+					"isScaffold": false,
+					"isSequenceLocked": false,
+					"name": ""
+				},
+				{
+					"id": "0070a65c-8021-420b-ad8a-5daea2a3d20a",
+					"segments": [
+						{
+							"id": "7ba420e0-55aa-4b50-9e18-b791f15f0f39",
+							"inVirtualHelixIndex": 1,
+							"fivePrime": {
+								"segmentId": "7ba420e0-55aa-4b50-9e18-b791f15f0f39",
+								"isThreePrime": false,
+								"index": 1,
+								"connectedSegmentId": null,
+								"modification": null,
+								"isConstrained": false
+							},
+							"threePrime": {
+								"segmentId": "7ba420e0-55aa-4b50-9e18-b791f15f0f39",
+								"isThreePrime": true,
+								"index": 13,
+								"connectedSegmentId": "78bf8845-73de-4953-94fd-841791871797",
+								"modification": null,
+								"isConstrained": true
+							},
+							"sequence": "NNNNNNNNNNNNN",
+							"slots": [
+								{ "bpIndex": 1, "seq": "N" },
+								{ "bpIndex": 2, "seq": "N" },
+								{ "bpIndex": 3, "seq": "N" },
+								{ "bpIndex": 4, "seq": "N" },
+								{ "bpIndex": 5, "seq": "N" },
+								{ "bpIndex": 6, "seq": "N" },
+								{ "bpIndex": 7, "seq": "N" },
+								{ "bpIndex": 8, "seq": "N" },
+								{ "bpIndex": 9, "seq": "N" },
+								{ "bpIndex": 10, "seq": "N" },
+								{ "bpIndex": 11, "seq": "N" },
+								{ "bpIndex": 12, "seq": "N" },
+								{ "bpIndex": 13, "seq": "N" }
+							]
+						},
+						{
+							"id": "78bf8845-73de-4953-94fd-841791871797",
+							"inVirtualHelixIndex": 0,
+							"fivePrime": {
+								"segmentId": "78bf8845-73de-4953-94fd-841791871797",
+								"isThreePrime": false,
+								"index": 13,
+								"connectedSegmentId": "7ba420e0-55aa-4b50-9e18-b791f15f0f39",
+								"modification": null,
+								"isConstrained": true
+							},
+							"threePrime": {
+								"segmentId": "78bf8845-73de-4953-94fd-841791871797",
+								"isThreePrime": true,
+								"index": 1,
+								"connectedSegmentId": null,
+								"modification": null,
+								"isConstrained": false
+							},
+							"sequence": "NNNNNNNNNNNN",
+							"slots": [
+								{ "bpIndex": 13, "seq": "N" },
+								{ "bpIndex": 12, "seq": "" },
+								{ "bpIndex": 11, "seq": "N" },
+								{ "bpIndex": 10, "seq": "N" },
+								{ "bpIndex": 9, "seq": "N" },
+								{ "bpIndex": 8, "seq": "N" },
+								{ "bpIndex": 7, "seq": "N" },
+								{ "bpIndex": 6, "seq": "N" },
+								{ "bpIndex": 5, "seq": "N" },
+								{ "bpIndex": 4, "seq": "N" },
+								{ "bpIndex": 3, "seq": "N" },
+								{ "bpIndex": 2, "seq": "N" },
+								{ "bpIndex": 1, "seq": "N" }
+							]
+						}
+					],
+					"color": "#6cb35d",
+					"isScaffold": false,
+					"isSequenceLocked": false,
+					"name": ""
+				},
+				{
+					"id": "40c8bbd8-7793-4916-a58d-17c20d53b583",
+					"segments": [
+						{
+							"id": "ea65b23d-6f8e-49f9-8dc6-8831410b408b",
+							"inVirtualHelixIndex": 2,
+							"fivePrime": {
+								"segmentId": "ea65b23d-6f8e-49f9-8dc6-8831410b408b",
+								"isThreePrime": false,
+								"index": 51,
+								"connectedSegmentId": null,
+								"modification": null,
+								"isConstrained": false
+							},
+							"threePrime": {
+								"segmentId": "ea65b23d-6f8e-49f9-8dc6-8831410b408b",
+								"isThreePrime": true,
+								"index": 62,
+								"connectedSegmentId": null,
+								"modification": null,
+								"isConstrained": false
+							},
+							"sequence": "TTCGACACTGG",
+							"slots": [
+								{ "bpIndex": 51, "seq": "T" },
+								{ "bpIndex": 52, "seq": "T" },
+								{ "bpIndex": 53, "seq": "C" },
+								{ "bpIndex": 54, "seq": "G" },
+								{ "bpIndex": 55, "seq": "A" },
+								{ "bpIndex": 56, "seq": "" },
+								{ "bpIndex": 57, "seq": "C" },
+								{ "bpIndex": 58, "seq": "A" },
+								{ "bpIndex": 59, "seq": "C" },
+								{ "bpIndex": 60, "seq": "T" },
+								{ "bpIndex": 61, "seq": "G" },
+								{ "bpIndex": 62, "seq": "G" }
+							]
+						}
+					],
+					"color": "#00bed7",
+					"isScaffold": false,
+					"isSequenceLocked": false,
+					"name": ""
+				},
+				{
+					"id": "cf266a1f-3fd9-4ee3-ad6b-f81f58583517",
+					"segments": [
+						{
+							"id": "bf7142fd-1a59-4446-b036-467b0328efd4",
+							"inVirtualHelixIndex": 2,
+							"fivePrime": {
+								"segmentId": "bf7142fd-1a59-4446-b036-467b0328efd4",
+								"isThreePrime": false,
+								"index": 63,
+								"connectedSegmentId": null,
+								"modification": null,
+								"isConstrained": false
+							},
+							"threePrime": {
+								"segmentId": "bf7142fd-1a59-4446-b036-467b0328efd4",
+								"isThreePrime": true,
+								"index": 50,
+								"connectedSegmentId": null,
+								"modification": null,
+								"isConstrained": false
+							},
+							"sequence": "NCCAGTGTCGAAN",
+							"slots": [
+								{ "bpIndex": 63, "seq": "N" },
+								{ "bpIndex": 62, "seq": "C" },
+								{ "bpIndex": 61, "seq": "C" },
+								{ "bpIndex": 60, "seq": "A" },
+								{ "bpIndex": 59, "seq": "G" },
+								{ "bpIndex": 58, "seq": "T" },
+								{ "bpIndex": 57, "seq": "G" },
+								{ "bpIndex": 56, "seq": "" },
+								{ "bpIndex": 55, "seq": "T" },
+								{ "bpIndex": 54, "seq": "C" },
+								{ "bpIndex": 53, "seq": "G" },
+								{ "bpIndex": 52, "seq": "A" },
+								{ "bpIndex": 51, "seq": "A" },
+								{ "bpIndex": 50, "seq": "N" }
+							]
+						}
+					],
+					"color": "#9a9ac2",
+					"isScaffold": false,
+					"isSequenceLocked": false,
+					"name": ""
+				}
+			],
+			"virtualHelices": [
+				{
+					"id": "92ea706a-e8b1-4011-b291-c2111d40fd11",
+					"index": 0,
+					"listRow": 0,
+					"regionId": "0ad043d9-f9f1-4246-8e92-8be6d0cebcc1",
+					"latticeCoords": { "row": 2, "col": 8 },
+					"length": 84,
+					"strandSets": [
+						{ "strandIndex": 0, "segmentIds": ["38dd4714-8710-4cc3-a5dc-a578671f3990"] },
+						{
+							"strandIndex": 1,
+							"segmentIds": [
+								"580edddf-e919-41c4-9ffb-295da4a7a8da",
+								"78bf8845-73de-4953-94fd-841791871797"
+							]
+						}
+					]
+				},
+				{
+					"id": "2fa8af00-79da-49cf-9b55-088884694708",
+					"index": 1,
+					"listRow": 1,
+					"regionId": "0ad043d9-f9f1-4246-8e92-8be6d0cebcc1",
+					"latticeCoords": { "row": 1, "col": 8 },
+					"length": 84,
+					"strandSets": [
+						{
+							"strandIndex": 0,
+							"segmentIds": [
+								"7ba420e0-55aa-4b50-9e18-b791f15f0f39",
+								"583fa57c-cb0d-4148-8022-426b05ed778b"
+							]
+						},
+						{ "strandIndex": 1, "segmentIds": ["b116e4b4-f47c-4de2-851c-a06e63230fd4"] }
+					]
+				},
+				{
+					"id": "8ec016e0-b14b-4a4a-9b43-0ff47bbfdf34",
+					"index": 2,
+					"listRow": 2,
+					"regionId": "0ad043d9-f9f1-4246-8e92-8be6d0cebcc1",
+					"latticeCoords": { "row": 1, "col": 9 },
+					"length": 84,
+					"strandSets": [
+						{ "strandIndex": 0, "segmentIds": ["ea65b23d-6f8e-49f9-8dc6-8831410b408b"] },
+						{ "strandIndex": 1, "segmentIds": ["bf7142fd-1a59-4446-b036-467b0328efd4"] }
+					]
+				}
+			]
+		}
+	]
+}

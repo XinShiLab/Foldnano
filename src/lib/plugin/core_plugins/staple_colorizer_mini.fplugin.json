@@ -1,0 +1,60 @@
+{
+	"schemaVersion": 1,
+	"id": "staple-colorizer-mini",
+	"name": "Staple Colorizer (mini)",
+	"version": "1.0.1",
+	"format": "foldnano_mini",
+	"applyStrategy": "replayMutationLogInRegion",
+	"entrypointUrl": "/plugins/staple_colorizer_mini/staple_colorizer_mini.zip",
+	"description": "foldnano_mini port of the Staple Colorizer. Recolors all non-scaffold oligos in the active region using an HSL palette. Replays as a single undo step.",
+	"parameters": [
+		{
+			"id": "palette",
+			"label": "Palette style",
+			"type": "select",
+			"options": [
+				{
+					"value": "golden_ratio",
+					"label": "Golden ratio (maximally distinct)"
+				},
+				{
+					"value": "rainbow",
+					"label": "Rainbow (evenly spaced)"
+				},
+				{
+					"value": "uniform",
+					"label": "Uniform (single hue)"
+				}
+			],
+			"default": "golden_ratio",
+			"description": "How hues are distributed across staples."
+		},
+		{
+			"id": "hue",
+			"label": "Base hue (°)",
+			"type": "number",
+			"default": 210,
+			"min": 0,
+			"max": 360,
+			"step": 1
+		},
+		{
+			"id": "saturation",
+			"label": "Saturation (%)",
+			"type": "number",
+			"default": 72,
+			"min": 0,
+			"max": 100,
+			"step": 1
+		},
+		{
+			"id": "lightness",
+			"label": "Lightness (%)",
+			"type": "number",
+			"default": 52,
+			"min": 0,
+			"max": 100,
+			"step": 1
+		}
+	]
+}

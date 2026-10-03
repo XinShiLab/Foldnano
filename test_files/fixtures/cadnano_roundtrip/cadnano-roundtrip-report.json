@@ -1,0 +1,378 @@
+{
+  "summary": {
+    "designs": 10,
+    "exactInScopeAgreement": 8,
+    "unexpectedDifferences": 0,
+    "warnedDeletionRelocations": 9
+  },
+  "designs": [
+    {
+      "design": "17. Krishnan_NatCommun2016_pin pore.json",
+      "sourceSha256": "f407fcd6405e667e5335fcf18caa8d2061a729e432a0fcb27ff6be59c78546f9",
+      "verdict": "stable normalization",
+      "error": null,
+      "documentProblems": [],
+      "importWarnings": {
+        "J0": [],
+        "J1": [],
+        "J2": []
+      },
+      "agreement": {
+        "virtualHelixGeometry": true,
+        "strandAndCrossoverTopology": true,
+        "loops": true,
+        "skipsExactly": true,
+        "sourceColors": true,
+        "exactInScopeAgreement": true
+      },
+      "unexpectedDifferences": [],
+      "deletionRelocations": [],
+      "representationOnlyChanges": 0,
+      "generatedMetadataChanges": 1,
+      "warnedLossySkipEntries": 0,
+      "scaffoldColorsInvented": 1,
+      "vstrandsReordered": 0,
+      "colorOrderVstrands": 24,
+      "firstReimportPartChanges": 0,
+      "nextExportStructurallyEqual": true,
+      "secondRoundTripPartChanges": 0
+    },
+    {
+      "design": "4FSF_25_2b_complete_full_loopbackscaffold.json",
+      "sourceSha256": "6636365b6fa7e8c64225ce1d738f1044a1fee465ca68e83e0487f1baf7d2d8f0",
+      "verdict": "lossy-but-warned (deletion relocated)",
+      "error": null,
+      "documentProblems": [],
+      "importWarnings": {
+        "J0": [
+          "VH 10: deletion at crossover bp 68 moved to bp 67 (deletions are not allowed on crossover sites).",
+          "VH 11: deletion at crossover bp 68 moved to bp 67 (deletions are not allowed on crossover sites).",
+          "VH 34: deletion at crossover bp 68 moved to bp 67 (deletions are not allowed on crossover sites).",
+          "VH 35: deletion at crossover bp 68 moved to bp 67 (deletions are not allowed on crossover sites).",
+          "VH 58: deletion at crossover bp 68 moved to bp 67 (deletions are not allowed on crossover sites).",
+          "VH 59: deletion at crossover bp 68 moved to bp 67 (deletions are not allowed on crossover sites).",
+          "VH 82: deletion at crossover bp 68 moved to bp 67 (deletions are not allowed on crossover sites).",
+          "VH 83: deletion at crossover bp 68 moved to bp 67 (deletions are not allowed on crossover sites)."
+        ],
+        "J1": [],
+        "J2": []
+      },
+      "agreement": {
+        "virtualHelixGeometry": true,
+        "strandAndCrossoverTopology": true,
+        "loops": true,
+        "skipsExactly": false,
+        "sourceColors": true,
+        "exactInScopeAgreement": false
+      },
+      "unexpectedDifferences": [],
+      "deletionRelocations": [
+        {
+          "vstrand": 10,
+          "fromBase": 68,
+          "toBase": 67
+        },
+        {
+          "vstrand": 11,
+          "fromBase": 68,
+          "toBase": 67
+        },
+        {
+          "vstrand": 34,
+          "fromBase": 68,
+          "toBase": 67
+        },
+        {
+          "vstrand": 35,
+          "fromBase": 68,
+          "toBase": 67
+        },
+        {
+          "vstrand": 58,
+          "fromBase": 68,
+          "toBase": 67
+        },
+        {
+          "vstrand": 59,
+          "fromBase": 68,
+          "toBase": 67
+        },
+        {
+          "vstrand": 82,
+          "fromBase": 68,
+          "toBase": 67
+        },
+        {
+          "vstrand": 83,
+          "fromBase": 68,
+          "toBase": 67
+        }
+      ],
+      "representationOnlyChanges": 0,
+      "generatedMetadataChanges": 96,
+      "warnedLossySkipEntries": 16,
+      "scaffoldColorsInvented": 96,
+      "vstrandsReordered": 0,
+      "colorOrderVstrands": 40,
+      "firstReimportPartChanges": 0,
+      "nextExportStructurallyEqual": true,
+      "secondRoundTripPartChanges": 0
+    },
+    {
+      "design": "8hb_2ab_8f.json",
+      "sourceSha256": "5fe6f87b5e714a0fd9429ee92d4cad92cbb3e5e840ef5784403831c7d1b74158",
+      "verdict": "stable normalization",
+      "error": null,
+      "documentProblems": [],
+      "importWarnings": {
+        "J0": [],
+        "J1": [],
+        "J2": []
+      },
+      "agreement": {
+        "virtualHelixGeometry": true,
+        "strandAndCrossoverTopology": true,
+        "loops": true,
+        "skipsExactly": true,
+        "sourceColors": true,
+        "exactInScopeAgreement": true
+      },
+      "unexpectedDifferences": [],
+      "deletionRelocations": [],
+      "representationOnlyChanges": 0,
+      "generatedMetadataChanges": 11,
+      "warnedLossySkipEntries": 0,
+      "scaffoldColorsInvented": 11,
+      "vstrandsReordered": 0,
+      "colorOrderVstrands": 4,
+      "firstReimportPartChanges": 0,
+      "nextExportStructurallyEqual": true,
+      "secondRoundTripPartChanges": 0
+    },
+    {
+      "design": "Force clamp.json",
+      "sourceSha256": "645b745d2de189cb74cdd7c756569ad6382a0781c8aed9c85fb0d6320d7adaad",
+      "verdict": "stable normalization",
+      "error": null,
+      "documentProblems": [],
+      "importWarnings": {
+        "J0": [],
+        "J1": [],
+        "J2": []
+      },
+      "agreement": {
+        "virtualHelixGeometry": true,
+        "strandAndCrossoverTopology": true,
+        "loops": true,
+        "skipsExactly": true,
+        "sourceColors": true,
+        "exactInScopeAgreement": true
+      },
+      "unexpectedDifferences": [],
+      "deletionRelocations": [],
+      "representationOnlyChanges": 0,
+      "generatedMetadataChanges": 1,
+      "warnedLossySkipEntries": 0,
+      "scaffoldColorsInvented": 1,
+      "vstrandsReordered": 0,
+      "colorOrderVstrands": 21,
+      "firstReimportPartChanges": 0,
+      "nextExportStructurallyEqual": true,
+      "secondRoundTripPartChanges": 0
+    },
+    {
+      "design": "Hilbert.json",
+      "sourceSha256": "c9376e9f2bc70debb190e3481f1cc0d35ea5f4010b9b15097cb4554c578c99f2",
+      "verdict": "stable normalization",
+      "error": null,
+      "documentProblems": [],
+      "importWarnings": {
+        "J0": [],
+        "J1": [],
+        "J2": []
+      },
+      "agreement": {
+        "virtualHelixGeometry": true,
+        "strandAndCrossoverTopology": true,
+        "loops": true,
+        "skipsExactly": true,
+        "sourceColors": true,
+        "exactInScopeAgreement": true
+      },
+      "unexpectedDifferences": [],
+      "deletionRelocations": [],
+      "representationOnlyChanges": 118,
+      "generatedMetadataChanges": 1,
+      "warnedLossySkipEntries": 0,
+      "scaffoldColorsInvented": 1,
+      "vstrandsReordered": 106,
+      "colorOrderVstrands": 27,
+      "firstReimportPartChanges": 0,
+      "nextExportStructurallyEqual": true,
+      "secondRoundTripPartChanges": 0
+    },
+    {
+      "design": "LargeTetrascaffold-B-3.json",
+      "sourceSha256": "35da76feb262de35483ee0fff091c21fd3251828595a9b40946b66582d8e0ec0",
+      "verdict": "stable normalization",
+      "error": null,
+      "documentProblems": [],
+      "importWarnings": {
+        "J0": [],
+        "J1": [],
+        "J2": []
+      },
+      "agreement": {
+        "virtualHelixGeometry": true,
+        "strandAndCrossoverTopology": true,
+        "loops": true,
+        "skipsExactly": true,
+        "sourceColors": true,
+        "exactInScopeAgreement": true
+      },
+      "unexpectedDifferences": [],
+      "deletionRelocations": [],
+      "representationOnlyChanges": 0,
+      "generatedMetadataChanges": 1,
+      "warnedLossySkipEntries": 0,
+      "scaffoldColorsInvented": 1,
+      "vstrandsReordered": 0,
+      "colorOrderVstrands": 28,
+      "firstReimportPartChanges": 0,
+      "nextExportStructurallyEqual": true,
+      "secondRoundTripPartChanges": 0
+    },
+    {
+      "design": "NRs_antenna_Cadnano1_2_Staples_cut_colored_64_del_MOD20210922.json",
+      "sourceSha256": "7b31a23053698626477168812a78b209bff7828f7525c405c5c5ff22520bfbc2",
+      "verdict": "stable normalization",
+      "error": null,
+      "documentProblems": [],
+      "importWarnings": {
+        "J0": [],
+        "J1": [],
+        "J2": []
+      },
+      "agreement": {
+        "virtualHelixGeometry": true,
+        "strandAndCrossoverTopology": true,
+        "loops": true,
+        "skipsExactly": true,
+        "sourceColors": true,
+        "exactInScopeAgreement": true
+      },
+      "unexpectedDifferences": [],
+      "deletionRelocations": [],
+      "representationOnlyChanges": 0,
+      "generatedMetadataChanges": 108,
+      "warnedLossySkipEntries": 0,
+      "scaffoldColorsInvented": 108,
+      "vstrandsReordered": 0,
+      "colorOrderVstrands": 53,
+      "firstReimportPartChanges": 0,
+      "nextExportStructurallyEqual": true,
+      "secondRoundTripPartChanges": 0
+    },
+    {
+      "design": "N_nanobase.json",
+      "sourceSha256": "4bb9b1d9fb9d4b459370f3f3dd01e2f71ab2ae29b8c57b686b1db7143b08b217",
+      "verdict": "stable normalization",
+      "error": null,
+      "documentProblems": [],
+      "importWarnings": {
+        "J0": [],
+        "J1": [],
+        "J2": []
+      },
+      "agreement": {
+        "virtualHelixGeometry": true,
+        "strandAndCrossoverTopology": true,
+        "loops": true,
+        "skipsExactly": true,
+        "sourceColors": true,
+        "exactInScopeAgreement": true
+      },
+      "unexpectedDifferences": [],
+      "deletionRelocations": [],
+      "representationOnlyChanges": 0,
+      "generatedMetadataChanges": 1,
+      "warnedLossySkipEntries": 0,
+      "scaffoldColorsInvented": 1,
+      "vstrandsReordered": 16,
+      "colorOrderVstrands": 29,
+      "firstReimportPartChanges": 0,
+      "nextExportStructurallyEqual": true,
+      "secondRoundTripPartChanges": 0
+    },
+    {
+      "design": "righthanded_turbine_only.json",
+      "sourceSha256": "681ea72e2b05ceb9f19e6e8a75116545644d0173292f70d9fd7fb5d5496c185c",
+      "verdict": "lossy-but-warned (deletion relocated)",
+      "error": null,
+      "documentProblems": [],
+      "importWarnings": {
+        "J0": [
+          "VH 48: deletion at crossover bp 385 moved to bp 386 (deletions are not allowed on crossover sites)."
+        ],
+        "J1": [],
+        "J2": []
+      },
+      "agreement": {
+        "virtualHelixGeometry": true,
+        "strandAndCrossoverTopology": true,
+        "loops": true,
+        "skipsExactly": false,
+        "sourceColors": true,
+        "exactInScopeAgreement": false
+      },
+      "unexpectedDifferences": [],
+      "deletionRelocations": [
+        {
+          "vstrand": 48,
+          "fromBase": 385,
+          "toBase": 386
+        }
+      ],
+      "representationOnlyChanges": 0,
+      "generatedMetadataChanges": 1,
+      "warnedLossySkipEntries": 2,
+      "scaffoldColorsInvented": 1,
+      "vstrandsReordered": 38,
+      "colorOrderVstrands": 22,
+      "firstReimportPartChanges": 0,
+      "nextExportStructurallyEqual": true,
+      "secondRoundTripPartChanges": 0
+    },
+    {
+      "design": "slottedcross.json",
+      "sourceSha256": "49eac0085a6281a46f87743eec3d6e35dad4e96b03bde5dea3c07a13c67c3985",
+      "verdict": "stable normalization",
+      "error": null,
+      "documentProblems": [],
+      "importWarnings": {
+        "J0": [],
+        "J1": [],
+        "J2": []
+      },
+      "agreement": {
+        "virtualHelixGeometry": true,
+        "strandAndCrossoverTopology": true,
+        "loops": true,
+        "skipsExactly": true,
+        "sourceColors": true,
+        "exactInScopeAgreement": true
+      },
+      "unexpectedDifferences": [],
+      "deletionRelocations": [],
+      "representationOnlyChanges": 0,
+      "generatedMetadataChanges": 1,
+      "warnedLossySkipEntries": 0,
+      "scaffoldColorsInvented": 1,
+      "vstrandsReordered": 30,
+      "colorOrderVstrands": 31,
+      "firstReimportPartChanges": 0,
+      "nextExportStructurallyEqual": true,
+      "secondRoundTripPartChanges": 0
+    }
+  ]
+}

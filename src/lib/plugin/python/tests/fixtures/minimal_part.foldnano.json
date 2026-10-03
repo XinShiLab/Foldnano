@@ -1,0 +1,108 @@
+{
+	"name": "minimal-test-part",
+	"id": "test-part-001",
+	"latticeType": "HONEYCOMB",
+	"maxBase": 21,
+	"virtualHelices": [
+		{
+			"index": 0,
+			"listRow": 0,
+			"latticeCoords": { "row": 0, "col": 0 },
+			"length": 21,
+			"strandSets": [{ "segmentIds": ["seg-scaffold-0"] }, { "segmentIds": ["seg-staple-0"] }]
+		},
+		{
+			"index": 1,
+			"listRow": 1,
+			"latticeCoords": { "row": 0, "col": 1 },
+			"length": 21,
+			"strandSets": [{ "segmentIds": [] }, { "segmentIds": ["seg-scaffold-1"] }]
+		}
+	],
+	"oligos": [
+		{
+			"id": "oligo-scaffold",
+			"segments": [
+				{
+					"id": "seg-scaffold-0",
+					"inVirtualHelixIndex": 0,
+					"fivePrime": {
+						"segmentId": "seg-scaffold-0",
+						"isThreePrime": false,
+						"index": 0,
+						"connectedSegmentId": null,
+						"modification": null,
+						"isConstrained": false
+					},
+					"threePrime": {
+						"segmentId": "seg-scaffold-0",
+						"isThreePrime": true,
+						"index": 10,
+						"connectedSegmentId": "seg-scaffold-1",
+						"modification": null,
+						"isConstrained": false
+					},
+					"sequence": "ATCGATCGATC",
+					"slots": []
+				},
+				{
+					"id": "seg-scaffold-1",
+					"inVirtualHelixIndex": 1,
+					"fivePrime": {
+						"segmentId": "seg-scaffold-1",
+						"isThreePrime": false,
+						"index": 10,
+						"connectedSegmentId": "seg-scaffold-0",
+						"modification": null,
+						"isConstrained": false
+					},
+					"threePrime": {
+						"segmentId": "seg-scaffold-1",
+						"isThreePrime": true,
+						"index": 0,
+						"connectedSegmentId": null,
+						"modification": null,
+						"isConstrained": false
+					},
+					"sequence": "GATCGATCGAT",
+					"slots": []
+				}
+			],
+			"color": "#0066cc",
+			"isScaffold": true,
+			"isSequenceLocked": false,
+			"name": null
+		},
+		{
+			"id": "oligo-staple",
+			"segments": [
+				{
+					"id": "seg-staple-0",
+					"inVirtualHelixIndex": 0,
+					"fivePrime": {
+						"segmentId": "seg-staple-0",
+						"isThreePrime": false,
+						"index": 20,
+						"connectedSegmentId": null,
+						"modification": "/5Alex488N/",
+						"isConstrained": false
+					},
+					"threePrime": {
+						"segmentId": "seg-staple-0",
+						"isThreePrime": true,
+						"index": 0,
+						"connectedSegmentId": null,
+						"modification": null,
+						"isConstrained": false
+					},
+					"sequence": "ATCGATCGATCGATCGATCGA",
+					"slots": []
+				}
+			],
+			"color": "#f28500",
+			"isScaffold": false,
+			"isSequenceLocked": false,
+			"name": "staple-1"
+		}
+	]
+}

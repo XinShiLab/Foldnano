@@ -1,0 +1,10 @@
+{
+	"schemaVersion": 1,
+	"id": "mutation-test",
+	"name": "Mutation Test (foldnano_mini)",
+	"version": "1.0.1",
+	"format": "foldnano_mini",
+	"applyStrategy": "replayMutationLog",
+	"entrypointUrl": "/plugins/mutation_test/mutation_test.zip",
+	"description": "Exercises every op in the foldnano_mini vocabulary against the active part. Adds a couple of scratch VHs, creates and connects segments, applies every property/slot/modification op, then cleans up. Used to verify end-to-end JS replay correctness."
+}

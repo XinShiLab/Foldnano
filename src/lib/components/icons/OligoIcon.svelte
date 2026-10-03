@@ -1,0 +1,33 @@
+<svg id="Layer_2" data-name="Layer 2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20.94 22.71">
+	<g id="Layer_1-2" data-name="Layer 1">
+		<rect
+			x="13.6"
+			y="1"
+			width="6.34"
+			height="6.34"
+			rx="2"
+			ry="2"
+			fill="none"
+			stroke="currentColor"
+			stroke-linecap="round"
+			stroke-linejoin="round"
+			stroke-width="2"
+		/>
+		<path
+			d="M1.54,17.58l3.92-2.17c.7-.39,1.56.12,1.56.92v4.35c0,.8-.86,1.3-1.56.92l-3.92-2.17c-.72-.4-.72-1.43,0-1.83Z"
+			fill="none"
+			stroke="currentColor"
+			stroke-linecap="round"
+			stroke-linejoin="round"
+			stroke-width="2"
+		/>
+		<path
+			d="M7.22,18.67h8.5c1.93,0,3.5-1.57,3.5-3.5s-1.57-3.5-3.5-3.5H4.72c-1.93,0-3.5-1.57-3.5-3.5s1.57-3.5,3.5-3.5h8.5"
+			fill="none"
+			stroke="currentColor"
+			stroke-linecap="round"
+			stroke-linejoin="round"
+			stroke-width="2"
+		/>
+	</g>
+</svg>
