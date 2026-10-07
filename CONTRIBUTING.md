@@ -147,6 +147,7 @@ Freeform-part plugin operations are dispatched through `src/lib/plugin/opDispatc
 - `main` is the stable branch; open PRs against it.
 - Feature branches: `feat/<name>`, fix branches: `fix/<name>`.
 - Run `pnpm check && pnpm test:branch && pnpm lint:branch` before pushing.
+- CI (GitHub Actions) runs `pnpm lint`, `pnpm check`, `pnpm test:all` and `pnpm build` on every pull request; it must pass before merging.
 
 ## AI-Assisted Contributions
 

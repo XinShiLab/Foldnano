@@ -10,6 +10,7 @@ covers:
   - scripts/vite-sandbox-worker.ts
   - scripts/vite-pyodide.ts
   - vercel.json
+  - .github/workflows/**
 ---
 
 # Dev tooling
@@ -77,6 +78,15 @@ by hand in the file header, the About dialog and `THIRD_PARTY_NOTICES.md`.
   which only warns.
 - **pre-push** — Git LFS.
 
+## CI (`.github/workflows/ci.yml`)
+
+GitHub Actions runs on every pull request and on pushes to `main`: a frozen-lockfile install,
+then `pnpm lint` (which includes `docs:verify`), `pnpm check`, `pnpm test:all` and `pnpm build`,
+the same commands as a local final check. Node comes from `.nvmrc` and pnpm from `package.json`
+`packageManager`, so CI and local machines use the same versions. The checkout fetches Git LFS
+files because the bundled plugin wheel lives there. The build needs no secrets: server code reads
+its environment at runtime (`$env/dynamic/private`), and Vercel deploys separately.
+
 ## Repo-maintenance scripts
 
 - **`scripts/docs-check.ts`** (`pnpm docs:check`, `pnpm docs:verify`) — reads each doc's
@@ -100,4 +110,6 @@ by hand in the file header, the About dialog and `THIRD_PARTY_NOTICES.md`.
 - Don't cover `package.json` in any doc: dependency bumps would warn on every doc that lists it.
 - Don't bundle the plugin worker through Vite's worker pipeline (`new Worker(new URL(...))`). It
   must stay a classic, self-contained string for the opaque-origin sandbox.
+- Don't add steps to CI that the local commands don't have. CI should run exactly what a
+  contributor can run before pushing, so a red check is reproducible locally.
 - Keep the docs-check hook a warning. Blocking commits on docs makes people skip the hook.
