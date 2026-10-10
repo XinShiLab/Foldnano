@@ -23,7 +23,7 @@ jobs:
           lfs: true
 
       # Uses the pnpm version pinned in package.json "packageManager".
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
 
       - uses: actions/setup-node@v5
         with:
