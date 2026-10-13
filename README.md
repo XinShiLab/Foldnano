@@ -6,8 +6,7 @@ account, and your designs stay on your machine.
 **Try it:** [fold.xinshilab.com](https://fold.xinshilab.com) · **Docs:** [fold.xinshilab.com/docs](https://fold.xinshilab.com/docs)
 
 > **Beta.** Foldnano is still under testing: use it with caution and keep copies of important
-> designs. The hosted app currently asks for an access code; you can also run it locally (see
-> [CONTRIBUTING.md](CONTRIBUTING.md)).
+> designs. You can also run it locally (see [CONTRIBUTING.md](CONTRIBUTING.md)).
 
 ![Foldnano editor: 3D structure view next to the strand view of a honeycomb design](static/screenshots/guide/selection-and-highlighting/01-three-views-selection-strand-viewer.webp)
 

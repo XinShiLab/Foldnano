@@ -89,8 +89,8 @@ Native Foldnano design files use `.fn.json`. Legacy cadnano `.json` and `.cadnan
 
 ## Environment
 
-Copy `.env.example` to `.env`. During the beta, the app sits behind an access gate: set
-`ALPHA_ACCESS_CODE` to any value and enter it when the app asks, otherwise every page stays locked.
+Copy `.env.example` to `.env`. The app has an optional access gate: leave `ALPHA_ACCESS_CODE`
+empty to open every page, or set it to a code that visitors must enter first.
 
 ## GitHub Integration Setup
 

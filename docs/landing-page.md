@@ -10,8 +10,8 @@ covers:
 
 # Landing Page (`/`)
 
-The root route is the marketing/landing page for Foldnano, gated behind a private-alpha
-access code. It routes visitors to `/editor` (primary) and `/docs` (secondary), and
+The root route is the marketing/landing page for Foldnano, behind the optional beta access
+gate (off when `ALPHA_ACCESS_CODE` is unset; see `docs/routes-guide.md` § Access gate). It routes visitors to `/editor` (primary) and `/docs` (secondary), and
 previews a real design in an interactive 3D hero.
 
 ## Files
@@ -88,7 +88,8 @@ for either. Fonts are the app's existing Nunito Sans (body/headline) and JetBrai
   check that no `/_app/immutable/...` chunk referenced by the prerendered
   `index.html` contains Three/Konva/Pyodide.
 - The page is server-rendered (not prerendered) solely to gate on the alpha-access
-  cookie via `+page.server.ts`. Don't add IndexedDB/storage access or other session
+  cookie via `+page.server.ts`. Keep it that way even while the gate is switched off, so
+  turning it back on is only an environment change. Don't add IndexedDB/storage access or other session
   state to the page itself — the load function's only job is the access check.
 - Don't link `/toc` from the landing page — it is an editor-facing page for advanced
   users, reachable from inside the editor.

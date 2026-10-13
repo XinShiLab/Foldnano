@@ -148,6 +148,17 @@ success, re-running every load function. `PrivacyNotice` therefore calls `submit
 boolean before the dynamic `import()` of `Editor.svelte`, so a load-data refresh can't remount the
 editor and drop the in-memory design.
 
+## Access gate
+
+`/`, `/docs`, `/editor`, `/oligos` and the `llms*.txt` routes sit behind an optional beta access
+gate. Every check goes through `hasAlphaAccess` (`src/lib/server/alphaAccess.ts`): page loads
+via `alphaAccessLoad`, which feeds `AlphaAccessGate`, and the text routes directly. The switch is
+the `ALPHA_ACCESS_CODE` environment variable: unset or empty opens the app to everyone (the
+hosted beta for reviewers, self-hosting); one or more comma-separated codes turn the gate on. On
+Vercel, scoping the variable to Preview keeps internal preview builds gated while Production stays
+open. Keep the gate code in place while it is off, and add new protected routes through
+`hasAlphaAccess` rather than a separate check.
+
 ## API Proxy Boundary
 
 All GitHub API calls **must** go through `/api/github/*`. The OAuth token sits in an httpOnly cookie and is attached server-side; client code never reads it. Adding new GitHub endpoints means adding a server route — do not add direct calls to `api.github.com` from the browser.
