@@ -551,16 +551,41 @@ part.get_oligo(id)       # -> MutableOligo | None
 part.oligos_in_region(region_id)
 part.vhs_in_region(region_id)
 
-# Structural mutations
+# Structural mutations (each raises InvalidOperationError when its can_* check refuses)
 part.create_segment(vh, five_index, three_index, color="#0066cc")  # strand set derived: 0 if 5'<3', else 1
-part.connect(seg_from, seg_to)        # 3'→5'
-part.break_oligo(seg, at_index)       # -> MutableSegment (first segment of the new oligo)
+part.create_oligo([(vh, five, three), ...], color=..., name=..., circular=False)  # -> MutableOligo
+part.connect(seg_from, seg_to)        # 3'→5'; adjacent ends merge into one segment
+part.break_oligo(seg, at_index)       # -> MutableOligo holding the 3' side
+part.remove_oligo(oligo)
+part.remove_segment(seg)              # -> MutableOligo split off downstream, or None
+part.fill_empty_strand_set(vh, strand_index)  # -> MutableSegment over the whole strand
+
+# Editor-level edits (named after the host Part methods / commands)
+part.get_segment_at(vh, strand_index, bp)     # hit test -> MutableSegment | None
+part.get_oligo_at(vh, strand_index, bp)       # -> MutableOligo | None (Part.getOligoByVh)
+part.get_end_at(vh, strand_index, bp)         # 5'/3' end at that bp -> MutableSegmentEnd | None
+part.get_slot_at(vh, strand_index, bp)        # -> MutableSlot | None
+part.add_skip_at(vh, bp), part.add_insert_at(vh, bp, count=1)  # skip / insert tools, both strands
+part.remove_skip_or_insertion_at(vh, bp)
+part.break_at(vh, strand_index, bp)           # break tool -> MutableOligo holding the 3' side
+part.connect_oligos(from_oligo, to_oligo)     # free 3' → free 5' (Part.connectTwoOligos)
+part.create_crossover(from_oligo, vh, strand_index, bp)  # 3' end onto a strand (Part.createCrossover)
+part.make_crossover(vh, strand_index, bp, to_vh)         # at a potential site (makeCrossoverCmd)
 part.reorder_vh(vh, target_region_row)
 part.add_region(kind, name, max_base, ...)  # -> MutableRegion; also creates a plane
 part.split_region(region_id, split_after_vh_id)
 part.set_plane_transform(plane_id, origin, u, v, normal)
 part.remove_vhs([index, ...])
 part.to_json()                        # full snapshot of the in-worker mirror
+
+# Checks (truthy Check with .reason) and crossover sites
+part.can_create_segment(vh, five_index, three_index)
+part.can_create_oligo([(vh, five, three), ...], circular=False)
+part.can_connect(seg_from, seg_to)
+part.can_break_oligo(seg, at_index), part.can_break_at(vh, strand_index, bp)
+part.can_connect_oligos(a, b), part.can_create_crossover(...), part.can_make_crossover(...)
+part.can_fill_empty_strand_set(vh, strand_index)
+part.potential_xover_sites(vh)        # [strand 0 sites, strand 1 sites]
 ```
 
 ### Properties that record ops
@@ -611,27 +636,68 @@ part.to_json()                        # full snapshot of the in-worker mirror
 
 **Plane and region structure ops (new)**
 
-| Method call                                       | Op kind                |
-| ------------------------------------------------- | ---------------------- |
-| `plane.set_transform(origin, u, v, normal)`       | `transform_plane`      |
-| `part.add_region(kind, name, max_base, ...)`      | `add_region_and_plane` |
-| `part.split_region(region_id, split_after_vh_id)` | `split_region`         |
+| Method call                                                | Op kind                |
+| ---------------------------------------------------------- | ---------------------- |
+| `part.set_plane_transform(plane_id, origin, u, v, normal)` | `transform_plane`      |
+| `part.add_region(kind, name, max_base, ...)`               | `add_region_and_plane` |
+| `part.split_region(region_id, split_after_vh_id)`          | `split_region`         |
 
-The full op vocabulary is the 24 kinds enumerated in `foldnano_mini/mutations.py`.
+The full op vocabulary is `KNOWN_OPS` in `foldnano_mini/mutations.py`.
+
+`add_skip_or_insertion` is the editor's skip / insert tool (`OligoSegment.addSkipOrInsertion`): `count` -1 skips, n > 0 appends n Ns to **both** strands, keeping their bases. Prefer it (`part.add_skip_at` / `add_insert_at`) over `set_slot_insertion`, which replaces the slot and turns the complementary base into Ns. `slot.seq = …` refuses writes that change the slot's length, since `set_slot_sequence` touches one strand and would leave the two out of step.
 
 ### Additional proxy APIs
+
+The proxies mirror the host's domain model (`Part` / `Oligo` / `OligoSegment` / `SegmentEnd` /
+`StrandSet`) in snake_case, so `seg.three_prime.connected_end` reads like
+`seg.threePrime.connectedEnd` in TypeScript. Keep new `foldnano_mini` API to that shape.
 
 **`MutableOligo`**
 
 ```python
 oligo.is_circular  # bool — True when every segment's 3' connects back within the same oligo
+oligo.five_prime   # MutableSegmentEnd | None — the free 5' end (None when circular)
+oligo.three_prime  # MutableSegmentEnd | None — the free 3' end
+oligo.five_modification = "/5Bio/"   # on the free 5' end; refused on a circular oligo
+oligo.three_modification = "/3Cy3/"  # on the free 3' end
+oligo.remove()     # same as part.remove_oligo(oligo)
+```
+
+**`MutableSlot`**
+
+```python
+slot.remove_skip_or_insertion()  # back to a plain base on both strands (set_slot_skip, skip=False)
 ```
 
 **`MutableSegment`**
 
 ```python
-seg.move_five_prime_to(idx)   # shift 5' end to bp index idx; emits move_terminus op
-seg.move_three_prime_to(idx)  # shift 3' end to bp index idx; emits move_terminus op
+seg.five_prime, seg.three_prime  # MutableSegmentEnd
+seg.in_virtual_helix             # MutableVirtualHelix
+seg.in_strand_index              # 0 | 1
+seg.low_index, seg.high_index    # bp range regardless of direction
+seg.oligo                        # MutableOligo
+seg.move_five_prime_to(idx)      # same as seg.five_prime.index = idx; emits move_terminus op
+seg.move_three_prime_to(idx)     # same as seg.three_prime.index = idx
+```
+
+`seg.five_index` / `seg.five_modification` (and the 3' versions) remain as shorthands for the
+end proxies. Modifications live only on free ends: setting one on a connected end raises, and
+the oligo-level `oligo.five_modification` / `three_modification` is the natural place to set them.
+`seg.remove()` is `part.remove_segment(seg)`.
+
+**`MutableSegmentEnd`** (`SegmentEnd`)
+
+```python
+end.index = idx            # move the end (move_terminus); refused per end.can_move_to(idx)
+end.can_move_to(idx)       # Check — port of SegmentEnd.canMoveTo (see below)
+end.modification           # get / set (set_segment_modification)
+end.is_three_prime, end.segment, end.in_virtual_helix, end.in_strand_index
+end.is_free                # no connection
+end.connected_segment      # MutableSegment | None
+end.connected_end          # the 5' end this 3' end joins (or vice versa)
+end.is_constrained         # connected across a lattice crossover site (recomputed, never stored)
+end.is_adjacent_to(other)  # same VH and strand, 1 bp apart (a connect would merge)
 ```
 
 **`MutableVirtualHelix`**
@@ -639,7 +705,95 @@ seg.move_three_prime_to(idx)  # shift 3' end to bp index idx; emits move_terminu
 ```python
 vh.length = n         # resize helix; emits set_vh_length op
 vh.move_to(col, row)  # move to new lattice cell (LatticedRegion only); validates parity
+vh.strand_sets        # [MutableStrandSet, MutableStrandSet]
+vh.segments_at(bp, strand_index=None)  # segments covering bp (both strands by default)
+vh.potential_xover_sites(strand_index)  # list[CrossoverSite(bp_index, to_vh_index, right)]
+vh.is_even_parity     # alias of vh.parity_is_even
 ```
+
+**`MutableStrandSet`** (`StrandSet`)
+
+```python
+ss.strand_index, ss.virtual_helix
+ss.segments, ss.segment_ids       # sorted by low bp
+ss.is_empty
+ss.is_index_occupied(bp)          # bool
+ss.is_index_occupied_by(bp)       # MutableSegment | None
+ss.is_range_occupied(a, b)        # inclusive, either order
+ss.segments_in_range(a, b)
+ss.free_ranges()                  # [(low, high), ...] inside the region's [min_base, max_base)
+```
+
+### Occupancy, checks and crossover sites
+
+Queries read an occupancy index derived from the offline mirror. Every op bumps a generation
+counter on `MutablePart`; the index (and the crossover-site cache) rebuilds lazily on the next
+query after it moved, so a run of writes costs nothing extra and no op can leave it stale. A query
+after an edit pays one O(segments) rebuild.
+
+Each mutating call runs its check first and raises `InvalidOperationError` (a `ValueError`) with
+the check's reason **before** recording anything, so a script can try-and-fall-back:
+
+```python
+check = part.can_create_segment(vh, 10, 30)
+if check:
+    part.create_segment(vh, 10, 30)
+else:
+    ctx.log(check.reason)
+```
+
+The checks predict what the host accepts on replay (the host stays authoritative); a parity golden
+keeps them aligned (see Testing below). What they enforce:
+
+| Call                               | Rule (host source)                                                                                                                                                                                        |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `create_segment` / `create_oligo`  | both ends inside the VH region's `[min_base, max_base)`; range free on its strand set (`Part.createOligo`)                                                                                                |
+| `end.index = …`, `move_*_prime_to` | `0 <= idx < vh.length`; swept range free of other segments; segment keeps its direction; a constrained end only to a matching site toward the same VH with the same `right` flag (`SegmentEnd.canMoveTo`) |
+| `connect`                          | different segments, both ends free (`Part.connectSegmentEnds`)                                                                                                                                            |
+| `break_oligo` / `break_at`         | bp inside the segment; a mid-segment break may not leave a 1-nt segment before a connected 3' end (`VirtualHelix.createNewSegment`)                                                                       |
+| `create_crossover`                 | free 3' end; not within one segment, onto a 3' end, or onto the bp after a free 5' end; not onto a connected 5' end (`Part.createCrossover`)                                                              |
+| `make_crossover`                   | a potential site toward `to_vh`; both strands present; the receiving strand not at or 1 nt before its 3' end (`makeCrossoverCmd`)                                                                         |
+| `slot.set_skip` / `set_insertion`  | slot inside the segment; complementary strand present; a skip needs both slots unmodified, an insertion can't go on a skip (`OligoSegment.addSkipOrInsertion`)                                            |
+
+Python is **stricter than replay** on skips and insertions (the editor enforces these, the model
+doesn't yet): no skip/insertion at a segment end or at a bp where either strand has a constrained
+crossover end; no connect, move, or mid-segment break that puts an end on a skip/insertion bp.
+
+**Connections are unrestricted**, as on the host: any free 3' end may join any free 5' end. A
+connection is _constrained_ when the two ends sit on different strand indices at the same bp and
+the first end's VH has a potential crossover site there pointing at the other VH (the `right` flag
+isn't compared). Pick a bp from `vh.potential_xover_sites(strand_index)` before connecting, or
+read `end.is_constrained` afterwards. Sites are a port of `latticeOffsets.ts` /
+`calcPotentialXoverSites` in `foldnano_mini/lattice.py`; freeform VHs have none.
+
+**Editor-level edits run on a scratch copy.** `create_crossover`, `make_crossover` and
+`connect_oligos` break and then connect, and what the host refuses after the break depends on
+what the break left. `foldnano_mini/editing.py` runs each once on a cheap copy of the mirror
+(oligos and segments copied, slot lists shared) and either refuses with the host's reason or
+records the resulting ops, so `can_*` and the call never disagree. They port the host
+literally, including its quirks: `create_crossover` compares only the target oligo's 5' _index_
+with the bp (on any helix), and a break one bp after an internal segment's connected 5' end
+lands the crossover on that 5' end. Like the editor, they clear modifications on ends they join.
+
+**Breaks follow `Oligo.breakOligoAt`.** At the oligo's own free 5'/3' end, or one bp before a
+free 3' end, a break does nothing. Breaking a circular oligo opens it in place (same id). A
+split-off oligo is a staple colored `#26bf40`, and a mid-segment break drops the 3'
+modification (both new 3' ends are fresh). `remove_segment` breaks at both ends of the segment:
+what was downstream becomes a new oligo, and removing an oligo's first segment removes that
+oligo id.
+
+**Adjacent ends merge.** `connect` between ends on the same VH and strand, 1 bp apart, merges
+the two segments: the 3'-side segment extends over the other, takes its slots and 3' connection,
+and the other segment is removed. Use a 1-bp gap (or `create_oligo`, which emits one segment for
+consecutive adjacent entries) when you mean a crossover.
+
+**`create_oligo`** takes one `(vh, five, three)` entry per segment, 5' → 3' (a plain tuple or a
+`SegmentSpec`; `vh` is a proxy or an index). Each 3' end joins the next entry's 5' end. The whole
+path is validated first (bounds, occupancy, entries overlapping each other, junctions on a
+skip/insertion), so an invalid path raises before anything is logged. It emits
+`create_segment` × n + `connect` × (n − 1) (+1 with `circular=True`); color, name and scaffold
+flag land on the resulting oligo. Repeat-group mirror oligos aren't predicted: they count as
+ordinary oligos at their current positions.
 
 **`MutableRegion` (LatticedRegion and FreeformRegion)**
 
@@ -647,8 +801,11 @@ vh.move_to(col, row)  # move to new lattice cell (LatticedRegion only); validate
 region.max_base            # int — current max base index
 region.min_base            # int — current min base index (usually 0)
 region.step                # int — base-index step for this lattice type (21 for HONEYCOMB, 32 for SQUARE)
-region.set_max_base(n)     # set absolute max base; emits set_region_max_base op
+region.set_max_base(n)     # grow or shrink; the change must be a multiple of step, and a shrink
+                           # is refused while strands reach n (can_set_max_base)
 region.increase_length_by(delta)  # grow by delta (must be a multiple of region.step)
+region.reduce_unused_length()     # shrink to the strands, rounded up to step, at least 2 steps
+region.remove_all_skips()         # -> count; region.remove_all_insertions() likewise
 ```
 
 **`FreeformRegion`** (additional method beyond `LatticedRegion`)
@@ -669,7 +826,7 @@ plane.u       # dict with x, y, z — horizontal axis unit vector
 plane.v       # dict with x, y, z — vertical axis unit vector
 plane.normal  # dict with x, y, z — normal vector
 
-plane.set_transform(origin, u, v, normal)  # emits transform_plane op
+# read-only: move a plane with part.set_plane_transform(plane.id, origin, u, v, normal)
 ```
 
 Access planes via `part.planes` (list of `MutablePlane`) or `part.set_plane_transform(plane_id, ...)`.
@@ -708,7 +865,8 @@ Use `ctx.set_result_foldnano_json(part.to_json_string())` instead if you want th
 - `part.break_oligo(seg, at_index)` is a **no-op** on circular oligos (returns `None`). Check `oligo.is_circular` before calling if unsure.
 - `part.split_region(region_id, split_after_vh_id)` requires the region to have at least 2 VHs; the VH identified by `split_after_vh_id` becomes the last VH of the original region.
 - `MutableSegment.oligo_id` is resolved dynamically on each access, so it stays correct after `part.connect(...)` merges two oligos.
-- Validation errors (bad hex color, out-of-range index, etc.) raise immediately and do **not** pollute `part.mutation_log` — the op is rejected before recording.
+- `part.connect(a, b)` between adjacent ends (same VH and strand, 1 bp apart) merges `b` into `a`; `b`'s proxy is stale afterwards.
+- Validation errors (bad hex color, out-of-range index, etc.) raise immediately and do **not** pollute `part.mutation_log` — the op is rejected before recording. Topology refusals raise `InvalidOperationError`; call the matching `can_*` first to branch instead.
 
 ---
 
@@ -718,7 +876,7 @@ The offline transport is pure Python, so `foldnano_mini` plugins can be unit-tes
 
 ### 1. Local invariants
 
-`foldnano_mini/invariants.py` runs cheap validators _before_ an op is appended to the log: hex-color shape, integer endpoint distinctness, strand-set-index ∈ {0, 1}, etc. They fail fast with a clear `ValueError` / `TypeError` and never touch the JS side.
+`foldnano_mini/invariants.py` runs cheap validators _before_ an op is appended to the log: hex-color shape, integer endpoint distinctness, strand-set-index ∈ {0, 1}, etc. They fail fast with a clear `ValueError` / `TypeError` and never touch the JS side. The topology checks (occupancy, bounds, crossover and skip rules; see [Occupancy, checks and crossover sites](#occupancy-checks-and-crossover-sites)) run the same way and raise `InvalidOperationError`.
 
 ```python
 import pytest
@@ -790,11 +948,24 @@ Reference test files:
 
 - `tests/test_foldnano_mini_offline.py` — offline transport behaviour, op recording, validation.
 - `tests/test_foldnano_mini_replay_self.py` — self-consistency between mirror and replay.
+- `tests/test_foldnano_mini_topology.py` — occupancy queries, end proxies, `can_*` checks, `create_oligo`.
+- `tests/test_foldnano_mini_parity.py` — the checks, crossover sites, and the results of
+  editor-level edits, against the host. Its golden
+  (`tests/fixtures/foldnano_mini_parity.golden.json`) is written by
+  `src/lib/plugin/foldnanoMiniParity.spec.ts` from the real `Part`; after changing a host rule,
+  regenerate with `UPDATE_FOLDNANO_MINI_PARITY=1 pnpm vitest run src/lib/plugin/foldnanoMiniParity.spec.ts`
+  and make the Python side agree.
+- `tests/test_foldnano_mini_replay_host.py` — the other direction: a scenario using the editing API
+  writes its log and predicted state (seeded ids) to `tests/fixtures/foldnano_mini_replay.golden.json`,
+  and `src/lib/plugin/foldnanoMiniReplay.spec.ts` replays it on the real `Part` and compares, ids
+  included. Every entity the host creates during an op must take its id from the op
+  (`break_oligo.newSegmentId`, `remove_segment.newOligoId`, ...). Regenerate with
+  `UPDATE_FOLDNANO_MINI_REPLAY=1 pnpm test:python`.
 - `tests/test_foldnano_regions.py` — Plane / DesignRegion proxy surface.
 
 ### All-ops example script
 
-`src/lib/plugin/python/example_all_ops.py` is a standalone CPython script that exercises all 24 op kinds in order against the `multi_region_part.foldnano.json` fixture (embedded inline). Run it from `src/lib/plugin/python/`:
+`src/lib/plugin/python/example_all_ops.py` is a standalone CPython script that exercises every op kind in order against the `multi_region_part.foldnano.json` fixture (embedded inline). Run it from `src/lib/plugin/python/`:
 
 ```bash
 cd src/lib/plugin/python
@@ -811,23 +982,23 @@ The built-in Script Lab plugin ships a **Full API Demo** starter template (acces
 
 The template is organized into 9 sections (A–I) guarded by `SKIPPED` fallbacks when preconditions are not met:
 
-| Section | Ops covered                                                                            |
-| ------- | -------------------------------------------------------------------------------------- |
-| A       | `set_oligo_color`, `set_oligo_name`, `set_oligo_is_scaffold`                           |
-| B       | `set_segment_modification`, `set_slot_sequence`, `set_slot_skip`, `set_slot_insertion` |
-| C       | `set_vh_length`, `set_region_max_base`                                                 |
-| D       | `create_segment` (×2), `connect`                                                       |
-| E       | `break_oligo`, `move_terminus` (5' + 3')                                               |
-| F       | `add_vh_at_coords`, `add_freeform_vh`                                                  |
-| G       | `move_lattice_vh`, `set_vh_local_frame`, `reorder_vh`                                  |
-| H       | `transform_plane`, `add_region_and_plane`, `split_region`                              |
-| I       | `remove_segment`, `remove_oligo`, `remove_vhs` (cleanup of demo artifacts)             |
+| Section | Ops covered                                                                                                     |
+| ------- | --------------------------------------------------------------------------------------------------------------- |
+| A       | `set_oligo_color`, `set_oligo_name`, `set_oligo_is_scaffold`                                                    |
+| B       | `set_segment_modification`, `set_slot_sequence`, `set_slot_skip`, `add_skip_or_insertion`, `set_slot_insertion` |
+| C       | `set_vh_length`, `set_region_max_base`                                                                          |
+| D       | `create_segment` (×2), `connect` via `create_oligo`                                                             |
+| E       | `break_oligo`, `move_terminus` (5' + 3')                                                                        |
+| F       | `add_vh_at_coords`, `add_freeform_vh`                                                                           |
+| G       | `move_lattice_vh`, `set_vh_local_frame`, `reorder_vh`                                                           |
+| H       | `transform_plane`, `add_region_and_plane`, `split_region`                                                       |
+| I       | `remove_segment`, `remove_oligo`, `remove_vhs` (cleanup of demo artifacts)                                      |
 
-The template ends with `ctx.set_result_mutation_log(part.mutation_log)` so you can click **Apply** to see the mutations take effect in the editor — or **Undo** to revert all 24 ops in one step.
+The template ends with `ctx.set_result_mutation_log(part.mutation_log)` so you can click **Apply** to see the mutations take effect in the editor — or **Undo** to revert all of them in one step.
 
 ### What is _not_ covered offline
 
-- Whether the JS-side `Part` accepts a given `connect(...)` topologically (e.g. valid crossover sites, parity).
+- Host rules the `can_*` checks don't model: repeat-group (mirror oligo) restrictions and `replayMutationLogInRegion`'s active-region scope.
 - 3D / view-side regressions.
 - Cross-plugin interactions in the editor.
 
@@ -1153,7 +1324,7 @@ n_helices = int(ctx.get_param("n_helices", 8))
 | `gc_colorizer`          | `foldnano_json` | `replacePartKeepAnnotationsWhereMatched`   | GC-based color gradient; `_raw` round-trip mutation                                                                                                                              |
 | `crossover_analyzer`    | `cadnano_json`  | `previewOnly`                              | **Zip bundle**: 3 modules; crossover counting; CSV + summary artifact                                                                                                            |
 | `staple_colorizer_mini` | `foldnano_mini` | `replayMutationLogInRegion`                | `foldnano_mini` port of `staple_colorizer`; recolors active region only; one undo step                                                                                           |
-| `mutation_test`         | `foldnano_mini` | `replayMutationLog`                        | Exercises all 24 op kinds in the `foldnano_mini` vocabulary; used to verify JS replay end-to-end                                                                                 |
+| `mutation_test`         | `foldnano_mini` | `replayMutationLog`                        | Exercises a broad slice of the `foldnano_mini` op vocabulary; used to verify JS replay end-to-end                                                                                |
 | `pyOrigamiBreak`        | `cadnano_json`  | `replaceRegion`                            | Real-world custom-tier plugin: `numpy`/`pandas`/`matplotlib` + the `cadnano2_5_mini` standard-extra wheel; thermodynamic staple-break optimization with a 9-parameter run dialog |
 | `side_panel_code_demo`  | `foldnano_json` | `previewOnly`                              | `sidePanel.type: "codeEditor"` with `execution: "input"` (the default) — manifest entrypoint runs, editor contents read via `ctx.get_side_panel_code()`                          |
 | `side_panel_form_demo`  | `foldnano_json` | `previewOnly`                              | `sidePanel.type: "form"` — manifest-declared fields render in a dedicated sidebar tab instead of the popup run dialog                                                            |

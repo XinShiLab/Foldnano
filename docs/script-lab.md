@@ -302,7 +302,7 @@ Script Lab ships three built-in starters in `scriptLabManifest.ts`:
 
 - `SCRIPT_LAB_MUTATION_TEMPLATE`
 - `SCRIPT_LAB_ANALYSIS_TEMPLATE`
-- `SCRIPT_LAB_FULL_API_DEMO_TEMPLATE` — exercises all 24 `foldnano_mini` op kinds against the current active region/design (discovering VHs, oligos, and regions dynamically rather than using a fixed fixture); see `docs/foldnano-plugin-development-guide.md` § ScriptLab Full API Demo
+- `SCRIPT_LAB_FULL_API_DEMO_TEMPLATE` — exercises every `foldnano_mini` op kind against the current active region/design (discovering VHs, oligos, and regions dynamically rather than using a fixed fixture, and using the `can_*` checks to skip a step with its reason instead of failing); see `docs/foldnano-plugin-development-guide.md` § ScriptLab Full API Demo
 
 Why keep them in code instead of static files:
 

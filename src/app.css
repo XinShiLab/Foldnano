@@ -178,6 +178,21 @@
 /* Shiki code blocks: inline background-color from github-dark theme
    takes precedence over prose's var(--tw-prose-pre-bg) */
 
+/* Inline code as a pill instead of typography's default bold-with-backticks.
+   Fixed radius because the theme's --radius is 0. */
+.prose :where(code):not(:where(pre *, .not-prose, .not-prose *)) {
+	padding: 0.125rem 0.375rem;
+	border-radius: 0.25rem;
+	background-color: var(--muted);
+	font-family: 'JetBrains Mono Variable', ui-monospace, monospace;
+	font-size: 0.875em;
+	font-weight: 400;
+}
+.prose :where(code):not(:where(pre *, .not-prose, .not-prose *))::before,
+.prose :where(code):not(:where(pre *, .not-prose, .not-prose *))::after {
+	content: none;
+}
+
 @media print {
 	html {
 		font-size: 12pt;

@@ -1305,7 +1305,11 @@ export class Part {
 			this._uncacheOligo(fromOligo);
 			if (fromOligo !== toOligo) this._uncacheOligo(toOligo);
 
-			if (fromSeg.threePrime.isAdjacentTo(toSeg.fivePrime)) {
+			if (!fromSeg.threePrime.isFree || !toSeg.fivePrime.isFree) {
+				throw new InvalidOperationError("Both the 3' and the 5' end must be free to connect.");
+			}
+			const isMerge = fromSeg.threePrime.isAdjacentTo(toSeg.fivePrime);
+			if (isMerge) {
 				fromSeg.threePrime.mergeTo(toSeg.fivePrime);
 			} else {
 				fromSeg.threePrime.connectTo(toSeg.fivePrime);
@@ -1316,8 +1320,9 @@ export class Part {
 				return;
 			}
 
-			// Migrate toSeg and every downstream-connected segment into fromOligo.
-			let current: OligoSegment | null = toSeg;
+			// Migrate every segment downstream of the junction into fromOligo. A merge has already
+			// destroyed toSeg and handed its 3' connection to fromSeg, so start from fromSeg's.
+			let current: OligoSegment | null = isMerge ? fromSeg.threePrime.connectedSegment : toSeg;
 			while (current && !fromOligo.segments.has(current)) {
 				const owner: Oligo | null = current.oligo;
 				if (owner && owner !== fromOligo) owner.segments.delete(current);
@@ -1337,7 +1342,7 @@ export class Part {
 		oligo: Oligo,
 		breakAtSegment: OligoSegment,
 		breakAtIndex: number,
-		opts?: { newOligoId?: string }
+		opts?: { newOligoId?: string; newSegmentId?: string }
 	): Oligo {
 		// first make sure the oligo is in this part
 		if (!this.oligos.has(oligo)) {
@@ -1365,7 +1370,12 @@ export class Part {
 		return newOligo;
 	}
 
-	removeSegmentFromOligo(oligo: Oligo, segment: OligoSegment): void {
+	/** `opts.newOligoId` names the oligo split off downstream of `segment`, if there is one. */
+	removeSegmentFromOligo(
+		oligo: Oligo,
+		segment: OligoSegment,
+		opts?: { newOligoId?: string }
+	): void {
 		// first make sure the oligo is in this part
 		if (!this.oligos.has(oligo)) {
 			throw new Error('Oligo must be part of this Part to remove a segment from it.');
@@ -1374,7 +1384,9 @@ export class Part {
 		this._uncacheOligo(oligo);
 
 		// break oligo at the segment's three prime end index
-		this.breakOligoAt(oligo, segment, segment.threePrime.index);
+		this.breakOligoAt(oligo, segment, segment.threePrime.index, {
+			newOligoId: opts?.newOligoId,
+		});
 		// break oligo at the segment's five prime end index on the original oligo
 
 		const oligoToRemove = this.breakOligoAt(oligo, segment, segment.fivePrime.index);

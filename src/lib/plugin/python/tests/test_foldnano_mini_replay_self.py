@@ -44,6 +44,7 @@ def test_replay_after_mixed_simple_ops(multi_region_part_foldnano_json: str) -> 
     seg = o.segments[0]
     seg.five_modification = "/5Bio/"
     seg.slot_at(3).seq = "G"
+    part.create_segment(vh=0, five_index=20, three_index=0)
     seg.slot_at(7).set_skip(True)
 
     _replay_matches_mirror(multi_region_part_foldnano_json, part.mutation_log, part.to_json())

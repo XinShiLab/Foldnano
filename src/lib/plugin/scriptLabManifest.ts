@@ -92,11 +92,11 @@ def run(ctx: PluginContext) -> None:
 export const SCRIPT_LAB_FULL_API_DEMO_TEMPLATE = `from itertools import product
 
 from foldnano.plugin import PluginContext
-from foldnano_mini import FreeformRegion, LatticedRegion, load_part
+from foldnano_mini import KNOWN_OPS, FreeformRegion, LatticedRegion, load_part
 
 
 def run(ctx: PluginContext) -> None:
-    """Full API Demo — exercises all 24 foldnano_mini op kinds on the active design.
+    """Full API Demo — exercises every foldnano_mini op kind on the active design.
 
     Sections A–H annotate / resize / restructure existing content; new VHs and
     segments created in sections F–G are removed in section I so the net
@@ -146,11 +146,14 @@ def run(ctx: PluginContext) -> None:
     # set_segment_modification (5' and 3') / set_slot_sequence / skip / insertion
     demo_seg = demo_oligo.segments[0] if demo_oligo and demo_oligo.segments else None
     if demo_seg is not None:
-        demo_seg.five_modification = "/5BioTEG/"
-        ctx.log(f"[set_segment_modification 5'] seg {demo_seg.id}: '/5BioTEG/'")
-
-        demo_seg.three_modification = "/3Cy3/"
-        ctx.log(f"[set_segment_modification 3'] seg {demo_seg.id}: '/3Cy3/'")
+        # Modifications live on the oligo's free ends (a circular oligo has none).
+        if not demo_oligo.is_circular:
+            demo_oligo.five_modification = "/5BioTEG/"
+            ctx.log(f"[set_segment_modification 5'] oligo {demo_oligo.id}: '/5BioTEG/'")
+            demo_oligo.three_modification = "/3Cy3/"
+            ctx.log(f"[set_segment_modification 3'] oligo {demo_oligo.id}: '/3Cy3/'")
+        else:
+            ctx.log("[set_segment_modification] SKIPPED — circular oligo has no free ends")
 
         lo = min(demo_seg.five_index, demo_seg.three_index)
         hi = max(demo_seg.five_index, demo_seg.three_index)
@@ -158,10 +161,25 @@ def run(ctx: PluginContext) -> None:
             mid = (lo + hi) // 2
             demo_seg.slot_at(mid).seq = "A"
             ctx.log(f"[set_slot_sequence]     bp {mid} → 'A'")
-            demo_seg.slot_at(mid + 1).set_skip(True)
-            ctx.log(f"[set_slot_skip]         bp {mid + 1} → skip=True")
-            demo_seg.slot_at(mid + 2).set_insertion("GC")
-            ctx.log(f"[set_slot_insertion]    bp {mid + 2} → insertion='GC'")
+            # can_set_* explains a refusal (no complementary strand, a crossover bp, ...)
+            skip_check = demo_seg.slot_at(mid + 1).can_set_skip()
+            if skip_check:
+                demo_seg.slot_at(mid + 1).set_skip(True)
+                ctx.log(f"[set_slot_skip]         bp {mid + 1} → skip=True")
+            else:
+                ctx.log(f"[set_slot_skip] SKIPPED — {skip_check.reason}")
+            insert_check = part.can_add_insert_at(demo_seg.vh_index, mid - 1)
+            if insert_check:
+                part.add_insert_at(demo_seg.vh_index, mid - 1)  # the insert tool: both strands
+                ctx.log(f"[add_skip_or_insertion] bp {mid - 1} → +1 base on both strands")
+            else:
+                ctx.log(f"[add_skip_or_insertion] SKIPPED — {insert_check.reason}")
+            insertion_check = demo_seg.slot_at(mid + 2).can_set_insertion()
+            if insertion_check:
+                demo_seg.slot_at(mid + 2).set_insertion("GC")
+                ctx.log(f"[set_slot_insertion]    bp {mid + 2} → insertion='GC'")
+            else:
+                ctx.log(f"[set_slot_insertion] SKIPPED — {insertion_check.reason}")
         else:
             ctx.log("[set_slot_*] SKIPPED — segment span < 5")
     else:
@@ -183,33 +201,25 @@ def run(ctx: PluginContext) -> None:
         ctx.log("[set_region_max_base] SKIPPED — region.step is 0")
 
     # ── D  Draw and connect strands (create_segment / connect) ───────────
+    # create_oligo emits create_segment per entry plus a connect per junction.
     new_seg1 = new_seg2 = None
     if vhs:
         vh0 = vhs[0]
         end = region.max_base        # upper bound after extension
         step = region.step
         half = max(step // 2, 1)
-        s1_five, s1_three = end - step, end - half - 1
-        s2_five, s2_three = end - half, end - 1
-        if s1_five >= 0 and s1_three > s1_five and s2_three > s2_five:
-            new_seg1 = part.create_segment(
-                vh0, five_index=s1_five, three_index=s1_three, color="#3b82f6"
-            )
+        # A 1-bp gap keeps the junction a crossover; adjacent ends would merge.
+        path = [(vh0, end - step, end - half - 1), (vh0, end - half + 1, end - 1)]
+        path_check = part.can_create_oligo(path)
+        if path_check:
+            demo_path = part.create_oligo(path, color="#3b82f6", name="API demo path")
+            new_seg1, new_seg2 = demo_path.segments
             ctx.log(
-                f"[create_segment]        seg {new_seg1.id} "
-                f"on vh[{vh0.index}] [{s1_five}..{s1_three}]"
+                f"[create_segment]×2 + [connect]  oligo {demo_path.id} on vh[{vh0.index}]: "
+                f"{[(s.five_index, s.three_index) for s in demo_path.segments]}"
             )
-            new_seg2 = part.create_segment(
-                vh0, five_index=s2_five, three_index=s2_three, color="#3b82f6"
-            )
-            ctx.log(
-                f"[create_segment]        seg {new_seg2.id} "
-                f"on vh[{vh0.index}] [{s2_five}..{s2_three}]"
-            )
-            part.connect(new_seg1, new_seg2)
-            ctx.log(f"[connect]               {new_seg1.id} → {new_seg2.id}")
         else:
-            ctx.log("[create_segment/connect] SKIPPED — not enough free space on VH")
+            ctx.log(f"[create_segment/connect] SKIPPED — {path_check.reason}")
     else:
         ctx.log("[create_segment/connect] SKIPPED — no VHs in region")
 
@@ -380,7 +390,7 @@ def run(ctx: PluginContext) -> None:
     # ── Summary ───────────────────────────────────────────────────────────
     op_kinds = sorted({op["op"] for op in part.mutation_log})
     ctx.log(f"\\nTotal ops emitted : {len(part.mutation_log)}")
-    ctx.log(f"Distinct op kinds : {len(op_kinds)} / 24")
+    ctx.log(f"Distinct op kinds : {len(op_kinds)} / {len(KNOWN_OPS)}")
     ctx.set_result({
         "active_region_id": region.id,
         "active_region_kind": region.kind,

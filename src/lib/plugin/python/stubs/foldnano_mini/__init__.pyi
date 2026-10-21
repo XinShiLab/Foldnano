@@ -24,7 +24,7 @@ Example::
 
 from __future__ import annotations
 
-from typing import Any, Protocol
+from typing import Any, NamedTuple, Protocol, Sequence
 
 __all__ = [
     "load_part",
@@ -34,9 +34,15 @@ __all__ = [
     "LatticedRegion",
     "FreeformRegion",
     "MutableVirtualHelix",
+    "MutableStrandSet",
     "MutableOligo",
     "MutableSegment",
+    "MutableSegmentEnd",
     "MutableSlot",
+    "SegmentSpec",
+    "CrossoverSite",
+    "Check",
+    "InvalidOperationError",
     "MutationLog",
     "KNOWN_OPS",
     "Transport",
@@ -58,6 +64,11 @@ def load_part(json_str: str, active_region_id: str | None=None) -> MutablePart:
         Optional UUID of the region the host considered "active" when the
         plugin was launched. Region-scoped plugins should respect this.
     """
+
+
+class _PlannedSegment(NamedTuple):
+    @property
+    def strand_index(self) -> int: ...
 
 
 class MutablePart:
@@ -132,6 +143,12 @@ class MutablePart:
 
     def get_oligo(self, oligo_id: str) -> MutableOligo | None: ...
 
+    def potential_xover_sites(self, vh: MutableVirtualHelix | int) -> list[list[CrossoverSite]]:
+        """
+        ``[strand 0 sites, strand 1 sites]`` for one VH, as the host's
+        ``Part.potentialXoverSites``. See :meth:`MutableVirtualHelix.potential_xover_sites`.
+        """
+
     def vhs_in_region(self, region_id: str) -> list[MutableVirtualHelix]: ...
 
     def oligos_in_region(self, region_id: str) -> list[MutableOligo]:
@@ -145,16 +162,23 @@ class MutablePart:
         set 0, otherwise strand set 1) — the same convention ``Part.createOligo``
         uses on the JS side. Both sides agree by construction.
 
-        Returns the newly-created segment proxy.
+        Raises :class:`InvalidOperationError` when :meth:`can_create_segment` refuses
+        it. Returns the newly-created segment proxy.
         """
 
     def connect(self, from_segment: MutableSegment, to_segment: MutableSegment) -> None:
         """
         Connect ``from_segment``'s 3' end to ``to_segment``'s 5' end.
 
-        If the segments live in different oligos, the offline mirror merges
-        them (see :mod:`foldnano_mini.transport`). The JS replayer is the
-        authoritative source for merge semantics.
+        Any free 3′ end may join any free 5′ end, as on the host; check
+        ``seg.three_prime.is_constrained`` afterwards (or pick a bp from
+        ``vh.potential_xover_sites(...)`` first) for a lattice crossover site.
+        Adjacent ends (same VH and strand, 1 bp apart) merge into one segment
+        instead: ``from_segment`` extends over ``to_segment``, which is removed.
+        If the segments were in different oligos, ``from_segment``'s oligo absorbs
+        the other.
+
+        Raises :class:`InvalidOperationError` when :meth:`can_connect` refuses it.
         """
 
     def remove_vhs(self, vhs: list[int | MutableVirtualHelix]) -> None:
@@ -169,13 +193,158 @@ class MutablePart:
 
     def break_oligo(self, segment: MutableSegment, at_index: int) -> MutableOligo:
         """
-        Break the oligo containing ``segment`` at ``at_index``.
+        Break the oligo containing ``segment`` so its new 3′ end is at ``at_index``
+        (``Part.breakOligoAt``).
 
-        The 3′ half of the break (from ``at_index`` onwards) is moved into a
-        new oligo. Returns a proxy for that new oligo.
+        Returns the oligo holding the 3′ side: a new oligo, or the same one when nothing
+        splits off. As on the host, a break at the oligo's own free 5′/3′ end or one bp
+        before a free 3′ end does nothing, and breaking a circular oligo opens it into one
+        linear oligo. A mid-segment break drops the segment's 3′ modification (both new 3′
+        ends are fresh). Raises :class:`InvalidOperationError` when
+        :meth:`can_break_oligo` refuses it.
+        """
 
-        The break is a no-op (returns the same oligo) if ``at_index`` equals
-        the 5′ or 3′ terminus of the segment, or if the oligo is circular.
+    def break_at(self, vh: MutableVirtualHelix | int, strand_index: int, bp_index: int) -> MutableOligo:
+        """
+        The break tool: break the strand at ``(vh, strand_index, bp_index)`` so its new 3′
+        end is at ``bp_index``. Same as :meth:`break_oligo` on the segment found there.
+        """
+
+    def can_break_at(self, vh: MutableVirtualHelix | int, strand_index: int, bp_index: int) -> Check: ...
+
+    def get_segment_at(self, vh: MutableVirtualHelix | int, strand_index: int, bp_index: int) -> MutableSegment | None:
+        """The segment covering ``bp_index`` on one strand of ``vh``, or ``None``."""
+
+    def get_oligo_at(self, vh: MutableVirtualHelix | int, strand_index: int, bp_index: int) -> MutableOligo | None:
+        """The oligo covering ``bp_index`` on one strand of ``vh`` (``Part.getOligoByVh``)."""
+
+    def get_end_at(self, vh: MutableVirtualHelix | int, strand_index: int, bp_index: int) -> MutableSegmentEnd | None:
+        """The 5′ or 3′ end sitting at ``bp_index`` on one strand of ``vh``, free or connected."""
+
+    def connect_oligos(self, from_oligo: MutableOligo, to_oligo: MutableOligo) -> None:
+        """
+        Join ``from_oligo``'s free 3′ end to ``to_oligo``'s free 5′ end
+        (``Part.connectTwoOligos``); the same oligo twice makes it circular.
+
+        Adjacent ends merge into one segment, as with :meth:`connect`. A modification
+        on either joined end is cleared, like the editor's connect.
+        """
+
+    def can_connect_oligos(self, from_oligo: MutableOligo, to_oligo: MutableOligo) -> Check: ...
+
+    def create_crossover(self, from_oligo: MutableOligo, vh: MutableVirtualHelix | int, strand_index: int, bp_index: int) -> None:
+        """
+        Join ``from_oligo``'s free 3′ end to the strand at ``(vh, strand_index, bp_index)``,
+        breaking that strand just before ``bp_index`` (``Part.createCrossover``; the editor's
+        drag from a 3′ end onto a strand).
+
+        If the target oligo's free 5′ end is at ``bp_index`` it is joined directly.
+        Refused onto a 3′ end, onto the bp right after a free 5′ end (a 1-nt leftover),
+        within one segment, or from a circular oligo.
+        """
+
+    def can_create_crossover(self, from_oligo: MutableOligo, vh: MutableVirtualHelix | int, strand_index: int, bp_index: int) -> Check: ...
+
+    def make_crossover(self, vh: MutableVirtualHelix | int, strand_index: int, bp_index: int, to_vh: MutableVirtualHelix | int) -> None:
+        """
+        Cross over at a potential crossover site, like clicking one in the editor
+        (``makeCrossoverCmd``): the strand whose 3′ end leaves at the site is broken there
+        and joined to the other strand at the same bp.
+
+        ``(vh, strand_index, bp_index)`` and ``to_vh`` must name a site from
+        ``vh.potential_xover_sites(strand_index)``; both strands must be there, and the
+        receiving strand must not end at or 1 nt before its 3′ end at the site.
+        """
+
+    def can_make_crossover(self, vh: MutableVirtualHelix | int, strand_index: int, bp_index: int, to_vh: MutableVirtualHelix | int) -> Check: ...
+
+    def remove_oligo(self, oligo: MutableOligo) -> None:
+        """Remove ``oligo`` and all its segments (``Part.removeOligo``)."""
+
+    def remove_segment(self, segment: MutableSegment) -> MutableOligo | None:
+        """
+        Remove one segment from its oligo (``Part.removeSegmentFromOligo``).
+
+        Segments upstream stay in the oligo; those downstream split off into a new oligo,
+        which is returned (``None`` when nothing was downstream). Removing an oligo's only
+        or first segment removes that oligo id.
+        """
+
+    def fill_empty_strand_set(self, vh: MutableVirtualHelix | int, strand_index: int, color: str='#888888') -> MutableSegment:
+        """
+        Draw one segment over the whole of an empty strand (``Part.fillEmptyStrandSet``),
+        from the region's ``min_base`` to ``min(vh.length, max_base) - 1``, 5′ → 3′ in the
+        strand's direction.
+        """
+
+    def can_fill_empty_strand_set(self, vh: MutableVirtualHelix | int, strand_index: int) -> Check: ...
+
+    def create_oligo(self, segments: Sequence[SegmentSpec | tuple[MutableVirtualHelix | int, int, int]], color: str='#888888', name: str | None=None, is_scaffold: bool=False, circular: bool=False) -> MutableOligo:
+        """
+        Create one oligo from a path of segments listed 5′ → 3′.
+
+        Each entry is ``(vh, five, three)`` (or a :class:`SegmentSpec`); each
+        segment's 3′ end joins the next one's 5′ end. Junctions are unrestricted,
+        like :meth:`connect`. Consecutive entries that are adjacent on the same VH
+        and strand become one segment (the host would merge them).
+        ``circular=True`` also joins the last 3′ end to the first 5′ end.
+
+        The whole path is checked first (:meth:`can_create_oligo`), so an invalid
+        path raises :class:`InvalidOperationError` before anything is recorded.
+        Returns the oligo; ``oligo.segments`` lists its segments 5′ → 3′.
+        """
+
+    def can_create_oligo(self, segments: Sequence[SegmentSpec | tuple[MutableVirtualHelix | int, int, int]], circular: bool=False) -> Check:
+        """
+        Whether :meth:`create_oligo` accepts this path: every segment in its
+        region's bounds and on free bases, no two entries overlapping, and no
+        junction on a skip or insertion.
+        """
+
+    def can_create_segment(self, vh: MutableVirtualHelix | int, five_index: int, three_index: int) -> Check:
+        """
+        Whether :meth:`create_segment` accepts this segment, as ``Part.createOligo``
+        checks it: both ends inside the VH region's ``[min_base, max_base)`` and the
+        range free on its strand set (``5' < 3'`` → strand set 0, else 1).
+        """
+
+    def can_connect(self, from_segment: MutableSegment, to_segment: MutableSegment) -> Check:
+        """
+        Whether :meth:`connect` accepts joining ``from_segment``'s 3′ end to
+        ``to_segment``'s 5′ end: different segments, both ends free, and neither end
+        on a skip or insertion.
+        """
+
+    def can_break_oligo(self, segment: MutableSegment, at_index: int) -> Check:
+        """
+        Whether :meth:`break_oligo` accepts this break: ``at_index`` inside the
+        segment, and a mid-segment break not leaving a new end on a skip or insertion.
+        """
+
+    def get_slot_at(self, vh: MutableVirtualHelix | int, strand_index: int, bp_index: int) -> MutableSlot | None:
+        """The slot at one base of one strand (``None`` where no segment covers it)."""
+
+    def add_skip_at(self, vh: MutableVirtualHelix | int, bp_index: int) -> None:
+        """
+        The skip tool: skip ``bp_index`` on both strands of ``vh``
+        (``OligoSegment.addSkipOrInsertion(bp, -1)``).
+        """
+
+    def can_add_skip_at(self, vh: MutableVirtualHelix | int, bp_index: int) -> Check: ...
+
+    def add_insert_at(self, vh: MutableVirtualHelix | int, bp_index: int, count: int=1) -> None:
+        """
+        The insert tool: add ``count`` inserted bases at ``bp_index`` on both strands of
+        ``vh``, keeping their bases. Calling it again adds more
+        (``OligoSegment.addSkipOrInsertion(bp, count)``).
+        """
+
+    def can_add_insert_at(self, vh: MutableVirtualHelix | int, bp_index: int) -> Check: ...
+
+    def remove_skip_or_insertion_at(self, vh: MutableVirtualHelix | int, bp_index: int) -> None:
+        """
+        Remove a skip or insertion at ``bp_index``: both strands go back to one base each
+        (``OligoSegment.removeSkipOrInsertion``). Does nothing on a plain base.
         """
 
     def reorder_vh(self, vh: MutableVirtualHelix | int, target_region_row: int) -> None:
@@ -286,11 +455,13 @@ class MutableRegion:
 
     def set_max_base(self, new_max_base: int) -> None:
         """
-        Extend all VHs in this region to ``new_max_base``.
+        Lengthen or shorten every VH in this region so the region ends at ``new_max_base``.
 
-        ``new_max_base`` must be greater than the current ``max_base`` and a
-        multiple of ``step``.
+        The change must be a multiple of ``step``. Shortening is refused while any
+        segment in the region reaches ``new_max_base`` or beyond.
         """
+
+    def can_set_max_base(self, new_max_base: int) -> Check: ...
 
     def increase_length_by(self, delta: int) -> None:
         """
@@ -298,6 +469,19 @@ class MutableRegion:
 
         ``delta`` must be a positive multiple of ``step``.
         """
+
+    def reduce_unused_length(self) -> None:
+        """
+        Shorten the region to the strands it holds, rounded up to ``step`` and at least
+        two steps, like the strand view's reduce-length button. Does nothing when already
+        that short.
+        """
+
+    def remove_all_skips(self) -> int:
+        """Turn every skip in this region back into a plain base; returns how many."""
+
+    def remove_all_insertions(self) -> int:
+        """Turn every insertion in this region back into a plain base; returns how many."""
 
     @property
     def supports_lattice_grid(self) -> bool: ...
@@ -375,7 +559,74 @@ class MutableVirtualHelix:
         """
 
     @property
+    def is_even_parity(self) -> bool:
+        """Same as ``parity_is_even``; named after the host's ``VirtualHelix.isEvenParity``."""
+
+    @property
+    def strand_sets(self) -> list[MutableStrandSet]:
+        """``[strand set 0, strand set 1]`` — see :class:`MutableStrandSet`."""
+
+    def segments_at(self, bp_index: int, strand_index: int | None=None) -> list['MutableSegment']:
+        """Segments covering ``bp_index`` — on one strand set, or both (strand 0 first)."""
+
+    def potential_xover_sites(self, strand_index: int) -> list[CrossoverSite]:
+        """
+        Potential crossover sites from one strand set, as the host's
+        ``potentialXoverSites(vh)[strand_index]``.
+
+        Each is ``CrossoverSite(bp_index, to_vh_index, right)``; only sites whose
+        target lattice position holds a VH in the same region are listed. Freeform
+        VHs have none. A connection between ends at a site's bp (opposite strand
+        indices) is a constrained crossover — see ``MutableSegmentEnd.is_constrained``.
+        """
+
+    @property
     def strand_set_segment_ids(self) -> list[list[str]]: ...
+
+
+class MutableStrandSet:
+    """
+    One strand of a VH — mirrors the host's ``StrandSet``.
+
+    Strand set 0 runs 5′→3′ with ascending bp, strand set 1 descending. Reach it as
+    ``vh.strand_sets[0]`` / ``vh.strand_sets[1]``. Occupancy queries read an index
+    rebuilt lazily after any edit, so they always see the current mirror.
+    """
+    def __init__(self, part: 'MutablePart', vh_index: int, strand_index: int) -> None: ...
+
+    @property
+    def strand_index(self) -> int: ...
+
+    @property
+    def virtual_helix(self) -> 'MutableVirtualHelix': ...
+
+    @property
+    def segment_ids(self) -> list[str]:
+        """Ids of this strand's segments, sorted by their low bp."""
+
+    @property
+    def segments(self) -> list['MutableSegment']:
+        """This strand's segments, sorted by their low bp."""
+
+    @property
+    def is_empty(self) -> bool: ...
+
+    def is_index_occupied(self, bp_index: int) -> bool: ...
+
+    def is_index_occupied_by(self, bp_index: int) -> 'MutableSegment | None':
+        """The segment covering ``bp_index`` on this strand, or ``None``."""
+
+    def is_range_occupied(self, start_index: int, end_index: int) -> bool:
+        """True when any segment overlaps the inclusive range (either order)."""
+
+    def segments_in_range(self, start_index: int, end_index: int) -> list['MutableSegment']:
+        """Segments overlapping the inclusive range (either order), sorted by low bp."""
+
+    def free_ranges(self) -> list[tuple[int, int]]:
+        """
+        Maximal free inclusive ``(low, high)`` ranges within the VH's region bounds
+        (where ``part.create_segment`` may place a segment).
+        """
 
 
 class MutableOligo:
@@ -412,9 +663,32 @@ class MutableOligo:
     @property
     def segments(self) -> list[MutableSegment]: ...
 
+    @property
+    def five_prime(self) -> MutableSegmentEnd | None:
+        """The oligo's free 5′ end, or ``None`` for a circular oligo."""
+
+    @property
+    def three_prime(self) -> MutableSegmentEnd | None:
+        """The oligo's free 3′ end, or ``None`` for a circular oligo."""
+
     def get_segment(self, segment_id: str) -> MutableSegment | None: ...
 
-    def remove(self) -> None: ...
+    def remove(self) -> None:
+        """Same as ``part.remove_oligo(oligo)``."""
+
+    @property
+    def five_modification(self) -> str | None:
+        """Modification on the oligo's free 5′ end (``None`` when unset or circular)."""
+
+    @five_modification.setter
+    def five_modification(self, value: str | None) -> None: ...
+
+    @property
+    def three_modification(self) -> str | None:
+        """Modification on the oligo's free 3′ end (``None`` when unset or circular)."""
+
+    @three_modification.setter
+    def three_modification(self, value: str | None) -> None: ...
 
     def touches_regions(self) -> set[str]:
         """Set of region IDs this oligo's segments visit (cross-region detection)."""
@@ -442,6 +716,28 @@ class MutableSegment:
     def length(self) -> int: ...
 
     @property
+    def five_prime(self) -> MutableSegmentEnd: ...
+
+    @property
+    def three_prime(self) -> MutableSegmentEnd: ...
+
+    @property
+    def low_index(self) -> int: ...
+
+    @property
+    def high_index(self) -> int: ...
+
+    @property
+    def in_virtual_helix(self) -> 'MutableVirtualHelix': ...
+
+    @property
+    def in_strand_index(self) -> int:
+        """0 or 1 — which strand set of its VH this segment lives on."""
+
+    @property
+    def oligo(self) -> 'MutableOligo': ...
+
+    @property
     def five_modification(self) -> str | None: ...
 
     @five_modification.setter
@@ -467,21 +763,98 @@ class MutableSegment:
 
     def move_five_prime_to(self, new_index: int) -> None:
         """
-        Move the 5′ terminus of this segment to ``new_index``.
+        Move the 5′ terminus to ``new_index`` (same as ``seg.five_prime.index = new_index``).
 
-        The caller is responsible for ensuring the new index does not cross the
-        3′ terminus or exceed the VH length.
+        Raises :class:`InvalidOperationError` when ``seg.five_prime.can_move_to``
+        refuses it.
         """
 
     def move_three_prime_to(self, new_index: int) -> None:
         """
-        Move the 3′ terminus of this segment to ``new_index``.
+        Move the 3′ terminus to ``new_index`` (same as ``seg.three_prime.index = new_index``).
 
-        The caller is responsible for ensuring the new index does not cross the
-        5′ terminus or exceed the VH length.
+        Raises :class:`InvalidOperationError` when ``seg.three_prime.can_move_to``
+        refuses it.
         """
 
-    def remove(self) -> None: ...
+    def remove(self) -> 'MutableOligo | None':
+        """Same as ``part.remove_segment(seg)``."""
+
+
+class MutableSegmentEnd:
+    """
+    One end of a segment — mirrors the host's ``SegmentEnd`` (``FivePrimeEnd`` /
+    ``ThreePrimeEnd``).
+
+    Reach it as ``segment.five_prime`` / ``segment.three_prime`` (or
+    ``oligo.five_prime`` / ``oligo.three_prime``). Setting ``index`` moves the end,
+    like assigning ``SegmentEnd.index`` on the host.
+    """
+    def __init__(self, part: 'MutablePart', segment_id: str, is_three_prime: bool) -> None: ...
+
+    @property
+    def segment(self) -> 'MutableSegment': ...
+
+    @property
+    def is_three_prime(self) -> bool: ...
+
+    @property
+    def index(self) -> int: ...
+
+    @index.setter
+    def index(self, new_index: int) -> None: ...
+
+    def can_move_to(self, new_index: int) -> Check:
+        """
+        Port of ``SegmentEnd.canMoveTo``: within the VH length, the swept range free
+        of other segments, the segment keeps its direction, and a constrained end
+        only moves to a matching crossover site. Also refuses a skip/insertion bp.
+        """
+
+    @property
+    def modification(self) -> str | None: ...
+
+    @modification.setter
+    def modification(self, value: str | None) -> None:
+        """
+        Set or clear (``None``) this end's modification; only a free end can carry one,
+        as in the editor's modification tool.
+        """
+
+    @property
+    def connected_segment(self) -> 'MutableSegment | None': ...
+
+    @property
+    def connected_end(self) -> 'MutableSegmentEnd | None':
+        """The end on the other side of this end's connection (3' ↔ 5')."""
+
+    @property
+    def is_free(self) -> bool: ...
+
+    @property
+    def is_constrained(self) -> bool:
+        """
+        True when this end is connected across a lattice crossover site.
+
+        Recomputed from the current mirror like the host's derived
+        ``SegmentEnd.isConstrained`` (the JSON field is only a snapshot): the two
+        ends sit on different strand indices at the same bp, and this end's VH has a
+        potential crossover site there pointing at the other VH. Freeform
+        connections are never constrained.
+        """
+
+    @property
+    def in_virtual_helix(self) -> 'MutableVirtualHelix': ...
+
+    @property
+    def in_strand_index(self) -> int: ...
+
+    def is_adjacent_to(self, other: 'MutableSegmentEnd') -> bool:
+        """
+        Port of ``SegmentEnd.isAdjacentTo``: same VH and strand, 1 bp apart.
+
+        A ``connect`` between adjacent ends merges the two segments into one.
+        """
 
 
 class MutableSlot:
@@ -495,14 +868,81 @@ class MutableSlot:
     def seq(self) -> str: ...
 
     @seq.setter
-    def seq(self, value: str) -> None: ...
+    def seq(self, value: str) -> None:
+        """
+        Write this slot's bases. The length must stay as it is (one base, none for a
+        skip, n for an insertion): a longer or shorter write would change one strand only.
+        Use ``part.add_insert_at`` / ``add_skip_at`` / ``remove_skip_or_insertion_at``
+        to change that.
+        """
 
     @property
     def skip(self) -> bool: ...
 
+    def can_set_skip(self) -> Check:
+        """
+        Whether ``set_skip(True)`` is allowed here.
+
+        Refused at a segment end, at a constrained crossover bp (either strand),
+        without a complementary strand, or when either strand's slot is already
+        a skip or insertion.
+        """
+
+    def can_set_insertion(self) -> Check:
+        """
+        Whether ``set_insertion(...)`` is allowed here (same rules as a skip, but an
+        existing insertion may be replaced).
+        """
+
     def set_skip(self, value: bool) -> None: ...
 
+    def remove_skip_or_insertion(self) -> None:
+        """
+        Turn a skip or insertion back into a plain base on both strands
+        (``OligoSegment.removeSkipOrInsertion``); a plain slot is left alone.
+        """
+
     def set_insertion(self, sequence: str) -> None: ...
+
+
+class SegmentSpec(NamedTuple):
+    """
+    One segment of a :meth:`MutablePart.create_oligo` path: a VH and its 5′/3′ bp.
+
+    A plain ``(vh, five, three)`` tuple works the same; this just names the fields.
+    ``vh`` is a :class:`MutableVirtualHelix` or a VH index.
+    """
+
+
+class CrossoverSite(NamedTuple):
+    """One potential crossover site, as the host's ``CrossoverSite``."""
+
+
+class Check:
+    """``ok`` plus the ``reason`` it is not, like the host's ``DuplicateCheck``."""
+    ok: bool
+
+    reason: str | None
+
+    def __init__(self, ok: bool, reason: str | None=None) -> None: ...
+
+    @classmethod
+    def passed(cls) -> 'Check': ...
+
+    @classmethod
+    def failed(cls, reason: str) -> 'Check': ...
+
+    def raise_if_failed(self) -> None:
+        """Raise :class:`InvalidOperationError` with ``reason`` unless ``ok``."""
+
+
+class InvalidOperationError(ValueError):
+    """
+    An edit the model refuses (occupied range, out of bounds, ...).
+
+    Named after the host's ``InvalidOperationError``. Subclasses ``ValueError``
+    so existing ``except ValueError`` handlers keep working.
+    """
 
 
 class MutationLog:

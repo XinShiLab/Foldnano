@@ -18,6 +18,21 @@ export const WHATS_NEW_REVIEWED_THROUGH = '2026-10-03T12:05:00+02:00';
 // Newest first. Edit freely; the draft script only inserts new entries at the top.
 export const WHATS_NEW: readonly WhatsNewEntry[] = [
 	{
+		date: '2026-10-21',
+		area: 'Plugins',
+		text: 'Python plugins can check an edit before making it (can_create_segment, can_connect, ...), find free bases and crossover sites, and draw a multi-segment oligo in one call with create_oligo.',
+	},
+	{
+		date: '2026-10-21',
+		area: 'Plugins',
+		text: 'Python plugins can edit like the strand view: find what is at a base, break, make or drag crossovers, join oligos, fill a strand, add skips and inserts on both strands like the skip and insert tools, set end modifications on the oligo, shorten a region, and clear all skips or insertions.',
+	},
+	{
+		date: '2026-10-21',
+		area: 'Strand view',
+		text: 'Fixed: undoing or redoing a connection that joined two strands end to end could make strands disappear until the page was reloaded.',
+	},
+	{
 		date: '2026-10-07',
 		area: 'Plugins',
 		text: 'A failed plugin run now always says why, with the Python error and its traceback, instead of only a red icon.',

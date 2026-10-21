@@ -44,9 +44,15 @@
 			"LatticedRegion",
 			"FreeformRegion",
 			"MutableVirtualHelix",
+			"MutableStrandSet",
 			"MutableOligo",
 			"MutableSegment",
+			"MutableSegmentEnd",
 			"MutableSlot",
+			"SegmentSpec",
+			"CrossoverSite",
+			"Check",
+			"InvalidOperationError",
 			"MutationLog",
 			"KNOWN_OPS",
 			"Transport",
@@ -56,7 +62,8 @@
 			"load_part"
 		],
 		"foldnano_mini.part": [
-			"MutablePart"
+			"MutablePart",
+			"SegmentSpec"
 		],
 		"foldnano_mini.plane": [
 			"MutablePlane"
@@ -67,12 +74,21 @@
 			"FreeformRegion"
 		],
 		"foldnano_mini.vh": [
-			"MutableVirtualHelix"
+			"MutableVirtualHelix",
+			"MutableStrandSet"
 		],
 		"foldnano_mini.oligo": [
 			"MutableOligo",
 			"MutableSegment",
+			"MutableSegmentEnd",
 			"MutableSlot"
+		],
+		"foldnano_mini.lattice": [
+			"CrossoverSite"
+		],
+		"foldnano_mini.checks": [
+			"Check",
+			"InvalidOperationError"
 		],
 		"foldnano_mini.mutations": [
 			"MutationLog",
@@ -907,6 +923,13 @@
 					"returns": "MutableOligo | None"
 				},
 				{
+					"name": "potential_xover_sites",
+					"kind": "method",
+					"signature": "(vh: MutableVirtualHelix | int)",
+					"returns": "list[list[CrossoverSite]]",
+					"doc": "``[strand 0 sites, strand 1 sites]`` for one VH, as the host's ``Part.potentialXoverSites``. See :meth:`MutableVirtualHelix.potential_xover_sites`."
+				},
+				{
 					"name": "vhs_in_region",
 					"kind": "method",
 					"signature": "(region_id: str)",
@@ -945,7 +968,182 @@
 					"kind": "method",
 					"signature": "(segment: MutableSegment, at_index: int)",
 					"returns": "MutableOligo",
-					"doc": "Break the oligo containing ``segment`` at ``at_index``."
+					"doc": "Break the oligo containing ``segment`` so its new 3\u2032 end is at ``at_index`` (``Part.breakOligoAt``)."
+				},
+				{
+					"name": "break_at",
+					"kind": "method",
+					"signature": "(vh: MutableVirtualHelix | int, strand_index: int, bp_index: int)",
+					"returns": "MutableOligo",
+					"doc": "The break tool: break the strand at ``(vh, strand_index, bp_index)`` so its new 3\u2032 end is at ``bp_index``. Same as :meth:`break_oligo` on the segment found there."
+				},
+				{
+					"name": "can_break_at",
+					"kind": "method",
+					"signature": "(vh: MutableVirtualHelix | int, strand_index: int, bp_index: int)",
+					"returns": "Check"
+				},
+				{
+					"name": "get_segment_at",
+					"kind": "method",
+					"signature": "(vh: MutableVirtualHelix | int, strand_index: int, bp_index: int)",
+					"returns": "MutableSegment | None",
+					"doc": "The segment covering ``bp_index`` on one strand of ``vh``, or ``None``."
+				},
+				{
+					"name": "get_oligo_at",
+					"kind": "method",
+					"signature": "(vh: MutableVirtualHelix | int, strand_index: int, bp_index: int)",
+					"returns": "MutableOligo | None",
+					"doc": "The oligo covering ``bp_index`` on one strand of ``vh`` (``Part.getOligoByVh``)."
+				},
+				{
+					"name": "get_end_at",
+					"kind": "method",
+					"signature": "(vh: MutableVirtualHelix | int, strand_index: int, bp_index: int)",
+					"returns": "MutableSegmentEnd | None",
+					"doc": "The 5\u2032 or 3\u2032 end sitting at ``bp_index`` on one strand of ``vh``, free or connected."
+				},
+				{
+					"name": "connect_oligos",
+					"kind": "method",
+					"signature": "(from_oligo: MutableOligo, to_oligo: MutableOligo)",
+					"returns": "None",
+					"doc": "Join ``from_oligo``'s free 3\u2032 end to ``to_oligo``'s free 5\u2032 end (``Part.connectTwoOligos``); the same oligo twice makes it circular."
+				},
+				{
+					"name": "can_connect_oligos",
+					"kind": "method",
+					"signature": "(from_oligo: MutableOligo, to_oligo: MutableOligo)",
+					"returns": "Check"
+				},
+				{
+					"name": "create_crossover",
+					"kind": "method",
+					"signature": "(from_oligo: MutableOligo, vh: MutableVirtualHelix | int, strand_index: int, bp_index: int)",
+					"returns": "None",
+					"doc": "Join ``from_oligo``'s free 3\u2032 end to the strand at ``(vh, strand_index, bp_index)``, breaking that strand just before ``bp_index`` (``Part.createCrossover``; the editor's drag from a 3\u2032 end onto a strand)."
+				},
+				{
+					"name": "can_create_crossover",
+					"kind": "method",
+					"signature": "(from_oligo: MutableOligo, vh: MutableVirtualHelix | int, strand_index: int, bp_index: int)",
+					"returns": "Check"
+				},
+				{
+					"name": "make_crossover",
+					"kind": "method",
+					"signature": "(vh: MutableVirtualHelix | int, strand_index: int, bp_index: int, to_vh: MutableVirtualHelix | int)",
+					"returns": "None",
+					"doc": "Cross over at a potential crossover site, like clicking one in the editor (``makeCrossoverCmd``): the strand whose 3\u2032 end leaves at the site is broken there and joined to the other strand at the same bp."
+				},
+				{
+					"name": "can_make_crossover",
+					"kind": "method",
+					"signature": "(vh: MutableVirtualHelix | int, strand_index: int, bp_index: int, to_vh: MutableVirtualHelix | int)",
+					"returns": "Check"
+				},
+				{
+					"name": "remove_oligo",
+					"kind": "method",
+					"signature": "(oligo: MutableOligo)",
+					"returns": "None",
+					"doc": "Remove ``oligo`` and all its segments (``Part.removeOligo``)."
+				},
+				{
+					"name": "remove_segment",
+					"kind": "method",
+					"signature": "(segment: MutableSegment)",
+					"returns": "MutableOligo | None",
+					"doc": "Remove one segment from its oligo (``Part.removeSegmentFromOligo``)."
+				},
+				{
+					"name": "fill_empty_strand_set",
+					"kind": "method",
+					"signature": "(vh: MutableVirtualHelix | int, strand_index: int, color: str='#888888')",
+					"returns": "MutableSegment",
+					"doc": "Draw one segment over the whole of an empty strand (``Part.fillEmptyStrandSet``), from the region's ``min_base`` to ``min(vh.length, max_base) - 1``, 5\u2032 \u2192 3\u2032 in the strand's direction."
+				},
+				{
+					"name": "can_fill_empty_strand_set",
+					"kind": "method",
+					"signature": "(vh: MutableVirtualHelix | int, strand_index: int)",
+					"returns": "Check"
+				},
+				{
+					"name": "create_oligo",
+					"kind": "method",
+					"signature": "(segments: Sequence[SegmentSpec | tuple[MutableVirtualHelix | int, int, int]], color: str='#888888', name: str | None=None, is_scaffold: bool=False, circular: bool=False)",
+					"returns": "MutableOligo",
+					"doc": "Create one oligo from a path of segments listed 5\u2032 \u2192 3\u2032."
+				},
+				{
+					"name": "can_create_oligo",
+					"kind": "method",
+					"signature": "(segments: Sequence[SegmentSpec | tuple[MutableVirtualHelix | int, int, int]], circular: bool=False)",
+					"returns": "Check",
+					"doc": "Whether :meth:`create_oligo` accepts this path: every segment in its region's bounds and on free bases, no two entries overlapping, and no junction on a skip or insertion."
+				},
+				{
+					"name": "can_create_segment",
+					"kind": "method",
+					"signature": "(vh: MutableVirtualHelix | int, five_index: int, three_index: int)",
+					"returns": "Check",
+					"doc": "Whether :meth:`create_segment` accepts this segment, as ``Part.createOligo`` checks it: both ends inside the VH region's ``[min_base, max_base)`` and the range free on its strand set (``5' < 3'`` \u2192 strand set 0, else 1)."
+				},
+				{
+					"name": "can_connect",
+					"kind": "method",
+					"signature": "(from_segment: MutableSegment, to_segment: MutableSegment)",
+					"returns": "Check",
+					"doc": "Whether :meth:`connect` accepts joining ``from_segment``'s 3\u2032 end to ``to_segment``'s 5\u2032 end: different segments, both ends free, and neither end on a skip or insertion."
+				},
+				{
+					"name": "can_break_oligo",
+					"kind": "method",
+					"signature": "(segment: MutableSegment, at_index: int)",
+					"returns": "Check",
+					"doc": "Whether :meth:`break_oligo` accepts this break: ``at_index`` inside the segment, and a mid-segment break not leaving a new end on a skip or insertion."
+				},
+				{
+					"name": "get_slot_at",
+					"kind": "method",
+					"signature": "(vh: MutableVirtualHelix | int, strand_index: int, bp_index: int)",
+					"returns": "MutableSlot | None",
+					"doc": "The slot at one base of one strand (``None`` where no segment covers it)."
+				},
+				{
+					"name": "add_skip_at",
+					"kind": "method",
+					"signature": "(vh: MutableVirtualHelix | int, bp_index: int)",
+					"returns": "None",
+					"doc": "The skip tool: skip ``bp_index`` on both strands of ``vh`` (``OligoSegment.addSkipOrInsertion(bp, -1)``)."
+				},
+				{
+					"name": "can_add_skip_at",
+					"kind": "method",
+					"signature": "(vh: MutableVirtualHelix | int, bp_index: int)",
+					"returns": "Check"
+				},
+				{
+					"name": "add_insert_at",
+					"kind": "method",
+					"signature": "(vh: MutableVirtualHelix | int, bp_index: int, count: int=1)",
+					"returns": "None",
+					"doc": "The insert tool: add ``count`` inserted bases at ``bp_index`` on both strands of ``vh``, keeping their bases. Calling it again adds more (``OligoSegment.addSkipOrInsertion(bp, count)``)."
+				},
+				{
+					"name": "can_add_insert_at",
+					"kind": "method",
+					"signature": "(vh: MutableVirtualHelix | int, bp_index: int)",
+					"returns": "Check"
+				},
+				{
+					"name": "remove_skip_or_insertion_at",
+					"kind": "method",
+					"signature": "(vh: MutableVirtualHelix | int, bp_index: int)",
+					"returns": "None",
+					"doc": "Remove a skip or insertion at ``bp_index``: both strands go back to one base each (``OligoSegment.removeSkipOrInsertion``). Does nothing on a plain base."
 				},
 				{
 					"name": "reorder_vh",
@@ -1094,7 +1292,13 @@
 					"kind": "method",
 					"signature": "(new_max_base: int)",
 					"returns": "None",
-					"doc": "Extend all VHs in this region to ``new_max_base``."
+					"doc": "Lengthen or shorten every VH in this region so the region ends at ``new_max_base``."
+				},
+				{
+					"name": "can_set_max_base",
+					"kind": "method",
+					"signature": "(new_max_base: int)",
+					"returns": "Check"
 				},
 				{
 					"name": "increase_length_by",
@@ -1102,6 +1306,27 @@
 					"signature": "(delta: int)",
 					"returns": "None",
 					"doc": "Extend all VHs in this region by ``delta`` bases."
+				},
+				{
+					"name": "reduce_unused_length",
+					"kind": "method",
+					"signature": "()",
+					"returns": "None",
+					"doc": "Shorten the region to the strands it holds, rounded up to ``step`` and at least two steps, like the strand view's reduce-length button. Does nothing when already that short."
+				},
+				{
+					"name": "remove_all_skips",
+					"kind": "method",
+					"signature": "()",
+					"returns": "int",
+					"doc": "Turn every skip in this region back into a plain base; returns how many."
+				},
+				{
+					"name": "remove_all_insertions",
+					"kind": "method",
+					"signature": "()",
+					"returns": "int",
+					"doc": "Turn every insertion in this region back into a plain base; returns how many."
 				},
 				{
 					"name": "supports_lattice_grid",
@@ -1176,7 +1401,13 @@
 					"kind": "method",
 					"signature": "(new_max_base: int)",
 					"returns": "None",
-					"doc": "Extend all VHs in this region to ``new_max_base``."
+					"doc": "Lengthen or shorten every VH in this region so the region ends at ``new_max_base``."
+				},
+				{
+					"name": "can_set_max_base",
+					"kind": "method",
+					"signature": "(new_max_base: int)",
+					"returns": "Check"
 				},
 				{
 					"name": "increase_length_by",
@@ -1184,6 +1415,27 @@
 					"signature": "(delta: int)",
 					"returns": "None",
 					"doc": "Extend all VHs in this region by ``delta`` bases."
+				},
+				{
+					"name": "reduce_unused_length",
+					"kind": "method",
+					"signature": "()",
+					"returns": "None",
+					"doc": "Shorten the region to the strands it holds, rounded up to ``step`` and at least two steps, like the strand view's reduce-length button. Does nothing when already that short."
+				},
+				{
+					"name": "remove_all_skips",
+					"kind": "method",
+					"signature": "()",
+					"returns": "int",
+					"doc": "Turn every skip in this region back into a plain base; returns how many."
+				},
+				{
+					"name": "remove_all_insertions",
+					"kind": "method",
+					"signature": "()",
+					"returns": "int",
+					"doc": "Turn every insertion in this region back into a plain base; returns how many."
 				},
 				{
 					"name": "supports_lattice_grid",
@@ -1258,7 +1510,13 @@
 					"kind": "method",
 					"signature": "(new_max_base: int)",
 					"returns": "None",
-					"doc": "Extend all VHs in this region to ``new_max_base``."
+					"doc": "Lengthen or shorten every VH in this region so the region ends at ``new_max_base``."
+				},
+				{
+					"name": "can_set_max_base",
+					"kind": "method",
+					"signature": "(new_max_base: int)",
+					"returns": "Check"
 				},
 				{
 					"name": "increase_length_by",
@@ -1266,6 +1524,27 @@
 					"signature": "(delta: int)",
 					"returns": "None",
 					"doc": "Extend all VHs in this region by ``delta`` bases."
+				},
+				{
+					"name": "reduce_unused_length",
+					"kind": "method",
+					"signature": "()",
+					"returns": "None",
+					"doc": "Shorten the region to the strands it holds, rounded up to ``step`` and at least two steps, like the strand view's reduce-length button. Does nothing when already that short."
+				},
+				{
+					"name": "remove_all_skips",
+					"kind": "method",
+					"signature": "()",
+					"returns": "int",
+					"doc": "Turn every skip in this region back into a plain base; returns how many."
+				},
+				{
+					"name": "remove_all_insertions",
+					"kind": "method",
+					"signature": "()",
+					"returns": "int",
+					"doc": "Turn every insertion in this region back into a plain base; returns how many."
 				},
 				{
 					"name": "supports_lattice_grid",
@@ -1338,9 +1617,102 @@
 					"doc": "Move this lattice VH to (col, row), preserving parity."
 				},
 				{
+					"name": "is_even_parity",
+					"kind": "property",
+					"type": "bool",
+					"doc": "Same as ``parity_is_even``; named after the host's ``VirtualHelix.isEvenParity``."
+				},
+				{
+					"name": "strand_sets",
+					"kind": "property",
+					"type": "list[MutableStrandSet]",
+					"doc": "``[strand set 0, strand set 1]`` \u2014 see :class:`MutableStrandSet`."
+				},
+				{
+					"name": "segments_at",
+					"kind": "method",
+					"signature": "(bp_index: int, strand_index: int | None=None)",
+					"returns": "list[MutableSegment]",
+					"doc": "Segments covering ``bp_index`` \u2014 on one strand set, or both (strand 0 first)."
+				},
+				{
+					"name": "potential_xover_sites",
+					"kind": "method",
+					"signature": "(strand_index: int)",
+					"returns": "list[CrossoverSite]",
+					"doc": "Potential crossover sites from one strand set, as the host's ``potentialXoverSites(vh)[strand_index]``."
+				},
+				{
 					"name": "strand_set_segment_ids",
 					"kind": "property",
 					"type": "list[list[str]]"
+				}
+			]
+		},
+		"MutableStrandSet": {
+			"module": "foldnano_mini",
+			"doc": "One strand of a VH \u2014 mirrors the host's ``StrandSet``.",
+			"members": [
+				{
+					"name": "strand_index",
+					"kind": "property",
+					"type": "int"
+				},
+				{
+					"name": "virtual_helix",
+					"kind": "property",
+					"type": "MutableVirtualHelix"
+				},
+				{
+					"name": "segment_ids",
+					"kind": "property",
+					"type": "list[str]",
+					"doc": "Ids of this strand's segments, sorted by their low bp."
+				},
+				{
+					"name": "segments",
+					"kind": "property",
+					"type": "list[MutableSegment]",
+					"doc": "This strand's segments, sorted by their low bp."
+				},
+				{
+					"name": "is_empty",
+					"kind": "property",
+					"type": "bool"
+				},
+				{
+					"name": "is_index_occupied",
+					"kind": "method",
+					"signature": "(bp_index: int)",
+					"returns": "bool"
+				},
+				{
+					"name": "is_index_occupied_by",
+					"kind": "method",
+					"signature": "(bp_index: int)",
+					"returns": "MutableSegment | None",
+					"doc": "The segment covering ``bp_index`` on this strand, or ``None``."
+				},
+				{
+					"name": "is_range_occupied",
+					"kind": "method",
+					"signature": "(start_index: int, end_index: int)",
+					"returns": "bool",
+					"doc": "True when any segment overlaps the inclusive range (either order)."
+				},
+				{
+					"name": "segments_in_range",
+					"kind": "method",
+					"signature": "(start_index: int, end_index: int)",
+					"returns": "list[MutableSegment]",
+					"doc": "Segments overlapping the inclusive range (either order), sorted by low bp."
+				},
+				{
+					"name": "free_ranges",
+					"kind": "method",
+					"signature": "()",
+					"returns": "list[tuple[int, int]]",
+					"doc": "Maximal free inclusive ``(low, high)`` ranges within the VH's region bounds (where ``part.create_segment`` may place a segment)."
 				}
 			]
 		},
@@ -1388,6 +1760,18 @@
 					"type": "list[MutableSegment]"
 				},
 				{
+					"name": "five_prime",
+					"kind": "property",
+					"type": "MutableSegmentEnd | None",
+					"doc": "The oligo's free 5\u2032 end, or ``None`` for a circular oligo."
+				},
+				{
+					"name": "three_prime",
+					"kind": "property",
+					"type": "MutableSegmentEnd | None",
+					"doc": "The oligo's free 3\u2032 end, or ``None`` for a circular oligo."
+				},
+				{
 					"name": "get_segment",
 					"kind": "method",
 					"signature": "(segment_id: str)",
@@ -1397,7 +1781,22 @@
 					"name": "remove",
 					"kind": "method",
 					"signature": "()",
-					"returns": "None"
+					"returns": "None",
+					"doc": "Same as ``part.remove_oligo(oligo)``."
+				},
+				{
+					"name": "five_modification",
+					"kind": "property",
+					"type": "str | None",
+					"doc": "Modification on the oligo's free 5\u2032 end (``None`` when unset or circular).",
+					"settable": true
+				},
+				{
+					"name": "three_modification",
+					"kind": "property",
+					"type": "str | None",
+					"doc": "Modification on the oligo's free 3\u2032 end (``None`` when unset or circular).",
+					"settable": true
 				},
 				{
 					"name": "touches_regions",
@@ -1443,6 +1842,42 @@
 					"type": "int"
 				},
 				{
+					"name": "five_prime",
+					"kind": "property",
+					"type": "MutableSegmentEnd"
+				},
+				{
+					"name": "three_prime",
+					"kind": "property",
+					"type": "MutableSegmentEnd"
+				},
+				{
+					"name": "low_index",
+					"kind": "property",
+					"type": "int"
+				},
+				{
+					"name": "high_index",
+					"kind": "property",
+					"type": "int"
+				},
+				{
+					"name": "in_virtual_helix",
+					"kind": "property",
+					"type": "MutableVirtualHelix"
+				},
+				{
+					"name": "in_strand_index",
+					"kind": "property",
+					"type": "int",
+					"doc": "0 or 1 \u2014 which strand set of its VH this segment lives on."
+				},
+				{
+					"name": "oligo",
+					"kind": "property",
+					"type": "MutableOligo"
+				},
+				{
 					"name": "five_modification",
 					"kind": "property",
 					"type": "str | None",
@@ -1481,20 +1916,95 @@
 					"kind": "method",
 					"signature": "(new_index: int)",
 					"returns": "None",
-					"doc": "Move the 5\u2032 terminus of this segment to ``new_index``."
+					"doc": "Move the 5\u2032 terminus to ``new_index`` (same as ``seg.five_prime.index = new_index``)."
 				},
 				{
 					"name": "move_three_prime_to",
 					"kind": "method",
 					"signature": "(new_index: int)",
 					"returns": "None",
-					"doc": "Move the 3\u2032 terminus of this segment to ``new_index``."
+					"doc": "Move the 3\u2032 terminus to ``new_index`` (same as ``seg.three_prime.index = new_index``)."
 				},
 				{
 					"name": "remove",
 					"kind": "method",
 					"signature": "()",
-					"returns": "None"
+					"returns": "MutableOligo | None",
+					"doc": "Same as ``part.remove_segment(seg)``."
+				}
+			]
+		},
+		"MutableSegmentEnd": {
+			"module": "foldnano_mini",
+			"doc": "One end of a segment \u2014 mirrors the host's ``SegmentEnd`` (``FivePrimeEnd`` / ``ThreePrimeEnd``).",
+			"members": [
+				{
+					"name": "segment",
+					"kind": "property",
+					"type": "MutableSegment"
+				},
+				{
+					"name": "is_three_prime",
+					"kind": "property",
+					"type": "bool"
+				},
+				{
+					"name": "index",
+					"kind": "property",
+					"type": "int",
+					"settable": true
+				},
+				{
+					"name": "can_move_to",
+					"kind": "method",
+					"signature": "(new_index: int)",
+					"returns": "Check",
+					"doc": "Port of ``SegmentEnd.canMoveTo``: within the VH length, the swept range free of other segments, the segment keeps its direction, and a constrained end only moves to a matching crossover site. Also refuses a skip/insertion bp."
+				},
+				{
+					"name": "modification",
+					"kind": "property",
+					"type": "str | None",
+					"settable": true
+				},
+				{
+					"name": "connected_segment",
+					"kind": "property",
+					"type": "MutableSegment | None"
+				},
+				{
+					"name": "connected_end",
+					"kind": "property",
+					"type": "MutableSegmentEnd | None",
+					"doc": "The end on the other side of this end's connection (3' \u2194 5')."
+				},
+				{
+					"name": "is_free",
+					"kind": "property",
+					"type": "bool"
+				},
+				{
+					"name": "is_constrained",
+					"kind": "property",
+					"type": "bool",
+					"doc": "True when this end is connected across a lattice crossover site."
+				},
+				{
+					"name": "in_virtual_helix",
+					"kind": "property",
+					"type": "MutableVirtualHelix"
+				},
+				{
+					"name": "in_strand_index",
+					"kind": "property",
+					"type": "int"
+				},
+				{
+					"name": "is_adjacent_to",
+					"kind": "method",
+					"signature": "(other: 'MutableSegmentEnd')",
+					"returns": "bool",
+					"doc": "Port of ``SegmentEnd.isAdjacentTo``: same VH and strand, 1 bp apart."
 				}
 			]
 		},
@@ -1519,10 +2029,31 @@
 					"type": "bool"
 				},
 				{
+					"name": "can_set_skip",
+					"kind": "method",
+					"signature": "()",
+					"returns": "Check",
+					"doc": "Whether ``set_skip(True)`` is allowed here."
+				},
+				{
+					"name": "can_set_insertion",
+					"kind": "method",
+					"signature": "()",
+					"returns": "Check",
+					"doc": "Whether ``set_insertion(...)`` is allowed here (same rules as a skip, but an existing insertion may be replaced)."
+				},
+				{
 					"name": "set_skip",
 					"kind": "method",
 					"signature": "(value: bool)",
 					"returns": "None"
+				},
+				{
+					"name": "remove_skip_or_insertion",
+					"kind": "method",
+					"signature": "()",
+					"returns": "None",
+					"doc": "Turn a skip or insertion back into a plain base on both strands (``OligoSegment.removeSkipOrInsertion``); a plain slot is left alone."
 				},
 				{
 					"name": "set_insertion",
@@ -1531,6 +2062,56 @@
 					"returns": "None"
 				}
 			]
+		},
+		"SegmentSpec": {
+			"module": "foldnano_mini",
+			"doc": "One segment of a :meth:`MutablePart.create_oligo` path: a VH and its 5\u2032/3\u2032 bp.",
+			"members": []
+		},
+		"CrossoverSite": {
+			"module": "foldnano_mini",
+			"doc": "One potential crossover site, as the host's ``CrossoverSite``.",
+			"members": []
+		},
+		"Check": {
+			"module": "foldnano_mini",
+			"doc": "``ok`` plus the ``reason`` it is not, like the host's ``DuplicateCheck``.",
+			"members": [
+				{
+					"name": "ok",
+					"kind": "attribute",
+					"type": "bool"
+				},
+				{
+					"name": "reason",
+					"kind": "attribute",
+					"type": "str | None"
+				},
+				{
+					"name": "passed",
+					"kind": "method",
+					"signature": "()",
+					"returns": "Check"
+				},
+				{
+					"name": "failed",
+					"kind": "method",
+					"signature": "(reason: str)",
+					"returns": "Check"
+				},
+				{
+					"name": "raise_if_failed",
+					"kind": "method",
+					"signature": "()",
+					"returns": "None",
+					"doc": "Raise :class:`InvalidOperationError` with ``reason`` unless ``ok``."
+				}
+			]
+		},
+		"InvalidOperationError": {
+			"module": "foldnano_mini",
+			"doc": "An edit the model refuses (occupied range, out of bounds, ...).",
+			"members": []
 		},
 		"MutationLog": {
 			"module": "foldnano_mini",

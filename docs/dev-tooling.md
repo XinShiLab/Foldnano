@@ -34,8 +34,11 @@ A dirty `vite.config.ts` or `package.json` makes `vitest --changed` rerun every 
 ## Sandbox worker source (`?sandbox-worker`)
 
 `scripts/vite-sandbox-worker.ts` resolves `import source from './x.worker.ts?sandbox-worker'` to the
-worker bundled by esbuild into one classic IIFE string, with `?raw` imports inlined and
-`import.meta.env` replaced by Vite's env object. The Python plugin sandbox starts it from a `blob:`
+worker bundled by esbuild into one classic IIFE string, with `import.meta.env` replaced by Vite's
+env object. esbuild has no `import.meta.glob`, so the plugin provides
+`virtual:foldnano-python-packages` instead: every `.py` file of the bundled Python packages
+(`foldnano`, `foldnano_mini`), read at bundle time, so a new module ships without touching the
+worker. In dev, adding or removing a module there invalidates the bundle and reloads the page. The Python plugin sandbox starts it from a `blob:`
 URL inside an opaque-origin iframe, where module workers fail silently (see
 `docs/python-plugin-system.md` § Sandbox). It runs the same way in dev and build and registers
 every bundled input as a watch file. `esbuild` is a direct devDependency for this plugin.

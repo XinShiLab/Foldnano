@@ -30,6 +30,7 @@ OP_SET_SEGMENT_MODIFICATION = "set_segment_modification"
 OP_SET_SLOT_SEQUENCE = "set_slot_sequence"
 OP_SET_SLOT_SKIP = "set_slot_skip"
 OP_SET_SLOT_INSERTION = "set_slot_insertion"
+OP_ADD_SKIP_OR_INSERTION = "add_skip_or_insertion"
 OP_CREATE_SEGMENT = "create_segment"
 OP_CONNECT = "connect"
 OP_REMOVE_SEGMENT = "remove_segment"
@@ -58,6 +59,7 @@ KNOWN_OPS: frozenset[str] = frozenset(
         OP_SET_SLOT_SEQUENCE,
         OP_SET_SLOT_SKIP,
         OP_SET_SLOT_INSERTION,
+        OP_ADD_SKIP_OR_INSERTION,
         OP_CREATE_SEGMENT,
         OP_CONNECT,
         OP_REMOVE_SEGMENT,

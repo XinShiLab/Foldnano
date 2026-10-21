@@ -14,6 +14,7 @@ import json
 import pytest
 
 from foldnano_mini import (
+    InvalidOperationError,
     FreeformRegion,
     LatticedRegion,
     MutableOligo,
@@ -111,19 +112,25 @@ def test_set_oligo_name_and_is_scaffold(multi_region_part_foldnano_json: str) ->
 
 def test_set_segment_modification(multi_region_part_foldnano_json: str) -> None:
     part = load_part(multi_region_part_foldnano_json)
-    seg = part.get_oligo("oligo-honey-only").segments[0]
+    oligo = part.get_oligo("oligo-honey-only")
+    seg = oligo.segments[0]
 
     seg.five_modification = "/5Bio/"
-    seg.three_modification = "/3Cy3/"
+    oligo.three_modification = "/3Cy3/"
 
     assert seg.five_modification == "/5Bio/"
-    assert seg.three_modification == "/3Cy3/"
+    assert oligo.five_modification == "/5Bio/"
+    assert oligo.three_modification == "/3Cy3/"
+    assert oligo.segments[-1].three_modification == "/3Cy3/"
     assert [op["op"] for op in part.mutation_log] == [
         M.OP_SET_SEGMENT_MODIFICATION,
         M.OP_SET_SEGMENT_MODIFICATION,
     ]
     assert part.mutation_log[0]["end"] == "5"
     assert part.mutation_log[1]["end"] == "3"
+    # seg's 3' end is connected (a crossover), so it can't carry one.
+    with pytest.raises(InvalidOperationError, match="free ends"):
+        seg.three_modification = "/3Cy3/"
 
 
 # ---------------------------------------------------------------------------
@@ -156,12 +163,17 @@ def test_set_slot_sequence_creates_slot_on_demand(
 def test_slot_skip_and_insertion(multi_region_part_foldnano_json: str) -> None:
     part = load_part(multi_region_part_foldnano_json)
     seg = part.get_oligo("oligo-honey-only").segments[0]
+    comp = part.create_segment(vh=0, five_index=20, three_index=0)
     seg.slot_at(7).set_skip(True)
-    seg.slot_at(8).set_insertion("AT")
+    seg.slot_at(9).set_insertion("AT")
 
     assert seg.slot_at(7).skip is True
-    assert seg.slot_at(8).seq == "AT"
+    assert seg.slot_at(9).seq == "AT"
+    # The host writes both strands' slots.
+    assert comp.slot_at(7).skip is True
+    assert comp.slot_at(9).seq == "NN"
     assert [op["op"] for op in part.mutation_log] == [
+        M.OP_CREATE_SEGMENT,
         M.OP_SET_SLOT_SKIP,
         M.OP_SET_SLOT_INSERTION,
     ]
@@ -208,7 +220,7 @@ def test_create_segment_validates_inputs(multi_region_part_foldnano_json: str) -
 def test_connect_merges_oligos(multi_region_part_foldnano_json: str) -> None:
     part = load_part(multi_region_part_foldnano_json)
     seg_a = part.create_segment(vh=2, five_index=40, three_index=50)
-    seg_b = part.create_segment(vh=2, five_index=51, three_index=60)
+    seg_b = part.create_segment(vh=2, five_index=55, three_index=60)
     n_oligos = len(part.oligos)
 
     part.connect(seg_a, seg_b)
@@ -224,6 +236,25 @@ def test_connect_merges_oligos(multi_region_part_foldnano_json: str) -> None:
         "fromSegmentId": seg_a.id,
         "toSegmentId": seg_b.id,
     }
+
+
+def test_connect_adjacent_ends_merges_segments(multi_region_part_foldnano_json: str) -> None:
+    # Same VH and strand, 1 bp apart: the host merges into one segment (no crossover).
+    part = load_part(multi_region_part_foldnano_json)
+    seg_a = part.create_segment(vh=2, five_index=40, three_index=50)
+    seg_b = part.create_segment(vh=2, five_index=51, three_index=55)
+    seg_c = part.create_segment(vh=2, five_index=58, three_index=62)
+    part.connect(seg_b, seg_c)
+
+    part.connect(seg_a, seg_b)
+
+    oligo = part.get_oligo(seg_a.oligo_id)
+    assert [s.id for s in oligo.segments] == [seg_a.id, seg_c.id]
+    assert (seg_a.five_index, seg_a.three_index) == (40, 55)
+    assert seg_a.connected_to_segment_id == seg_c.id
+    assert seg_c.connected_from_segment_id == seg_a.id
+    assert part._resolve_oligo_id_for_segment(seg_b.id) is None
+    assert all(seg_b.id not in ids for vh in part.virtual_helices for ids in vh.strand_set_segment_ids)
 
 
 def test_remove_oligo(multi_region_part_foldnano_json: str) -> None:
@@ -245,10 +276,11 @@ def test_remove_segment(multi_region_part_foldnano_json: str) -> None:
 
     seg_b0.remove()
 
-    # Neighbour back-reference cleared.
-    surviving = part.get_oligo("oligo-cross-region")
-    assert surviving is not None
-    other = surviving.get_segment("seg-C0")
+    # As Part.removeSegmentFromOligo: the rest splits off under the op's newOligoId, and
+    # the original oligo (left holding only seg-B0) is removed.
+    new_oligo_id = part.mutation_log[-1]["newOligoId"]
+    assert part.get_oligo("oligo-cross-region") is None
+    other = part.get_oligo(new_oligo_id).get_segment("seg-C0")
     assert other.connected_from_segment_id is None
 
 

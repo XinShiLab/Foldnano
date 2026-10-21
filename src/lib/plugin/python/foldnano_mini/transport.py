@@ -22,6 +22,7 @@ import uuid
 from typing import Any, Callable, Protocol
 
 from . import mutations as M
+from .checks import InvalidOperationError
 
 
 class Transport(Protocol):
@@ -126,6 +127,13 @@ def _next_vh_index(raw: dict) -> int:
     return (max(used) + 1) if used else 0
 
 
+def _find_slot(segment: dict, bp_index: int) -> dict | None:
+    for slot in segment.get("slots", []):
+        if slot.get("bpIndex") == bp_index:
+            return slot
+    return None
+
+
 def _slot_at(segment: dict, bp_index: int) -> dict:
     """Find or create a slot at bpIndex in segment.slots."""
     slots = segment.setdefault("slots", [])
@@ -171,13 +179,36 @@ def _h_set_slot_sequence(raw: dict, op: dict) -> None:
     slot["seq"] = op["seq"]
 
 
+def _complementary_segment(raw: dict, seg: dict, bp_index: int) -> dict | None:
+    """The other strand's segment covering ``bp_index`` on ``seg``'s VH, if any."""
+    vh_index = int(seg["inVirtualHelixIndex"])
+    own_strand = _strand_index_of(raw, seg)
+    for o in raw.get("oligos", []):
+        for s in o.get("segments", []):
+            if int(s["inVirtualHelixIndex"]) != vh_index or s is seg:
+                continue
+            if _strand_index_of(raw, s) == own_strand:
+                continue
+            lo, hi = sorted((int(s["fivePrime"]["index"]), int(s["threePrime"]["index"])))
+            if lo <= bp_index <= hi:
+                return s
+    return None
+
+
 def _h_set_slot_skip(raw: dict, op: dict) -> None:
+    # The host's addSkipOrInsertion / removeSkipOrInsertion change both strands' slots.
     oligo = _find_oligo(raw, op["oligoId"])
     seg = _find_segment(oligo, op["segmentId"])
-    slot = _slot_at(seg, op["bpIndex"])
-    # Convention: a skip is encoded as an empty sequence on a present slot.
-    slot["seq"] = "" if op["skip"] else slot.get("seq", "")
-    slot["skip"] = bool(op["skip"])
+    comp = _complementary_segment(raw, seg, op["bpIndex"])
+    for target in (seg, comp):
+        if target is None:
+            continue
+        slot = _slot_at(target, op["bpIndex"])
+        if op["skip"]:
+            slot["seq"] = ""
+        elif len(slot.get("seq", "")) != 1:
+            slot["seq"] = (slot.get("seq") or "N")[0]
+        slot["skip"] = bool(op["skip"])
 
 
 def _h_set_slot_insertion(raw: dict, op: dict) -> None:
@@ -185,6 +216,35 @@ def _h_set_slot_insertion(raw: dict, op: dict) -> None:
     seg = _find_segment(oligo, op["segmentId"])
     slot = _slot_at(seg, op["bpIndex"])
     slot["seq"] = op["insertion"]
+    slot["skip"] = False
+    comp = _complementary_segment(raw, seg, op["bpIndex"])
+    if comp is not None:
+        comp_slot = _slot_at(comp, op["bpIndex"])
+        comp_slot["seq"] = "N" * len(op["insertion"])
+        comp_slot["skip"] = False
+
+
+def _h_add_skip_or_insertion(raw: dict, op: dict) -> None:
+    """Port of ``OligoSegment.addSkipOrInsertion`` (the skip and insert tools): a skip
+    empties both strands' slots; an insertion appends ``count`` Ns to both, keeping
+    their bases. A slot the mirror hasn't stored yet is a plain ``N``."""
+    _, seg = _find_segment_in_part(raw, op["segmentId"])
+    bp = int(op["bpIndex"])
+    count = int(op["count"])
+    comp = _complementary_segment(raw, seg, bp)
+    for target in (seg, comp):
+        if target is None:
+            continue
+        slot = _find_slot(target, bp)
+        if slot is None:
+            slot = {"bpIndex": bp, "seq": "N"}
+            target.setdefault("slots", []).append(slot)
+        if count < 0:
+            slot["seq"] = ""
+            slot["skip"] = True
+        else:
+            slot["seq"] = (slot.get("seq") or "") + "N" * count
+            slot["skip"] = False
 
 
 def _h_create_segment(raw: dict, op: dict) -> None:
@@ -240,25 +300,60 @@ def _h_create_segment(raw: dict, op: dict) -> None:
     strand_sets[ss_idx].setdefault("segmentIds", []).append(new_seg_id)
 
 
-def _h_connect(raw: dict, op: dict) -> None:
-    """Connect three' end of seg_a to five' end of seg_b.
+def _strand_index_of(raw: dict, seg: dict) -> int:
+    vh_index = int(seg["inVirtualHelixIndex"])
+    for vh in raw.get("virtualHelices", []):
+        if int(vh["index"]) != vh_index:
+            continue
+        for ss_idx, ss in enumerate(vh.get("strandSets", [])[:2]):
+            if seg["id"] in ss.get("segmentIds", []):
+                return ss_idx
+    return 0 if int(seg["fivePrime"]["index"]) < int(seg["threePrime"]["index"]) else 1
 
-    If they live in different oligos, merge: append oligo_b's segments after
-    seg_a in oligo_a, then drop oligo_b. This is a simplified projection of
-    what the JS side does — the JS replayer is authoritative.
+
+def _is_adjacent(raw: dict, seg_a: dict, seg_b: dict) -> bool:
+    """Port of ``SegmentEnd.isAdjacentTo`` for seg_a's 3' end and seg_b's 5' end."""
+    if int(seg_a["inVirtualHelixIndex"]) != int(seg_b["inVirtualHelixIndex"]):
+        return False
+    if _strand_index_of(raw, seg_a) != _strand_index_of(raw, seg_b):
+        return False
+    return abs(int(seg_a["threePrime"]["index"]) - int(seg_b["fivePrime"]["index"])) == 1
+
+
+def _h_connect(raw: dict, op: dict) -> None:
+    """Connect seg_a's 3' end to seg_b's 5' end, as ``Part.connectSegmentEnds``.
+
+    Adjacent ends (same VH and strand, 1 bp apart) merge: seg_a extends to seg_b's
+    3' end, takes over its slots and its 3' connection, and seg_b is removed.
+    Otherwise it's a crossover. If the segments were in different oligos, the
+    segments downstream of the junction move into seg_a's oligo, which survives.
     """
     from_seg_id = op["fromSegmentId"]
     to_seg_id = op["toSegmentId"]
     oligo_a, seg_a = _find_segment_in_part(raw, from_seg_id)
     oligo_b, seg_b = _find_segment_in_part(raw, to_seg_id)
 
-    seg_a["threePrime"]["connectedSegmentId"] = to_seg_id
-    seg_b["fivePrime"]["connectedSegmentId"] = from_seg_id
+    if _is_adjacent(raw, seg_a, seg_b):
+        next_id = seg_b["threePrime"].get("connectedSegmentId")
+        seg_a["threePrime"]["index"] = int(seg_b["threePrime"]["index"])
+        seg_a["threePrime"]["connectedSegmentId"] = next_id
+        seg_a.setdefault("slots", []).extend(seg_b.get("slots", []))
+        if next_id:
+            _, nxt = _find_segment_in_part(raw, next_id)
+            nxt["fivePrime"]["connectedSegmentId"] = from_seg_id
+        oligo_b["segments"] = [s for s in oligo_b["segments"] if s["id"] != to_seg_id]
+        for vh in raw.get("virtualHelices", []):
+            for ss in vh.get("strandSets", []):
+                if to_seg_id in ss.get("segmentIds", []):
+                    ss["segmentIds"] = [sid for sid in ss["segmentIds"] if sid != to_seg_id]
+    else:
+        seg_a["threePrime"]["connectedSegmentId"] = to_seg_id
+        seg_b["fivePrime"]["connectedSegmentId"] = from_seg_id
 
-    if oligo_a["id"] == oligo_b["id"]:
+    if oligo_a is oligo_b:
         return  # circularised or already same oligo
 
-    # Merge: insert oligo_b's segments after seg_a in oligo_a, drop oligo_b.
+    # Insert oligo_b's remaining segments after seg_a in oligo_a, drop oligo_b.
     a_segs = oligo_a["segments"]
     a_pos = next(i for i, s in enumerate(a_segs) if s["id"] == from_seg_id)
     a_segs[a_pos + 1 : a_pos + 1] = oligo_b["segments"]
@@ -266,36 +361,16 @@ def _h_connect(raw: dict, op: dict) -> None:
 
 
 def _h_remove_segment(raw: dict, op: dict) -> None:
+    """Port of ``Part.removeSegmentFromOligo``: break at the segment's 3' end, then at
+    its 5' end, and remove the oligo left holding only the segment."""
     oligo = _find_oligo(raw, op["oligoId"])
     seg = _find_segment(oligo, op["segmentId"])
-
-    # Clear neighbour back-references.
-    five_link = seg["fivePrime"].get("connectedSegmentId")
-    three_link = seg["threePrime"].get("connectedSegmentId")
-    if five_link:
-        try:
-            _, prev = _find_segment_in_part(raw, five_link)
-            prev["threePrime"]["connectedSegmentId"] = None
-        except KeyError:
-            pass
-    if three_link:
-        try:
-            _, nxt = _find_segment_in_part(raw, three_link)
-            nxt["fivePrime"]["connectedSegmentId"] = None
-        except KeyError:
-            pass
-
-    # Drop from the oligo.
-    oligo["segments"] = [s for s in oligo["segments"] if s["id"] != seg["id"]]
-    if not oligo["segments"]:
-        raw["oligos"].remove(oligo)
-
-    # Drop from any strand set listing.
-    for vh in raw.get("virtualHelices", []):
-        for ss in vh.get("strandSets", []):
-            ids = ss.get("segmentIds", [])
-            if seg["id"] in ids:
-                ss["segmentIds"] = [sid for sid in ids if sid != seg["id"]]
+    _break_oligo_at(raw, oligo, seg, int(seg["threePrime"]["index"]), op.get("newOligoId"), None)
+    owner, seg = _find_segment_in_part(raw, op["segmentId"])
+    detached = _break_oligo_at(
+        raw, owner, seg, int(seg["fivePrime"]["index"]), f"py-oligo-{uuid.uuid4()}", None
+    )
+    _h_remove_oligo(raw, {"oligoId": detached["id"]})
 
 
 def _h_remove_oligo(raw: dict, op: dict) -> None:
@@ -437,138 +512,167 @@ def _h_remove_vhs(raw: dict, op: dict) -> None:
 
 
 def _h_break_oligo(raw: dict, op: dict) -> None:
-    """Split an oligo at the given segment and at_index.
-
-    The 3′ half (from at_index onwards in the 3′ direction) moves to a new
-    oligo. Handles both boundary breaks (at the segment's 3′ end) and
-    mid-segment breaks (where a new sub-segment dict is created).
-    """
     oligo = _find_oligo(raw, op["oligoId"])
     seg = _find_segment(oligo, op["segmentId"])
-    at_index = int(op["atIndex"])
-    new_oligo_id = op["newOligoId"]
+    _break_oligo_at(raw, oligo, seg, int(op["atIndex"]), op["newOligoId"], op.get("newSegmentId"))
 
+
+def _break_oligo_at(
+    raw: dict,
+    oligo: dict,
+    seg: dict,
+    index: int,
+    new_oligo_id: str | None,
+    new_segment_id: str | None,
+) -> dict:
+    """Port of ``Oligo.breakOligoAt``; returns the oligo holding the 3' side (``oligo``
+    itself when nothing splits off).
+
+    A break at the oligo's own free 5'/3' end, or one bp before a free 3' end, is a
+    no-op. Breaking a circular oligo opens it without creating a second oligo.
+    """
+    segs = oligo["segments"]
+    five_end = next((s for s in segs if s["fivePrime"].get("connectedSegmentId") is None), None)
+    three_end = next((s for s in segs if s["threePrime"].get("connectedSegmentId") is None), None)
+    circular = five_end is None and three_end is None
     five = int(seg["fivePrime"]["index"])
     three = int(seg["threePrime"]["index"])
-    ascending = five < three
+    if (
+        (seg is five_end and index == five)
+        or (seg is three_end and index == three)
+        or (abs(three - index) == 1 and seg["threePrime"].get("connectedSegmentId") is None)
+    ):
+        return oligo
 
-    # A circular oligo is one where EVERY segment's 3′ end connects back into
-    # the same oligo (forming a closed loop). Using any() would misclassify
-    # a linear oligo that has an internal crossover between two of its segments.
-    segs = oligo.get("segments", [])
-    seg_ids_in_oligo = {s["id"] for s in segs}
-    is_circular = bool(segs) and all(
-        s["threePrime"].get("connectedSegmentId") in seg_ids_in_oligo for s in segs
-    )
-    if is_circular:
-        return  # No-op for circular oligos
+    new_seg = _break_segment_at(raw, seg, index, new_segment_id)
+    if new_seg is None:
+        return oligo
+    if circular:
+        if all(s is not new_seg for s in segs):
+            segs.append(new_seg)
+        return oligo
 
-    if at_index == three:
-        # Boundary break — disconnect at the 3′ end and collect the chain
-        connected_id = seg["threePrime"].get("connectedSegmentId")
-        seg["threePrime"]["connectedSegmentId"] = None
-        if not connected_id:
-            return  # 3′ end was already free; no new oligo
-        # Null the 5′ back-link on the formerly-connected segment
-        for o in raw.get("oligos", []):
-            for s in o.get("segments", []):
-                if s["id"] == connected_id:
-                    s["fivePrime"]["connectedSegmentId"] = None
-                    break
-        # Collect the chain
-        by_id = {s["id"]: s for s in oligo.get("segments", [])}
-        chain: list[dict] = []
-        cursor: str | None = connected_id
-        while cursor and cursor in by_id:
-            chain.append(by_id[cursor])
-            next_id = by_id[cursor]["threePrime"].get("connectedSegmentId")
-            cursor = next_id if next_id and next_id in by_id else None
-        if not chain:
-            return
-        chain_ids = {s["id"] for s in chain}
-        oligo["segments"] = [s for s in oligo["segments"] if s["id"] not in chain_ids]
-    else:
-        # Mid-segment break — create a new sub-segment for the 3′ half
-        new_seg_id = op.get("newSegmentId") or f"py-seg-{uuid.uuid4()}"
-        old_three_connected = seg["threePrime"].get("connectedSegmentId")
-        if ascending:
-            new_five = at_index + 1
-        else:
-            new_five = at_index - 1
-        new_sub_seg: dict = {
-            "id": new_seg_id,
-            "inVirtualHelixIndex": seg["inVirtualHelixIndex"],
-            "fivePrime": {
-                "segmentId": new_seg_id,
-                "isThreePrime": False,
-                "index": new_five,
-                "connectedSegmentId": None,
-                "modification": None,
-                "isConstrained": False,
-            },
-            "threePrime": {
-                "segmentId": new_seg_id,
-                "isThreePrime": True,
-                "index": three,
-                "connectedSegmentId": old_three_connected,
-                "modification": seg["threePrime"].get("modification"),
-                "isConstrained": False,
-            },
-            "sequence": "",
-            "slots": [],
-        }
-        # Redistribute slots
-        if ascending:
-            new_sub_seg["slots"] = [s for s in seg.get("slots", []) if s.get("bpIndex", 0) > at_index]
-            seg["slots"] = [s for s in seg.get("slots", []) if s.get("bpIndex", 0) <= at_index]
-        else:
-            new_sub_seg["slots"] = [s for s in seg.get("slots", []) if s.get("bpIndex", 0) < at_index]
-            seg["slots"] = [s for s in seg.get("slots", []) if s.get("bpIndex", 0) >= at_index]
-        # Update original segment's 3′ end
-        seg["threePrime"]["index"] = at_index
-        seg["threePrime"]["connectedSegmentId"] = None
-        # Update back-link on the formerly-connected segment
-        if old_three_connected:
-            for o in raw.get("oligos", []):
-                for s in o.get("segments", []):
-                    if s["id"] == old_three_connected:
-                        s["fivePrime"]["connectedSegmentId"] = new_seg_id
-                        break
-        # Collect chain from new_sub_seg onwards
-        by_id = {s["id"]: s for s in oligo.get("segments", [])}
-        chain = [new_sub_seg]
-        cursor = old_three_connected
-        while cursor and cursor in by_id:
-            chain.append(by_id[cursor])
-            next_id = by_id[cursor]["threePrime"].get("connectedSegmentId")
-            cursor = next_id if next_id and next_id in by_id else None
-        chain_ids = {s["id"] for s in chain if s is not new_sub_seg}
-        oligo["segments"] = [s for s in oligo["segments"] if s["id"] not in chain_ids]
-        # Add new_sub_seg to VH strand set
-        for vh in raw.get("virtualHelices", []):
-            if int(vh.get("index", -1)) == int(seg["inVirtualHelixIndex"]):
-                for ss in vh.get("strandSets", []):
-                    ids = ss.get("segmentIds", [])
-                    if seg["id"] in ids:
-                        idx_in_ss = ids.index(seg["id"])
-                        ids.insert(idx_in_ss + 1, new_seg_id)
-                        break
-
+    # The new oligo takes new_seg and everything downstream of it (addConnectedSegmentsFrom3Prime).
+    by_id = {s["id"]: s for o in raw.get("oligos", []) for s in o.get("segments", [])}
+    by_id[new_seg["id"]] = new_seg
+    chain = [new_seg]
+    cursor = new_seg["threePrime"].get("connectedSegmentId")
+    while cursor and all(c["id"] != cursor for c in chain):
+        chain.append(by_id[cursor])
+        cursor = by_id[cursor]["threePrime"].get("connectedSegmentId")
+    chain_ids = {c["id"] for c in chain}
+    oligo["segments"] = [s for s in segs if s["id"] not in chain_ids]
     new_oligo: dict = {
-        "id": new_oligo_id,
+        "id": new_oligo_id or f"py-oligo-{uuid.uuid4()}",
         "color": "#26bf40",
-        "isScaffold": bool(oligo.get("isScaffold", False)),
+        "isScaffold": False,
         "isSequenceLocked": False,
-        "name": None,
+        "name": "",
         "segments": chain,
     }
     raw.setdefault("oligos", []).append(new_oligo)
+    return new_oligo
+
+
+def _break_segment_at(raw: dict, seg: dict, index: int, new_segment_id: str | None) -> dict | None:
+    """Port of ``OligoSegment.breakSegmentAt``: the segment that starts the 3' side, if any."""
+    five = int(seg["fivePrime"]["index"])
+    three = int(seg["threePrime"]["index"])
+    if not min(five, three) <= index <= max(five, three):
+        raise InvalidOperationError(f"Index {index} out of range for segment {seg['id']!r}")
+    if index == three:
+        next_id = seg["threePrime"].get("connectedSegmentId")
+        if not next_id:
+            return None
+        seg["threePrime"]["connectedSegmentId"] = None
+        _, nxt = _find_segment_in_part(raw, next_id)
+        nxt["fivePrime"]["connectedSegmentId"] = None
+        return nxt
+    if index == five:
+        prev_id = seg["fivePrime"].get("connectedSegmentId")
+        if prev_id:
+            seg["fivePrime"]["connectedSegmentId"] = None
+            _, prev = _find_segment_in_part(raw, prev_id)
+            prev["threePrime"]["connectedSegmentId"] = None
+        return seg
+
+    ascending = _strand_index_of(raw, seg) == 0
+    if (index + 1 if ascending else index - 1) == three:
+        # VirtualHelix.createNewSegment refuses a 1-nt segment.
+        raise InvalidOperationError(f"Breaking at bp {index} would leave a 1-nt segment")
+    new_id = new_segment_id or f"py-seg-{uuid.uuid4()}"
+    next_id = seg["threePrime"].get("connectedSegmentId")
+    new_seg: dict = {
+        "id": new_id,
+        "inVirtualHelixIndex": seg["inVirtualHelixIndex"],
+        "fivePrime": {
+            "segmentId": new_id,
+            "isThreePrime": False,
+            "index": index + 1 if ascending else index - 1,
+            "connectedSegmentId": None,
+            "modification": None,
+            "isConstrained": False,
+        },
+        # Both new 3' ends are fresh on the host, so the old 3' modification is dropped.
+        "threePrime": {
+            "segmentId": new_id,
+            "isThreePrime": True,
+            "index": three,
+            "connectedSegmentId": next_id,
+            "modification": None,
+            "isConstrained": False,
+        },
+        "sequence": "",
+        "slots": [
+            s for s in seg.get("slots", [])
+            if (s.get("bpIndex", 0) > index if ascending else s.get("bpIndex", 0) < index)
+        ],
+    }
+    seg["slots"] = [
+        s for s in seg.get("slots", [])
+        if (s.get("bpIndex", 0) <= index if ascending else s.get("bpIndex", 0) >= index)
+    ]
+    seg["threePrime"] = {
+        "segmentId": seg["id"],
+        "isThreePrime": True,
+        "index": index,
+        "connectedSegmentId": None,
+        "modification": None,
+        "isConstrained": False,
+    }
+    if next_id:
+        _, nxt = _find_segment_in_part(raw, next_id)
+        nxt["fivePrime"]["connectedSegmentId"] = new_id
+    for vh in raw.get("virtualHelices", []):
+        if int(vh.get("index", -1)) != int(seg["inVirtualHelixIndex"]):
+            continue
+        for ss in vh.get("strandSets", []):
+            ids = ss.get("segmentIds", [])
+            if seg["id"] in ids:
+                ids.insert(ids.index(seg["id"]) + 1, new_id)
+    return new_seg
 
 
 def _h_move_terminus(raw: dict, op: dict) -> None:
     oligo, seg = _find_segment_in_part(raw, op["segmentId"])
     end_key = "fivePrime" if op["end"] == "5" else "threePrime"
     seg[end_key]["index"] = int(op["toIndex"])
+    # The host re-derives slots for the new range; content outside it is gone.
+    lo, hi = sorted((int(seg["fivePrime"]["index"]), int(seg["threePrime"]["index"])))
+    kept: list[dict] = []
+    for slot in seg.get("slots", []):
+        bp = int(slot.get("bpIndex", lo))
+        if lo <= bp <= hi:
+            kept.append(slot)
+            continue
+        # A dropped skip/insertion also clears its complementary slot, as on the host.
+        if len(slot.get("seq", "")) != 1 or slot.get("skip"):
+            comp = _complementary_segment(raw, seg, bp)
+            comp_slot = _find_slot(comp, bp) if comp is not None else None
+            if comp_slot is not None:
+                comp_slot["seq"] = (comp_slot.get("seq") or "N")[0]
+                comp_slot["skip"] = False
+    seg["slots"] = kept
 
 
 def _h_set_vh_length(raw: dict, op: dict) -> None:
@@ -579,14 +683,16 @@ def _h_set_vh_length(raw: dict, op: dict) -> None:
 def _h_set_region_max_base(raw: dict, op: dict) -> None:
     region = _find_region(raw, op["regionId"])
     new_max = int(op["newMaxBase"])
-    # Update region's max base fields
+    old_max = region.get("maxBase")
+    if old_max is None:
+        old_max = region.get("defaultMaxBase", new_max)
+    delta = new_max - int(old_max)
     region["maxBase"] = new_max
     region["defaultMaxBase"] = new_max
-    # Extend all VHs in this region
-    region_id = region["id"]
+    # As DesignRegion.increaseVhsLengthBy: every VH in the region changes by the same delta.
     for vh in raw.get("virtualHelices", []):
-        if vh.get("regionId") == region_id:
-            vh["length"] = new_max
+        if vh.get("regionId") == region["id"]:
+            vh["length"] = int(vh["length"]) + delta
 
 
 def _h_move_lattice_vh(raw: dict, op: dict) -> None:
@@ -726,6 +832,7 @@ _HANDLERS: _HandlersT = {
     M.OP_SET_SLOT_SEQUENCE: _h_set_slot_sequence,
     M.OP_SET_SLOT_SKIP: _h_set_slot_skip,
     M.OP_SET_SLOT_INSERTION: _h_set_slot_insertion,
+    M.OP_ADD_SKIP_OR_INSERTION: _h_add_skip_or_insertion,
     M.OP_CREATE_SEGMENT: _h_create_segment,
     M.OP_CONNECT: _h_connect,
     M.OP_REMOVE_SEGMENT: _h_remove_segment,

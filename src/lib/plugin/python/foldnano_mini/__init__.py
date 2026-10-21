@@ -21,14 +21,16 @@ Example::
         ctx.set_result_mutation_log(part.mutation_log)
 """
 
+from .checks import Check, InvalidOperationError
+from .lattice import CrossoverSite
 from .loader import load_part
 from .mutations import KNOWN_OPS, MutationLog
-from .oligo import MutableOligo, MutableSegment, MutableSlot
-from .part import MutablePart
+from .oligo import MutableOligo, MutableSegment, MutableSegmentEnd, MutableSlot
+from .part import MutablePart, SegmentSpec
 from .plane import MutablePlane
 from .region import FreeformRegion, LatticedRegion, MutableRegion
 from .transport import OfflineTransport, Transport
-from .vh import MutableVirtualHelix
+from .vh import MutableStrandSet, MutableVirtualHelix
 
 __all__ = [
     "load_part",
@@ -38,9 +40,15 @@ __all__ = [
     "LatticedRegion",
     "FreeformRegion",
     "MutableVirtualHelix",
+    "MutableStrandSet",
     "MutableOligo",
     "MutableSegment",
+    "MutableSegmentEnd",
     "MutableSlot",
+    "SegmentSpec",
+    "CrossoverSite",
+    "Check",
+    "InvalidOperationError",
     "MutationLog",
     "KNOWN_OPS",
     "Transport",

@@ -6,7 +6,7 @@ Run from src/lib/plugin/python/:
     python example_all_ops.py
     # or: uv run python example_all_ops.py
 
-All 24 op kinds are demonstrated in logical order. Each section prints its
+Every op kind (KNOWN_OPS) is demonstrated in logical order. Each section prints its
 op name, performs the mutation, asserts the offline-mirror reflects the
 change, and prints the result.
 
@@ -300,15 +300,16 @@ ok("is_scaffold", oligo_honey.is_scaffold)
 # ───────────────────────────────────────────────────────────────────────────
 
 sep("Op 4 — set_segment_modification  (5' end)")
-seg_a0 = oligo_honey.segments[0]  # seg-A0: vh=0, five=0, three=20
-seg_a0.five_modification = "/5BioTEG/"
+# Modifications live on free ends, so set them through the oligo's 5'/3' ends.
+seg_a0 = oligo_honey.segments[0]  # seg-A0: vh=0, five=0, three=20 (3' crosses to seg-A1)
+oligo_honey.five_modification = "/5BioTEG/"
 assert seg_a0.five_modification == "/5BioTEG/"
-ok("5' modification", seg_a0.five_modification)
+ok("5' modification", oligo_honey.five_modification)
 
 sep("Op 5 — set_segment_modification  (3' end)  [same op kind, 2nd call]")
-seg_a0.three_modification = "/3Cy3/"
-assert seg_a0.three_modification == "/3Cy3/"
-ok("3' modification", seg_a0.three_modification)
+oligo_honey.three_modification = "/3Cy3/"  # lands on seg-A1's free 3' end
+assert oligo_honey.three_modification == "/3Cy3/"
+ok("3' modification", oligo_honey.three_modification)
 
 # ───────────────────────────────────────────────────────────────────────────
 # GROUP 3 — Slot-level annotations
@@ -320,14 +321,23 @@ assert seg_a0.slot_at(5).seq == "T"
 ok("slot[5] seq", seg_a0.slot_at(5).seq)
 
 sep("Op 7 — set_slot_skip")
+# A skip or insertion needs the complementary strand (both strands' slots change).
+seg_comp = part.create_segment(vh=0, five_index=20, three_index=0, color="#888888")
+assert seg_a0.slot_at(10).can_set_skip()
 seg_a0.slot_at(10).set_skip(True)
 assert seg_a0.slot_at(10).skip is True
+assert seg_comp.slot_at(10).skip is True
 ok("slot[10] skip", seg_a0.slot_at(10).skip)
 
 sep("Op 8 — set_slot_insertion")
 seg_a0.slot_at(15).set_insertion("GCGC")
 assert seg_a0.slot_at(15).seq == "GCGC"
 ok("slot[15] insertion", seg_a0.slot_at(15).seq)
+
+sep("Op 8b — add_skip_or_insertion  (the editor's insert tool, both strands)")
+part.add_insert_at(0, 12, count=2)
+assert len(seg_a0.slot_at(12).seq) == 3 and len(seg_comp.slot_at(12).seq) == 3
+ok("slot[12] insert x2 on both strands", seg_a0.slot_at(12).seq)
 
 # ───────────────────────────────────────────────────────────────────────────
 # GROUP 4 — VH and region sizing
@@ -369,8 +379,9 @@ ok("seg_new1 five_index", seg_new1.five_index)
 ok("seg_new1 three_index", seg_new1.three_index)
 ok("seg_new1 length", seg_new1.length)
 
-# Draw a second segment [51..63] to connect to.
-seg_new2 = part.create_segment(vh=2, five_index=51, three_index=63, color="#884400")
+# Draw a second segment [53..63] to connect to. The gap keeps the connection a
+# crossover: adjacent ends (50 → 51) would merge into one segment instead.
+seg_new2 = part.create_segment(vh=2, five_index=53, three_index=63, color="#884400")
 
 sep("Op 12 — connect")
 n_oligos_before = len(part.oligos)
@@ -591,19 +602,19 @@ print(f"  VHs      : {[vh.index for vh in part.virtual_helices]}")
 print(f"  Oligos   : {[o.id for o in part.oligos]}")
 print(f"  Planes   : {[p.id for p in part.planes]}")
 
-sep("Mutation log — all 24 op kinds covered")
+sep("Mutation log — every op kind covered")
 log = part.mutation_log
 op_kinds = [op["op"] for op in log]
 print(f"  Total ops logged : {len(log)}")
 for i, kind in enumerate(op_kinds, 1):
     print(f"  {i:2d}. {kind}")
 
-# Verify all 24 op kinds appear at least once.
+# Verify every op kind appears at least once.
 from foldnano_mini.mutations import KNOWN_OPS
 
 missing = KNOWN_OPS - set(op_kinds)
 assert not missing, f"MISSING ops: {missing}"
-ok("All 24 op kinds present in log", True)
+ok(f"All {len(KNOWN_OPS)} op kinds present in log", True)
 
 sep("Self-consistency check — replay log into fresh mirror")
 replayed = part.replay_log_into_fresh_mirror(PART_JSON, log)
