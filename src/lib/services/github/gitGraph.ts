@@ -14,6 +14,8 @@ export const LANE_WIDTH = 16; // px between lane centres
 export const ROW_HEIGHT = 28; // px per commit row
 export const DOT_RADIUS = 4; // px
 export const HALF_ROW = ROW_HEIGHT / 2; // y of dot
+export const CORNER_RADIUS = 8; // px, rounded elbow where a line changes lane
+export const GRAPH_BRANCH_LIMIT = 12; // branches whose history is fetched (one request each)
 
 export const LANE_COLORS = [
 	'#4183f5', // blue
@@ -51,7 +53,12 @@ export interface DrawDot {
 	cy: number;
 	color: string;
 }
-export type DrawInstruction = DrawLine | DrawDot;
+export interface DrawPath {
+	type: 'path';
+	d: string;
+	color: string;
+}
+export type DrawInstruction = DrawLine | DrawPath | DrawDot;
 
 export interface CommitNode {
 	sha: string;
@@ -63,10 +70,30 @@ export interface CommitNode {
 	isCurrentBranch: boolean; // at least one label === currentBranch
 	lane: number;
 	parentLanes: number[];
+	/** Other lanes that were also waiting for this commit; they end here, joining the dot. */
+	joiningLanes: number[];
 	entering: (string | null)[];
 	exiting: (string | null)[];
 	/** Total lane count for this row (determines SVG width). */
 	maxLanes: number;
+}
+
+// ─── Branch selection ────────────────────────────────────────────────────────
+
+/**
+ * The branches whose history the graph loads: the current and default branches always, then the
+ * rest in the order GitHub listed them, up to `limit`.
+ */
+export function pickGraphBranches(
+	branches: GitHubBranch[],
+	currentBranch: string,
+	defaultBranch: string | null,
+	limit = GRAPH_BRANCH_LIMIT
+): GitHubBranch[] {
+	const pinned = [currentBranch, defaultBranch];
+	const first = pinned.flatMap((name) => branches.filter((b) => b.name === name));
+	const rest = branches.filter((b) => !pinned.includes(b.name));
+	return [...new Set([...first, ...rest])].slice(0, limit);
 }
 
 // ─── Layout ──────────────────────────────────────────────────────────────────
@@ -109,21 +136,35 @@ export function computeLayout(
 		// Capture state entering this row
 		const entering: (string | null)[] = [...activeLanes];
 
-		// Find or assign a lane for this commit
-		let lane = activeLanes.indexOf(rawCommit.sha);
-		if (lane === -1) {
+		// Every lane waiting for this commit converges on its dot; the lowest one carries on
+		const waiting: number[] = [];
+		for (let k = 0; k < activeLanes.length; k++) {
+			if (activeLanes[k] === rawCommit.sha) waiting.push(k);
+		}
+		let lane: number;
+		if (waiting.length > 0) {
+			lane = waiting[0];
+		} else {
 			lane = firstFreeSlot();
 			setSlot(lane, rawCommit.sha);
 		}
+		const joiningLanes = waiting.slice(1);
+		for (const k of joiningLanes) activeLanes[k] = null;
 
-		// Assign lanes to parents
 		const parentLanes: number[] = [];
 		const parents = rawCommit.parents ?? [];
 
 		for (let i = 0; i < parents.length; i++) {
 			const parentSha = parents[i].sha;
 
-			// Check if this parent is already tracked in a different lane
+			if (i === 0) {
+				// Stay in this lane even if another lane already tracks the parent, so the branch
+				// line runs straight down to its fork point and joins there.
+				activeLanes[lane] = parentSha;
+				parentLanes.push(lane);
+				continue;
+			}
+
 			let existingLane = -1;
 			for (let k = 0; k < activeLanes.length; k++) {
 				if (k !== lane && activeLanes[k] === parentSha) {
@@ -131,17 +172,9 @@ export function computeLayout(
 					break;
 				}
 			}
-
 			if (existingLane !== -1) {
-				// Parent already tracked — commit's lane merges into it
-				if (i === 0) activeLanes[lane] = null; // free commit's lane
 				parentLanes.push(existingLane);
-			} else if (i === 0) {
-				// First parent, not yet tracked — continue in same lane
-				activeLanes[lane] = parentSha;
-				parentLanes.push(lane);
 			} else {
-				// Non-first parent, not yet tracked — open a new lane
 				const slot = firstFreeSlot(lane);
 				setSlot(slot, parentSha);
 				parentLanes.push(slot);
@@ -180,6 +213,7 @@ export function computeLayout(
 			isCurrentBranch: branchLabels.includes(currentBranch),
 			lane,
 			parentLanes,
+			joiningLanes,
 			entering,
 			exiting,
 			maxLanes,
@@ -191,63 +225,79 @@ export function computeLayout(
 
 // ─── Drawing instructions ────────────────────────────────────────────────────
 
+/** Rounded elbow from the dot sideways into lane x1, then down to the row's bottom edge. */
+function elbowDown(x0: number, x1: number): string {
+	const r = Math.min(CORNER_RADIUS, Math.abs(x1 - x0), HALF_ROW);
+	const s = Math.sign(x1 - x0);
+	const sweep = s > 0 ? 1 : 0;
+	return `M ${x0} ${HALF_ROW} H ${x1 - s * r} A ${r} ${r} 0 0 ${sweep} ${x1} ${HALF_ROW + r} V ${ROW_HEIGHT}`;
+}
+
+/** Rounded elbow from the top of lane x1 down, then sideways into the dot at x0. */
+function elbowUp(x0: number, x1: number): string {
+	const r = Math.min(CORNER_RADIUS, Math.abs(x1 - x0), HALF_ROW);
+	const s = Math.sign(x1 - x0);
+	const sweep = s > 0 ? 1 : 0;
+	return `M ${x1} 0 V ${HALF_ROW - r} A ${r} ${r} 0 0 ${sweep} ${x1 - s * r} ${HALF_ROW} H ${x0}`;
+}
+
 /**
- * Compute SVG draw instructions for a single commit row.
+ * Compute SVG draw instructions for a single commit row. Lines that change lane are drawn as
+ * a horizontal run plus a rounded corner, never a diagonal; the dot comes last so it sits on top.
  */
 export function rowInstructions(node: CommitNode): DrawInstruction[] {
-	const Y_TOP = 0;
-	const Y_MID = HALF_ROW;
-	const Y_BOT = ROW_HEIGHT;
-	const { lane, entering, exiting, parentLanes } = node;
-
+	const { lane, entering, exiting, parentLanes, joiningLanes } = node;
 	const instructions: DrawInstruction[] = [];
+	const x0 = lx(lane);
 
-	const maxK = Math.max(entering.length, exiting.length, lane + 1, node.maxLanes);
-
-	// Pass-through lanes (not this commit's lane)
+	// Pass-through lanes: same sha above and below, untouched by this commit
+	const maxK = Math.max(entering.length, exiting.length);
 	for (let k = 0; k < maxK; k++) {
 		if (k === lane) continue;
-		const hasIn = k < entering.length && entering[k] !== null;
-		const hasOut = k < exiting.length && exiting[k] !== null;
-		if (hasIn && hasOut) {
+		const above = entering[k] ?? null;
+		if (above !== null && above === (exiting[k] ?? null)) {
 			instructions.push({
 				type: 'line',
 				x1: lx(k),
-				y1: Y_TOP,
+				y1: 0,
 				x2: lx(k),
-				y2: Y_BOT,
+				y2: ROW_HEIGHT,
 				color: laneColor(k),
 			});
 		}
 	}
 
-	// Entering line: top → dot (only if lane was active entering this row)
-	const hadEntering = lane < entering.length && entering[lane] !== null;
-	if (hadEntering) {
+	if ((entering[lane] ?? null) !== null) {
 		instructions.push({
 			type: 'line',
-			x1: lx(lane),
-			y1: Y_TOP,
-			x2: lx(lane),
-			y2: Y_MID,
+			x1: x0,
+			y1: 0,
+			x2: x0,
+			y2: HALF_ROW,
 			color: laneColor(lane),
 		});
 	}
 
-	// Dot
-	instructions.push({ type: 'dot', cx: lx(lane), cy: Y_MID, color: laneColor(lane) });
-
-	// Parent connections: dot → bottom of each parent lane
-	for (const pLane of parentLanes) {
-		instructions.push({
-			type: 'line',
-			x1: lx(lane),
-			y1: Y_MID,
-			x2: lx(pLane),
-			y2: Y_BOT,
-			color: laneColor(pLane),
-		});
+	for (const k of joiningLanes) {
+		instructions.push({ type: 'path', d: elbowUp(x0, lx(k)), color: laneColor(k) });
 	}
+
+	for (const pLane of parentLanes) {
+		if (pLane === lane) {
+			instructions.push({
+				type: 'line',
+				x1: x0,
+				y1: HALF_ROW,
+				x2: x0,
+				y2: ROW_HEIGHT,
+				color: laneColor(lane),
+			});
+		} else {
+			instructions.push({ type: 'path', d: elbowDown(x0, lx(pLane)), color: laneColor(pLane) });
+		}
+	}
+
+	instructions.push({ type: 'dot', cx: x0, cy: HALF_ROW, color: laneColor(lane) });
 
 	return instructions;
 }

@@ -109,6 +109,7 @@ Users who are already authenticated but can't see a private repo can use the **"
 | `/api/auth/github/logout`   | POST     | Clear both auth cookies                                 |
 | `/api/auth/github/status`   | GET      | Returns `{ authenticated, user }`                       |
 | `/api/github/repos`         | GET      | List user's repositories                                |
+| `/api/github/repo`          | GET      | One repository's metadata (default branch)              |
 | `/api/github/contents`      | GET/PUT  | Get or update a file                                    |
 | `/api/github/branches`      | GET/POST | List or create branches                                 |
 | `/api/github/commits`       | GET      | List commits                                            |
@@ -326,31 +327,34 @@ Implements a greedy lane-assignment algorithm producing a per-row SVG commit DAG
 
 For each commit (topological order, newest-first by author date):
 
-1. Find `lane = activeLanes.indexOf(commit.sha)` or claim first free slot.
-2. Snapshot `entering = [...activeLanes]`.
-3. For **first parent**: if already tracked in lane M → free commit's lane, `parentLane[0] = M`; else continue in same lane.
-4. For **additional parents** (merge commits): find/create a free slot.
+1. Snapshot `entering = [...activeLanes]`.
+2. Every lane waiting for `commit.sha` converges on it: the lowest becomes the commit's `lane`, the rest are `joiningLanes` and are freed. If none is waiting, claim the first free slot.
+3. **First parent**: always continue in the commit's own lane, even when another lane already tracks that parent. This keeps a branch line vertical down to its fork point, where step 2 joins it — instead of cutting across at the branch's oldest commit.
+4. **Additional parents** (merge commits): reuse a lane already tracking the parent, else claim a free slot.
 5. Snapshot `exiting = [...activeLanes]`.
 
 **SVG constants:**
 
-| Constant      | Value    | Description                                          |
-| ------------- | -------- | ---------------------------------------------------- |
-| `LANE_WIDTH`  | 16px     | Horizontal spacing between lane centres              |
-| `ROW_HEIGHT`  | 28px     | Pixel height of each commit row                      |
-| `DOT_RADIUS`  | 4px      | Commit dot radius                                    |
-| `LANE_COLORS` | 8 colors | Blue, red, green, amber, purple, cyan, orange, brown |
+| Constant        | Value    | Description                                           |
+| --------------- | -------- | ----------------------------------------------------- |
+| `LANE_WIDTH`    | 16px     | Horizontal spacing between lane centres               |
+| `ROW_HEIGHT`    | 28px     | Pixel height of each commit row                       |
+| `DOT_RADIUS`    | 4px      | Commit dot radius                                     |
+| `CORNER_RADIUS` | 8px      | Radius of the rounded elbow where a line changes lane |
+| `LANE_COLORS`   | 8 colors | Blue, red, green, amber, purple, cyan, orange, brown  |
 
-**`rowInstructions(node)`** returns `DrawInstruction[]` (lines + dot) for one SVG row:
+**`rowInstructions(node)`** returns `DrawInstruction[]` (lines, paths, dot) for one SVG row. Nothing is ever drawn diagonally: a lane change is a horizontal run plus a rounded corner, kept inside the row so it meets the next row at a lane centre.
 
-- Pass-through lanes: full vertical line (`y=0` to `y=28`)
+- Pass-through lanes: full vertical line (`y=0` to `y=28`), only where the lane carries the same SHA above and below (a lane freed by a join and reused for a merge parent in the same row is not a pass-through)
 - Entering line: `y=0` to `y=14` for commit's own lane (if lane was active above)
-- Dot at `(lx(lane), 14)`
-- Parent connections: `(lx(lane), 14)` to `(lx(parentLane), 28)` — straight or diagonal for merges
+- Joining lanes: path down from the top of the lane, rounded corner, horizontal into the dot
+- Parent in the same lane: vertical `y=14` to `y=28`; parent in another lane (merges): path horizontal out of the dot, rounded corner, down to the row bottom in the parent's lane
+- Dot at `(lx(lane), 14)`, emitted last so lines never cover it
 
 ### GitGraphPanel.svelte
 
-- Fetches up to 8 branches in parallel, 50 commits each (first page)
+- Fetches history for up to `GRAPH_BRANCH_LIMIT` (12) branches in parallel, 50 commits each (first page). `pickGraphBranches()` always includes the current branch and the repo's default branch (from `GET /api/github/repo`; the graph still loads if that fails), then the rest in GitHub's (alphabetical) order. When branches are left out the toolbar says "N of M branches"
+- **Switch-to-branch dropdown** in the toolbar lists every branch (marking those not in the graph), so a branch without a label in the graph can still be switched to. Switching replaces the repo context, which refetches the graph with the new branch included
 - Merges into a deduplicated `Map<sha, GitHubCommit>`
 - Renders each `CommitNode` as: inline SVG (graph column) + branch label pills + short message + date
 - **Branch label pills**: current branch shown bold + double-ring (`box-shadow: 0 0 0 2px white, 0 0 0 4px <color>`); other branches are clickable to switch

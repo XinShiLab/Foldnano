@@ -115,6 +115,10 @@ export async function listRepos(opts?: {
 	);
 }
 
+export async function getRepo(owner: string, repo: string): Promise<GitHubRepo> {
+	return apiFetch(`/api/github/repo${qs({ owner, repo })}`);
+}
+
 // --- Contents ---
 
 export async function getFileContent(

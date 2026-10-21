@@ -2,13 +2,14 @@
 	import { resolve } from '$app/paths';
 
 	const CONTROLLER = 'Prof. Xin Shi, Department of Chemistry, KU Leuven';
-	const LAST_UPDATED = '2026-10-07';
+	const LAST_UPDATED = '2026-10-13';
 
 	const STORAGE_ITEMS = [
 		{
 			name: 'foldnano_alpha_access',
 			kind: 'Cookie',
-			purpose: 'Remembers that you entered a valid access code during testing.',
+			purpose:
+				'Remembers that you entered a valid access code. Set only while an access code is required.',
 			lifetime: '30 days',
 		},
 		{

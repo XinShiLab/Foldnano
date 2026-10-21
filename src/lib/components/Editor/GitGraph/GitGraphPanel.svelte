@@ -1,10 +1,12 @@
 <script lang="ts">
 	import { LoaderCircle, RefreshCw, GitBranch, Plus } from '@lucide/svelte';
 	import { toast } from 'svelte-sonner';
-	import { listBranches, listCommits, createBranch } from '$lib/services/github/api';
+	import * as Select from '$lib/components/ui/select/index.js';
+	import { listBranches, listCommits, createBranch, getRepo } from '$lib/services/github/api';
 	import { getEditorDocumentSession } from '../context/EditorDocumentSession.svelte';
 	import {
 		computeLayout,
+		pickGraphBranches,
 		rowInstructions,
 		laneColor,
 		lx,
@@ -30,6 +32,8 @@
 	// ─── State ──────────────────────────────────────────────────────────────
 
 	let branches = $state<GitHubBranch[]>([]);
+	/** The subset of `branches` whose history is loaded into the graph. */
+	let graphBranches = $state<GitHubBranch[]>([]);
 	let allCommits = $state<Map<string, GitHubCommit>>(new Map());
 	let layoutRows = $state<CommitNode[]>([]);
 	let graphWidth = $state(LANE_WIDTH * 2); // grows as more lanes appear
@@ -54,10 +58,18 @@
 		loading = true;
 		error = '';
 		try {
-			branches = await listBranches(repoCtx.owner, repoCtx.repo, 100);
+			const [allBranches, defaultBranch] = await Promise.all([
+				listBranches(repoCtx.owner, repoCtx.repo, 100),
+				// Only used to prioritise branches; the graph still works without it
+				getRepo(repoCtx.owner, repoCtx.repo).then(
+					(r) => r.default_branch,
+					() => null
+				),
+			]);
+			branches = allBranches;
+			graphBranches = pickGraphBranches(allBranches, repoCtx.branch, defaultBranch);
 
-			// Fetch first page from each branch (up to 8) in parallel
-			const branchesToFetch = branches.slice(0, 8);
+			const branchesToFetch = graphBranches;
 			// eslint-disable-next-line svelte/prefer-svelte-reactivity
 			const pages = new Map<string, number>();
 			const results = await Promise.all(
@@ -91,8 +103,7 @@
 		if (!repoCtx || loadingMore) return;
 		loadingMore = true;
 		try {
-			// Fetch next page for each branch in parallel
-			const branchesToFetch = branches.slice(0, 8);
+			const branchesToFetch = graphBranches;
 			const results = await Promise.all(
 				branchesToFetch.map((b) => {
 					const page = nextPage.get(b.commit.sha) ?? 2;
@@ -205,6 +216,8 @@
 		}
 	}
 
+	const graphBranchNames = $derived(new Set(graphBranches.map((b) => b.name)));
+
 	// Lane of the current branch HEAD — used to anchor the uncommitted-changes row
 	const headLane = $derived.by(() => {
 		if (!repoCtx) return 0;
@@ -219,6 +232,7 @@
 			fetchAll();
 		} else {
 			branches = [];
+			graphBranches = [];
 			allCommits = new Map();
 			layoutRows = [];
 		}
@@ -227,20 +241,54 @@
 
 <div class="flex h-full flex-col">
 	<!-- Toolbar -->
-	<div class="flex items-center justify-between border-b border-border px-2 py-1">
-		<span class="text-xs text-muted-foreground">{allCommits.size} commits</span>
-		<button
-			class="rounded p-1 text-muted-foreground hover:bg-muted hover:text-muted-foreground disabled:opacity-40"
-			title="Refresh"
-			onclick={fetchAll}
-			disabled={loading}
-		>
-			{#if loading}
-				<LoaderCircle size={13} class="animate-spin" />
-			{:else}
-				<RefreshCw size={13} />
+	<div class="flex items-center gap-2 border-b border-border px-2 py-1">
+		<span class="min-w-0 truncate text-xs text-muted-foreground">
+			{allCommits.size} commits
+			{#if graphBranches.length < branches.length}
+				<span title="Only these branches' history is shown; switch to a branch to bring it in">
+					· {graphBranches.length} of {branches.length} branches
+				</span>
 			{/if}
-		</button>
+		</span>
+		<div class="ml-auto flex shrink-0 items-center gap-1">
+			{#if repoCtx && branches.length > 0}
+				<Select.Root
+					type="single"
+					bind:value={() => repoCtx?.branch ?? '', (v) => v && switchToBranch(v)}
+					disabled={!!switching || loading}
+				>
+					<Select.Trigger size="sm" class="h-6 max-w-40 py-0" title="Switch to branch">
+						<GitBranch size={11} />
+						<span class="truncate">{switching || repoCtx.branch}</span>
+					</Select.Trigger>
+					<Select.Content class="max-h-72">
+						<Select.Group>
+							<Select.Label>Switch to branch</Select.Label>
+							{#each branches as b (b.name)}
+								<Select.Item value={b.name} label={b.name}>
+									<span class="truncate">{b.name}</span>
+									{#if !graphBranchNames.has(b.name)}
+										<span class="ml-auto pl-2 text-[10px] text-muted-foreground">not in graph</span>
+									{/if}
+								</Select.Item>
+							{/each}
+						</Select.Group>
+					</Select.Content>
+				</Select.Root>
+			{/if}
+			<button
+				class="rounded p-1 text-muted-foreground hover:bg-muted hover:text-muted-foreground disabled:opacity-40"
+				title="Refresh"
+				onclick={fetchAll}
+				disabled={loading}
+			>
+				{#if loading}
+					<LoaderCircle size={13} class="animate-spin" />
+				{:else}
+					<RefreshCw size={13} />
+				{/if}
+			</button>
+		</div>
 	</div>
 
 	{#if error}
@@ -320,6 +368,8 @@
 									stroke={instr.color}
 									stroke-width="1.5"
 								/>
+							{:else if instr.type === 'path'}
+								<path d={instr.d} fill="none" stroke={instr.color} stroke-width="1.5" />
 							{:else}
 								<circle
 									cx={instr.cx}

@@ -14,12 +14,11 @@ public release; its completed items are not repeated here. Add new items to the 
       holds only a Git LFS pointer for the plugin wheel; accepted (2026-10-03), since the
       public repo holds the files.
 
-**Deferred until the paper is published** (decided 2026-09-27): remove the access gate
-(`AlphaAccessGate` and its "Beta Testing" titles on `/`, `/docs`, `/editor` and `/oligos`, and the
-README note about the access code). When removing it, make the app open when `ALPHA_ACCESS_CODE`
-is unset; today an unset code locks everyone out, which would break self-hosting. The alpha
-wording became beta on 2026-10-07 (toolbar badge, gate titles, a use-with-caution note); drop
-the "beta" badge at 1.0.
+**Deferred until the paper is published** (decided 2026-09-27): the access gate is switched off
+since 2026-10-13 (an unset `ALPHA_ACCESS_CODE` opens the app); decide whether to delete its code
+(`AlphaAccessGate` and its "Beta Testing" titles on `/`, `/docs`, `/editor` and `/oligos`) or keep
+it for internal test deployments. The alpha wording became beta on 2026-10-07 (toolbar badge,
+gate titles, a use-with-caution note); drop the "beta" badge at 1.0.
 
 ## After the beta
 
