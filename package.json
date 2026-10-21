@@ -18,6 +18,7 @@
 		"build": "node scripts/build-plugins.mjs && vite build",
 		"build:plugins": "node scripts/build-plugins.mjs",
 		"gen:pyodide-packages": "node scripts/generate-pyodide-packages.mjs",
+		"gen:python-api": "python3 scripts/gen_python_api.py",
 		"whats-new:draft": "node scripts/whats-new-draft.ts",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo '' && husky",
@@ -33,7 +34,8 @@
 		"test:unit": "vitest",
 		"test": "vitest run --changed",
 		"test:branch": "vitest run --changed main",
-		"test:all": "vitest run"
+		"test:all": "vitest run",
+		"test:python": "cd src/lib/plugin/python && uv run --locked --extra dev pytest -q"
 	},
 	"devDependencies": {
 		"@eslint/compat": "latest",

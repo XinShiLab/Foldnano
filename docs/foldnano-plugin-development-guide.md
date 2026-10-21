@@ -518,6 +518,13 @@ def run(ctx: PluginContext) -> None:
     ctx.set_result_mutation_log(part.mutation_log)
 ```
 
+### Discovering the API
+
+You don't have to memorise the surface:
+
+- **Type stubs.** `src/lib/plugin/python/stubs/foldnano_mini/__init__.pyi` (and `stubs/foldnano/__init__.pyi`) list every public class, method and property with signatures and docstrings, generated from the bundled sources. Read them directly, hand them to a coding agent, or set `MYPYPATH` / pyright `stubPath` to that `stubs` folder for editor completion and type checking outside Foldnano.
+- **Script Lab autocomplete.** Typing `.` after `ctx`, `part`, or anything derived from them (`part.active_region.`, `for oligo in part.oligos: oligo.`) lists that object's members; **Ctrl+Space** opens the list anywhere.
+
 ### Loading and the active region
 
 ```python

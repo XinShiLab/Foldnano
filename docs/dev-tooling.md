@@ -84,10 +84,13 @@ by hand in the file header, the About dialog and `THIRD_PARTY_NOTICES.md`.
 ## CI (`.github/workflows/ci.yml`)
 
 GitHub Actions runs on every pull request and on pushes to `main`: a frozen-lockfile install,
-then `pnpm lint` (which includes `docs:verify`), `pnpm check`, `pnpm test:all` and `pnpm build`,
-the same commands as a local final check. Node comes from `.nvmrc` and pnpm from `package.json`
+then `pnpm lint` (which includes `docs:verify`), `pnpm check`, `pnpm test:all`, `pnpm build` and
+`pnpm test:python` (pytest for the bundled `foldnano` / `foldnano_mini` packages, via uv), the same
+commands as a local final check. Node comes from `.nvmrc` and pnpm from `package.json`
 `packageManager`, so CI and local machines use the same versions. The checkout fetches Git LFS
-files because the bundled plugin wheel lives there. The build needs no secrets: server code reads
+files because the bundled plugin wheel lives there. `src/lib/plugin/python/.python-version` pins
+the Python uv uses to the pinned Pyodide's minor version (`PYODIDE_PYTHON_VERSION`); bump both
+together. The build needs no secrets: server code reads
 its environment at runtime (`$env/dynamic/private`), and Vercel deploys separately.
 
 ## Repo-maintenance scripts

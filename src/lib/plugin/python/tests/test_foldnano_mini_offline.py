@@ -320,11 +320,18 @@ def test_allocator_sees_ids_created_earlier_this_run(
     assert part.allocate_segment_id() == "py-seg-next-seg"
 
 
-def test_add_vh_freeform_not_supported(multi_region_part_foldnano_json: str) -> None:
+def test_add_vh_freeform(multi_region_part_foldnano_json: str) -> None:
     part = load_part(multi_region_part_foldnano_json)
     free = part.get_region("region-free")
     assert isinstance(free, FreeformRegion)
-    assert not hasattr(free, "add_vh_at")
+    vh = free.add_vh_at(origin=(1.0, 2.0, 3.0), direction=(0.0, 0.0, 2.0), length=21)
+    assert vh.region_id == "region-free"
+    assert vh.is_freeform
+    op = part.mutation_log[-1]
+    assert op["op"] == "add_freeform_vh"
+    assert op["origin"] == [1.0, 2.0, 3.0]
+    assert op["axis"] == [0.0, 0.0, 1.0]
+    assert op["length"] == 21
 
 
 def test_set_vh_local_frame(multi_region_part_foldnano_json: str) -> None:

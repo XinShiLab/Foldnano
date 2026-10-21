@@ -3,6 +3,7 @@ covers:
   - src/lib/plugin/**
   - src/lib/components/Editor/Plugin/**
   - scripts/build-plugins.mjs
+  - scripts/gen_python_api.py
   - scripts/generate-pyodide-packages.mjs
   - scripts/vite-sandbox-worker.ts
   - scripts/vite-pyodide.ts
@@ -837,6 +838,18 @@ pyodide.FS.writeFile('/foldnano_mini/part.py', foldnanoMiniPart);
 
 All files are written to Pyodide's virtual filesystem at `INIT_RUNTIME` time, so both `from foldnano.plugin import PluginContext` and `from foldnano_mini import load_part` work in every plugin regardless of network availability.
 
+### Generated API stubs and completion index
+
+`scripts/gen_python_api.py` (`pnpm gen:python-api`) reads both packages with `ast` (never imports them) and writes, from one pass:
+
+- `src/lib/plugin/python/stubs/<package>/__init__.pyi`: every name in the package's `__all__`, with real signatures and full docstrings, plus the unexported helpers/aliases those names use. One file per package so an author (or their coding agent) can read the whole surface at once.
+- `src/lib/plugin/python/stubs/<package>/<module>.pyi`: re-export shims so `from foldnano.plugin import PluginContext` type-checks against the stubs.
+- `src/lib/plugin/python-api-index.generated.json`: members per class (inherited members flattened, setter-backed properties marked `settable`), function signatures and first-paragraph docs. Script Lab autocomplete reads it (`docs/script-lab.md` § API autocomplete).
+
+What's public is decided by each package's `__init__.py` `__all__`: a new proxy method appears once it's on an exported class; a new class needs an `__all__` entry. Point a type checker at the stubs with `MYPYPATH=src/lib/plugin/python/stubs` (or pyright `stubPath`).
+
+`python-completions.spec.ts` runs the generator with `--check` (skipped when `python3` is missing) and globs the package sources into its import graph, so `pnpm test` reruns it whenever a `.py` file changes. When it fails, run `pnpm gen:python-api` and commit the outputs.
+
 ### Run harness
 
 Each plugin execution runs inside an isolated module namespace:
@@ -1249,6 +1262,8 @@ Coverage: `initRuntime` idempotency, RUNTIME_ERROR retry, concurrent installs an
 ---
 
 ## Boundaries / Don'ts
+
+- Don't hand-edit `python/stubs/**` or `python-api-index.generated.json`; change the Python source (signature, annotation, docstring, `__all__`) and regenerate.
 
 This file is for **Foldnano developers** working on the host side of the plugin system. Plugin authors should read `foldnano-plugin-development-guide.md`.
 

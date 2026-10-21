@@ -285,6 +285,8 @@ export class EditorViewContext {
 	showScaffoldMap: boolean = $state(false);
 	showSidePanel: boolean = $state(false);
 	sidePanelTab: SidePanelId = $state('GITHUB');
+	/** Plugin ids whose code editor is in a pop-out window; their panel stays mounted off-tab. */
+	poppedOutPluginPanels: SvelteSet<string> = new SvelteSet();
 	newFileDialogOpen: boolean = $state(false);
 	publishToGitHubDialogOpen: boolean = $state(false);
 	activeGitHubTab: 'files' | 'changes' | 'graph' = $state('files');
