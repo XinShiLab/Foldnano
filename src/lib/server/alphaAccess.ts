@@ -44,11 +44,17 @@ export function alphaAccessCookieIsValid(
 	});
 }
 
+export function alphaAccessGranted(
+	cookieValue: string | undefined,
+	configuredCodes: string[]
+): boolean {
+	// No configured code switches the gate off (hosted deploy with the variable removed, self-hosting).
+	if (configuredCodes.length === 0) return true;
+	return alphaAccessCookieIsValid(cookieValue, configuredCodes);
+}
+
 export function hasAlphaAccess(cookies: Cookies): boolean {
-	return alphaAccessCookieIsValid(
-		cookies.get(ALPHA_ACCESS_COOKIE_NAME),
-		getConfiguredAlphaAccessCodes()
-	);
+	return alphaAccessGranted(cookies.get(ALPHA_ACCESS_COOKIE_NAME), getConfiguredAlphaAccessCodes());
 }
 
 export function setAlphaAccessCookie(cookies: Cookies, accessCode: string, secure: boolean): void {

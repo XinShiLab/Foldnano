@@ -76,7 +76,10 @@ by hand in the file header, the About dialog and `THIRD_PARTY_NOTICES.md`.
 
 - **pre-commit** — `lint-staged` (Prettier on staged files), then `docs-check.ts --staged`,
   which only warns.
-- **pre-push** — Git LFS.
+- **pre-push** — Git LFS. It first runs `.husky/pre-push.local` if present: an untracked,
+  gitignored per-clone hook for a maintainer's own checks (e.g. a push guard). Git sends the
+  pushed refs on stdin only once, so the hook buffers them and pipes them to both steps; a local
+  hook that reads stdin directly would otherwise starve `git lfs pre-push` and skip LFS uploads.
 
 ## CI (`.github/workflows/ci.yml`)
 

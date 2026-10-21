@@ -163,6 +163,18 @@
 		};
 		editor.textarea.addEventListener('keydown', stopEditorShortcutPropagation);
 
+		// Writing-assistant extensions ignore `spellcheck=false`; these are their own opt-outs.
+		for (const [name, value] of [
+			['data-gramm', 'false'],
+			['data-gramm_editor', 'false'],
+			['data-enable-grammarly', 'false'],
+			['data-lt-active', 'false'],
+			['autocorrect', 'off'],
+			['translate', 'no'],
+		]) {
+			editor.textarea.setAttribute(name, value);
+		}
+
 		return () => {
 			editor?.textarea.removeEventListener('keydown', stopEditorShortcutPropagation);
 			editor?.remove();

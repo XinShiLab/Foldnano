@@ -1,1 +1,9 @@
-git lfs pre-push "$@"
+# Git passes the pushed refs on stdin; buffer them so each step below can read them.
+refs=$(cat)
+
+# Optional, untracked per-clone checks (gitignored), e.g. a maintainer's own push guard.
+if [ -f .husky/pre-push.local ]; then
+	printf '%s\n' "$refs" | sh .husky/pre-push.local "$@"
+fi
+
+printf '%s\n' "$refs" | git lfs pre-push "$@"

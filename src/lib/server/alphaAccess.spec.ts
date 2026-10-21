@@ -4,6 +4,7 @@ import {
 	ALPHA_ACCESS_COOKIE_PATH,
 	alphaAccessCodeMatches,
 	alphaAccessCookieIsValid,
+	alphaAccessGranted,
 	buildAlphaAccessCookieValue,
 	normalizeAlphaAccessCode,
 } from './alphaAccess';
@@ -21,6 +22,19 @@ describe('alphaAccess', () => {
 		expect(alphaAccessCodeMatches('wrong-code', ['secret-code'])).toBe(false);
 		expect(alphaAccessCodeMatches('   ', ['secret-code'])).toBe(false);
 		expect(alphaAccessCodeMatches('secret-code', [])).toBe(false);
+	});
+
+	it('grants access to everyone when no code is configured', () => {
+		expect(alphaAccessGranted(undefined, [])).toBe(true);
+		expect(alphaAccessGranted('v1.stale', [])).toBe(true);
+	});
+
+	it('requires a valid cookie when a code is configured', () => {
+		expect(alphaAccessGranted(undefined, ['secret-code'])).toBe(false);
+		expect(alphaAccessGranted('v1.stale', ['secret-code'])).toBe(false);
+		expect(alphaAccessGranted(buildAlphaAccessCookieValue('secret-code'), ['secret-code'])).toBe(
+			true
+		);
 	});
 
 	it('accepts any code from a list of multiple configured codes', () => {

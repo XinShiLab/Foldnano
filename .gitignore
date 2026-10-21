@@ -38,3 +38,6 @@ test_files/fixtures/oxdna_export/tacoxDNA/
 .svelte-kit/
 # Generated plugin zips (built by scripts/build-plugins.mjs)
 static/plugins/*/*.zip
+
+# Per-clone git hook additions (see docs/dev-tooling.md)
+.husky/*.local
