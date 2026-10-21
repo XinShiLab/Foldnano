@@ -489,6 +489,21 @@ describe('undo round-trip: every command', () => {
 	}
 });
 
+describe('undo round-trip: adjacent-end merge', () => {
+	it('merging into an oligo that continues through a crossover round-trips', () => {
+		const { doc, part, vh0, vh1, history } = emptyLatticeScene();
+		const a = part.createOligo(vh0, 0, 9);
+		const b = part.createOligo(vh0, 10, 11);
+		part.connectTwoOligos(b, part.createOligo(vh1, 11, 0));
+		expectUndoRoundTrip(doc, history, () =>
+			strands.createCrossoverCmd(
+				{ part, fromOligo: a, toOligo: b, toSegment: firstSegment(b), atIndexTarget: 10 },
+				history
+			)
+		);
+	});
+});
+
 describe('undo round-trip: history verifier', () => {
 	it('rejects an edit whose capture scope misses what it mutates', () => {
 		const { doc, part, up0, history } = latticeScene();

@@ -2,7 +2,7 @@
 title: Plugin Patterns
 description: Round-trip mutation, foldnano_mini mutable API, user-configurable parameters, and patterns by use case
 category: plugin-development
-order: 6
+order: 7
 slug: plugin-patterns
 ---
 
@@ -87,52 +87,88 @@ part = load_part(json_str, active_region_id=None)  # -> MutablePart
 
 `active_region_id` should usually be threaded from `ctx.active_region_id`. It enables `part.active_region`, `part.oligos_in_region(region_id)`, `part.vhs_in_region(region_id)`, and (with `replayMutationLogInRegion`) is enforced by the host as a scope constraint at apply time.
 
-### MutablePart surface
+### API reference
+
+Every public name, with what it does and whether it reads or changes the design, is on its own page: [foldnano_mini API Reference](/docs/plugin-development/foldnano-mini-api). The sections below show how the pieces fit together.
+
+### Asking before you edit
+
+Every structural call has a `can_*` check that returns a `Check`. It is truthy when the edit is allowed and carries a `reason` when it is not:
 
 ```python
-part.regions             # list[MutableRegion]   : LatticedRegion | FreeformRegion
-part.virtual_helices     # list[MutableVirtualHelix]
-part.oligos              # list[MutableOligo]
-part.active_region       # MutableRegion | None
-part.mutation_log        # list[dict] : JSON-serialisable op records
-part.lattice_type        # 'HONEYCOMB' | 'SQUARE' | 'FREEFORM' (from first region)
-part.max_base            # int
-
-part.get_region(id)      # -> MutableRegion | None
-part.get_vh(index)       # -> MutableVirtualHelix | None
-part.get_oligo(id)       # -> MutableOligo | None
-part.oligos_in_region(region_id)
-part.vhs_in_region(region_id)
-
-# Structural mutations
-part.create_segment(vh, five_index, three_index, color="#0066cc")
-part.connect(seg_from, seg_to)        # 3'→5'
-part.remove_vhs([index, ...])
-part.to_json()                        # full snapshot of the in-worker mirror
+check = part.can_create_segment(vh, 10, 30)
+if check:
+    part.create_segment(vh, 10, 30)
+else:
+    ctx.log(f"skipped: {check.reason}")
 ```
 
-### Properties that record ops
+The edit itself runs the same check and raises `InvalidOperationError` before anything is recorded, so a refused call never leaves a half-written log. The checks cover:
 
-| Read/write attribute | Op kind |
-| --- | --- |
-| `oligo.color = '#…'` | `set_oligo_color` |
-| `oligo.name = '…'` | `set_oligo_name` |
-| `oligo.is_scaffold = True/False` | `set_oligo_is_scaffold` |
-| `seg.five_modification = '/5…/'` | `set_segment_modification` |
-| `seg.three_modification = '/3…/'` | `set_segment_modification` |
-| `seg.slot_at(bp).seq = '…'` | `set_slot_sequence` |
-| `seg.slot_at(bp).set_skip(True)` | `set_slot_skip` |
-| `seg.slot_at(bp).set_insertion(…)` | `set_slot_insertion` |
-| `seg.remove()` | `remove_segment` |
-| `oligo.remove()` | `remove_oligo` |
-| `region.add_vh_at(row, col)` | `add_vh_at_coords` (lattice only) |
-| `vh.local_frame = {…}` | `set_vh_local_frame` (freeform) |
+- **Creating** a segment: both ends inside the region's bases, on free bases of the strand it runs along (5' below 3' is strand 0, otherwise strand 1).
+- **Moving** an end (`seg.five_prime.index = 12`, or `end.can_move_to(12)` first): inside the helix, not over another segment, not reversing the segment. An end on a crossover site may only move to another matching site.
+- **Connecting**: two different segments with free ends.
+- **Skips and insertions** (`slot.can_set_skip()`, `slot.can_set_insertion()`): inside the segment, not at its end, with the complementary strand present, and not at a crossover site.
+- **Skip and insertion positions** are also off limits for connecting, moving an end, or breaking.
+
+Free bases are easy to find too: `vh.strand_sets[0].free_ranges()` lists them, and `ss.is_index_occupied_by(bp)` returns the segment at a base.
+
+### Crossovers and segment ends
+
+`part.connect(a, b)` joins any free 3' end to any free 5' end. To land on a lattice crossover site, pick a base from `vh.potential_xover_sites(strand_index)` (each site has `bp_index`, `to_vh_index` and `right`), or check afterwards with `seg.three_prime.is_constrained`. Freeform helices have no sites.
+
+When the two ends are on the same helix and strand, one base apart, `connect` **merges** the two segments into one instead of making a crossover. Leave a gap of at least one base if you want a crossover.
+
+Each segment has `seg.five_prime` and `seg.three_prime` end objects with `index`, `modification`, `is_free`, `connected_segment`, `connected_end` and `is_constrained`.
+
+### Editing like the strand view
+
+These calls do what the strand view's tools do, and each has a `can_*` check:
+
+```python
+oligo = part.get_oligo_at(vh, 0, 21)     # what's at a base (also get_segment_at, get_end_at)
+part.break_at(vh, 0, 21)                 # the break tool: new 3' end at base 21
+part.make_crossover(vh, 0, 21, other_vh) # click a crossover site: break both strands, cross them
+part.create_crossover(oligo, vh, 1, 30)  # drag an oligo's 3' end onto a strand at base 30
+part.connect_oligos(oligo_a, oligo_b)    # join a free 3' end to a free 5' end
+part.remove_oligo(oligo)
+part.remove_segment(seg)                 # what was downstream becomes its own oligo
+part.fill_empty_strand_set(vh, 1)        # one strand along the whole helix
+part.add_insert_at(vh, 30)               # the insert tool: +1 base on both strands
+part.add_skip_at(vh, 35)                 # the skip tool: skip on both strands
+part.remove_skip_or_insertion_at(vh, 30)
+```
+
+Modifications live on free ends, so set them on the oligo: `oligo.five_modification = "/5Bio/"`, `oligo.three_modification = "/3Cy3/"`. A connected end refuses one.
+
+For a region, `region.set_max_base(n)` grows or shrinks it (a shrink is refused while strands reach that far), `region.reduce_unused_length()` trims it to its strands, and `region.remove_all_skips()` / `region.remove_all_insertions()` clear those in one call. A single slot goes back to a plain base with `slot.remove_skip_or_insertion()`, and `part.get_slot_at(vh, strand_index, bp)` finds a slot by position.
+
+### Drawing an oligo along a path
+
+`part.create_oligo` builds a whole multi-segment oligo in one call. List one `(vh, five, three)` entry per segment, from 5' to 3'; each segment's 3' end joins the next one's 5' end:
+
+```python
+oligo = part.create_oligo(
+    [
+        (vh_a, 10, 30),   # strand 0 on vh_a
+        (vh_b, 30, 10),   # crossover at base 30, then strand 1 on vh_b
+    ],
+    color="#ff8800",
+    name="my staple",
+)
+```
+
+The whole path is checked before anything is recorded. Entries that continue each other on the same strand become a single segment, `circular=True` closes the loop, and `SegmentSpec(vh, five, three)` can stand in for a tuple when you want named fields.
 
 ### Common pitfalls
 
 - `replayMutationLogInRegion` aborts if any op's target VH is outside the active region. Use `part.oligos_in_region(...)` / `part.vhs_in_region(...)` to filter inputs up front.
 - `region.add_vh_at(...)` only exists on `LatticedRegion`. For freeform regions, use `vh.local_frame = {...}`.
 - `MutableSegment.oligo_id` is resolved dynamically on each access, so it stays correct after `part.connect(...)` merges two oligos.
+- Connecting two ends that are one base apart on the same strand merges the segments; the second segment no longer exists afterwards.
+- Breaks behave as in the editor. Breaking at an oligo's own free end, or one base before a free 3' end, does nothing. Breaking a circular oligo opens it into one linear oligo with the same id. A piece that splits off is a new staple oligo (green, not scaffold), and a mid-segment break drops the segment's 3' modification.
+- `part.remove_segment(seg)` keeps the segments before it in the oligo and moves those after it into a new oligo (returned). Removing an oligo's first segment therefore removes that oligo id.
+- Crossover calls clear modifications on the ends they join, since only free ends carry one.
 - Validation errors raise immediately and do **not** pollute `part.mutation_log`.
 
 ---

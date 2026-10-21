@@ -330,6 +330,14 @@ vh.scaffoldStrandIndex;
 Freeform VHs do not have lattice parity and will throw if parity helpers are
 used without `latticeCoords`.
 
+**Lattice coords are assumed non-negative.** Parity is `row % 2 === col % 2`, and
+the Python plugin API (`MutableVirtualHelix.parity_is_even`) uses the same
+expression. `%` differs for negatives (JS `-1 % 2 === -1`, Python `-1 % 2 == 1`),
+so a negative coord would give the two runtimes different parity, and different
+scaffold strands and crossover sites. Nothing in the model enforces this today
+(`LatticedDesignRegion.addVhAtCoords` takes any integer). If negative coords ever
+become possible, switch both sides to a sign-safe parity (e.g. `((row + col) % 2 + 2) % 2 === 0`).
+
 ---
 
 ## StrandSet
@@ -346,6 +354,10 @@ StrandSet
 ```
 
 Segments are resolved through `part.segmentsLookup`.
+
+Paths that create oligos or segments take the caller's ids when given (`createOligo` opts, `breakOligoAt`'s `newOligoId` / `newSegmentId`, `removeSegmentFromOligo`'s `newOligoId`): `foldnano_mini` replay names everything it creates, so later ops in the same log can refer to it.
+
+Any path that destroys a segment must also `part.unregisterSegment` it (e.g. `Oligo.removeEndSegment`, used by the adjacent-end merge `SegmentEnd.mergeTo`); a stale entry makes undo/redo throw when it re-registers the id.
 
 Important helpers:
 

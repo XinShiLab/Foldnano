@@ -75,7 +75,7 @@ Plugins are third-party code the user chose to run, so the trust model is "like 
 
 **What it does not isolate:** plugins that share the standard-tier worker share one interpreter, so they can observe or monkeypatch each other's modules; and the plugin still receives the full design JSON and can return any result (validated before Apply as usual).
 
-**Build.** The worker is imported as a string with `?sandbox-worker` (`scripts/vite-sandbox-worker.ts`, see `docs/dev-tooling.md`): esbuild bundles it as a classic IIFE with the `?raw` Python packages inlined. Module workers fail silently in an opaque origin, so it must not go through Vite's worker pipeline. Pyodide itself is loaded with a dynamic `import()` of `pyodide.mjs` from the URLs in `INIT_RUNTIME`.
+**Build.** The worker is imported as a string with `?sandbox-worker` (`scripts/vite-sandbox-worker.ts`, see `docs/dev-tooling.md`): esbuild bundles it as a classic IIFE with every module of the Python packages inlined (`virtual:foldnano-python-packages`; a new `.py` file needs no worker change). Module workers fail silently in an opaque origin, so it must not go through Vite's worker pipeline. Pyodide itself is loaded with a dynamic `import()` of `pyodide.mjs` from the URLs in `INIT_RUNTIME`.
 
 **Self-hosted Pyodide core.** The core (`pyodide.mjs`, `pyodide.asm.js`/`.wasm`, `python_stdlib.zip`, `pyodide-lock.json`; `PYODIDE_CORE_FILES`) comes from the exact-pinned `pyodide` devDependency, so `pnpm-lock.yaml` checks it, and `selfHostedPyodide()` (`scripts/vite-pyodide.ts`) emits it into the client build at `PYODIDE_CORE_PATH` (`/pyodide/v<version>/`). Distribution packages (numpy, …) still come from jsDelivr (`PYODIDE_PACKAGE_BASE_URL`, passed as `packageBaseUrl`); Pyodide checks each against the sha256 in the self-hosted lock file (`checkIntegrity`, on by default). The sandbox is cross-origin to the app, so `vercel.json` serves the core with `Access-Control-Allow-Origin: *` (and an immutable cache header; the path is versioned). The worker can't resolve app paths from its opaque origin, so the bridge resolves them (`pyodideUrls`) and sends absolute URLs in `INIT_RUNTIME`. `buildSandboxCsp` allows scripts only from the core path and connections to the core and package paths. **On loopback pages (`pnpm dev`, `pnpm preview`) the core comes from the CDN instead** (same pinned release): Chrome's local-network protection blocks the opaque-origin sandbox from fetching localhost at all, even with CORS and `Access-Control-Allow-Private-Network`. So self-hosting is exercised only on a deployed site. Vercel previews couldn't load it either: Deployment Protection redirects the sandbox's cookieless requests to the login page. So preview builds (`VERCEL_ENV=preview`, baked in as `__PYODIDE_SELF_HOSTED__` by `vite.config.ts`) also use the CDN; production self-hosts. To test self-hosting itself, build a preview without that switch and with protection off, or check production. `VITE_PYODIDE_INDEX_URL` points core and packages at another full distribution, for debugging.
 
@@ -103,7 +103,7 @@ src/lib/plugin/
     bridge.ts                       ← PyodideWorkerBridge
     bridge.spec.ts                  ← vitest unit tests for the bridge
     sandboxHost.ts                  ← SandboxedWorker (opaque-origin iframe host) + buildSandboxCsp()
-    sandbox-worker.d.ts             ← types for `?sandbox-worker` source imports
+    sandbox-worker.d.ts             ← types for `?sandbox-worker` and `virtual:foldnano-python-packages`
     pyodide.worker.ts               ← Web Worker entry point (INIT_RUNTIME / RUN_PLUGIN / …)
     pyodideConfig.ts                ← PYODIDE_VERSION pin, core path, pyodideUrls()
   python/foldnano/
@@ -115,11 +115,17 @@ src/lib/plugin/
   python/foldnano_mini/
     __init__.py                     ← mutable plugin entrypoint
     loader.py                       ← load_part(...)
-    mutations.py                    ← mutation-log vocabulary (24 op kinds)
+    mutations.py                    ← mutation-log vocabulary (KNOWN_OPS)
     invariants.py                   ← pre-log validation helpers
+    checks.py                       ← Check (truthy can_* result), InvalidOperationError
+    topology.py                     ← occupancy index (rebuilt lazily per op generation)
+    lattice.py                      ← potential crossover sites (port of latticeOffsets.ts)
+    editing.py                      ← editor-level edits planned on a scratch mirror copy
     transport.py                    ← offline mirror transport
     part.py, region.py, vh.py, oligo.py, plane.py
-  python/example_all_ops.py         ← standalone CPython script exercising all 24 ops; run with `python example_all_ops.py`
+  python/tests/fixtures/foldnano_mini_parity.golden.json ← host verdicts, written by foldnanoMiniParity.spec.ts
+  python/tests/fixtures/foldnano_mini_replay.golden.json ← Python log + predicted state, replayed by foldnanoMiniReplay.spec.ts
+  python/example_all_ops.py         ← standalone CPython script exercising every op kind; run with `python example_all_ops.py`
   core_plugins/
     design_stats.fplugin.json       ← demo plugin manifest (previewOnly, cadnano_json)
     staple_colorizer.fplugin.json   ← demo plugin manifest (replaceRegionKeepAnnotationsWhereMatched, cadnano_json)
@@ -145,7 +151,7 @@ static/plugins/
   sequence_report/plugin.py         ← demo: per-oligo CSV report using foldnano_json
   gc_colorizer/plugin.py            ← demo: GC-based color gradient using foldnano_json
   staple_colorizer_mini/plugin.py   ← demo: region-scoped recolor via foldnano_mini
-  mutation_test/plugin.py           ← demo: all 24 foldnano_mini op kinds; used to verify JS replay end-to-end
+  mutation_test/plugin.py           ← demo: every foldnano_mini op kind; used to verify JS replay end-to-end
   crossover_analyzer/
     plugin.py                       ← demo (multi-file): orchestration entry point
     analyzer.py                     ← demo (multi-file): crossover extraction module
@@ -245,7 +251,7 @@ All fields are typed in `src/lib/plugin/types.ts`:
 
 **Missing means 1, forever** (`DEFAULT_MANIFEST_SCHEMA_VERSION`, not the current version), like `.fn.json` files without a header. `withSchemaVersion` fills it in, so `validateManifest` returns, and `PluginRegistry` loads from IndexedDB, manifests with an explicit version. This is safe only because of two rules: unknown fields are rejected (a newer field used without declaring its version fails loudly), and **an existing field never changes meaning** in a later version; add a new field instead. A stored manifest newer than the app is flagged `needs-reinstall`.
 
-**Published schema:** `static/schemas/fplugin-v1.schema.json` (JSON Schema 2020-12), documented for authors in `src/content/plugin-development/03-plugin-manifest.md`. `manifestSchema.spec.ts` keeps it in lockstep: every shipped manifest must pass both the schema and `validateManifest`, the schema's field lists must equal the validator's, and network-entry rules must agree.
+**Published schema:** `static/schemas/fplugin-v1.schema.json` (JSON Schema 2020-12), documented for authors in `src/content/plugin-development/04-plugin-manifest.md`. `manifestSchema.spec.ts` keeps it in lockstep: every shipped manifest must pass both the schema and `validateManifest`, the schema's field lists must equal the validator's, and network-entry rules must agree.
 
 **Bumping the version:** add the field to the validator and its field lists, raise `MANIFEST_SCHEMA_VERSION` (and the `schemaVersion` literal type), publish `fplugin-v<N>.schema.json` next to the old one, and update the author docs.
 
@@ -825,16 +831,11 @@ This override happens on the main thread in `PluginCoordinator`; the worker does
 
 ## The `foldnano` And `foldnano_mini` Python Packages
 
-The worker bundles two Python packages at build time using Vite's `?raw` loader:
-
-```typescript
-// pyodide.worker.ts
-import foldnanoPlugin from '../python/foldnano/plugin.py?raw';
-import foldnanoMiniPart from '../python/foldnano_mini/part.py?raw';
-// …
-pyodide.FS.writeFile('/foldnano/plugin.py', foldnanoPlugin);
-pyodide.FS.writeFile('/foldnano_mini/part.py', foldnanoMiniPart);
-```
+The worker bundles both Python packages at build time from one import,
+`virtual:foldnano-python-packages` (provided by `scripts/vite-sandbox-worker.ts`, see
+`docs/dev-tooling.md`): every `.py` file under `python/foldnano/` and `python/foldnano_mini/`,
+keyed `'<package>/<module>.py'`. Don't list modules by hand in `pyodide.worker.ts`; a new module
+is picked up automatically.
 
 All files are written to Pyodide's virtual filesystem at `INIT_RUNTIME` time, so both `from foldnano.plugin import PluginContext` and `from foldnano_mini import load_part` work in every plugin regardless of network availability.
 

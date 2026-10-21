@@ -2,7 +2,7 @@
 title: Testing Plugins
 description: Offline unit testing for foldnano_mini plugins using CPython, pytest fixtures, and the self-consistency replay check
 category: plugin-development
-order: 7
+order: 8
 slug: plugin-testing
 ---
 
@@ -15,6 +15,23 @@ The offline transport is pure Python, so `foldnano_mini` plugins can be unit-tes
 ### 1. Local invariants
 
 `foldnano_mini/invariants.py` runs cheap validators _before_ an op is appended to the log: hex-color shape, integer endpoint distinctness, strand-set-index ∈ {0, 1}, etc. They fail fast with a clear `ValueError` / `TypeError` and never touch the JS side.
+
+Topology edits are checked the same way, before anything is recorded: occupancy, region bounds, end moves, crossovers, breaks, and skip or insertion placement. A refused edit raises `InvalidOperationError` (a `ValueError`) with the reason, and every such call has a `can_*` twin that returns the same answer without raising, so tests can assert on either:
+
+```python
+import pytest
+from foldnano_mini import InvalidOperationError, load_part
+
+def test_occupied_range_refused(multi_region_part_foldnano_json):
+    part = load_part(multi_region_part_foldnano_json)
+    check = part.can_create_segment(0, 15, 25)   # strand 0 of VH 0 is taken there
+    assert not check and "occupied" in check.reason
+    with pytest.raises(InvalidOperationError):
+        part.create_segment(0, 15, 25)
+    assert part.mutation_log == []
+```
+
+These checks are kept in step with the editor's own rules by parity tests in the repository, so a log that passes them replays in the app.
 
 ```python
 import pytest
@@ -82,11 +99,13 @@ Reference test files:
 
 - `tests/test_foldnano_mini_offline.py`: offline transport behaviour, op recording, validation.
 - `tests/test_foldnano_mini_replay_self.py`: self-consistency between mirror and replay.
+- `tests/test_foldnano_mini_topology.py`: occupancy queries, segment ends, `can_*` checks, `create_oligo` and the editor-level calls.
+- `tests/test_foldnano_mini_parity.py` and `tests/test_foldnano_mini_replay_host.py`: agreement with the app's own model, in both directions.
 - `tests/test_foldnano_regions.py`: Plane / DesignRegion proxy surface.
 
 ### What is _not_ covered offline
 
-- Whether the JS-side `Part` accepts a given `connect(...)` topologically.
+- Repeat groups (mirror oligos), and the active-region limit of `replayMutationLogInRegion`: the checks don't model them.
 - 3D / view-side regressions.
 - Cross-plugin interactions in the editor.
 

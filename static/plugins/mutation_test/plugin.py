@@ -144,6 +144,8 @@ def run(ctx: PluginContext) -> None:
     # Op 8-10: slot sequence / skip / insertion (on seg_a)
     # ------------------------------------------------------------------
     seg_a.slot_at(5).seq = "A"
+    # A skip or insertion needs the complementary strand (both strands' slots change).
+    part.create_segment(vh=new_vh_a, five_index=10, three_index=0, color="#3366cc")
     seg_a.slot_at(6).set_skip(True)
     seg_a.slot_at(7).set_insertion("AT")
     ctx.log("Applied slot ops at bp 5 (seq), 6 (skip), 7 (insertion) on seg_a")

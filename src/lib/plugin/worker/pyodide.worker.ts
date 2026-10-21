@@ -8,8 +8,9 @@
  *
  * Runs as a classic script inside the opaque-origin plugin sandbox
  * (sandboxHost.ts); it is imported as a string via `?sandbox-worker`, never
- * as a module worker. The foldnano Python packages are inlined from `?raw`
- * imports and written into Pyodide's virtual filesystem at init time.
+ * as a module worker. Every module of the foldnano Python packages is inlined
+ * from `virtual:foldnano-python-packages` and written into Pyodide's virtual
+ * filesystem at init time.
  */
 
 import {
@@ -22,30 +23,10 @@ import { loadedPackageLogs, missingModuleHint } from './scriptImports';
 import { connectSourcesFromCsp, isConnectAllowed } from './connectSources';
 
 // ---------------------------------------------------------------------------
-// Bundle the foldnano Python package at build time (Vite ?raw loader)
+// The foldnano and foldnano_mini packages, every module, inlined at bundle time
+// (scripts/vite-sandbox-worker.ts)
 // ---------------------------------------------------------------------------
-import foldnanoInit from '../python/foldnano/__init__.py?raw';
-import foldnanoPlugin from '../python/foldnano/plugin.py?raw';
-import foldnanoVh from '../python/foldnano/vh.py?raw';
-import foldnanoOligo from '../python/foldnano/oligo.py?raw';
-import foldnanoIo from '../python/foldnano/io.py?raw';
-import foldnanoLogCapture from '../python/foldnano/_log_capture.py?raw';
-import foldnanoDocument from '../python/foldnano/document.py?raw';
-import foldnanoPart from '../python/foldnano/part.py?raw';
-import foldnanoRegion from '../python/foldnano/region.py?raw';
-import foldnanoPlane from '../python/foldnano/plane.py?raw';
-
-// foldnano_mini — mutable, ergonomic API. Sibling to `foldnano` (read-only).
-import foldnanoMiniInit from '../python/foldnano_mini/__init__.py?raw';
-import foldnanoMiniLoader from '../python/foldnano_mini/loader.py?raw';
-import foldnanoMiniMutations from '../python/foldnano_mini/mutations.py?raw';
-import foldnanoMiniInvariants from '../python/foldnano_mini/invariants.py?raw';
-import foldnanoMiniTransport from '../python/foldnano_mini/transport.py?raw';
-import foldnanoMiniPart from '../python/foldnano_mini/part.py?raw';
-import foldnanoMiniRegion from '../python/foldnano_mini/region.py?raw';
-import foldnanoMiniVh from '../python/foldnano_mini/vh.py?raw';
-import foldnanoMiniOligo from '../python/foldnano_mini/oligo.py?raw';
-import foldnanoMiniPlane from '../python/foldnano_mini/plane.py?raw';
+import pythonPackageFiles from 'virtual:foldnano-python-packages';
 
 // ---------------------------------------------------------------------------
 // Minimal Pyodide type surface (the worker loads Pyodide at run time, not from the npm package)
@@ -325,31 +306,16 @@ async function initRuntime(indexUrl: string, packageBaseUrl: string): Promise<vo
 		// Load micropip so plugins can install packages at activation time
 		await pyodide.loadPackage(['micropip']);
 
-		// Write foldnano package into the virtual filesystem
-		pyodide.FS.mkdir('/foldnano');
-		pyodide.FS.writeFile('/foldnano/__init__.py', foldnanoInit);
-		pyodide.FS.writeFile('/foldnano/plugin.py', foldnanoPlugin);
-		pyodide.FS.writeFile('/foldnano/vh.py', foldnanoVh);
-		pyodide.FS.writeFile('/foldnano/oligo.py', foldnanoOligo);
-		pyodide.FS.writeFile('/foldnano/io.py', foldnanoIo);
-		pyodide.FS.writeFile('/foldnano/_log_capture.py', foldnanoLogCapture);
-		pyodide.FS.writeFile('/foldnano/document.py', foldnanoDocument);
-		pyodide.FS.writeFile('/foldnano/part.py', foldnanoPart);
-		pyodide.FS.writeFile('/foldnano/region.py', foldnanoRegion);
-		pyodide.FS.writeFile('/foldnano/plane.py', foldnanoPlane);
-
-		// Write foldnano_mini package
-		pyodide.FS.mkdir('/foldnano_mini');
-		pyodide.FS.writeFile('/foldnano_mini/__init__.py', foldnanoMiniInit);
-		pyodide.FS.writeFile('/foldnano_mini/loader.py', foldnanoMiniLoader);
-		pyodide.FS.writeFile('/foldnano_mini/mutations.py', foldnanoMiniMutations);
-		pyodide.FS.writeFile('/foldnano_mini/invariants.py', foldnanoMiniInvariants);
-		pyodide.FS.writeFile('/foldnano_mini/transport.py', foldnanoMiniTransport);
-		pyodide.FS.writeFile('/foldnano_mini/part.py', foldnanoMiniPart);
-		pyodide.FS.writeFile('/foldnano_mini/region.py', foldnanoMiniRegion);
-		pyodide.FS.writeFile('/foldnano_mini/vh.py', foldnanoMiniVh);
-		pyodide.FS.writeFile('/foldnano_mini/oligo.py', foldnanoMiniOligo);
-		pyodide.FS.writeFile('/foldnano_mini/plane.py', foldnanoMiniPlane);
+		// Write the foldnano and foldnano_mini packages into the virtual filesystem
+		const packageDirs = new Set<string>();
+		for (const [file, source] of Object.entries(pythonPackageFiles)) {
+			const dir = `/${file.split('/')[0]}`;
+			if (!packageDirs.has(dir)) {
+				pyodide.FS.mkdir(dir);
+				packageDirs.add(dir);
+			}
+			pyodide.FS.writeFile(`/${file}`, source);
+		}
 
 		// Add '/' to sys.path and install the stdout capture helper
 		await pyodide.runPythonAsync(INIT_HARNESS);

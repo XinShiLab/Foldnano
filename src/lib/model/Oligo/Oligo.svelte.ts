@@ -236,6 +236,8 @@ export default class Oligo {
 		// remove the segment from this oligo
 		this.segments.delete(endSegment);
 		endSegment.destroy();
+		// Otherwise undo/redo can't re-register the merged segment's id.
+		endSegment.inPart.unregisterSegment(endSegment);
 	}
 
 	// this is wrong because removing a segment in the middle will create two new oligos, this should be handled in Part
@@ -356,7 +358,11 @@ export default class Oligo {
 	 * if this oligo is circular, breaking at one segment doesn't creates two new oligos
 	 * if this oligo is not circular, create new oligo with newSegment and add all connected segments to it
 	 */
-	breakOligoAt(segment: OligoSegment, index: number, opts?: { newOligoId?: string }): Oligo {
+	breakOligoAt(
+		segment: OligoSegment,
+		index: number,
+		opts?: { newOligoId?: string; newSegmentId?: string }
+	): Oligo {
 		const isOldOligoCircular = this.isCircular; // check if this oligo is circular before breaking
 
 		// if ths is a free end of this oligo, do nothing
@@ -373,7 +379,7 @@ export default class Oligo {
 		// breakSegmentAt handles crossover connections: transfers the 3' connection to the
 		// new stub segment and disconnects/returns the connected segment when breaking at an end.
 
-		const newSegment = segment.breakSegmentAt(index);
+		const newSegment = segment.breakSegmentAt(index, opts?.newSegmentId);
 
 		if (!newSegment) {
 			// no new segment created, return this oligo

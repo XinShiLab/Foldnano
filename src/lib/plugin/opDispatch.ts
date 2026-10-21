@@ -45,6 +45,7 @@ export type MutationOp =
 	| SetSlotSequenceOp
 	| SetSlotSkipOp
 	| SetSlotInsertionOp
+	| AddSkipOrInsertionOp
 	| CreateSegmentOp
 	| ConnectOp
 	| RemoveSegmentOp
@@ -113,6 +114,14 @@ interface SetSlotInsertionOp {
 	insertion: string;
 }
 
+/** The skip and insert tools: `count` -1 adds a skip, n > 0 adds n inserted bases, on both strands. */
+interface AddSkipOrInsertionOp {
+	op: 'add_skip_or_insertion';
+	segmentId: string;
+	bpIndex: number;
+	count: number;
+}
+
 interface CreateSegmentOp {
 	op: 'create_segment';
 	vhId: string;
@@ -135,6 +144,8 @@ interface RemoveSegmentOp {
 	op: 'remove_segment';
 	oligoId: string;
 	segmentId: string;
+	/** Id for the oligo split off downstream of the removed segment, if any. */
+	newOligoId?: string;
 }
 
 interface RemoveOligoOp {
@@ -168,7 +179,7 @@ interface BreakOligoOp {
 	segmentId: string;
 	atIndex: number;
 	newOligoId: string;
-	/** Python-allocated id for the new sub-segment created on mid-segment splits (mirror only). */
+	/** Id for the sub-segment a mid-segment break creates. */
 	newSegmentId?: string;
 }
 
@@ -392,6 +403,15 @@ export function dispatchOp(op: MutationOp, part: Part, options: DispatchOptions 
 			compSlot.seq = op.insertion.length === 1 ? 'N' : 'N'.repeat(op.insertion.length);
 			return;
 		}
+		case 'add_skip_or_insertion': {
+			const seg = findSegment(part, op.segmentId);
+			guardVhInRegion(part, seg.inVirtualHelix.regionId, activeRegionId);
+			if (!Number.isInteger(op.count) || op.count === 0 || op.count < -1) {
+				throw new Error(`add_skip_or_insertion: count must be -1 or a positive integer`);
+			}
+			seg.addSkipOrInsertion(op.bpIndex, op.count);
+			return;
+		}
 		case 'create_segment': {
 			const vh = findVh(part, op.vhId);
 			guardVhInRegion(part, vh.regionId, activeRegionId);
@@ -421,7 +441,7 @@ export function dispatchOp(op: MutationOp, part: Part, options: DispatchOptions 
 			guardVhInRegion(part, seg.inVirtualHelix.regionId, activeRegionId);
 			const oligo = seg.oligo;
 			if (!oligo) throw new Error(`remove_segment: segment ${seg.id} has no owning oligo`);
-			part.removeSegmentFromOligo(oligo, seg);
+			part.removeSegmentFromOligo(oligo, seg, { newOligoId: op.newOligoId });
 			return;
 		}
 		case 'remove_oligo': {
@@ -472,7 +492,11 @@ export function dispatchOp(op: MutationOp, part: Part, options: DispatchOptions 
 			const oligo = findOligo(part, op.oligoId);
 			guardOligoInRegion(part, oligo, activeRegionId);
 			const seg = findSegment(part, op.segmentId);
-			part.breakOligoAt(oligo, seg, op.atIndex, { newOligoId: op.newOligoId });
+			if (op.newSegmentId) assertSegmentIdAvailable(part, op.newSegmentId);
+			part.breakOligoAt(oligo, seg, op.atIndex, {
+				newOligoId: op.newOligoId,
+				newSegmentId: op.newSegmentId,
+			});
 			return;
 		}
 		case 'move_terminus': {

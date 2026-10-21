@@ -44,6 +44,3 @@ gate titles, a use-with-caution note); drop the "beta" badge at 1.0.
   "SOLUTION DOESNT EXIST". This used to kill the Python runtime and show only a red icon; the
   run now reports the message. Consider friendlier wording in the plugin (e.g. suggest a longer
   scaffold such as p8064) and checking the scaffold length before running.
-- Renumber `src/content/plugin-development/` so file prefixes match their `order:` front matter
-  (two files start with `02-`). Slugs come from front matter, so URLs don't change. Carried over
-  from the retired doc-site to-do list (2026-10-07).

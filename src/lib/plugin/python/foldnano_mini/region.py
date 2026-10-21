@@ -10,6 +10,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from . import invariants, mutations as M
+from .checks import Check
+from .topology import slot_kind
 
 if TYPE_CHECKING:
     from .part import MutablePart
@@ -64,19 +66,36 @@ class MutableRegion:
         return int(self._raw().get("minBase", 0))
 
     def set_max_base(self, new_max_base: int) -> None:
-        """Extend all VHs in this region to ``new_max_base``.
+        """Lengthen or shorten every VH in this region so the region ends at ``new_max_base``.
 
-        ``new_max_base`` must be greater than the current ``max_base`` and a
-        multiple of ``step``.
+        The change must be a multiple of ``step``. Shortening is refused while any
+        segment in the region reaches ``new_max_base`` or beyond.
         """
-        current = self.max_base
-        if new_max_base <= current:
-            raise ValueError(
-                f"set_max_base: new_max_base ({new_max_base}) must be greater than "
-                f"current max_base ({current})"
+        self.can_set_max_base(new_max_base).raise_if_failed()
+        self._part._apply(
+            {
+                "op": M.OP_SET_REGION_MAX_BASE,
+                "regionId": self._id,
+                "newMaxBase": int(new_max_base),
+            }
+        )
+
+    def can_set_max_base(self, new_max_base: int) -> Check:
+        if isinstance(new_max_base, bool) or not isinstance(new_max_base, int):
+            raise TypeError(f"new_max_base must be int, got {type(new_max_base).__name__}")
+        delta = new_max_base - self.max_base
+        if delta == 0:
+            return Check.failed(f"Region {self.name!r} already ends at {new_max_base}")
+        if delta % self.step != 0:
+            return Check.failed(f"The change ({delta}) must be a multiple of step ({self.step})")
+        if new_max_base <= self.min_base:
+            return Check.failed(f"max_base must stay above min_base ({self.min_base})")
+        used = self._used_length()
+        if new_max_base < used:
+            return Check.failed(
+                f"Cannot shorten region {self.name!r} to {new_max_base}: strands reach bp {used - 1}"
             )
-        delta = new_max_base - current
-        self.increase_length_by(delta)
+        return Check.passed()
 
     def increase_length_by(self, delta: int) -> None:
         """Extend all VHs in this region by ``delta`` bases.
@@ -85,17 +104,51 @@ class MutableRegion:
         """
         if not isinstance(delta, int) or delta <= 0:
             raise ValueError(f"increase_length_by: delta must be a positive int, got {delta!r}")
-        if delta % self.step != 0:
-            raise ValueError(
-                f"increase_length_by: delta ({delta}) must be a multiple of step ({self.step})"
-            )
-        self._part._apply(
-            {
-                "op": M.OP_SET_REGION_MAX_BASE,
-                "regionId": self._id,
-                "newMaxBase": self.max_base + delta,
-            }
-        )
+        self.set_max_base(self.max_base + delta)
+
+    def reduce_unused_length(self) -> None:
+        """Shorten the region to the strands it holds, rounded up to ``step`` and at least
+        two steps, like the strand view's reduce-length button. Does nothing when already
+        that short."""
+        target = max(-(-self._used_length() // self.step) * self.step, 2 * self.step)
+        if target != self.max_base:
+            self.set_max_base(target)
+
+    def _used_length(self) -> int:
+        """One past the highest bp any segment in the region covers (0 when empty)."""
+        topo = self._part._topology()
+        used = 0
+        for vh in self.virtual_helices:
+            for ss in (0, 1):
+                intervals = topo.intervals(vh.index, ss)
+                if intervals:
+                    used = max(used, max(high for _, high, _ in intervals) + 1)
+        return used
+
+    def remove_all_skips(self) -> int:
+        """Turn every skip in this region back into a plain base; returns how many."""
+        return self._remove_all("skip")
+
+    def remove_all_insertions(self) -> int:
+        """Turn every insertion in this region back into a plain base; returns how many."""
+        return self._remove_all("insertion")
+
+    def _remove_all(self, kind: str) -> int:
+        topo = self._part._topology()
+        targets: list[tuple[str, int]] = []
+        seen: set[tuple[int, int]] = set()
+        for vh in self.virtual_helices:
+            for ss in (0, 1):
+                for _, _, seg_id in topo.intervals(vh.index, ss):
+                    for slot in topo.raw_segment(seg_id).get("slots", []):
+                        bp = int(slot["bpIndex"])
+                        # One op clears both strands, so visit each bp once.
+                        if (vh.index, bp) not in seen and slot_kind(topo.raw_segment(seg_id), bp) == kind:
+                            seen.add((vh.index, bp))
+                            targets.append((seg_id, bp))
+        for seg_id, bp in targets:
+            self._part._segment_proxy(seg_id).slot_at(bp).remove_skip_or_insertion()
+        return len(targets)
 
     @property
     def supports_lattice_grid(self) -> bool:

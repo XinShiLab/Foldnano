@@ -273,7 +273,8 @@ export default class OligoSegment {
 		return Array.from({ length: slot.seq.length }, (_, i) => prior + i);
 	}
 
-	breakSegmentAt(index: number): OligoSegment | null {
+	/** `newSegmentId` names the segment a mid-segment break creates. */
+	breakSegmentAt(index: number, newSegmentId?: string): OligoSegment | null {
 		if (index < this.lowIndex || index > this.highIndex) throw new Error('Index out of range');
 		if (index === this.threePrime.index) {
 			const connectedSegment = this.threePrime.connectedSegment;
@@ -289,7 +290,11 @@ export default class OligoSegment {
 		const splitIdx = this.slots.findIndex((s) => s.bpIndex === index);
 		if (splitIdx === -1) throw new Error('Break index slot not found');
 		const newStartBp = this.inStrandIndex === 0 ? index + 1 : index - 1;
-		const newSegment = this.inVirtualHelix.createNewSegment(newStartBp, this.threePrime.index);
+		const newSegment = this.inVirtualHelix.createNewSegment(
+			newStartBp,
+			this.threePrime.index,
+			newSegmentId
+		);
 		const threePrimeConnection = this.threePrime.connectedSegment;
 		this.threePrime.disconnect();
 		if (threePrimeConnection) newSegment.threePrime.connectTo(threePrimeConnection.fivePrime);

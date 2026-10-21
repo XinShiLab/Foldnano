@@ -170,6 +170,31 @@ describe('opDispatch', () => {
 			expect(seg.slotForBp(3)?.seq.length).toBe(1);
 		});
 
+		it('add_skip_or_insertion adds inserted bases to both strands, cumulatively', () => {
+			const seg = [...[...part.oligos][0].segments][0];
+			const compSeg = [...[...part.oligos][1].segments][0];
+			compSeg.slotForBp(4)!.seq = 'G';
+			const insert = { op: 'add_skip_or_insertion', segmentId: seg.id, bpIndex: 4 } as const;
+			runLog(part, [
+				{ ...insert, count: 1 },
+				{ ...insert, count: 2 },
+			]);
+			expect(seg.slotForBp(4)?.seq).toHaveLength(4);
+			// The complementary strand keeps its base and gains the same number of Ns.
+			expect(compSeg.slotForBp(4)?.seq).toBe('GNNN');
+		});
+
+		it('add_skip_or_insertion with count -1 adds a skip on both strands', () => {
+			const seg = [...[...part.oligos][0].segments][0];
+			const compSeg = [...[...part.oligos][1].segments][0];
+			runLog(part, [{ op: 'add_skip_or_insertion', segmentId: seg.id, bpIndex: 6, count: -1 }]);
+			expect(seg.slotForBp(6)?.seq).toBe('');
+			expect(compSeg.slotForBp(6)?.seq).toBe('');
+			expect(() =>
+				runLog(part, [{ op: 'add_skip_or_insertion', segmentId: seg.id, bpIndex: 6, count: 0 }])
+			).toThrow(/count/);
+		});
+
 		it('set_slot_insertion creates an insertion on a normal slot (create path)', () => {
 			const oligo = [...part.oligos][0];
 			const seg = [...oligo.segments][0];
@@ -327,6 +352,34 @@ describe('opDispatch', () => {
 			// The two oligos should have merged into one.
 			expect(part.oligos.has(oligoA) || part.oligos.has(oligoB)).toBe(true);
 			expect(part.oligos.has(oligoA) && part.oligos.has(oligoB)).toBe(false);
+		});
+
+		it('merging adjacent ends keeps the downstream crossover in the merged oligo', () => {
+			const vh = addLatticeVh(part, 1, 0);
+			const vh2 = addLatticeVh(part, 2, 0);
+			part.createOligo(vh, 0, 9, '#aa0000', { oligoId: 'oA', segmentId: 'sA' });
+			part.createOligo(vh, 10, 20, '#00aa00', { oligoId: 'oB', segmentId: 'sB' });
+			part.createOligo(vh2, 20, 10, '#0000aa', { oligoId: 'oC', segmentId: 'sC' });
+			runLog(part, [
+				{ op: 'connect', fromSegmentId: 'sB', toSegmentId: 'sC' },
+				{ op: 'connect', fromSegmentId: 'sA', toSegmentId: 'sB' },
+			]);
+			const merged = part.getOligoById('oA');
+			expect([...merged!.segments].map((s) => s.id)).toEqual(['sA', 'sC']);
+			expect(part.getOligoById('oB')).toBeNull();
+			expect(part.getSegmentById('sB')).toBeNull();
+			expect(part.getSegmentById('sA')!.threePrime.index).toBe(20);
+		});
+
+		it('connect rejects an end that is already connected', () => {
+			const vh = addLatticeVh(part, 1, 0);
+			part.createOligo(vh, 0, 9, '#aa0000', { oligoId: 'oA', segmentId: 'sA' });
+			part.createOligo(vh, 10, 20, '#00aa00', { oligoId: 'oB', segmentId: 'sB' });
+			part.createOligo(vh, 30, 40, '#0000aa', { oligoId: 'oC', segmentId: 'sC' });
+			runLog(part, [{ op: 'connect', fromSegmentId: 'sA', toSegmentId: 'sC' }]);
+			expect(() =>
+				runLog(part, [{ op: 'connect', fromSegmentId: 'sA', toSegmentId: 'sB' }])
+			).toThrow(/must be free/);
 		});
 	});
 
