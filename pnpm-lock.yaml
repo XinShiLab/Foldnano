@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  paneforge@1.0.2: 67986fbf23179265d30eec5b33b2f1ba33bfbfdbd62f7480379154ff22610d46
+
 importers:
 
   .:
@@ -137,7 +140,7 @@ importers:
         version: 1.1.0(svelte@5.57.1(@typescript-eslint/types@8.71.0))
       paneforge:
         specifier: ^1.0.2
-        version: 1.0.2(svelte@5.57.1(@typescript-eslint/types@8.71.0))
+        version: 1.0.2(patch_hash=67986fbf23179265d30eec5b33b2f1ba33bfbfdbd62f7480379154ff22610d46)(svelte@5.57.1(@typescript-eslint/types@8.71.0))
       playwright:
         specifier: ^1.63.0
         version: 1.63.0
@@ -4169,7 +4172,7 @@ snapshots:
     dependencies:
       p-limit: 3.1.0
 
-  paneforge@1.0.2(svelte@5.57.1(@typescript-eslint/types@8.71.0)):
+  paneforge@1.0.2(patch_hash=67986fbf23179265d30eec5b33b2f1ba33bfbfdbd62f7480379154ff22610d46)(svelte@5.57.1(@typescript-eslint/types@8.71.0)):
     dependencies:
       runed: 0.23.4(svelte@5.57.1(@typescript-eslint/types@8.71.0))
       svelte: 5.57.1(@typescript-eslint/types@8.71.0)

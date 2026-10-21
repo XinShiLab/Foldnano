@@ -47,6 +47,10 @@ Primary files:
 - `src/lib/components/Editor/SidePanel/PluginCodeEditorSidePanel.svelte`
 - `src/lib/components/Editor/SidePanel/PluginCodeEditorShell.svelte`
 - `src/lib/components/Editor/SidePanel/ScriptLabReferenceCard.svelte`
+- `src/lib/components/Editor/SidePanel/python-autocomplete.ts`
+- `src/lib/components/Editor/SidePanel/PopOutWindow.svelte`
+- `src/lib/components/Editor/SidePanel/prism-foreign-document.ts`
+- `src/lib/plugin/python-completions.ts`
 - `src/lib/components/Editor/Plugin/PluginRunOutput.svelte`
 
 Relevant tests:
@@ -54,6 +58,7 @@ Relevant tests:
 - `src/lib/plugin/manifestValidation.spec.ts`
 - `src/lib/plugin/PluginRegistry.spec.ts`
 - `src/lib/plugin/PluginCoordinator.spec.ts`
+- `src/lib/plugin/python-completions.spec.ts`
 
 Related generic runtime files:
 
@@ -175,6 +180,33 @@ Current UI responsibilities:
   - generic run-output renderer
   - now uses dynamic tabs for `Console`, `Result`, `Artifacts`, and `Apply`
   - auto-switches to `Apply` when a pending apply exists
+
+### 6. Pop-out window
+
+The shell's header button moves the whole editor surface (toolbar, editor, output) into a separate browser window; the side panel shows a placeholder with **Show window** / **Bring back**. Every code-editor plugin gets it, not only Script Lab.
+
+- `PopOutWindow` opens a same-origin `window.open('')` popup and `mount()`s the shell's `editorSurface` snippet into it with the opener's contexts. Same realm, so state, the Pyodide worker, `pluginCoordinator` and Apply all work unchanged; there is no messaging layer and no second `TabSync` participant.
+- `mount()` into the popup's `<body>` is what makes Svelte's delegated events (`onclick`) work there; moving existing DOM nodes would not, because delegation listens on the main document.
+- The popup's `about:blank` has no doctype, so it is rewritten (`document.write`) into a standards-mode document first; in quirks mode prism's `height: 100%` line-number pseudo-element stretches every line to the editor height.
+- The mount/portal root is a `<div>` created by the opener's `document`, then appended to the popup body. Nodes keep their realm when adopted, and opener-realm `instanceof` checks (bits-ui's dev-mode portal-target check) reject popup-realm nodes like the popup's own `<body>`; a throw there aborts the whole mount.
+- `patches/paneforge@1.0.2.patch`: paneforge keeps one module-level drag-cursor `<style>` and appends it to the dragged handle's document, but removed it from the main `document.head`. A drag in the popup then threw on release, left `dragState` set (handle stuck to the cursor) and poisoned every later drag in both windows. The patch uses `element.remove()`; re-check it when upgrading paneforge.
+- `PopOutWindowContent` wraps the snippet in `BitsConfig defaultPortalTo` so menus/tooltips portal into the popup. bits-ui and paneforge otherwise resolve documents via `ownerDocument`, so they work as-is.
+- Stylesheets and `<html>` attributes (theme class) are mirrored from the opener with `MutationObserver`s (Vite HMR rewrites `<style>` in place). `<body>` is deliberately not mirrored: bits-ui scroll-lock writes there.
+- The editor is created by an `{@attach}` rather than `onMount`, so it is rebuilt in whichever window hosts it. The buffer survives (it lives in `plugin.sidePanelCode`); the editor's own undo history, caret and pane split do not.
+- `bridgeForeignDocument` (`prism-foreign-document.ts`) covers prism-code-editor binding to the module-level `document`: it forwards the popup's `selectionchange` to the main document and, while the popup has focus, routes `document.execCommand` to the popup's document (edits, auto-indent and bracket insertion use it).
+- Lifetime: the popup closes when the shell unmounts or the opener's `pagehide` fires; closing the popup (`pagehide`, plus a `closed` poll) docks the editor back.
+- Switching side-panel tabs must not unmount a popped-out panel (that would close its window). The popped-out state lives in `EditorViewContext.poppedOutPluginPanels` (bound to the shell's `poppedOut` by `PluginCodeEditorSidePanel`), and `SidePanel` keeps every id in it mounted in a keyed `{#each}`, hidden while another tab shows, so the same instance survives the switch. Docking removes the id, which unmounts an off-tab panel.
+- Known gaps: `PluginRunDialog`, `PluginActivationConfirmDialog` and toasts still render in the main window, and app keyboard shortcuts do not reach the popup (intended).
+
+### 7. API autocomplete
+
+`PluginCodeEditorShell` adds `foldnano` / `foldnano_mini` completions to every code-editor plugin, not only Script Lab (every plugin runs with both packages on its path).
+
+- `python-completions.ts` is the editor-agnostic engine: given the text before the caret it returns members for the receiver's type, module exports after `from … import`, or scope names, keywords and builtins for a bare identifier.
+- Type inference is deliberately shallow and runs on every keystroke: parameter/assignment annotations, `x = <chain>`, `for x in <chain>` (element type), `next((x for x in <chain> …))`, indexing, and method return types from the index. An unannotated `ctx` is `PluginContext`. No `isinstance` narrowing, no flow analysis; the last binding before the caret wins.
+- An unresolved receiver offers nothing while typing; **Ctrl+Space** falls back to every API member so a name can still be found.
+- The data comes from `src/lib/plugin/python-api-index.generated.json` (see `docs/python-plugin-system.md` § Generated API stubs and completion index). Never hand-edit it.
+- `python-autocomplete.ts` adapts the engine to `prism-code-editor`'s `autoComplete` extension. `basicEditor` renders into a shadow root, so the popup CSS is injected there; `cursorPosition` (which `autoComplete` needs) comes from `basicEditor`'s own extension set. Completion sources are synchronous, which is why the engine can't ask Pyodide (e.g. Jedi).
 
 ---
 
@@ -469,6 +501,7 @@ Questions to ask:
 - is the editor still primary?
 - did helper UI start competing with the editor or output area?
 - does the toolbar stay single-row on narrow panel widths?
+- does the pop-out window still work (menus open inside it, typing/Enter/Tab, theme switch, closing it docks back)?
 
 ---
 
@@ -540,11 +573,15 @@ If future maintenance makes those features more generic, that is good. Script La
 
 ## Boundaries / Don'ts
 
+- Don't make completions depend on the Pyodide worker: sources are synchronous and the worker is busy (or not loaded) during runs. Extend the generated index or the shallow inference instead.
+
 - **Do not bypass the plugin system.** Script Lab must stay a normal plugin instance using the same coordinator, worker, and result-apply path as other plugins.
 - **Do not persist Script Lab editor code per-document.** The editor buffer is global — the same script should survive tab switches and be available across any open design. Persistence uses the global `plugins` IndexedDB table (`sidePanelCode` field), not the document snapshot or context tables. The same save path now covers every `codeEditor` plugin, not just Script Lab — don't reintroduce a Script-Lab-only guard on it.
 - **Do not infer mutations from logs or structured results.** Only `ctx.set_result_mutation_log(...)` should unlock Apply.
 - **Do not add "run follow-up" lightly.** Reusing the previous Python namespace would materially change the reproducibility contract.
 - **Do not turn `execution: "entrypoint"` into the default for all code-editor plugins without a migration pass.** Existing code-editor plugins rely on `execution: "input"` behavior.
+- **Do not render side-panel tabs so that switching unmounts a popped-out plugin panel.** Its `PopOutWindow` closes on unmount; keep `SidePanel`'s keyed list of `poppedOutPluginPanels`.
+- **Do not move the editor's DOM nodes into the pop-out window.** Mount into it (`PopOutWindow`); moved nodes lose Svelte's delegated event handlers. Anything that portals or reads `document` directly needs to target the popup's document instead.
 - **Do not make helper UI dominate the panel.** Script Lab is an editor first; templates and reference affordances must stay compact.
 - **Do not special-case Script Lab inside the worker.** The special behavior belongs on the host side when selecting `pluginCodeForRun`.
 - **Do not couple third-party plugin guidance to `origin: "builtin"`.** Built-in registration is a host packaging choice, not part of the public third-party plugin contract.

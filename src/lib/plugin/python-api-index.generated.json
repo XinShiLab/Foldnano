@@ -1,0 +1,1612 @@
+{
+	"modules": {
+		"foldnano": [
+			"PluginContext",
+			"PartData",
+			"parse_cadnano_json",
+			"parse_foldnano_json",
+			"VirtualHelixProxy",
+			"OligoProxy",
+			"OligoSegmentProxy",
+			"RegionProxy",
+			"LatticedRegionProxy",
+			"FreeformRegionProxy",
+			"PlaneProxy"
+		],
+		"foldnano.plugin": [
+			"PluginContext"
+		],
+		"foldnano.io": [
+			"PartData",
+			"parse_cadnano_json",
+			"parse_foldnano_json"
+		],
+		"foldnano.vh": [
+			"VirtualHelixProxy"
+		],
+		"foldnano.oligo": [
+			"OligoProxy",
+			"OligoSegmentProxy"
+		],
+		"foldnano.region": [
+			"RegionProxy",
+			"LatticedRegionProxy",
+			"FreeformRegionProxy"
+		],
+		"foldnano.plane": [
+			"PlaneProxy"
+		],
+		"foldnano_mini": [
+			"load_part",
+			"MutablePart",
+			"MutablePlane",
+			"MutableRegion",
+			"LatticedRegion",
+			"FreeformRegion",
+			"MutableVirtualHelix",
+			"MutableOligo",
+			"MutableSegment",
+			"MutableSlot",
+			"MutationLog",
+			"KNOWN_OPS",
+			"Transport",
+			"OfflineTransport"
+		],
+		"foldnano_mini.loader": [
+			"load_part"
+		],
+		"foldnano_mini.part": [
+			"MutablePart"
+		],
+		"foldnano_mini.plane": [
+			"MutablePlane"
+		],
+		"foldnano_mini.region": [
+			"MutableRegion",
+			"LatticedRegion",
+			"FreeformRegion"
+		],
+		"foldnano_mini.vh": [
+			"MutableVirtualHelix"
+		],
+		"foldnano_mini.oligo": [
+			"MutableOligo",
+			"MutableSegment",
+			"MutableSlot"
+		],
+		"foldnano_mini.mutations": [
+			"MutationLog",
+			"KNOWN_OPS"
+		],
+		"foldnano_mini.transport": [
+			"Transport",
+			"OfflineTransport"
+		]
+	},
+	"functions": {
+		"parse_cadnano_json": {
+			"module": "foldnano",
+			"signature": "(json_str: str)",
+			"returns": "dict",
+			"doc": "Parse a cadnano JSON string into a Python dict."
+		},
+		"parse_foldnano_json": {
+			"module": "foldnano",
+			"signature": "(json_str: str, active_region_id: Optional[str]=None)",
+			"returns": "PartData",
+			"doc": "Parse a foldnano_json string (Part.toJSON() output) into a PartData object."
+		},
+		"load_part": {
+			"module": "foldnano_mini",
+			"signature": "(json_str: str, active_region_id: str | None=None)",
+			"returns": "MutablePart",
+			"doc": "Parse a foldnano_json string and return a mutable view onto it."
+		}
+	},
+	"classes": {
+		"PluginContext": {
+			"module": "foldnano",
+			"doc": "Holds all I/O for a single plugin run.",
+			"members": [
+				{
+					"name": "primary_artifact",
+					"kind": "attribute",
+					"type": "str | None"
+				},
+				{
+					"name": "artifacts",
+					"kind": "attribute",
+					"type": "dict[str, Union[str, bytes]]"
+				},
+				{
+					"name": "plugin_result",
+					"kind": "attribute",
+					"type": "dict | None"
+				},
+				{
+					"name": "logs",
+					"kind": "attribute",
+					"type": "list[str]"
+				},
+				{
+					"name": "mutation_log",
+					"kind": "attribute",
+					"type": "list[dict] | None"
+				},
+				{
+					"name": "get_part_as_cadnano_json",
+					"kind": "method",
+					"signature": "(part_index: int=0)",
+					"returns": "str",
+					"doc": "Return the active part as a cadnano JSON string."
+				},
+				{
+					"name": "set_result_cadnano_json",
+					"kind": "method",
+					"signature": "(json_str: str)",
+					"returns": "None",
+					"doc": "Store the plugin's output as a cadnano JSON string."
+				},
+				{
+					"name": "get_part_as_foldnano_json",
+					"kind": "method",
+					"signature": "(part_index: int=0)",
+					"returns": "str",
+					"doc": "Return the active part as a Foldnano JSON string (Part.toJSON() format)."
+				},
+				{
+					"name": "set_result_foldnano_json",
+					"kind": "method",
+					"signature": "(json_str: str)",
+					"returns": "None",
+					"doc": "Store the plugin's output as a Foldnano JSON string (Part.toJSON() format)."
+				},
+				{
+					"name": "set_result_mutation_log",
+					"kind": "method",
+					"signature": "(log: list[dict])",
+					"returns": "None",
+					"doc": "Store a foldnano_mini mutation log to be replayed against the host's canonical ``Part`` under one undo step (apply strategy ``replayMutationLog`` / ``replayMutationLogInRegion``)."
+				},
+				{
+					"name": "log",
+					"kind": "method",
+					"signature": "(msg: str)",
+					"returns": "None",
+					"doc": "Append a message to the plugin's log."
+				},
+				{
+					"name": "write_artifact",
+					"kind": "method",
+					"signature": "(name: str, data: Union[str, bytes])",
+					"returns": "None",
+					"doc": "Store a named artifact (e.g. a CSV report, a PDB file)."
+				},
+				{
+					"name": "set_result",
+					"kind": "method",
+					"signature": "(data: dict)",
+					"returns": "None",
+					"doc": "Store a structured result dict that will be displayed in the plugin output panel."
+				},
+				{
+					"name": "format",
+					"kind": "property",
+					"type": "str"
+				},
+				{
+					"name": "params",
+					"kind": "property",
+					"type": "dict",
+					"doc": "All parameter values passed from the UI."
+				},
+				{
+					"name": "get_param",
+					"kind": "method",
+					"signature": "(key: str, default=None)",
+					"returns": null,
+					"doc": "Return a single parameter value, or *default* if not set."
+				},
+				{
+					"name": "side_panel_type",
+					"kind": "property",
+					"type": "str | None",
+					"doc": "Type of host-rendered side panel used for this run, if any."
+				},
+				{
+					"name": "get_side_panel_code",
+					"kind": "method",
+					"signature": "(default: str='')",
+					"returns": "str",
+					"doc": "Return the side panel code-editor contents, or *default* if absent."
+				},
+				{
+					"name": "active_region_id",
+					"kind": "property",
+					"type": "str | None",
+					"doc": "ID of the DesignRegion the host considered \"active\" when this plugin was launched, or ``None``. Region-scoped plugins should respect this: scope their reads/writes to VHs whose ``region_id`` matches."
+				}
+			]
+		},
+		"PartData": {
+			"module": "foldnano",
+			"doc": "Parsed representation of a part's foldnano_json (Part.toJSON() output).",
+			"members": [
+				{
+					"name": "name",
+					"kind": "attribute",
+					"type": "str"
+				},
+				{
+					"name": "id",
+					"kind": "attribute",
+					"type": "str"
+				},
+				{
+					"name": "lattice_type",
+					"kind": "attribute",
+					"type": "str"
+				},
+				{
+					"name": "max_base",
+					"kind": "attribute",
+					"type": "int"
+				},
+				{
+					"name": "virtual_helices",
+					"kind": "attribute",
+					"type": "list[VirtualHelixProxy]"
+				},
+				{
+					"name": "oligos",
+					"kind": "attribute",
+					"type": "list[OligoProxy]"
+				},
+				{
+					"name": "regions",
+					"kind": "attribute",
+					"type": "list[RegionProxy]"
+				},
+				{
+					"name": "planes",
+					"kind": "attribute",
+					"type": "list[PlaneProxy]"
+				},
+				{
+					"name": "active_region_id",
+					"kind": "attribute",
+					"type": "Optional[str]"
+				},
+				{
+					"name": "get_vh",
+					"kind": "method",
+					"signature": "(index: int)",
+					"returns": "VirtualHelixProxy | None",
+					"doc": "Return the VirtualHelixProxy with the given VH index, or None."
+				},
+				{
+					"name": "get_oligo",
+					"kind": "method",
+					"signature": "(id: str)",
+					"returns": "OligoProxy | None",
+					"doc": "Return the OligoProxy with the given ID, or None."
+				},
+				{
+					"name": "get_region",
+					"kind": "method",
+					"signature": "(region_id: str)",
+					"returns": "RegionProxy | None",
+					"doc": "Return the RegionProxy with the given ID, or None."
+				},
+				{
+					"name": "get_plane",
+					"kind": "method",
+					"signature": "(plane_id: str)",
+					"returns": "PlaneProxy | None",
+					"doc": "Return the PlaneProxy with the given ID, or None."
+				},
+				{
+					"name": "region_for_vh",
+					"kind": "method",
+					"signature": "(vh_index: int)",
+					"returns": "RegionProxy | None",
+					"doc": "Return the region a given VH belongs to, or None if unknown."
+				},
+				{
+					"name": "vhs_in_region",
+					"kind": "method",
+					"signature": "(region_id: str)",
+					"returns": "list[VirtualHelixProxy]",
+					"doc": "Return all VHs whose ``region_id`` matches the given region."
+				},
+				{
+					"name": "oligos_in_region",
+					"kind": "method",
+					"signature": "(region_id: str)",
+					"returns": "list[OligoProxy]",
+					"doc": "Return oligos whose every segment lives in the given region."
+				},
+				{
+					"name": "active_region",
+					"kind": "property",
+					"type": "RegionProxy | None",
+					"doc": "The region the host marked active when this plugin was launched, or None."
+				}
+			]
+		},
+		"VirtualHelixProxy": {
+			"module": "foldnano",
+			"doc": "Read-only proxy for a VirtualHelix parsed from a foldnano_json document.",
+			"members": [
+				{
+					"name": "index",
+					"kind": "attribute",
+					"type": "int"
+				},
+				{
+					"name": "id",
+					"kind": "attribute",
+					"type": "str"
+				},
+				{
+					"name": "region_id",
+					"kind": "attribute",
+					"type": "Optional[str]"
+				},
+				{
+					"name": "row",
+					"kind": "attribute",
+					"type": "Optional[int]"
+				},
+				{
+					"name": "col",
+					"kind": "attribute",
+					"type": "Optional[int]"
+				},
+				{
+					"name": "length",
+					"kind": "attribute",
+					"type": "int"
+				},
+				{
+					"name": "strand_set_segment_ids",
+					"kind": "attribute",
+					"type": "list[list[str]]"
+				},
+				{
+					"name": "local_frame",
+					"kind": "attribute",
+					"type": "Optional[dict]"
+				},
+				{
+					"name": "list_row",
+					"kind": "attribute",
+					"type": "Optional[int]"
+				},
+				{
+					"name": "from_json",
+					"kind": "method",
+					"signature": "(vh_json: dict)",
+					"returns": "VirtualHelixProxy"
+				},
+				{
+					"name": "is_freeform",
+					"kind": "property",
+					"type": "bool",
+					"doc": "True when this VH has no lattice coordinates (freeform region VH)."
+				},
+				{
+					"name": "parity_is_even",
+					"kind": "property",
+					"type": "bool",
+					"doc": "True when row % 2 == col % 2 (scaffold on strandSet[0])."
+				}
+			]
+		},
+		"OligoProxy": {
+			"module": "foldnano",
+			"doc": "Read-only proxy for one Oligo from a foldnano_json document.",
+			"members": [
+				{
+					"name": "id",
+					"kind": "attribute",
+					"type": "str"
+				},
+				{
+					"name": "color",
+					"kind": "attribute",
+					"type": "str"
+				},
+				{
+					"name": "is_scaffold",
+					"kind": "attribute",
+					"type": "bool"
+				},
+				{
+					"name": "is_sequence_locked",
+					"kind": "attribute",
+					"type": "bool"
+				},
+				{
+					"name": "name",
+					"kind": "attribute",
+					"type": "object"
+				},
+				{
+					"name": "segments",
+					"kind": "attribute",
+					"type": "list[OligoSegmentProxy]"
+				},
+				{
+					"name": "from_json",
+					"kind": "method",
+					"signature": "(oligo_json: dict)",
+					"returns": "OligoProxy"
+				},
+				{
+					"name": "sequence",
+					"kind": "property",
+					"type": "str",
+					"doc": "Concatenated sequence across all segments."
+				},
+				{
+					"name": "is_circular",
+					"kind": "property",
+					"type": "bool",
+					"doc": "True when the last segment's 3' end connects back to the first segment's 5' end (circular oligo)."
+				},
+				{
+					"name": "touches_regions",
+					"kind": "method",
+					"signature": "(part)",
+					"returns": "set[str]",
+					"doc": "Return the set of region IDs this oligo's segments visit."
+				}
+			]
+		},
+		"OligoSegmentProxy": {
+			"module": "foldnano",
+			"doc": "Read-only proxy for one OligoSegment from a foldnano_json document.",
+			"members": [
+				{
+					"name": "id",
+					"kind": "attribute",
+					"type": "str"
+				},
+				{
+					"name": "vh_index",
+					"kind": "attribute",
+					"type": "int"
+				},
+				{
+					"name": "five_prime_index",
+					"kind": "attribute",
+					"type": "int"
+				},
+				{
+					"name": "three_prime_index",
+					"kind": "attribute",
+					"type": "int"
+				},
+				{
+					"name": "five_prime_modification",
+					"kind": "attribute",
+					"type": "object"
+				},
+				{
+					"name": "three_prime_modification",
+					"kind": "attribute",
+					"type": "object"
+				},
+				{
+					"name": "connected_from_segment_id",
+					"kind": "attribute",
+					"type": "object"
+				},
+				{
+					"name": "connected_to_segment_id",
+					"kind": "attribute",
+					"type": "object"
+				},
+				{
+					"name": "slots",
+					"kind": "attribute",
+					"type": "list[dict]"
+				},
+				{
+					"name": "sequence",
+					"kind": "attribute",
+					"type": "str"
+				},
+				{
+					"name": "from_json",
+					"kind": "method",
+					"signature": "(seg_json: dict)",
+					"returns": "OligoSegmentProxy"
+				},
+				{
+					"name": "is_free_five_prime",
+					"kind": "property",
+					"type": "bool",
+					"doc": "True when no upstream segment connects into this 5' end."
+				},
+				{
+					"name": "is_free_three_prime",
+					"kind": "property",
+					"type": "bool",
+					"doc": "True when this 3' end does not connect to a downstream segment."
+				},
+				{
+					"name": "length",
+					"kind": "property",
+					"type": "int",
+					"doc": "Number of base-pair positions spanned (inclusive)."
+				}
+			]
+		},
+		"RegionProxy": {
+			"module": "foldnano",
+			"doc": "Read-only proxy for a DesignRegion parsed from a foldnano_json document.",
+			"members": [
+				{
+					"name": "id",
+					"kind": "attribute",
+					"type": "str"
+				},
+				{
+					"name": "name",
+					"kind": "attribute",
+					"type": "str"
+				},
+				{
+					"name": "kind",
+					"kind": "attribute",
+					"type": "RegionKind"
+				},
+				{
+					"name": "plane_id",
+					"kind": "attribute",
+					"type": "str"
+				},
+				{
+					"name": "vh_order",
+					"kind": "attribute",
+					"type": "list[str]"
+				},
+				{
+					"name": "step",
+					"kind": "attribute",
+					"type": "int"
+				},
+				{
+					"name": "turns_per_step",
+					"kind": "attribute",
+					"type": "int"
+				},
+				{
+					"name": "sub_step_size",
+					"kind": "attribute",
+					"type": "int"
+				},
+				{
+					"name": "twist_offset",
+					"kind": "attribute",
+					"type": "float"
+				},
+				{
+					"name": "min_base",
+					"kind": "attribute",
+					"type": "int"
+				},
+				{
+					"name": "default_max_base",
+					"kind": "attribute",
+					"type": "int"
+				},
+				{
+					"name": "from_json",
+					"kind": "method",
+					"signature": "(region_json: dict)",
+					"returns": "RegionProxy"
+				},
+				{
+					"name": "supports_lattice_grid",
+					"kind": "property",
+					"type": "bool"
+				}
+			]
+		},
+		"LatticedRegionProxy": {
+			"module": "foldnano",
+			"doc": "Lattice-backed region (HONEYCOMB or SQUARE).",
+			"members": [
+				{
+					"name": "supports_lattice_grid",
+					"kind": "property",
+					"type": "bool"
+				},
+				{
+					"name": "id",
+					"kind": "attribute",
+					"type": "str"
+				},
+				{
+					"name": "name",
+					"kind": "attribute",
+					"type": "str"
+				},
+				{
+					"name": "kind",
+					"kind": "attribute",
+					"type": "RegionKind"
+				},
+				{
+					"name": "plane_id",
+					"kind": "attribute",
+					"type": "str"
+				},
+				{
+					"name": "vh_order",
+					"kind": "attribute",
+					"type": "list[str]"
+				},
+				{
+					"name": "step",
+					"kind": "attribute",
+					"type": "int"
+				},
+				{
+					"name": "turns_per_step",
+					"kind": "attribute",
+					"type": "int"
+				},
+				{
+					"name": "sub_step_size",
+					"kind": "attribute",
+					"type": "int"
+				},
+				{
+					"name": "twist_offset",
+					"kind": "attribute",
+					"type": "float"
+				},
+				{
+					"name": "min_base",
+					"kind": "attribute",
+					"type": "int"
+				},
+				{
+					"name": "default_max_base",
+					"kind": "attribute",
+					"type": "int"
+				},
+				{
+					"name": "from_json",
+					"kind": "method",
+					"signature": "(region_json: dict)",
+					"returns": "RegionProxy"
+				}
+			]
+		},
+		"FreeformRegionProxy": {
+			"module": "foldnano",
+			"doc": "Freeform region \u2014 VHs are placed by ``localFrame`` rather than lattice coords.",
+			"members": [
+				{
+					"name": "id",
+					"kind": "attribute",
+					"type": "str"
+				},
+				{
+					"name": "name",
+					"kind": "attribute",
+					"type": "str"
+				},
+				{
+					"name": "kind",
+					"kind": "attribute",
+					"type": "RegionKind"
+				},
+				{
+					"name": "plane_id",
+					"kind": "attribute",
+					"type": "str"
+				},
+				{
+					"name": "vh_order",
+					"kind": "attribute",
+					"type": "list[str]"
+				},
+				{
+					"name": "step",
+					"kind": "attribute",
+					"type": "int"
+				},
+				{
+					"name": "turns_per_step",
+					"kind": "attribute",
+					"type": "int"
+				},
+				{
+					"name": "sub_step_size",
+					"kind": "attribute",
+					"type": "int"
+				},
+				{
+					"name": "twist_offset",
+					"kind": "attribute",
+					"type": "float"
+				},
+				{
+					"name": "min_base",
+					"kind": "attribute",
+					"type": "int"
+				},
+				{
+					"name": "default_max_base",
+					"kind": "attribute",
+					"type": "int"
+				},
+				{
+					"name": "from_json",
+					"kind": "method",
+					"signature": "(region_json: dict)",
+					"returns": "RegionProxy"
+				},
+				{
+					"name": "supports_lattice_grid",
+					"kind": "property",
+					"type": "bool"
+				}
+			]
+		},
+		"PlaneProxy": {
+			"module": "foldnano",
+			"doc": "Read-only proxy for a Plane parsed from a foldnano_json document.",
+			"members": [
+				{
+					"name": "id",
+					"kind": "attribute",
+					"type": "str"
+				},
+				{
+					"name": "name",
+					"kind": "attribute",
+					"type": "str"
+				},
+				{
+					"name": "origin",
+					"kind": "attribute",
+					"type": "_Vec3"
+				},
+				{
+					"name": "u",
+					"kind": "attribute",
+					"type": "_Vec3"
+				},
+				{
+					"name": "v",
+					"kind": "attribute",
+					"type": "_Vec3"
+				},
+				{
+					"name": "normal",
+					"kind": "attribute",
+					"type": "_Vec3"
+				},
+				{
+					"name": "from_json",
+					"kind": "method",
+					"signature": "(plane_json: dict)",
+					"returns": "PlaneProxy"
+				}
+			]
+		},
+		"MutablePart": {
+			"module": "foldnano_mini",
+			"doc": "Top-level mutable view onto a foldnano_json part.",
+			"members": [
+				{
+					"name": "allocate_vh_id",
+					"kind": "method",
+					"signature": "()",
+					"returns": "str"
+				},
+				{
+					"name": "allocate_oligo_id",
+					"kind": "method",
+					"signature": "()",
+					"returns": "str"
+				},
+				{
+					"name": "allocate_segment_id",
+					"kind": "method",
+					"signature": "()",
+					"returns": "str"
+				},
+				{
+					"name": "name",
+					"kind": "property",
+					"type": "str"
+				},
+				{
+					"name": "id",
+					"kind": "property",
+					"type": "str"
+				},
+				{
+					"name": "lattice_type",
+					"kind": "property",
+					"type": "str",
+					"doc": "Kind of the first region (HONEYCOMB / SQUARE / FREEFORM)."
+				},
+				{
+					"name": "max_base",
+					"kind": "property",
+					"type": "int",
+					"doc": "Default-region ``defaultMaxBase``."
+				},
+				{
+					"name": "active_region_id",
+					"kind": "property",
+					"type": "str | None"
+				},
+				{
+					"name": "active_region",
+					"kind": "property",
+					"type": "MutableRegion | None"
+				},
+				{
+					"name": "allocate_plane_id",
+					"kind": "method",
+					"signature": "()",
+					"returns": "str"
+				},
+				{
+					"name": "allocate_region_id",
+					"kind": "method",
+					"signature": "()",
+					"returns": "str"
+				},
+				{
+					"name": "regions",
+					"kind": "property",
+					"type": "list[MutableRegion]"
+				},
+				{
+					"name": "virtual_helices",
+					"kind": "property",
+					"type": "list[MutableVirtualHelix]"
+				},
+				{
+					"name": "planes",
+					"kind": "property",
+					"type": "list[MutablePlane]"
+				},
+				{
+					"name": "oligos",
+					"kind": "property",
+					"type": "list[MutableOligo]"
+				},
+				{
+					"name": "get_region",
+					"kind": "method",
+					"signature": "(region_id: str)",
+					"returns": "MutableRegion | None"
+				},
+				{
+					"name": "get_vh",
+					"kind": "method",
+					"signature": "(index: int)",
+					"returns": "MutableVirtualHelix | None"
+				},
+				{
+					"name": "get_oligo",
+					"kind": "method",
+					"signature": "(oligo_id: str)",
+					"returns": "MutableOligo | None"
+				},
+				{
+					"name": "vhs_in_region",
+					"kind": "method",
+					"signature": "(region_id: str)",
+					"returns": "list[MutableVirtualHelix]"
+				},
+				{
+					"name": "oligos_in_region",
+					"kind": "method",
+					"signature": "(region_id: str)",
+					"returns": "list[MutableOligo]",
+					"doc": "Oligos whose every segment lives in ``region_id`` (cross-region oligos excluded)."
+				},
+				{
+					"name": "create_segment",
+					"kind": "method",
+					"signature": "(vh: MutableVirtualHelix | int, five_index: int, three_index: int, color: str='#888888', is_scaffold: bool=False, name: str | None=None)",
+					"returns": "MutableSegment",
+					"doc": "Create a new oligo containing one fresh segment."
+				},
+				{
+					"name": "connect",
+					"kind": "method",
+					"signature": "(from_segment: MutableSegment, to_segment: MutableSegment)",
+					"returns": "None",
+					"doc": "Connect ``from_segment``'s 3' end to ``to_segment``'s 5' end."
+				},
+				{
+					"name": "remove_vhs",
+					"kind": "method",
+					"signature": "(vhs: list[int | MutableVirtualHelix])",
+					"returns": "None",
+					"doc": "Remove the listed virtual helices."
+				},
+				{
+					"name": "break_oligo",
+					"kind": "method",
+					"signature": "(segment: MutableSegment, at_index: int)",
+					"returns": "MutableOligo",
+					"doc": "Break the oligo containing ``segment`` at ``at_index``."
+				},
+				{
+					"name": "reorder_vh",
+					"kind": "method",
+					"signature": "(vh: MutableVirtualHelix | int, target_region_row: int)",
+					"returns": "None",
+					"doc": "Reorder ``vh`` within its region to ``target_region_row`` (0-based)."
+				},
+				{
+					"name": "set_plane_transform",
+					"kind": "method",
+					"signature": "(plane_id: str, origin: tuple[float, float, float] | list[float] | dict, u: tuple[float, float, float] | list[float] | dict, v: tuple[float, float, float] | list[float] | dict, normal: tuple[float, float, float] | list[float] | dict)",
+					"returns": "None",
+					"doc": "Update the 3D pose of the plane identified by ``plane_id``."
+				},
+				{
+					"name": "add_region",
+					"kind": "method",
+					"signature": "(kind: str, name: str, max_base: int, *, min_base: int=0, plane_origin: tuple[float, float, float]=(0.0, 0.0, 0.0), plane_u: tuple[float, float, float]=(1.0, 0.0, 0.0), plane_v: tuple[float, float, float]=(0.0, 1.0, 0.0), plane_normal: tuple[float, float, float]=(0.0, 0.0, 1.0), plane_name: str | None=None, step: int | None=None, turns_per_step: int | None=None, sub_step_size: int | None=None, twist_offset: float | None=None)",
+					"returns": "MutableRegion",
+					"doc": "Create a new region + plane and append them to the part."
+				},
+				{
+					"name": "split_region",
+					"kind": "method",
+					"signature": "(region: MutableRegion | str, split_after_vh: MutableVirtualHelix | str)",
+					"returns": "MutableRegion",
+					"doc": "Split ``region`` into two at the given VH boundary."
+				},
+				{
+					"name": "mutation_log",
+					"kind": "property",
+					"type": "list[dict[str, Any]]",
+					"doc": "The op log captured so far. JSON-serialisable."
+				},
+				{
+					"name": "to_json",
+					"kind": "method",
+					"signature": "()",
+					"returns": "dict[str, Any]",
+					"doc": "Return a deep copy of the current mirror dict."
+				},
+				{
+					"name": "to_json_string",
+					"kind": "method",
+					"signature": "()",
+					"returns": "str",
+					"doc": "Return the current mirror serialised to JSON."
+				},
+				{
+					"name": "replay_log_into_fresh_mirror",
+					"kind": "method",
+					"signature": "(json_str: str, log: list[dict[str, Any]])",
+					"returns": "dict[str, Any]",
+					"doc": "Self-consistency helper: replay a log into a fresh OfflineTransport deserialised from ``json_str``, returning the final mirror dict."
+				}
+			]
+		},
+		"MutablePlane": {
+			"module": "foldnano_mini",
+			"doc": "Read-only view of a plane dict from the mirror.",
+			"members": [
+				{
+					"name": "id",
+					"kind": "property",
+					"type": "str"
+				},
+				{
+					"name": "name",
+					"kind": "property",
+					"type": "str"
+				},
+				{
+					"name": "origin",
+					"kind": "property",
+					"type": "dict[str, float]"
+				},
+				{
+					"name": "u",
+					"kind": "property",
+					"type": "dict[str, float]"
+				},
+				{
+					"name": "v",
+					"kind": "property",
+					"type": "dict[str, float]"
+				},
+				{
+					"name": "normal",
+					"kind": "property",
+					"type": "dict[str, float]"
+				}
+			]
+		},
+		"MutableRegion": {
+			"module": "foldnano_mini",
+			"doc": "",
+			"members": [
+				{
+					"name": "id",
+					"kind": "property",
+					"type": "str"
+				},
+				{
+					"name": "name",
+					"kind": "property",
+					"type": "str"
+				},
+				{
+					"name": "kind",
+					"kind": "property",
+					"type": "str"
+				},
+				{
+					"name": "plane_id",
+					"kind": "property",
+					"type": "str"
+				},
+				{
+					"name": "vh_order",
+					"kind": "property",
+					"type": "list[str]"
+				},
+				{
+					"name": "step",
+					"kind": "property",
+					"type": "int"
+				},
+				{
+					"name": "default_max_base",
+					"kind": "property",
+					"type": "int"
+				},
+				{
+					"name": "max_base",
+					"kind": "property",
+					"type": "int"
+				},
+				{
+					"name": "min_base",
+					"kind": "property",
+					"type": "int"
+				},
+				{
+					"name": "set_max_base",
+					"kind": "method",
+					"signature": "(new_max_base: int)",
+					"returns": "None",
+					"doc": "Extend all VHs in this region to ``new_max_base``."
+				},
+				{
+					"name": "increase_length_by",
+					"kind": "method",
+					"signature": "(delta: int)",
+					"returns": "None",
+					"doc": "Extend all VHs in this region by ``delta`` bases."
+				},
+				{
+					"name": "supports_lattice_grid",
+					"kind": "property",
+					"type": "bool"
+				},
+				{
+					"name": "virtual_helices",
+					"kind": "property",
+					"type": "list[MutableVirtualHelix]"
+				}
+			]
+		},
+		"LatticedRegion": {
+			"module": "foldnano_mini",
+			"doc": "HONEYCOMB / SQUARE region \u2014 supports adding VHs at lattice coordinates.",
+			"members": [
+				{
+					"name": "add_vh_at",
+					"kind": "method",
+					"signature": "(row: int, col: int, length: int | None=None)",
+					"returns": "MutableVirtualHelix",
+					"doc": "Add a VH to the offline mirror."
+				},
+				{
+					"name": "id",
+					"kind": "property",
+					"type": "str"
+				},
+				{
+					"name": "name",
+					"kind": "property",
+					"type": "str"
+				},
+				{
+					"name": "kind",
+					"kind": "property",
+					"type": "str"
+				},
+				{
+					"name": "plane_id",
+					"kind": "property",
+					"type": "str"
+				},
+				{
+					"name": "vh_order",
+					"kind": "property",
+					"type": "list[str]"
+				},
+				{
+					"name": "step",
+					"kind": "property",
+					"type": "int"
+				},
+				{
+					"name": "default_max_base",
+					"kind": "property",
+					"type": "int"
+				},
+				{
+					"name": "max_base",
+					"kind": "property",
+					"type": "int"
+				},
+				{
+					"name": "min_base",
+					"kind": "property",
+					"type": "int"
+				},
+				{
+					"name": "set_max_base",
+					"kind": "method",
+					"signature": "(new_max_base: int)",
+					"returns": "None",
+					"doc": "Extend all VHs in this region to ``new_max_base``."
+				},
+				{
+					"name": "increase_length_by",
+					"kind": "method",
+					"signature": "(delta: int)",
+					"returns": "None",
+					"doc": "Extend all VHs in this region by ``delta`` bases."
+				},
+				{
+					"name": "supports_lattice_grid",
+					"kind": "property",
+					"type": "bool"
+				},
+				{
+					"name": "virtual_helices",
+					"kind": "property",
+					"type": "list[MutableVirtualHelix]"
+				}
+			]
+		},
+		"FreeformRegion": {
+			"module": "foldnano_mini",
+			"doc": "Freeform region \u2014 VHs placed by ``localFrame`` rather than lattice coords.",
+			"members": [
+				{
+					"name": "add_vh_at",
+					"kind": "method",
+					"signature": "(origin: tuple[float, float, float], direction: tuple[float, float, float]=(0.0, 0.0, 1.0), length: int | None=None)",
+					"returns": "MutableVirtualHelix",
+					"doc": "Add a new VH to this freeform region at the given 3D position."
+				},
+				{
+					"name": "id",
+					"kind": "property",
+					"type": "str"
+				},
+				{
+					"name": "name",
+					"kind": "property",
+					"type": "str"
+				},
+				{
+					"name": "kind",
+					"kind": "property",
+					"type": "str"
+				},
+				{
+					"name": "plane_id",
+					"kind": "property",
+					"type": "str"
+				},
+				{
+					"name": "vh_order",
+					"kind": "property",
+					"type": "list[str]"
+				},
+				{
+					"name": "step",
+					"kind": "property",
+					"type": "int"
+				},
+				{
+					"name": "default_max_base",
+					"kind": "property",
+					"type": "int"
+				},
+				{
+					"name": "max_base",
+					"kind": "property",
+					"type": "int"
+				},
+				{
+					"name": "min_base",
+					"kind": "property",
+					"type": "int"
+				},
+				{
+					"name": "set_max_base",
+					"kind": "method",
+					"signature": "(new_max_base: int)",
+					"returns": "None",
+					"doc": "Extend all VHs in this region to ``new_max_base``."
+				},
+				{
+					"name": "increase_length_by",
+					"kind": "method",
+					"signature": "(delta: int)",
+					"returns": "None",
+					"doc": "Extend all VHs in this region by ``delta`` bases."
+				},
+				{
+					"name": "supports_lattice_grid",
+					"kind": "property",
+					"type": "bool"
+				},
+				{
+					"name": "virtual_helices",
+					"kind": "property",
+					"type": "list[MutableVirtualHelix]"
+				}
+			]
+		},
+		"MutableVirtualHelix": {
+			"module": "foldnano_mini",
+			"doc": "",
+			"members": [
+				{
+					"name": "index",
+					"kind": "property",
+					"type": "int"
+				},
+				{
+					"name": "id",
+					"kind": "property",
+					"type": "str"
+				},
+				{
+					"name": "region_id",
+					"kind": "property",
+					"type": "str | None"
+				},
+				{
+					"name": "length",
+					"kind": "property",
+					"type": "int",
+					"settable": true
+				},
+				{
+					"name": "row",
+					"kind": "property",
+					"type": "int | None"
+				},
+				{
+					"name": "col",
+					"kind": "property",
+					"type": "int | None"
+				},
+				{
+					"name": "is_freeform",
+					"kind": "property",
+					"type": "bool"
+				},
+				{
+					"name": "parity_is_even",
+					"kind": "property",
+					"type": "bool"
+				},
+				{
+					"name": "local_frame",
+					"kind": "property",
+					"type": "dict | None",
+					"settable": true
+				},
+				{
+					"name": "move_to",
+					"kind": "method",
+					"signature": "(col: int, row: int)",
+					"returns": "None",
+					"doc": "Move this lattice VH to (col, row), preserving parity."
+				},
+				{
+					"name": "strand_set_segment_ids",
+					"kind": "property",
+					"type": "list[list[str]]"
+				}
+			]
+		},
+		"MutableOligo": {
+			"module": "foldnano_mini",
+			"doc": "",
+			"members": [
+				{
+					"name": "id",
+					"kind": "property",
+					"type": "str"
+				},
+				{
+					"name": "color",
+					"kind": "property",
+					"type": "str",
+					"settable": true
+				},
+				{
+					"name": "name",
+					"kind": "property",
+					"type": "str | None",
+					"settable": true
+				},
+				{
+					"name": "is_scaffold",
+					"kind": "property",
+					"type": "bool",
+					"settable": true
+				},
+				{
+					"name": "is_sequence_locked",
+					"kind": "property",
+					"type": "bool"
+				},
+				{
+					"name": "is_circular",
+					"kind": "property",
+					"type": "bool",
+					"doc": "True if every segment's 3\u2032 end is connected to another segment in this oligo."
+				},
+				{
+					"name": "segments",
+					"kind": "property",
+					"type": "list[MutableSegment]"
+				},
+				{
+					"name": "get_segment",
+					"kind": "method",
+					"signature": "(segment_id: str)",
+					"returns": "MutableSegment | None"
+				},
+				{
+					"name": "remove",
+					"kind": "method",
+					"signature": "()",
+					"returns": "None"
+				},
+				{
+					"name": "touches_regions",
+					"kind": "method",
+					"signature": "()",
+					"returns": "set[str]",
+					"doc": "Set of region IDs this oligo's segments visit (cross-region detection)."
+				}
+			]
+		},
+		"MutableSegment": {
+			"module": "foldnano_mini",
+			"doc": "",
+			"members": [
+				{
+					"name": "id",
+					"kind": "property",
+					"type": "str"
+				},
+				{
+					"name": "oligo_id",
+					"kind": "property",
+					"type": "str"
+				},
+				{
+					"name": "vh_index",
+					"kind": "property",
+					"type": "int"
+				},
+				{
+					"name": "five_index",
+					"kind": "property",
+					"type": "int"
+				},
+				{
+					"name": "three_index",
+					"kind": "property",
+					"type": "int"
+				},
+				{
+					"name": "length",
+					"kind": "property",
+					"type": "int"
+				},
+				{
+					"name": "five_modification",
+					"kind": "property",
+					"type": "str | None",
+					"settable": true
+				},
+				{
+					"name": "three_modification",
+					"kind": "property",
+					"type": "str | None",
+					"settable": true
+				},
+				{
+					"name": "connected_from_segment_id",
+					"kind": "property",
+					"type": "str | None"
+				},
+				{
+					"name": "connected_to_segment_id",
+					"kind": "property",
+					"type": "str | None"
+				},
+				{
+					"name": "slots",
+					"kind": "property",
+					"type": "list[MutableSlot]"
+				},
+				{
+					"name": "slot_at",
+					"kind": "method",
+					"signature": "(bp_index: int)",
+					"returns": "MutableSlot",
+					"doc": "Return a proxy for the slot at ``bp_index`` (created on first write)."
+				},
+				{
+					"name": "move_five_prime_to",
+					"kind": "method",
+					"signature": "(new_index: int)",
+					"returns": "None",
+					"doc": "Move the 5\u2032 terminus of this segment to ``new_index``."
+				},
+				{
+					"name": "move_three_prime_to",
+					"kind": "method",
+					"signature": "(new_index: int)",
+					"returns": "None",
+					"doc": "Move the 3\u2032 terminus of this segment to ``new_index``."
+				},
+				{
+					"name": "remove",
+					"kind": "method",
+					"signature": "()",
+					"returns": "None"
+				}
+			]
+		},
+		"MutableSlot": {
+			"module": "foldnano_mini",
+			"doc": "One position on a segment \u2014 sequence, skip, or insertion.",
+			"members": [
+				{
+					"name": "bp_index",
+					"kind": "property",
+					"type": "int"
+				},
+				{
+					"name": "seq",
+					"kind": "property",
+					"type": "str",
+					"settable": true
+				},
+				{
+					"name": "skip",
+					"kind": "property",
+					"type": "bool"
+				},
+				{
+					"name": "set_skip",
+					"kind": "method",
+					"signature": "(value: bool)",
+					"returns": "None"
+				},
+				{
+					"name": "set_insertion",
+					"kind": "method",
+					"signature": "(sequence: str)",
+					"returns": "None"
+				}
+			]
+		},
+		"MutationLog": {
+			"module": "foldnano_mini",
+			"doc": "Append-only ordered log of ops.",
+			"members": [
+				{
+					"name": "append",
+					"kind": "method",
+					"signature": "(op: dict[str, Any])",
+					"returns": "None"
+				},
+				{
+					"name": "to_list",
+					"kind": "method",
+					"signature": "()",
+					"returns": "list[dict[str, Any]]",
+					"doc": "Return a shallow copy of the op list \u2014 safe to JSON-encode."
+				},
+				{
+					"name": "clear",
+					"kind": "method",
+					"signature": "()",
+					"returns": "None"
+				}
+			]
+		},
+		"Transport": {
+			"module": "foldnano_mini",
+			"doc": "Common interface for offline (mirror) and live (JS RPC) transports.",
+			"members": [
+				{
+					"name": "apply",
+					"kind": "method",
+					"signature": "(op: dict[str, Any])",
+					"returns": "None"
+				},
+				{
+					"name": "read_part",
+					"kind": "method",
+					"signature": "()",
+					"returns": "dict[str, Any]"
+				},
+				{
+					"name": "log",
+					"kind": "property",
+					"type": "list[dict[str, Any]]"
+				}
+			]
+		},
+		"OfflineTransport": {
+			"module": "foldnano_mini",
+			"doc": "In-process transport.",
+			"members": [
+				{
+					"name": "raw",
+					"kind": "property",
+					"type": "dict[str, Any]"
+				},
+				{
+					"name": "log",
+					"kind": "property",
+					"type": "list[dict[str, Any]]"
+				},
+				{
+					"name": "read_part",
+					"kind": "method",
+					"signature": "()",
+					"returns": "dict[str, Any]"
+				},
+				{
+					"name": "apply",
+					"kind": "method",
+					"signature": "(op: dict[str, Any])",
+					"returns": "None"
+				}
+			]
+		}
+	}
+}

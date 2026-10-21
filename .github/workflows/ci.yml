@@ -43,3 +43,12 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: src/lib/plugin/python/uv.lock
+
+      # uv reads src/lib/plugin/python/.python-version (the pinned Pyodide's Python).
+      - name: Python plugin tests
+        run: pnpm test:python

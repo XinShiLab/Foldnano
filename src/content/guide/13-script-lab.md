@@ -36,8 +36,35 @@ Core plugins can be switched off again but not removed.
 | **Reset** | Clears the output pane, discards an unapplied result, and returns an errored run to ready (same as **Reset** in the Plugins panel) |
 | **Help** (book icon) | Loads a starter script and shows a quick API reference (below) |
 | **More** (**⋯**) | Opens a menu with the editor font size (**A−** / **A+**), **Restore default script** (the Mutation Starter), and **Download**, which saves the script as a `.py` file |
+| **Pop out** (arrow icon, next to **Python**) | Moves the editor and output into a separate browser window (see [Working In A Separate Window](#working-in-a-separate-window)) |
 
 The editor and output pane are split; drag the divider to resize them. Your script is kept in browser storage, so it survives reloads and is the same whichever design is open.
+
+The editor suggests API names as you type. After a `.` it lists what that object offers, so `part.` shows the part's collections and methods, and inside `for oligo in part.oligos:` the line `oligo.` shows oligo properties such as `color`. Each suggestion shows its type or signature; properties marked *settable* record a change when you assign to them. Press **Tab** or **Enter** to insert a suggestion, or **Ctrl+Space** to open the list anywhere.
+
+### Working In A Separate Window
+
+The side panel is narrow. To give a longer script more room, click the **Pop out** icon next to the **Python** badge. The toolbar, editor and output move into their own browser window, which you can resize or drag to a second screen while the design stays in view in the main window.
+
+![Script Lab panel header with an arrow pointing to the Pop out icon, right of the Python badge](/screenshots/guide/script-lab/03-pop-out-button.webp)
+
+*The **Pop out** icon sits next to the **Python** badge.*
+
+![Script Lab in its own window over the editor, with a script in the editor and the Apply tab open; the main window's side panel shows the Script Lab is open in a separate window placeholder with Show window and Bring back buttons](/screenshots/guide/script-lab/04-pop-out-window.webp)
+
+*The popped-out window has the same controls as the side panel, which now offers to bring the editor back.*
+
+Everything works the same in the popped-out window: **Run**, the output tabs, and **Apply**, which changes the design in the main window as one undoable step. You can switch the side panel to another tab, such as **Source Control**, and the window stays open.
+
+To return the editor to the side panel, click **Bring back** in the side panel, click the panel icon in the window's header, or close the window. **Show window** brings a window that's hidden behind others to the front.
+
+Good to know:
+
+- **Your script moves with it.** Only the editor's own undo history (`Ctrl/Cmd + Z` while typing) starts over each time it moves.
+- **Design shortcuts stay in the main window.** Keys such as undo for the design, delete, or switching tools work when the main window has focus, not the popped-out one.
+- **Notifications and confirmation dialogs open in the main window.** If a click in the popped-out window seems to do nothing, check the main window.
+- **Closing or reloading the main tab closes the window too.**
+- **If nothing opens,** your browser blocked the pop-up. Allow pop-ups for this site, then click **Pop out** again.
 
 ## Starter Scripts
 

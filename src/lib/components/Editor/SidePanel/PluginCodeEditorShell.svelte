@@ -1,14 +1,30 @@
 <script lang="ts">
 	import { PYODIDE_PYTHON_VERSION, PYODIDE_VERSION } from '$lib/plugin/worker/pyodideConfig';
-	import { onMount } from 'svelte';
+	import { untrack } from 'svelte';
 	import type { Snippet } from 'svelte';
-	import { Download, Ellipsis, Eraser, FileCode2, Play, RotateCcw, Square } from '@lucide/svelte';
+	import type { Attachment } from 'svelte/attachments';
+	import {
+		AppWindow,
+		Download,
+		Ellipsis,
+		Eraser,
+		FileCode2,
+		PanelRightClose,
+		Play,
+		RotateCcw,
+		Square,
+		SquareArrowOutUpRight,
+	} from '@lucide/svelte';
+	import { toast } from 'svelte-sonner';
 	import type { Component } from 'svelte';
 	import type { PrismEditor } from 'prism-code-editor';
 	import { basicEditor } from 'prism-code-editor/setups';
 	import type { EditorTheme } from 'prism-code-editor/themes';
 	import 'prism-code-editor/prism/languages/python';
 	import 'prism-code-editor/languages/python';
+	import { addPythonAutocomplete } from './python-autocomplete';
+	import { bridgeForeignDocument } from './prism-foreign-document';
+	import PopOutWindow from './PopOutWindow.svelte';
 
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -50,6 +66,8 @@
 		onRestoreDefaultScript?: () => void | Promise<void>;
 		onDownload?: (code: string) => void | Promise<void>;
 		onCodeChange?: (code: string) => void;
+		/** Editor surface lives in a separate window; bindable so the owner can keep it alive. */
+		poppedOut?: boolean;
 	}
 
 	let {
@@ -74,11 +92,12 @@
 		onRestoreDefaultScript,
 		onDownload,
 		onCodeChange,
+		poppedOut = $bindable(false),
 	}: Props = $props();
 
 	let script = $state(code);
 	let editorFontSize = $state(12);
-	let editorHost: HTMLDivElement | null = null;
+	let popOutWindow: PopOutWindow | null = $state(null);
 	let editor: PrismEditor<{ theme: EditorTheme }> | null = null;
 	let toolbarScrollEl: HTMLDivElement | null = null;
 
@@ -141,266 +160,344 @@
 		toolbarScrollEl.scrollLeft += event.deltaY;
 	}
 
-	onMount(() => {
-		if (!editorHost) return;
+	// An attachment rather than onMount: the editor is rebuilt in whichever window hosts it.
+	const mountEditor: Attachment<HTMLDivElement> = (host) =>
+		untrack(() => {
+			const instance = basicEditor(host, {
+				language: 'python',
+				theme,
+				lineNumbers: true,
+				tabSize: 4,
+				wordWrap: false,
+				value: script,
+				onUpdate: (value) => {
+					setScript(value);
+				},
+			});
+			addPythonAutocomplete(instance, host.shadowRoot);
+			const releaseDocument = bridgeForeignDocument(host.ownerDocument);
 
-		editor = basicEditor(editorHost, {
-			language: 'python',
-			theme,
-			lineNumbers: true,
-			tabSize: 4,
-			wordWrap: false,
-			value: script,
-			onUpdate: (value) => {
-				setScript(value);
-			},
+			// Prevent editor keystrokes from falling through to the app-wide editor shortcuts
+			// registered on <body>, such as Backspace/Delete removing design selections.
+			const stopEditorShortcutPropagation = (event: KeyboardEvent) => {
+				event.stopPropagation();
+			};
+			instance.textarea.addEventListener('keydown', stopEditorShortcutPropagation);
+
+			// Writing-assistant extensions ignore `spellcheck=false`; these are their own opt-outs.
+			for (const [name, value] of [
+				['data-gramm', 'false'],
+				['data-gramm_editor', 'false'],
+				['data-enable-grammarly', 'false'],
+				['data-lt-active', 'false'],
+				['autocorrect', 'off'],
+				['translate', 'no'],
+			]) {
+				instance.textarea.setAttribute(name, value);
+			}
+
+			editor = instance;
+			return () => {
+				instance.textarea.removeEventListener('keydown', stopEditorShortcutPropagation);
+				instance.remove();
+				releaseDocument();
+				if (editor === instance) editor = null;
+			};
 		});
 
-		// Prevent editor keystrokes from falling through to the app-wide editor shortcuts
-		// registered on <body>, such as Backspace/Delete removing design selections.
-		const stopEditorShortcutPropagation = (event: KeyboardEvent) => {
-			event.stopPropagation();
-		};
-		editor.textarea.addEventListener('keydown', stopEditorShortcutPropagation);
-
-		// Writing-assistant extensions ignore `spellcheck=false`; these are their own opt-outs.
-		for (const [name, value] of [
-			['data-gramm', 'false'],
-			['data-gramm_editor', 'false'],
-			['data-enable-grammarly', 'false'],
-			['data-lt-active', 'false'],
-			['autocorrect', 'off'],
-			['translate', 'no'],
-		]) {
-			editor.textarea.setAttribute(name, value);
-		}
-
-		return () => {
-			editor?.textarea.removeEventListener('keydown', stopEditorShortcutPropagation);
-			editor?.remove();
-			editor = null;
-		};
-	});
+	function handlePopOutBlocked(): void {
+		poppedOut = false;
+		toast.error("Couldn't open a separate window", {
+			description: 'Allow pop-ups for this site, then try again.',
+		});
+	}
 
 	const PYTHON_MINOR = PYODIDE_PYTHON_VERSION.split('.').slice(0, 2).join('.');
 </script>
 
-<div class="flex h-full min-h-0 flex-col overflow-hidden text-sm">
-	<div class="border-b border-border px-2.5 py-2">
-		<div class="flex items-center justify-between gap-2">
-			<div class="min-w-0">
-				<div class="flex items-center gap-1.5">
-					<h2 class="truncate text-sm font-semibold text-foreground">{title}</h2>
-					<Badge variant="outline" class={`h-4 px-1.5 text-[10px] ${statusBadgeClass()}`}
-						>{statusLabel()}</Badge
+{#if poppedOut}
+	<div
+		class="flex h-full flex-col items-center justify-center gap-2 px-4 text-center text-sm text-muted-foreground"
+	>
+		<AppWindow size={20} />
+		<p>{title} is open in a separate window.</p>
+		<div class="flex items-center gap-1.5">
+			<Button
+				size="xs"
+				variant="outline"
+				class="h-6 px-2 text-[11px]"
+				onclick={() => popOutWindow?.focus()}
+			>
+				Show window
+			</Button>
+			<Button
+				size="xs"
+				variant="outline"
+				class="h-6 gap-1 px-2 text-[11px]"
+				onclick={() => (poppedOut = false)}
+			>
+				<PanelRightClose size={11} />
+				Bring back
+			</Button>
+		</div>
+	</div>
+	<PopOutWindow
+		bind:this={popOutWindow}
+		name={`foldnano-code-editor-${filename}`}
+		title={`${title} · Foldnano`}
+		onClose={() => (poppedOut = false)}
+		onBlocked={handlePopOutBlocked}
+	>
+		{@render editorSurface()}
+	</PopOutWindow>
+{:else}
+	{@render editorSurface()}
+{/if}
+
+{#snippet editorSurface()}
+	<div class="flex h-full min-h-0 flex-col overflow-hidden text-sm">
+		<div class="border-b border-border px-2.5 py-2">
+			<div class="flex items-center justify-between gap-2">
+				<div class="min-w-0">
+					<div class="flex items-center gap-1.5">
+						<h2 class="truncate text-sm font-semibold text-foreground">{title}</h2>
+						<Badge variant="outline" class={`h-4 px-1.5 text-[10px] ${statusBadgeClass()}`}
+							>{statusLabel()}</Badge
+						>
+						{#if titleTail}
+							{@render titleTail()}
+						{/if}
+					</div>
+					<!-- One truncated line keeps the header compact; hover shows the full description. -->
+					<Tooltip.Provider>
+						<Tooltip.Root>
+							<Tooltip.Trigger>
+								{#snippet child({ props })}
+									<p
+										{...props}
+										class="cursor-default truncate text-[11px] whitespace-nowrap text-muted-foreground"
+									>
+										{description}
+									</p>
+								{/snippet}
+							</Tooltip.Trigger>
+							<Tooltip.Content side="bottom" align="start">
+								<p class="max-w-72 text-[11px] leading-4">{description}</p>
+							</Tooltip.Content>
+						</Tooltip.Root>
+					</Tooltip.Provider>
+				</div>
+				<div class="flex shrink-0 items-center gap-1">
+					<Badge
+						variant="outline"
+						class="h-4 gap-1 border-border/80 bg-muted/60 px-1.5 text-[10px]"
 					>
-					{#if titleTail}
-						{@render titleTail()}
+						<FileCode2 size={10} />
+						Python
+					</Badge>
+					{#if showPrototypeBadge}
+						<Badge variant="outline" class="h-4 border-border/80 bg-muted/60 px-1.5 text-[10px]">
+							Prototype
+						</Badge>
+					{/if}
+					{#if poppedOut}
+						<Button
+							size="xs"
+							variant="ghost"
+							class="h-5 w-5 px-0"
+							title="Move the editor back into the side panel"
+							aria-label="Move the editor back into the side panel"
+							onclick={() => (poppedOut = false)}
+						>
+							<PanelRightClose size={12} />
+						</Button>
+					{:else}
+						<Button
+							size="xs"
+							variant="ghost"
+							class="h-5 w-5 px-0"
+							title="Open the editor in a separate window"
+							aria-label="Open the editor in a separate window"
+							onclick={() => (poppedOut = true)}
+						>
+							<SquareArrowOutUpRight size={12} />
+						</Button>
 					{/if}
 				</div>
-				<!-- One truncated line keeps the header compact; hover shows the full description. -->
-				<Tooltip.Provider>
-					<Tooltip.Root>
-						<Tooltip.Trigger>
+			</div>
+		</div>
+
+		<div
+			bind:this={toolbarScrollEl}
+			class="scrollbar-none overflow-x-auto overflow-y-hidden border-b border-border [&::-webkit-scrollbar]:hidden"
+			onwheel={handleToolbarWheel}
+		>
+			<div class="flex w-max min-w-full items-center gap-1.5 px-2.5 py-1.5 whitespace-nowrap">
+				<Button
+					size="xs"
+					class="h-6 gap-1 px-1.5 text-[11px]"
+					onclick={() => onRun?.(script)}
+					disabled={runDisabled}
+				>
+					<Play size={11} />
+					Run
+				</Button>
+				<Button
+					size="xs"
+					variant="outline"
+					class="h-6 gap-1 px-1.5 text-[11px]"
+					onclick={() => onStop?.()}
+					disabled={stopDisabled}
+				>
+					<Square size={11} />
+					Stop
+				</Button>
+				<Button
+					size="xs"
+					variant="outline"
+					class="h-6 gap-1 px-1.5 text-[11px]"
+					onclick={() => onClearScript?.()}
+					title="Clear the editor to a bare run(ctx) skeleton"
+				>
+					<Eraser size={11} />
+					Clear
+				</Button>
+				<Button
+					size="xs"
+					variant="outline"
+					class="h-6 gap-1 px-1.5 text-[11px]"
+					onclick={() => onResetPlugin?.()}
+					title="Clear run output and reset to ready state"
+				>
+					<RotateCcw size={11} />
+					Reset
+				</Button>
+				<div class="ml-auto flex items-center gap-1 pl-1.5">
+					{#if toolbarTail}
+						{@render toolbarTail()}
+					{/if}
+					<DropdownMenu.Root>
+						<DropdownMenu.Trigger>
 							{#snippet child({ props })}
-								<p
+								<Button
 									{...props}
-									class="cursor-default truncate text-[11px] whitespace-nowrap text-muted-foreground"
+									size="xs"
+									variant="outline"
+									class="h-6 w-6 px-0"
+									title="More actions"
+									aria-label="More actions"
 								>
-									{description}
-								</p>
+									<Ellipsis size={12} />
+								</Button>
 							{/snippet}
-						</Tooltip.Trigger>
-						<Tooltip.Content side="bottom" align="start">
-							<p class="max-w-72 text-[11px] leading-4">{description}</p>
-						</Tooltip.Content>
-					</Tooltip.Root>
-				</Tooltip.Provider>
-			</div>
-			<div class="flex shrink-0 items-center gap-1">
-				<Badge variant="outline" class="h-4 gap-1 border-border/80 bg-muted/60 px-1.5 text-[10px]">
-					<FileCode2 size={10} />
-					Python
-				</Badge>
-				{#if showPrototypeBadge}
-					<Badge variant="outline" class="h-4 border-border/80 bg-muted/60 px-1.5 text-[10px]">
-						Prototype
-					</Badge>
-				{/if}
-			</div>
-		</div>
-	</div>
-
-	<div
-		bind:this={toolbarScrollEl}
-		class="scrollbar-none overflow-x-auto overflow-y-hidden border-b border-border [&::-webkit-scrollbar]:hidden"
-		onwheel={handleToolbarWheel}
-	>
-		<div class="flex w-max min-w-full items-center gap-1.5 px-2.5 py-1.5 whitespace-nowrap">
-			<Button
-				size="xs"
-				class="h-6 gap-1 px-1.5 text-[11px]"
-				onclick={() => onRun?.(script)}
-				disabled={runDisabled}
-			>
-				<Play size={11} />
-				Run
-			</Button>
-			<Button
-				size="xs"
-				variant="outline"
-				class="h-6 gap-1 px-1.5 text-[11px]"
-				onclick={() => onStop?.()}
-				disabled={stopDisabled}
-			>
-				<Square size={11} />
-				Stop
-			</Button>
-			<Button
-				size="xs"
-				variant="outline"
-				class="h-6 gap-1 px-1.5 text-[11px]"
-				onclick={() => onClearScript?.()}
-				title="Clear the editor to a bare run(ctx) skeleton"
-			>
-				<Eraser size={11} />
-				Clear
-			</Button>
-			<Button
-				size="xs"
-				variant="outline"
-				class="h-6 gap-1 px-1.5 text-[11px]"
-				onclick={() => onResetPlugin?.()}
-				title="Clear run output and reset to ready state"
-			>
-				<RotateCcw size={11} />
-				Reset
-			</Button>
-			<div class="ml-auto flex items-center gap-1 pl-1.5">
-				{#if toolbarTail}
-					{@render toolbarTail()}
-				{/if}
-				<DropdownMenu.Root>
-					<DropdownMenu.Trigger>
-						{#snippet child({ props })}
-							<Button
-								{...props}
-								size="xs"
-								variant="outline"
-								class="h-6 w-6 px-0"
-								title="More actions"
-								aria-label="More actions"
-							>
-								<Ellipsis size={12} />
-							</Button>
-						{/snippet}
-					</DropdownMenu.Trigger>
-					<DropdownMenu.Content align="end" class="w-52">
-						<div class="flex items-center justify-between gap-2 px-2 py-1.5 text-xs">
-							<span class="text-muted-foreground">Font size</span>
-							<!-- Plain buttons, not menu items, so stepping the size keeps the menu open. -->
-							<div class="flex items-center gap-1">
-								<Button
-									size="xs"
-									variant="outline"
-									class="h-6 w-6 px-0 text-[10px]"
-									aria-label="Decrease font size"
-									onclick={() => adjustEditorFontSize(-1)}
-									disabled={editorFontSize <= MIN_EDITOR_FONT_SIZE}
-								>
-									A-
-								</Button>
-								<span class="w-9 text-center text-[11px] tabular-nums">{editorFontSize}px</span>
-								<Button
-									size="xs"
-									variant="outline"
-									class="h-6 w-6 px-0 text-[10px]"
-									aria-label="Increase font size"
-									onclick={() => adjustEditorFontSize(1)}
-									disabled={editorFontSize >= MAX_EDITOR_FONT_SIZE}
-								>
-									A+
-								</Button>
+						</DropdownMenu.Trigger>
+						<DropdownMenu.Content align="end" class="w-52">
+							<div class="flex items-center justify-between gap-2 px-2 py-1.5 text-xs">
+								<span class="text-muted-foreground">Font size</span>
+								<!-- Plain buttons, not menu items, so stepping the size keeps the menu open. -->
+								<div class="flex items-center gap-1">
+									<Button
+										size="xs"
+										variant="outline"
+										class="h-6 w-6 px-0 text-[10px]"
+										aria-label="Decrease font size"
+										onclick={() => adjustEditorFontSize(-1)}
+										disabled={editorFontSize <= MIN_EDITOR_FONT_SIZE}
+									>
+										A-
+									</Button>
+									<span class="w-9 text-center text-[11px] tabular-nums">{editorFontSize}px</span>
+									<Button
+										size="xs"
+										variant="outline"
+										class="h-6 w-6 px-0 text-[10px]"
+										aria-label="Increase font size"
+										onclick={() => adjustEditorFontSize(1)}
+										disabled={editorFontSize >= MAX_EDITOR_FONT_SIZE}
+									>
+										A+
+									</Button>
+								</div>
 							</div>
-						</div>
-						<DropdownMenu.Separator />
-						{#if onRestoreDefaultScript}
-							<DropdownMenu.Item onclick={() => onRestoreDefaultScript?.()}>
-								<RotateCcw size={12} />
-								Restore default script
-							</DropdownMenu.Item>
-						{/if}
-						{#if showDownloadButton}
-							<DropdownMenu.Item onclick={() => onDownload?.(script)}>
-								<Download size={12} />
-								Download {filename}
-							</DropdownMenu.Item>
-						{/if}
-						{#if toolbarActions.length > 0}
 							<DropdownMenu.Separator />
-							{#each toolbarActions as action (action.id)}
-								{@const ActionIcon = action.icon}
-								<DropdownMenu.Item
-									class="items-start"
-									onclick={() => action.onClick?.()}
-									disabled={action.disabled}
-								>
-									{#if ActionIcon}
-										<ActionIcon size={12} class="mt-0.5" />
-									{/if}
-									<div class="min-w-0">
-										<div>{action.label}</div>
-										{#if action.tooltip}
-											<div class="text-[10px] leading-4 whitespace-normal text-muted-foreground">
-												{action.tooltip}
-											</div>
-										{/if}
-									</div>
+							{#if onRestoreDefaultScript}
+								<DropdownMenu.Item onclick={() => onRestoreDefaultScript?.()}>
+									<RotateCcw size={12} />
+									Restore default script
 								</DropdownMenu.Item>
-							{/each}
-						{/if}
-					</DropdownMenu.Content>
-				</DropdownMenu.Root>
+							{/if}
+							{#if showDownloadButton}
+								<DropdownMenu.Item onclick={() => onDownload?.(script)}>
+									<Download size={12} />
+									Download {filename}
+								</DropdownMenu.Item>
+							{/if}
+							{#if toolbarActions.length > 0}
+								<DropdownMenu.Separator />
+								{#each toolbarActions as action (action.id)}
+									{@const ActionIcon = action.icon}
+									<DropdownMenu.Item
+										class="items-start"
+										onclick={() => action.onClick?.()}
+										disabled={action.disabled}
+									>
+										{#if ActionIcon}
+											<ActionIcon size={12} class="mt-0.5" />
+										{/if}
+										<div class="min-w-0">
+											<div>{action.label}</div>
+											{#if action.tooltip}
+												<div class="text-[10px] leading-4 whitespace-normal text-muted-foreground">
+													{action.tooltip}
+												</div>
+											{/if}
+										</div>
+									</DropdownMenu.Item>
+								{/each}
+							{/if}
+						</DropdownMenu.Content>
+					</DropdownMenu.Root>
+				</div>
 			</div>
 		</div>
-	</div>
 
-	<Resizable.PaneGroup direction="vertical" class="min-h-0 flex-1">
-		<Resizable.Pane defaultSize={58} minSize={34}>
-			<div class="flex h-full min-h-0 flex-col overflow-hidden">
-				<div class="flex items-center justify-between border-b border-border px-2.5 py-1.5">
-					<div class="flex min-w-0 items-center gap-1.5 overflow-hidden">
-						<Badge
-							variant="outline"
-							class="h-4 border-border/80 bg-muted/50 px-1.5 font-mono text-[10px]"
+		<Resizable.PaneGroup direction="vertical" class="min-h-0 flex-1">
+			<Resizable.Pane defaultSize={58} minSize={34}>
+				<div class="flex h-full min-h-0 flex-col overflow-hidden">
+					<div class="flex items-center justify-between border-b border-border px-2.5 py-1.5">
+						<div class="flex min-w-0 items-center gap-1.5 overflow-hidden">
+							<Badge
+								variant="outline"
+								class="h-4 border-border/80 bg-muted/50 px-1.5 font-mono text-[10px]"
+							>
+								{filename}
+							</Badge>
+							<span class="truncate text-[11px] text-muted-foreground">Plugin script</span>
+						</div>
+						<div
+							class="shrink-0 text-[10px] text-muted-foreground"
+							title="Pyodide {PYODIDE_VERSION} · Python {PYODIDE_PYTHON_VERSION}"
 						>
-							{filename}
-						</Badge>
-						<span class="truncate text-[11px] text-muted-foreground">Plugin script</span>
+							Py {PYTHON_MINOR}
+						</div>
 					</div>
-					<div
-						class="shrink-0 text-[10px] text-muted-foreground"
-						title="Pyodide {PYODIDE_VERSION} · Python {PYODIDE_PYTHON_VERSION}"
-					>
-						Py {PYTHON_MINOR}
+					<div class="min-h-0 flex-1 overflow-hidden bg-[#0d1117]">
+						<div
+							{@attach mountEditor}
+							class="h-full w-full"
+							style={`display:grid;height:100%;font-family:var(--font-mono, 'JetBrains Mono Variable', monospace);font-size:${editorFontSize}px;`}
+						></div>
 					</div>
 				</div>
-				<div class="min-h-0 flex-1 overflow-hidden bg-[#0d1117]">
-					<div
-						bind:this={editorHost}
-						class="h-full w-full"
-						style={`display:grid;height:100%;font-family:var(--font-mono, 'JetBrains Mono Variable', monospace);font-size:${editorFontSize}px;`}
-					></div>
+			</Resizable.Pane>
+
+			<Resizable.Handle withHandle />
+
+			<Resizable.Pane defaultSize={42} minSize={24}>
+				<div class="h-full min-h-0 overflow-hidden">
+					{@render output?.()}
 				</div>
-			</div>
-		</Resizable.Pane>
-
-		<Resizable.Handle withHandle />
-
-		<Resizable.Pane defaultSize={42} minSize={24}>
-			<div class="h-full min-h-0 overflow-hidden">
-				{@render output?.()}
-			</div>
-		</Resizable.Pane>
-	</Resizable.PaneGroup>
-</div>
+			</Resizable.Pane>
+		</Resizable.PaneGroup>
+	</div>
+{/snippet}

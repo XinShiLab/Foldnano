@@ -16,6 +16,7 @@ pnpm whats-new:draft  # draft About → What's New entries from add/feat/fix com
 pnpm test         # only suites affected by uncommitted changes (vitest --changed) — default inner loop
 pnpm test:branch  # only suites affected by this branch vs main — before pushing/PR
 pnpm test:all     # full suite (every spec) — final check / CI
+pnpm test:python  # pytest for the bundled Python plugin packages (uv; Python pinned in .python-version)
 pnpm test:unit    # vitest in watch mode
 
 # Lint — same scoping; the full run checks every file

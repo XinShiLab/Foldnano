@@ -29,7 +29,7 @@ _PROJECT_ROOT = pathlib.Path(__file__).parent.parent.parent.parent.parent.parent
 @pytest.fixture()
 def only_scaf_cadnano_json() -> str:
     """Return the 'only_scaf.json' cadnano fixture as a JSON string."""
-    fixture_path = _PROJECT_ROOT / "test_files" / "only_scaf.json"
+    fixture_path = _PROJECT_ROOT / "test_files" / "internal_cadnano_designs" / "only_scaf.json"
     return fixture_path.read_text(encoding="utf-8")
 
 

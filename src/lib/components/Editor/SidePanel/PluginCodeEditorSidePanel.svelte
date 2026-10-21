@@ -168,6 +168,16 @@
 	const saver = new EditorCodeSaver((code) =>
 		editorCtx.pluginCoordinator.persistEditorCode(pluginId, code)
 	);
+	const poppedOut = {
+		get: () => editorCtx.poppedOutPluginPanels.has(pluginId),
+		set: (next: boolean) => {
+			if (next) editorCtx.poppedOutPluginPanels.add(pluginId);
+			else editorCtx.poppedOutPluginPanels.delete(pluginId);
+		},
+	};
+	// Unmounted for good (plugin removed or disabled): its popup has closed with it.
+	$effect(() => () => poppedOut.set(false));
+
 	let lastSeenCode: string | null = null;
 	$effect(() => {
 		const code = plugin.sidePanelCode;
@@ -207,6 +217,7 @@
 	onRestoreDefaultScript={handleRestoreDefaultScript}
 	onDownload={handleDownload}
 	onCodeChange={(code) => (plugin.sidePanelCode = code)}
+	bind:poppedOut={poppedOut.get, poppedOut.set}
 >
 	{#snippet titleTail()}
 		{#if saver.state === 'error'}

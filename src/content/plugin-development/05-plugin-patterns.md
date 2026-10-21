@@ -72,6 +72,13 @@ def run(ctx: PluginContext) -> None:
     ctx.set_result_mutation_log(part.mutation_log)
 ```
 
+### Finding your way around the API
+
+Two generated references list the whole surface, so you don't need to memorise it:
+
+- **Type stubs** in the repository under `src/lib/plugin/python/stubs/`. `foldnano_mini/__init__.pyi` and `foldnano/__init__.pyi` each hold every public class, method and property of their package, with signatures and docstrings. Read them, give them to a coding agent, or point your type checker at that folder (`MYPYPATH`, or pyright's `stubPath`) to get completion and type errors in your own editor.
+- **Script Lab autocomplete**, which is built from the same data. See [Script Lab](/docs/guide/script-lab).
+
 ### Loading and the active region
 
 ```python

@@ -1,0 +1,14 @@
+diff --git a/dist/internal/utils/style.js b/dist/internal/utils/style.js
+index fba01d421d11eb642bf91fa5abc3cee69d6d3604..a327df371d03cff692941afeddc679fd90982480 100644
+--- a/dist/internal/utils/style.js
++++ b/dist/internal/utils/style.js
+@@ -27,7 +27,8 @@ export function getCursorStyle(state) {
+ export function resetGlobalCursorStyle() {
+     if (element === null)
+         return;
+-    document.head.removeChild(element);
++    // Patched: the element may live in another window's document (Script Lab pop-out).
++    element.remove();
+     currentState = null;
+     element = null;
+ }
