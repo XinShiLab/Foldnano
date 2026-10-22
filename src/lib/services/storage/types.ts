@@ -17,7 +17,8 @@ export type BackupReason =
 	| 'before_branch_reload'
 	| 'before_conflict_resolve'
 	| 'before_discard'
-	| 'before_restore';
+	| 'before_restore'
+	| 'before_repair';
 
 export type OverwriteBackupReason = Exclude<BackupReason, 'periodic'>;
 

@@ -1,10 +1,15 @@
 <script lang="ts">
+	import { page } from '$app/state';
+
+	import AskAiMenu from '$lib/components/docs/AskAiMenu.svelte';
+
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
 
 	// Uppercase alias so Svelte 5 treats it as a component reference in the template
 	const Content = $derived(data.content);
+	const [category, slug] = $derived(page.params.slug?.split('/') ?? []);
 
 	let articleEl = $state<HTMLElement | null>(null);
 	let tocItems = $state<{ id: string; text: string; level: number }[]>([]);
@@ -29,12 +34,17 @@
 </svelte:head>
 
 <div class="flex gap-8">
-	<article
-		bind:this={articleEl}
-		class="prose max-w-none min-w-0 flex-1 py-8 dark:prose-invert prose-headings:scroll-mt-20"
-	>
-		<Content />
-	</article>
+	<div class="min-w-0 flex-1 py-8">
+		<div class="float-right ml-4 print:hidden">
+			<AskAiMenu {category} {slug} />
+		</div>
+		<article
+			bind:this={articleEl}
+			class="prose max-w-none dark:prose-invert prose-headings:scroll-mt-20"
+		>
+			<Content />
+		</article>
+	</div>
 
 	{#if tocItems.length > 0}
 		<nav class="hidden w-48 shrink-0 xl:block print:hidden">

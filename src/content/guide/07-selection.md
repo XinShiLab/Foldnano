@@ -2,7 +2,7 @@
 title: Selection and Highlighting
 description: End-based selection, lattice and freeform selection, selection filters, and highlight/hide controls
 category: guide
-order: 6
+order: 7
 slug: selection
 ---
 

@@ -1,6 +1,7 @@
 import FoldnanoDocument from '$lib/model/document.svelte';
 import { DocumentFormatError } from '$lib/model/documentFormat';
 import type { BackupReason, LocalBackup } from '$lib/services/storage';
+import { toast } from 'svelte-sonner';
 
 export type DocumentLoadFailureReason = 'too-new' | 'malformed' | 'error';
 
@@ -10,6 +11,15 @@ export interface DocumentLoadFailure {
 	name: string | null;
 	message: string;
 	reason: DocumentLoadFailureReason;
+}
+
+/** Tells the user a design was repaired on load (`repairDocumentJson`); no-op when nothing was. */
+export function notifyDocumentRepairs(repairs: string[]): void {
+	if (repairs.length === 0) return;
+	console.warn('[documentRepair] Repaired the document on load:', repairs);
+	toast.warning('This design had inconsistencies from an earlier bug and was repaired.', {
+		description: repairs.join('\n'),
+	});
 }
 
 /** A backup as shown in the Backups dialog and on the recovery screen. */
@@ -36,6 +46,7 @@ export const BACKUP_REASON_LABELS: Record<BackupReason, string> = {
 	before_conflict_resolve: 'Before resolving a conflict',
 	before_discard: 'Before discarding local changes',
 	before_restore: 'Before restoring a backup',
+	before_repair: 'Before repairing on load',
 };
 
 export function describeLoadFailure(

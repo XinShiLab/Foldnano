@@ -31,6 +31,16 @@ import {
 	type RegionKind,
 } from '$lib/model/Part/DesignRegion';
 import { Plane, type PlaneVec3 } from '$lib/model/Part/Plane.svelte';
+import { MIRROR_EDIT_ERROR } from '$lib/model/Part/Part.svelte';
+import {
+	addRepeatInstance,
+	createRepeatGroup,
+	deleteRepeatGroup,
+	detachRepeatGroup,
+	removeRepeatInstance,
+	syncRepeatGroups,
+} from '$lib/model/Part/repeatGroups';
+import { InvalidOperationError } from '$lib/errors';
 import type { VirtualHelixFrame } from '$lib/model/geometry3d/dnaGeometry';
 
 // ---------------------------------------------------------------------------
@@ -62,7 +72,12 @@ export type MutationOp =
 	| ReorderVhOp
 	| TransformPlaneOp
 	| AddRegionAndPlaneOp
-	| SplitRegionOp;
+	| SplitRegionOp
+	| CreateRepeatGroupOp
+	| AddRepeatInstanceOp
+	| RemoveRepeatInstanceOp
+	| DetachRepeatGroupOp
+	| DeleteRepeatGroupOp;
 
 interface SetOligoColorOp {
 	op: 'set_oligo_color';
@@ -261,6 +276,38 @@ interface SplitRegionOp {
 	newRegionId: string;
 }
 
+interface CreateRepeatGroupOp {
+	op: 'create_repeat_group';
+	groupId: string;
+	instanceId: string;
+	name: string;
+	oligoIds: string[];
+	bpOffset: number;
+}
+
+interface AddRepeatInstanceOp {
+	op: 'add_repeat_instance';
+	groupId: string;
+	instanceId: string;
+	bpOffset: number;
+}
+
+interface RemoveRepeatInstanceOp {
+	op: 'remove_repeat_instance';
+	groupId: string;
+	instanceId: string;
+}
+
+interface DetachRepeatGroupOp {
+	op: 'detach_repeat_group';
+	groupId: string;
+}
+
+interface DeleteRepeatGroupOp {
+	op: 'delete_repeat_group';
+	groupId: string;
+}
+
 // ---------------------------------------------------------------------------
 // Lookup helpers
 // ---------------------------------------------------------------------------
@@ -328,6 +375,7 @@ export interface DispatchOptions {
  */
 export function dispatchOp(op: MutationOp, part: Part, options: DispatchOptions = {}): void {
 	const { activeRegionId } = options;
+	assertNotMirrorTarget(op, part);
 
 	switch (op.op) {
 		case 'set_oligo_color': {
@@ -645,6 +693,36 @@ export function dispatchOp(op: MutationOp, part: Part, options: DispatchOptions 
 			part.syncListRows();
 			return;
 		}
+		case 'create_repeat_group': {
+			const oligos = op.oligoIds.map((id) => findOligo(part, id));
+			for (const oligo of oligos) guardOligoInRegion(part, oligo, activeRegionId);
+			createRepeatGroup(part, oligos, op.bpOffset, {
+				groupId: op.groupId,
+				instanceId: op.instanceId,
+				name: op.name,
+			});
+			return;
+		}
+		case 'add_repeat_instance': {
+			guardRepeatGroupInRegion(part, op.groupId, activeRegionId);
+			addRepeatInstance(part, op.groupId, op.bpOffset, op.instanceId);
+			return;
+		}
+		case 'remove_repeat_instance': {
+			guardRepeatGroupInRegion(part, op.groupId, activeRegionId);
+			removeRepeatInstance(part, op.groupId, op.instanceId);
+			return;
+		}
+		case 'detach_repeat_group': {
+			guardRepeatGroupInRegion(part, op.groupId, activeRegionId);
+			detachRepeatGroup(part, op.groupId);
+			return;
+		}
+		case 'delete_repeat_group': {
+			guardRepeatGroupInRegion(part, op.groupId, activeRegionId);
+			deleteRepeatGroup(part, op.groupId);
+			return;
+		}
 		default: {
 			const _exhaustive: never = op;
 			throw new Error(`Unknown op kind: ${(_exhaustive as { op: string }).op}`);
@@ -653,8 +731,95 @@ export function dispatchOp(op: MutationOp, part: Part, options: DispatchOptions 
 }
 
 // ---------------------------------------------------------------------------
-// Region-scope guards
+// Log replay
 // ---------------------------------------------------------------------------
+
+const REPEAT_GROUP_OPS: ReadonlySet<MutationOp['op']> = new Set([
+	'create_repeat_group',
+	'add_repeat_instance',
+	'remove_repeat_instance',
+	'detach_repeat_group',
+	'delete_repeat_group',
+]);
+
+/** Ops that change an oligo's attributes or bases, never positions; mirrors can't fail to follow. */
+const ATTRIBUTE_OPS: ReadonlySet<MutationOp['op']> = new Set([
+	'set_oligo_color',
+	'set_oligo_name',
+	'set_oligo_is_scaffold',
+	'set_segment_modification',
+	'set_slot_sequence',
+]);
+
+/** A log op that failed on replay: its position in the log, and why. */
+export class MutationReplayError extends Error {
+	constructor(
+		readonly opIndex: number,
+		readonly op: MutationOp,
+		readonly reason: string
+	) {
+		super(`op ${opIndex} (${op.op}): ${reason}`);
+		this.name = 'MutationReplayError';
+	}
+}
+
+/**
+ * Replay a `foldnano_mini` mutation log onto `part`, op by op.
+ *
+ * Mirrors are re-synced after every op that can move them, because the Python side rebuilds
+ * them after each op too: a later op may use space a mirror just left. Attribute writes wait
+ * for the enclosing transaction's sync. The caller wraps this in `historyStack.snapshotTx`.
+ * Throws `MutationReplayError` naming the op that failed, including a mirror that couldn't
+ * be rebuilt after it.
+ */
+export function replayMutationLog(
+	part: Part,
+	log: readonly MutationOp[],
+	options: DispatchOptions = {}
+): void {
+	log.forEach((op, i) => {
+		try {
+			dispatchOp(op, part, options);
+			if (
+				REPEAT_GROUP_OPS.has(op.op) ||
+				(part.repeatGroups.length > 0 && !ATTRIBUTE_OPS.has(op.op))
+			) {
+				syncRepeatGroups(part);
+			}
+		} catch (err) {
+			throw new MutationReplayError(i, op, err instanceof Error ? err.message : String(err));
+		}
+	});
+}
+
+// ---------------------------------------------------------------------------
+// Mirror and region-scope guards
+// ---------------------------------------------------------------------------
+
+/** Mirrors are regenerated from their originals, never edited (docs/repeat-units.md). */
+function assertNotMirrorTarget(op: MutationOp, part: Part): void {
+	const targets: (Oligo | null | undefined)[] = [];
+	if ('oligoId' in op) targets.push(part.getOligoById(op.oligoId));
+	if ('segmentId' in op) targets.push(part.getSegmentById(op.segmentId)?.oligo);
+	if (op.op === 'connect') {
+		targets.push(part.getSegmentById(op.fromSegmentId)?.oligo);
+		targets.push(part.getSegmentById(op.toSegmentId)?.oligo);
+	}
+	if (targets.some((oligo) => oligo?.isMirror)) {
+		throw new InvalidOperationError(MIRROR_EDIT_ERROR);
+	}
+}
+
+function guardRepeatGroupInRegion(
+	part: Part,
+	groupId: string,
+	activeRegionId: string | null | undefined
+): void {
+	if (!activeRegionId) return;
+	for (const oligo of part.oligos) {
+		if (oligo.repeatGroupId === groupId) guardOligoInRegion(part, oligo, activeRegionId);
+	}
+}
 
 function guardVhInRegion(
 	part: Part,

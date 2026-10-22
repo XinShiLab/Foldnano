@@ -2,7 +2,7 @@
 title: Script Lab
 description: Write and run your own Python scripts against the open design, and apply their edits as one undoable step
 category: guide
-order: 13
+order: 14
 slug: script-lab
 ---
 

@@ -5,6 +5,7 @@ covers:
   - src/lib/components/Editor/ErrorLogDialog.svelte
   - src/lib/components/Editor/DocumentRecoveryScreen.svelte
   - src/lib/components/Editor/context/documentRecovery.ts
+  - src/lib/model/documentRepair.ts
 ---
 
 # Storage Architecture
@@ -245,6 +246,26 @@ is kept for a missing snapshot. The screen offers:
 
 `loadFailure` is cleared at the start of every local load.
 
+### Repair on load
+
+`repairDocumentJson()` (`src/lib/model/documentRepair.ts`) runs on the migrated JSON wherever a
+document enters the editor: local load, file import (`foldnanojsonParser`), open from GitHub and
+pull. It restores the oligo ↔ strandSet invariants that an earlier undo bug could break, and
+returns the fixed snapshot plus one line per kind of fix:
+
+- strandSet ids no oligo owns are dropped (they kept "empty" VHs from being deleted)
+- owned segments missing from their VH, or listed in the wrong strand, are re-listed
+- segments on a VH that no longer exists are dropped, and so are second claims on one segment id
+- crossover links that aren't reciprocal within one oligo are cleared, then any oligo that is no
+  longer one connected piece is split (the first piece keeps the id; split-off pieces lose
+  repeat-group membership)
+
+A consistent document passes through as the same object. When something was fixed,
+`notifyDocumentRepairs()` shows a warning toast, and `EditorDocumentSession.#persistRepair()` writes
+the repaired copy back (owner tab only). A local load saves with a `before_repair` backup so the
+unrepaired copy stays restorable. Open and pull write the GitHub version first, as usual, then the
+repair as a newer local save, so the repair shows up as a local change to commit.
+
 Snapshots handed back to IndexedDB must be plain objects: a Svelte `$state` proxy fails the write
 with `DataCloneError`. The recovery screen and Backups dialog keep their lists in `$state.raw`,
 and `restoreBackup()` also unwraps with `$state.snapshot()`.
@@ -323,7 +344,7 @@ transaction as the write that replaces the copy:
 - **overwrite reasons** (`SaveDocumentOptions.backup`): always, when a write replaces the user's
   copy: `before_pull`, `before_accept_remote`, `before_branch_reload`, `before_conflict_resolve`
   (diff dialog _Apply resolved JSON_, `applyResolvedConflict()`), `before_discard`,
-  `before_restore`. Because the newest backup's time restarts the 10-minute clock, an overwrite
+  `before_restore`, `before_repair` (load-time repair, see § Repair on load). Because the newest backup's time restarts the 10-minute clock, an overwrite
   also delays the next periodic backup
 
 `createdAt` is when the backup was taken (the moment that version was replaced) and is strictly
@@ -374,6 +395,7 @@ If the deleted document is the currently open document, the editor resets to a f
 - **Don't overwrite a user's copy without a `backup` option.** Any write that replaces the stored snapshot with something the user didn't just author (remote content, a backup, a resolved conflict) passes `SaveDocumentOptions.backup` with a reason, so the replaced copy is kept in the same transaction. Don't reintroduce a separate "create backup, then overwrite" step.
 - **Don't await-skip GitHub SHA / `lastSyncAt` writes in sync flows.** Await `setFileMetadata` / `stampSyncTime` / `stampCommitSha` in commit, pull, open and discard paths.
 - **Validate remote JSON before persisting it.** Any path that writes fetched JSON into the working copy must run `migrateDocumentJson()` first, or a file from a newer app can replace the user's local copy before `fromJSON` refuses it.
+- **Don't call `repairDocumentJson()` inside `FoldnanoDocument.fromJSON()`.** `doc.restore`, undo snapshots and `verifyHistoryEntry` all load through `fromJSON`; repairing there would hide the next history bug instead of failing its round-trip check. Repair only at the entry points listed in § Repair on load.
 - **Document snapshots are plain objects.** Don't pre-stringify them on the working-copy path. Stringification is reserved for GitHub commits and exports.
 - **Don't add a new IndexedDB table without bumping the Dexie version.** Schema changes require a `db.version(N).stores({...})` step plus, if needed, a migration entry in the `migrations` table.
 

@@ -137,12 +137,19 @@ class MutableRegion:
         topo = self._part._topology()
         targets: list[tuple[str, int]] = []
         seen: set[tuple[int, int]] = set()
+        # A mirror's skips follow its original, so only originals and ordinary strands are cleared.
+        mirror_oligos = {o["id"] for o in self._part._raw.get("oligos", []) if o.get("mirrorOf")}
         for vh in self.virtual_helices:
             for ss in (0, 1):
                 for _, _, seg_id in topo.intervals(vh.index, ss):
+                    if topo.segment(seg_id).oligo_id in mirror_oligos:
+                        continue
                     for slot in topo.raw_segment(seg_id).get("slots", []):
                         bp = int(slot["bpIndex"])
                         # One op clears both strands, so visit each bp once.
+                        comp_id = topo.segment_at(vh.index, 1 - ss, bp)
+                        if comp_id is not None and topo.segment(comp_id).oligo_id in mirror_oligos:
+                            continue
                         if (vh.index, bp) not in seen and slot_kind(topo.raw_segment(seg_id), bp) == kind:
                             seen.add((vh.index, bp))
                             targets.append((seg_id, bp))

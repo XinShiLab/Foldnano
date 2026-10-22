@@ -12,7 +12,7 @@ from . import invariants, mutations as M
 from .lattice import CrossoverSite
 
 if TYPE_CHECKING:
-    from .oligo import MutableSegment
+    from .oligo import MutableSegment, SegmentView
     from .part import MutablePart
 
 
@@ -45,7 +45,7 @@ class MutableStrandSet:
         return [seg_id for _, _, seg_id in self._intervals()]
 
     @property
-    def segments(self) -> list["MutableSegment"]:
+    def segments(self) -> list["MutableSegment | SegmentView"]:
         """This strand's segments, sorted by their low bp."""
         return [self._part._segment_proxy(seg_id) for seg_id in self.segment_ids]
 
@@ -56,7 +56,7 @@ class MutableStrandSet:
     def is_index_occupied(self, bp_index: int) -> bool:
         return self.is_index_occupied_by(bp_index) is not None
 
-    def is_index_occupied_by(self, bp_index: int) -> "MutableSegment | None":
+    def is_index_occupied_by(self, bp_index: int) -> "MutableSegment | SegmentView | None":
         """The segment covering ``bp_index`` on this strand, or ``None``."""
         seg_id = self._part._topology().segment_at(self._vh_index, self._strand_index, bp_index)
         return self._part._segment_proxy(seg_id) if seg_id else None
@@ -65,7 +65,7 @@ class MutableStrandSet:
         """True when any segment overlaps the inclusive range (either order)."""
         return bool(self.segments_in_range(start_index, end_index))
 
-    def segments_in_range(self, start_index: int, end_index: int) -> list["MutableSegment"]:
+    def segments_in_range(self, start_index: int, end_index: int) -> list["MutableSegment | SegmentView"]:
         """Segments overlapping the inclusive range (either order), sorted by low bp."""
         ids = self._part._topology().segments_overlapping(
             self._vh_index, self._strand_index, start_index, end_index
@@ -195,12 +195,12 @@ class MutableVirtualHelix:
         """``[strand set 0, strand set 1]`` — see :class:`MutableStrandSet`."""
         return [MutableStrandSet(self._part, self._index, i) for i in (0, 1)]
 
-    def segments_at(self, bp_index: int, strand_index: int | None = None) -> list["MutableSegment"]:
+    def segments_at(self, bp_index: int, strand_index: int | None = None) -> list["MutableSegment | SegmentView"]:
         """Segments covering ``bp_index`` — on one strand set, or both (strand 0 first)."""
         strands = (0, 1) if strand_index is None else (strand_index,)
         for ss in strands:
             invariants.validate_strand_set_index(ss)
-        out: list["MutableSegment"] = []
+        out: list["MutableSegment | SegmentView"] = []
         for ss in strands:
             seg = self.strand_sets[ss].is_index_occupied_by(bp_index)
             if seg is not None:

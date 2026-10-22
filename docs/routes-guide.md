@@ -151,7 +151,7 @@ editor and drop the in-memory design.
 
 ## Access gate
 
-`/`, `/docs`, `/editor`, `/oligos` and the `llms*.txt` routes sit behind an optional beta access
+`/`, `/docs`, `/editor`, `/oligos` and the doc text routes (`llms*.txt`, per-page `.md`, `/docs/search-index.json`; see `doc-site.md`) sit behind an optional beta access
 gate. Every check goes through `hasAlphaAccess` (`src/lib/server/alphaAccess.ts`): page loads
 via `alphaAccessLoad`, which feeds `AlphaAccessGate`, and the text routes directly. The switch is
 the `ALPHA_ACCESS_CODE` environment variable: unset or empty opens the app to everyone (the

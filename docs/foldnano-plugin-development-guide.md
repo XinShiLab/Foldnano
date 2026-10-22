@@ -539,7 +539,9 @@ part = load_part(json_str, active_region_id=None)  # -> MutablePart
 part.regions             # list[MutableRegion]   — LatticedRegion | FreeformRegion
 part.planes              # list[MutablePlane]
 part.virtual_helices     # list[MutableVirtualHelix]
-part.oligos              # list[MutableOligo]
+part.oligos              # list[MutableOligo | MirrorOligo] — mirrors are read-only copies
+part.real_oligos         # list[MutableOligo] — every oligo except mirrors (Part.realOligos)
+part.repeat_groups       # list[MutableRepeatGroup]
 part.active_region       # MutableRegion | None
 part.mutation_log        # list[dict] — JSON-serialisable op records
 part.lattice_type        # 'HONEYCOMB' | 'SQUARE' | 'FREEFORM' (from first region)
@@ -547,7 +549,8 @@ part.max_base            # int
 
 part.get_region(id)      # -> MutableRegion | None
 part.get_vh(index)       # -> MutableVirtualHelix | None
-part.get_oligo(id)       # -> MutableOligo | None
+part.get_oligo(id)       # -> MutableOligo | MirrorOligo | None
+part.get_repeat_group(id) # -> MutableRepeatGroup | None
 part.oligos_in_region(region_id)
 part.vhs_in_region(region_id)
 
@@ -559,6 +562,7 @@ part.break_oligo(seg, at_index)       # -> MutableOligo holding the 3' side
 part.remove_oligo(oligo)
 part.remove_segment(seg)              # -> MutableOligo split off downstream, or None
 part.fill_empty_strand_set(vh, strand_index)  # -> MutableSegment over the whole strand
+part.create_repeat_group([oligo, ...], bp_offset)  # -> MutableRepeatGroup (see Repeat groups)
 
 # Editor-level edits (named after the host Part methods / commands)
 part.get_segment_at(vh, strand_index, bp)     # hit test -> MutableSegment | None
@@ -585,6 +589,7 @@ part.can_connect(seg_from, seg_to)
 part.can_break_oligo(seg, at_index), part.can_break_at(vh, strand_index, bp)
 part.can_connect_oligos(a, b), part.can_create_crossover(...), part.can_make_crossover(...)
 part.can_fill_empty_strand_set(vh, strand_index)
+part.can_create_repeat_group([oligo, ...], bp_offset)
 part.potential_xover_sites(vh)        # [strand 0 sites, strand 1 sites]
 ```
 
@@ -641,6 +646,16 @@ part.potential_xover_sites(vh)        # [strand 0 sites, strand 1 sites]
 | `part.set_plane_transform(plane_id, origin, u, v, normal)` | `transform_plane`      |
 | `part.add_region(kind, name, max_base, ...)`               | `add_region_and_plane` |
 | `part.split_region(region_id, split_after_vh_id)`          | `split_region`         |
+
+**Repeat group ops**
+
+| Method call                             | Op kind                  |
+| --------------------------------------- | ------------------------ |
+| `part.create_repeat_group(oligos, off)` | `create_repeat_group`    |
+| `group.add_instance(off)`               | `add_repeat_instance`    |
+| `group.remove_instance(instance)`       | `remove_repeat_instance` |
+| `group.detach()`                        | `detach_repeat_group`    |
+| `group.delete()`                        | `delete_repeat_group`    |
 
 The full op vocabulary is `KNOWN_OPS` in `foldnano_mini/mutations.py`.
 
@@ -792,8 +807,8 @@ consecutive adjacent entries) when you mean a crossover.
 path is validated first (bounds, occupancy, entries overlapping each other, junctions on a
 skip/insertion), so an invalid path raises before anything is logged. It emits
 `create_segment` × n + `connect` × (n − 1) (+1 with `circular=True`); color, name and scaffold
-flag land on the resulting oligo. Repeat-group mirror oligos aren't predicted: they count as
-ordinary oligos at their current positions.
+flag land on the resulting oligo. Repeat-group mirror oligos count as ordinary oligos at their
+current positions.
 
 **`MutableRegion` (LatticedRegion and FreeformRegion)**
 
@@ -830,6 +845,45 @@ plane.normal  # dict with x, y, z — normal vector
 ```
 
 Access planes via `part.planes` (list of `MutablePlane`) or `part.set_plane_transform(plane_id, ...)`.
+
+### Repeat groups and mirror oligos
+
+A repeat group (the editor's **Duplicate as linked mirror copies**) is a set of originals copied
+at each instance's bp offset along the same VHs. The copies, **mirror oligos**, are regenerated
+from their originals, never edited (`docs/repeat-units.md`). `foldnano_mini` rebuilds them in
+Python after every op, the same way the host does when it replays the log, so `part.oligos` and
+the occupancy queries always show where the mirrors are now.
+
+```python
+group = part.create_repeat_group([a, b], 21)    # mirrors built immediately
+group.add_instance(42)                          # -> RepeatInstance(id, bp_offset)
+group.can_add_instance(63)                      # Check, e.g. "Copy 3 of Repeat 1: ..."
+group.instances, group.originals, group.mirrors, group.mirrors_of(instance)
+group.remove_instance(instance)                 # removing the last one deletes the group
+group.detach()                                  # mirrors become ordinary, editable oligos
+group.delete()                                  # mirrors removed, originals kept
+
+a.repeat_group                                  # MutableRepeatGroup | None (originals only)
+mirror.is_mirror                                # True
+mirror.mirror_of                                # MirrorInfo(group, instance, source)
+mirror.source                                   # the original, as a MutableOligo
+```
+
+- **Mirrors are read-only.** They come back as `MirrorOligo`, and their segments, ends and slots
+  as `SegmentView` / `SegmentEndView` / `SlotView`: the same reads as the mutable proxies, no
+  setters or edit methods. Writing to one raises `InvalidOperationError` ("Mirror oligos can't be
+  edited. Edit the original instead."), as does any edit that would change one indirectly, such
+  as a skip on the strand opposite a mirror. Iterate `part.real_oligos` when editing every oligo.
+- **Edits to an original follow to its mirrors.** Color, name, scaffold flag, modifications and
+  bases are copied over at once; any other edit (moving an end, connecting, breaking, skips)
+  rebuilds them. If a rebuilt copy can't be placed (it would overlap a strand, lose a lattice
+  crossover site, or leave a skip unpaired), the edit raises "Copy N of Repeat M: ..." and is
+  neither applied nor logged. The matching `can_*` check predicts it.
+- **Membership follows the host:** both halves of a broken original stay in the group,
+  connecting an ordinary oligo to an original pulls it into the group, and two groups can't be
+  joined.
+- **Mirror ids** are `<source id>@<instance id>` in Python, stable across rebuilds. The host gives
+  its mirrors its own ids, so don't carry a mirror id out of the run.
 
 ### Identifiers
 
@@ -961,6 +1015,10 @@ Reference test files:
   included. Every entity the host creates during an op must take its id from the op
   (`break_oligo.newSegmentId`, `remove_segment.newOligoId`, ...). Regenerate with
   `UPDATE_FOLDNANO_MINI_REPLAY=1 pnpm test:python`.
+- `tests/test_foldnano_mini_repeat.py` — repeat groups: mirror rebuilds, read-only mirrors, group
+  ops. Its scenario writes `tests/fixtures/foldnano_mini_repeat_replay.golden.json`, which
+  `src/lib/plugin/foldnanoMiniRepeatReplay.spec.ts` replays on the real `Part` (mirrors compared by
+  source and instance). Regenerate with `UPDATE_FOLDNANO_MINI_REPEAT=1 pnpm test:python`.
 - `tests/test_foldnano_regions.py` — Plane / DesignRegion proxy surface.
 
 ### All-ops example script
@@ -972,7 +1030,7 @@ cd src/lib/plugin/python
 python example_all_ops.py
 ```
 
-It uses `assert` statements and prints `ok: <description>` for each op, then finishes with a self-consistency replay check. All 24 KNOWN_OPS must appear in the log. This script is the authoritative reference for the full API surface.
+It uses `assert` statements and prints `ok: <description>` for each op, then finishes with a self-consistency replay check. Every op kind in `KNOWN_OPS` must appear in the log. This script is the authoritative reference for the full API surface.
 
 > **Note:** This script runs in CPython against the offline transport. It is not a ScriptLab script — it imports `foldnano_mini` directly and embeds fixture JSON inline. See [ScriptLab Full API Demo](#scriptlab-full-api-demo) for the in-browser equivalent.
 
@@ -998,7 +1056,7 @@ The template ends with `ctx.set_result_mutation_log(part.mutation_log)` so you c
 
 ### What is _not_ covered offline
 
-- Host rules the `can_*` checks don't model: repeat-group (mirror oligo) restrictions and `replayMutationLogInRegion`'s active-region scope.
+- Host rules the `can_*` checks don't model: `replayMutationLogInRegion`'s active-region scope.
 - 3D / view-side regressions.
 - Cross-plugin interactions in the editor.
 

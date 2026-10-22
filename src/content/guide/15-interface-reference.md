@@ -2,7 +2,7 @@
 title: Interface Reference
 description: Every toolbar button, menu, panel, and status indicator in the Foldnano editor, area by area
 category: guide
-order: 14
+order: 15
 slug: interface-reference
 ---
 

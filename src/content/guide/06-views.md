@@ -2,7 +2,7 @@
 title: Views And Regions
 description: Plane, helix/freeform, strand, and 3D views, including multi-region workflows
 category: guide
-order: 5
+order: 6
 slug: views
 ---
 

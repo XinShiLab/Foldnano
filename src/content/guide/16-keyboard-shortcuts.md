@@ -2,7 +2,7 @@
 title: Keyboard Shortcuts
 description: Complete keyboard shortcut reference for the Foldnano editor
 category: guide
-order: 15
+order: 16
 slug: keyboard-shortcuts
 ---
 

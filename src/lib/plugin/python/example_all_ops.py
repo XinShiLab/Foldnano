@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-example_all_ops.py — exercises every foldnano_mini op kind exactly once.
+example_all_ops.py — exercises every foldnano_mini op kind at least once.
 
 Run from src/lib/plugin/python/:
     python example_all_ops.py
@@ -24,7 +24,7 @@ _PLUGIN_DIR = pathlib.Path(__file__).resolve().parent
 if str(_PLUGIN_DIR) not in sys.path:
     sys.path.insert(0, str(_PLUGIN_DIR))
 
-from foldnano_mini import FreeformRegion, LatticedRegion, load_part  # noqa: E402
+from foldnano_mini import FreeformRegion, InvalidOperationError, LatticedRegion, load_part  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Fixture — same JSON as tests/fixtures/multi_region_part.foldnano.json
@@ -590,6 +590,57 @@ assert len(part.virtual_helices) == n_vhs_before - 1
 assert new_free_vh_id not in part.get_region("region-free").vh_order
 ok("VH count after remove", len(part.virtual_helices))
 ok("new_free_vh gone from region-free", new_free_vh_id not in part.get_region("region-free").vh_order)
+
+# ───────────────────────────────────────────────────────────────────────────
+# GROUP 12 — Repeat groups (linked mirror copies)
+# ───────────────────────────────────────────────────────────────────────────
+
+sep("Op 27 — create_repeat_group  (a short strand copied one step along its VH)")
+square = part.get_region("region-square")
+lo, hi = next(
+    r
+    for vh in square.virtual_helices
+    for r in vh.strand_sets[0].free_ranges()
+    if r[1] - r[0] >= 5
+)
+square_vh = next(vh for vh in square.virtual_helices if (lo, hi) in vh.strand_sets[0].free_ranges())
+unit = part.create_oligo([(square_vh, lo, lo + 5)], color="#336699", name="unit")
+offset = next(
+    k * square.step for k in range(1, 6) if part.can_create_repeat_group([unit], k * square.step)
+)
+group = part.create_repeat_group([unit], offset)
+[mirror] = group.mirrors
+assert mirror.is_mirror and mirror.mirror_of.source == unit
+ok("mirror built at", [(s.vh_index, s.five_index, s.three_index) for s in mirror.segments])
+try:
+    mirror.color = "#ff0000"
+    raise AssertionError("a mirror must be read-only")
+except InvalidOperationError as exc:
+    ok("mirror write refused", str(exc).split(" (")[0])
+unit.color = "#663399"
+ok("edit on the original reaches its mirror", mirror.color)
+
+sep("Op 28 — add_repeat_instance  (a second copy)")
+second = group.add_instance(next(
+    k * square.step for k in range(2, 8) if k * square.step != offset and group.can_add_instance(k * square.step)
+))
+ok("instances", [i.bp_offset for i in group.instances])
+
+sep("Op 29 — remove_repeat_instance")
+group.remove_instance(second)
+ok("instances", [i.bp_offset for i in group.instances])
+
+sep("Op 30 — detach_repeat_group  (mirrors become ordinary oligos)")
+group.detach()
+freed = part.get_oligo(mirror.id)
+assert not freed.is_mirror and part.repeat_groups == []
+ok("detached copy is editable", type(freed).__name__)
+
+sep("Op 31 — delete_repeat_group  (mirrors removed, originals kept)")
+group = part.create_repeat_group([unit], -offset if part.can_create_repeat_group([unit], -offset) else 2 * offset)
+group.delete()
+assert part.repeat_groups == [] and not any(o.is_mirror for o in part.oligos)
+ok("groups left", len(part.repeat_groups))
 
 # ───────────────────────────────────────────────────────────────────────────
 # Final summary

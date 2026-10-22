@@ -21,7 +21,7 @@ import type { HistoryStack } from '$lib/commands/history.svelte';
 import type { VStrandJSON } from '$lib/model/io/cadnanoJSON';
 import type { Part } from '$lib/model/Part';
 import { LatticedDesignRegion } from '$lib/model/Part/DesignRegion';
-import { dispatchOp, type MutationOp } from './opDispatch';
+import { MutationReplayError, replayMutationLog, type MutationOp } from './opDispatch';
 import {
 	performReplaceRegion,
 	performReplaceRegionKeepAnnotations,
@@ -184,16 +184,13 @@ function applyReplayMutationLog(
 	}
 
 	historyStack.snapshotTx(`Plugin: ${manifest.name}`, () => {
-		for (let i = 0; i < log.length; i++) {
-			const op = log[i];
-			try {
-				dispatchOp(op, part, { activeRegionId });
-			} catch (err) {
-				const reason = err instanceof Error ? err.message : String(err);
-				throw new Error(
-					`Plugin "${manifest.name}" mutation-log replay failed at op ${i} (${op.op}): ${reason}`
-				);
-			}
+		try {
+			replayMutationLog(part, log, { activeRegionId });
+		} catch (err) {
+			if (!(err instanceof MutationReplayError)) throw err;
+			throw new Error(
+				`Plugin "${manifest.name}" mutation-log replay failed at op ${err.opIndex} (${err.op.op}): ${err.reason}`
+			);
 		}
 		part.rebuildRspCaches();
 	});

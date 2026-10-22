@@ -140,6 +140,9 @@ def class_members(info: ClassInfo) -> list[dict]:
         if any(d.endswith(".setter") for d in decs):
             if stmt.name in members:
                 members[stmt.name]["settable"] = True
+            else:
+                # `@Base.prop.setter` in a subclass: settable here, typed by the base (see flattened).
+                members[stmt.name] = {"name": stmt.name, "kind": "property", "settable": True, "inherit": True}
             continue
         doc = first_paragraph(ast.get_docstring(stmt))
         returns = norm_type(ast.unparse(stmt.returns)) if stmt.returns else None
@@ -373,11 +376,17 @@ def build_index(packages: list[dict]) -> dict:
     def flattened(name: str, stack: tuple[str, ...] = ()) -> list[dict]:
         cls = classes[name]
         own = {m["name"] for m in cls["members"]}
-        inherited = []
+        from_bases = []
         for base in cls["bases"]:
             if base in classes and base not in stack:
-                inherited += [m for m in flattened(base, stack + (name,)) if m["name"] not in own]
-        return cls["members"] + inherited
+                from_bases += flattened(base, stack + (name,))
+        members = []
+        for m in cls["members"]:
+            if m.pop("inherit", False):
+                base_member = next((b for b in from_bases if b["name"] == m["name"]), {})
+                m = {**base_member, **m}
+            members.append(m)
+        return members + [m for m in from_bases if m["name"] not in own]
 
     for name in classes:
         classes[name]["members"] = flattened(name)

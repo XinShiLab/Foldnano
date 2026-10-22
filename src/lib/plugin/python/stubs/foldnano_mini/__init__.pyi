@@ -24,7 +24,7 @@ Example::
 
 from __future__ import annotations
 
-from typing import Any, NamedTuple, Protocol, Sequence
+from typing import Any, Callable, Iterable, NamedTuple, Protocol, Sequence
 
 __all__ = [
     "load_part",
@@ -39,6 +39,15 @@ __all__ = [
     "MutableSegment",
     "MutableSegmentEnd",
     "MutableSlot",
+    "MirrorOligo",
+    "OligoView",
+    "SegmentView",
+    "SegmentEndView",
+    "SlotView",
+    "MutableRepeatGroup",
+    "RepeatInstance",
+    "MirrorInfo",
+    "MIRROR_EDIT_ERROR",
     "SegmentSpec",
     "CrossoverSite",
     "Check",
@@ -48,6 +57,8 @@ __all__ = [
     "Transport",
     "OfflineTransport",
 ]
+
+MIRROR_EDIT_ERROR: Any
 
 KNOWN_OPS: frozenset[str]
 
@@ -64,6 +75,10 @@ def load_part(json_str: str, active_region_id: str | None=None) -> MutablePart:
         Optional UUID of the region the host considered "active" when the
         plugin was launched. Region-scoped plugins should respect this.
     """
+
+
+class _ReadOnly:
+    """Refuses attribute writes on views, so a write to a mirror says why."""
 
 
 class _PlannedSegment(NamedTuple):
@@ -135,13 +150,47 @@ class MutablePart:
     def planes(self) -> list[MutablePlane]: ...
 
     @property
-    def oligos(self) -> list[MutableOligo]: ...
+    def oligos(self) -> list[MutableOligo | MirrorOligo]:
+        """
+        Every oligo, including repeat groups' read-only mirror oligos. Use
+        :attr:`real_oligos` for the ones you can edit.
+        """
+
+    @property
+    def real_oligos(self) -> list[MutableOligo]:
+        """
+        Every oligo except mirror oligos (the host's ``Part.realOligos``): what the
+        oligo list and exports show.
+        """
+
+    @property
+    def repeat_groups(self) -> list[MutableRepeatGroup]: ...
+
+    def get_repeat_group(self, group_id: str) -> MutableRepeatGroup | None: ...
+
+    def create_repeat_group(self, oligos: Sequence[MutableOligo], bp_offset: int) -> MutableRepeatGroup:
+        """
+        Make ``oligos`` the originals of a new repeat group with one copy ``bp_offset``
+        bp along the same VHs (the editor's "Duplicate as linked mirror copies").
+
+        The copy's mirror oligos are built immediately and rebuilt after every later edit
+        to an original; a region the copy runs past grows. Add more copies with
+        ``group.add_instance``. Raises ``InvalidOperationError`` when
+        :meth:`can_create_repeat_group` refuses it.
+        """
+
+    def can_create_repeat_group(self, oligos: Sequence[MutableOligo], bp_offset: int) -> Check:
+        """
+        Whether :meth:`create_repeat_group` accepts this: at least one oligo, none a
+        mirror or already in a group, and the copy placeable (no overlap, crossovers on
+        matching lattice sites, skips/insertions paired).
+        """
 
     def get_region(self, region_id: str) -> MutableRegion | None: ...
 
     def get_vh(self, index: int) -> MutableVirtualHelix | None: ...
 
-    def get_oligo(self, oligo_id: str) -> MutableOligo | None: ...
+    def get_oligo(self, oligo_id: str) -> MutableOligo | MirrorOligo | None: ...
 
     def potential_xover_sites(self, vh: MutableVirtualHelix | int) -> list[list[CrossoverSite]]:
         """
@@ -151,8 +200,11 @@ class MutablePart:
 
     def vhs_in_region(self, region_id: str) -> list[MutableVirtualHelix]: ...
 
-    def oligos_in_region(self, region_id: str) -> list[MutableOligo]:
-        """Oligos whose every segment lives in ``region_id`` (cross-region oligos excluded)."""
+    def oligos_in_region(self, region_id: str) -> list[MutableOligo | MirrorOligo]:
+        """
+        Oligos whose every segment lives in ``region_id`` (cross-region oligos excluded),
+        mirror oligos included.
+        """
 
     def create_segment(self, vh: MutableVirtualHelix | int, five_index: int, three_index: int, color: str='#888888', is_scaffold: bool=False, name: str | None=None) -> MutableSegment:
         """
@@ -566,7 +618,7 @@ class MutableVirtualHelix:
     def strand_sets(self) -> list[MutableStrandSet]:
         """``[strand set 0, strand set 1]`` — see :class:`MutableStrandSet`."""
 
-    def segments_at(self, bp_index: int, strand_index: int | None=None) -> list['MutableSegment']:
+    def segments_at(self, bp_index: int, strand_index: int | None=None) -> list['MutableSegment | SegmentView']:
         """Segments covering ``bp_index`` — on one strand set, or both (strand 0 first)."""
 
     def potential_xover_sites(self, strand_index: int) -> list[CrossoverSite]:
@@ -605,7 +657,7 @@ class MutableStrandSet:
         """Ids of this strand's segments, sorted by their low bp."""
 
     @property
-    def segments(self) -> list['MutableSegment']:
+    def segments(self) -> list['MutableSegment | SegmentView']:
         """This strand's segments, sorted by their low bp."""
 
     @property
@@ -613,13 +665,13 @@ class MutableStrandSet:
 
     def is_index_occupied(self, bp_index: int) -> bool: ...
 
-    def is_index_occupied_by(self, bp_index: int) -> 'MutableSegment | None':
+    def is_index_occupied_by(self, bp_index: int) -> 'MutableSegment | SegmentView | None':
         """The segment covering ``bp_index`` on this strand, or ``None``."""
 
     def is_range_occupied(self, start_index: int, end_index: int) -> bool:
         """True when any segment overlaps the inclusive range (either order)."""
 
-    def segments_in_range(self, start_index: int, end_index: int) -> list['MutableSegment']:
+    def segments_in_range(self, start_index: int, end_index: int) -> list['MutableSegment | SegmentView']:
         """Segments overlapping the inclusive range (either order), sorted by low bp."""
 
     def free_ranges(self) -> list[tuple[int, int]]:
@@ -629,7 +681,11 @@ class MutableStrandSet:
         """
 
 
-class MutableOligo:
+class OligoView(_ReadOnly):
+    """
+    A strand of linked segments (read-only). See :class:`MutableOligo` and
+    :class:`MirrorOligo`.
+    """
     def __init__(self, part: 'MutablePart', oligo_id: str) -> None: ...
 
     @property
@@ -638,20 +694,11 @@ class MutableOligo:
     @property
     def color(self) -> str: ...
 
-    @color.setter
-    def color(self, value: str) -> None: ...
-
     @property
     def name(self) -> str | None: ...
 
-    @name.setter
-    def name(self, value: str | None) -> None: ...
-
     @property
     def is_scaffold(self) -> bool: ...
-
-    @is_scaffold.setter
-    def is_scaffold(self, value: bool) -> None: ...
 
     @property
     def is_sequence_locked(self) -> bool: ...
@@ -659,6 +706,66 @@ class MutableOligo:
     @property
     def is_circular(self) -> bool:
         """True if every segment's 3′ end is connected to another segment in this oligo."""
+
+    @property
+    def segments(self) -> list[SegmentView]: ...
+
+    @property
+    def five_prime(self) -> SegmentEndView | None:
+        """The oligo's free 5′ end, or ``None`` for a circular oligo."""
+
+    @property
+    def three_prime(self) -> SegmentEndView | None:
+        """The oligo's free 3′ end, or ``None`` for a circular oligo."""
+
+    def get_segment(self, segment_id: str) -> SegmentView | None: ...
+
+    @property
+    def five_modification(self) -> str | None:
+        """Modification on the oligo's free 5′ end (``None`` when unset or circular)."""
+
+    @property
+    def three_modification(self) -> str | None:
+        """Modification on the oligo's free 3′ end (``None`` when unset or circular)."""
+
+    def touches_regions(self) -> set[str]:
+        """Set of region IDs this oligo's segments visit (cross-region detection)."""
+
+    @property
+    def is_mirror(self) -> bool:
+        """True for a mirror oligo: a read-only copy of a repeat group's original."""
+
+    @property
+    def mirror_of(self) -> 'MirrorInfo | None':
+        """For a mirror: its ``(group, instance, source)``; ``None`` otherwise."""
+
+    @property
+    def repeat_group(self) -> 'MutableRepeatGroup | None':
+        """
+        The repeat group this oligo is an original of (``None`` for mirrors and
+        ordinary oligos; a mirror's group is ``mirror_of.group``).
+        """
+
+
+class MutableOligo(OligoView):
+    """A strand of linked segments: an ordinary oligo or a repeat group's original."""
+    @OligoView.color.setter
+    def color(self, value: str) -> None: ...
+
+    @OligoView.name.setter
+    def name(self, value: str | None) -> None: ...
+
+    @OligoView.is_scaffold.setter
+    def is_scaffold(self, value: bool) -> None: ...
+
+    @OligoView.five_modification.setter
+    def five_modification(self, value: str | None) -> None: ...
+
+    @OligoView.three_modification.setter
+    def three_modification(self, value: str | None) -> None: ...
+
+    def remove(self) -> None:
+        """Same as ``part.remove_oligo(oligo)``."""
 
     @property
     def segments(self) -> list[MutableSegment]: ...
@@ -673,28 +780,9 @@ class MutableOligo:
 
     def get_segment(self, segment_id: str) -> MutableSegment | None: ...
 
-    def remove(self) -> None:
-        """Same as ``part.remove_oligo(oligo)``."""
 
-    @property
-    def five_modification(self) -> str | None:
-        """Modification on the oligo's free 5′ end (``None`` when unset or circular)."""
-
-    @five_modification.setter
-    def five_modification(self, value: str | None) -> None: ...
-
-    @property
-    def three_modification(self) -> str | None:
-        """Modification on the oligo's free 3′ end (``None`` when unset or circular)."""
-
-    @three_modification.setter
-    def three_modification(self, value: str | None) -> None: ...
-
-    def touches_regions(self) -> set[str]:
-        """Set of region IDs this oligo's segments visit (cross-region detection)."""
-
-
-class MutableSegment:
+class SegmentView(_ReadOnly):
+    """A stretch of one strand of one VH, part of an oligo (read-only)."""
     def __init__(self, part: 'MutablePart', oligo_id: str, segment_id: str) -> None: ...
 
     @property
@@ -716,10 +804,10 @@ class MutableSegment:
     def length(self) -> int: ...
 
     @property
-    def five_prime(self) -> MutableSegmentEnd: ...
+    def five_prime(self) -> SegmentEndView: ...
 
     @property
-    def three_prime(self) -> MutableSegmentEnd: ...
+    def three_prime(self) -> SegmentEndView: ...
 
     @property
     def low_index(self) -> int: ...
@@ -735,19 +823,13 @@ class MutableSegment:
         """0 or 1 — which strand set of its VH this segment lives on."""
 
     @property
-    def oligo(self) -> 'MutableOligo': ...
+    def oligo(self) -> 'OligoView': ...
 
     @property
     def five_modification(self) -> str | None: ...
 
-    @five_modification.setter
-    def five_modification(self, value: str | None) -> None: ...
-
     @property
     def three_modification(self) -> str | None: ...
-
-    @three_modification.setter
-    def three_modification(self, value: str | None) -> None: ...
 
     @property
     def connected_from_segment_id(self) -> str | None: ...
@@ -756,10 +838,19 @@ class MutableSegment:
     def connected_to_segment_id(self) -> str | None: ...
 
     @property
-    def slots(self) -> list[MutableSlot]: ...
+    def slots(self) -> list[SlotView]: ...
 
-    def slot_at(self, bp_index: int) -> MutableSlot:
+    def slot_at(self, bp_index: int) -> SlotView:
         """Return a proxy for the slot at ``bp_index`` (created on first write)."""
+
+
+class MutableSegment(SegmentView):
+    """A stretch of one strand of one VH, part of an oligo."""
+    @SegmentView.five_modification.setter
+    def five_modification(self, value: str | None) -> None: ...
+
+    @SegmentView.three_modification.setter
+    def three_modification(self, value: str | None) -> None: ...
 
     def move_five_prime_to(self, new_index: int) -> None:
         """
@@ -780,20 +871,34 @@ class MutableSegment:
     def remove(self) -> 'MutableOligo | None':
         """Same as ``part.remove_segment(seg)``."""
 
+    @property
+    def five_prime(self) -> MutableSegmentEnd: ...
 
-class MutableSegmentEnd:
+    @property
+    def three_prime(self) -> MutableSegmentEnd: ...
+
+    @property
+    def oligo(self) -> 'MutableOligo': ...
+
+    @property
+    def slots(self) -> list[MutableSlot]: ...
+
+    def slot_at(self, bp_index: int) -> MutableSlot:
+        """Return a proxy for the slot at ``bp_index`` (created on first write)."""
+
+
+class SegmentEndView(_ReadOnly):
     """
     One end of a segment — mirrors the host's ``SegmentEnd`` (``FivePrimeEnd`` /
-    ``ThreePrimeEnd``).
+    ``ThreePrimeEnd``), read-only.
 
     Reach it as ``segment.five_prime`` / ``segment.three_prime`` (or
-    ``oligo.five_prime`` / ``oligo.three_prime``). Setting ``index`` moves the end,
-    like assigning ``SegmentEnd.index`` on the host.
+    ``oligo.five_prime`` / ``oligo.three_prime``).
     """
     def __init__(self, part: 'MutablePart', segment_id: str, is_three_prime: bool) -> None: ...
 
     @property
-    def segment(self) -> 'MutableSegment': ...
+    def segment(self) -> 'SegmentView': ...
 
     @property
     def is_three_prime(self) -> bool: ...
@@ -801,31 +906,14 @@ class MutableSegmentEnd:
     @property
     def index(self) -> int: ...
 
-    @index.setter
-    def index(self, new_index: int) -> None: ...
-
-    def can_move_to(self, new_index: int) -> Check:
-        """
-        Port of ``SegmentEnd.canMoveTo``: within the VH length, the swept range free
-        of other segments, the segment keeps its direction, and a constrained end
-        only moves to a matching crossover site. Also refuses a skip/insertion bp.
-        """
-
     @property
     def modification(self) -> str | None: ...
 
-    @modification.setter
-    def modification(self, value: str | None) -> None:
-        """
-        Set or clear (``None``) this end's modification; only a free end can carry one,
-        as in the editor's modification tool.
-        """
+    @property
+    def connected_segment(self) -> 'SegmentView | None': ...
 
     @property
-    def connected_segment(self) -> 'MutableSegment | None': ...
-
-    @property
-    def connected_end(self) -> 'MutableSegmentEnd | None':
+    def connected_end(self) -> 'SegmentEndView | None':
         """The end on the other side of this end's connection (3' ↔ 5')."""
 
     @property
@@ -849,7 +937,7 @@ class MutableSegmentEnd:
     @property
     def in_strand_index(self) -> int: ...
 
-    def is_adjacent_to(self, other: 'MutableSegmentEnd') -> bool:
+    def is_adjacent_to(self, other: 'SegmentEndView') -> bool:
         """
         Port of ``SegmentEnd.isAdjacentTo``: same VH and strand, 1 bp apart.
 
@@ -857,8 +945,41 @@ class MutableSegmentEnd:
         """
 
 
-class MutableSlot:
-    """One position on a segment — sequence, skip, or insertion."""
+class MutableSegmentEnd(SegmentEndView):
+    """
+    One end of a segment — mirrors the host's ``SegmentEnd``. Setting ``index``
+    moves the end, like assigning ``SegmentEnd.index`` on the host.
+    """
+    @SegmentEndView.index.setter
+    def index(self, new_index: int) -> None: ...
+
+    def can_move_to(self, new_index: int) -> Check:
+        """
+        Port of ``SegmentEnd.canMoveTo``: within the VH length, the swept range free
+        of other segments, the segment keeps its direction, and a constrained end
+        only moves to a matching crossover site. Also refuses a skip/insertion bp.
+        """
+
+    @SegmentEndView.modification.setter
+    def modification(self, value: str | None) -> None:
+        """
+        Set or clear (``None``) this end's modification; only a free end can carry one,
+        as in the editor's modification tool.
+        """
+
+    @property
+    def segment(self) -> 'MutableSegment': ...
+
+    @property
+    def connected_segment(self) -> 'MutableSegment | None': ...
+
+    @property
+    def connected_end(self) -> 'MutableSegmentEnd | None':
+        """The end on the other side of this end's connection (3' ↔ 5')."""
+
+
+class SlotView(_ReadOnly):
+    """One position on a segment — sequence, skip, or insertion (read-only)."""
     def __init__(self, part: 'MutablePart', oligo_id: str, segment_id: str, bp_index: int) -> None: ...
 
     @property
@@ -867,7 +988,13 @@ class MutableSlot:
     @property
     def seq(self) -> str: ...
 
-    @seq.setter
+    @property
+    def skip(self) -> bool: ...
+
+
+class MutableSlot(SlotView):
+    """One position on a segment — sequence, skip, or insertion."""
+    @SlotView.seq.setter
     def seq(self, value: str) -> None:
         """
         Write this slot's bases. The length must stay as it is (one base, none for a
@@ -875,9 +1002,6 @@ class MutableSlot:
         Use ``part.add_insert_at`` / ``add_skip_at`` / ``remove_skip_or_insertion_at``
         to change that.
         """
-
-    @property
-    def skip(self) -> bool: ...
 
     def can_set_skip(self) -> Check:
         """
@@ -903,6 +1027,81 @@ class MutableSlot:
         """
 
     def set_insertion(self, sequence: str) -> None: ...
+
+
+class MirrorOligo(OligoView):
+    """
+    A mirror oligo: the copy of a repeat group's original at one instance's offset.
+
+    Read-only. The host regenerates it from its source after every edit, so edit
+    ``mirror_of.source`` instead; any write to a mirror raises ``InvalidOperationError``.
+    """
+    @property
+    def source(self) -> 'MutableOligo':
+        """The original this mirror copies (same as ``mirror_of.source``)."""
+
+
+class MutableRepeatGroup:
+    """A repeat group (the host's ``RepeatGroup``): originals plus one copy per instance."""
+    def __init__(self, part: 'MutablePart', group_id: str) -> None: ...
+
+    @property
+    def id(self) -> str: ...
+
+    @property
+    def name(self) -> str: ...
+
+    @property
+    def instances(self) -> list[RepeatInstance]:
+        """The copies, in the order the host places them."""
+
+    def get_instance(self, instance_id: str) -> RepeatInstance | None: ...
+
+    @property
+    def originals(self) -> list['MutableOligo']:
+        """The oligos being repeated (``oligo.repeat_group is self``)."""
+
+    @property
+    def mirrors(self) -> list['MirrorOligo']:
+        """Every mirror oligo of this group, across all instances."""
+
+    def mirrors_of(self, instance: RepeatInstance | str) -> list['MirrorOligo']:
+        """The mirror oligos of one instance (one per original)."""
+
+    def add_instance(self, bp_offset: int) -> RepeatInstance:
+        """
+        Add a copy ``bp_offset`` bp along the originals' VHs (the panel's **Add copy**).
+
+        Its mirror oligos are built immediately; a region the copy runs past grows.
+        Raises ``InvalidOperationError`` when :meth:`can_add_instance` refuses it.
+        """
+
+    def can_add_instance(self, bp_offset: int) -> Check:
+        """
+        Whether :meth:`add_instance` accepts this offset: not 0 or an offset the group
+        already has, and every copy placeable (no overlap, crossovers on matching lattice
+        sites, skips/insertions paired).
+        """
+
+    def remove_instance(self, instance: RepeatInstance | str) -> None:
+        """
+        Remove one copy and its mirror oligos (the ✕ on a copy's chip). Removing the
+        last copy deletes the group; its originals become ordinary oligos.
+        """
+
+    def detach(self) -> None:
+        """Dissolve the group, keeping the mirrors as independent, editable oligos."""
+
+    def delete(self) -> None:
+        """Remove the group and its mirror oligos; the originals stay as ordinary oligos."""
+
+
+class RepeatInstance(NamedTuple):
+    """One copy of a repeat group: its id and its bp offset from the originals."""
+
+
+class MirrorInfo(NamedTuple):
+    """What a mirror oligo copies: ``oligo.mirror_of``."""
 
 
 class SegmentSpec(NamedTuple):

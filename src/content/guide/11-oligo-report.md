@@ -2,7 +2,7 @@
 title: Oligo Report And Diff
 description: Review every oligo of a design in a sortable table, download the CSV, and compare two saved designs
 category: guide
-order: 10
+order: 11
 slug: oligo-report
 ---
 

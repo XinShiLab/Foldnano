@@ -145,8 +145,20 @@ function nextGroupName(part: Part): string {
 	return `Repeat ${n}`;
 }
 
+/** Ids and name a caller supplies instead of generated ones (plugin ops adopt the plugin's). */
+export interface RepeatGroupIds {
+	groupId?: string;
+	instanceId?: string;
+	name?: string;
+}
+
 /** Makes `oligos` the originals of a new group with one instance at `bpOffset`. */
-export function createRepeatGroup(part: Part, oligos: Oligo[], bpOffset: number): RepeatGroup {
+export function createRepeatGroup(
+	part: Part,
+	oligos: Oligo[],
+	bpOffset: number,
+	ids: RepeatGroupIds = {}
+): RepeatGroup {
 	if (oligos.length === 0) throw new InvalidOperationError('Select oligos to mirror.');
 	if (oligos.some((o) => o.isMirror)) {
 		throw new InvalidOperationError('Mirrors can only be made from original oligos.');
@@ -154,10 +166,13 @@ export function createRepeatGroup(part: Part, oligos: Oligo[], bpOffset: number)
 	if (oligos.some((o) => o.repeatGroupId)) {
 		throw new InvalidOperationError('Some selected oligos already belong to a repeat group.');
 	}
+	if (ids.groupId && part.getRepeatGroup(ids.groupId)) {
+		throw new InvalidOperationError(`Repeat group id ${ids.groupId} already exists.`);
+	}
 	const group: RepeatGroup = {
-		id: uuidv4(),
-		name: nextGroupName(part),
-		instances: [{ id: uuidv4(), bpOffset }],
+		id: ids.groupId ?? uuidv4(),
+		name: ids.name ?? nextGroupName(part),
+		instances: [{ id: ids.instanceId ?? uuidv4(), bpOffset }],
 	};
 	part.repeatGroups.push(group);
 	for (const oligo of oligos) oligo.repeatGroupId = group.id;
@@ -170,12 +185,17 @@ function requireGroup(part: Part, groupId: string): RepeatGroup {
 	return group;
 }
 
-export function addRepeatInstance(part: Part, groupId: string, bpOffset: number): void {
+export function addRepeatInstance(
+	part: Part,
+	groupId: string,
+	bpOffset: number,
+	instanceId: string = uuidv4()
+): void {
 	const group = requireGroup(part, groupId);
 	if (bpOffset === 0 || group.instances.some((i) => i.bpOffset === bpOffset)) {
 		throw new InvalidOperationError(`${group.name} already has a copy at that offset.`);
 	}
-	group.instances.push({ id: uuidv4(), bpOffset });
+	group.instances.push({ id: instanceId, bpOffset });
 }
 
 /** Removing the last instance deletes the group (its originals become plain oligos). */

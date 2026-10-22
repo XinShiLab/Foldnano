@@ -7,6 +7,9 @@ import type Oligo from '$lib/model/Oligo';
 import type OligoSegment from '$lib/model/Oligo/OligoSegment.svelte';
 import type { Part } from '$lib/model/Part';
 import { addFreeformVh, addLatticeVh } from '$lib/model/test/testHelpers';
+import { SvelteSet } from 'svelte/reactivity';
+import type { EndSelection } from '$lib/components/Editor/context/EditorViewContext.svelte';
+import { removeSelection } from '$lib/components/Editor/strandActions';
 import type { HistoryStack } from './history.svelte';
 import { canonicalSnapshot, firstDifference } from './historyVerification';
 import { createTestHistory, expectUndoRoundTrip } from './test/undoRoundTrip';
@@ -500,6 +503,24 @@ describe('undo round-trip: adjacent-end merge', () => {
 				{ part, fromOligo: a, toOligo: b, toSegment: firstSegment(b), atIndexTarget: 10 },
 				history
 			)
+		);
+	});
+});
+
+describe('undo round-trip: one tx, several scopes', () => {
+	it('deleting oligos that share a VH in one selection round-trips', () => {
+		const { doc, part, vh0, vh1, history } = emptyLatticeScene();
+		const oligos = [
+			part.createOligo(vh0, 6, 21),
+			part.createOligo(vh0, 23, 32),
+			part.createOligo(vh1, 14, 27),
+		];
+		const ends = new SvelteSet(
+			oligos.flatMap((oligo) => [...oligo.segments]).flatMap((s) => [s.fivePrime, s.threePrime])
+		);
+		const selection = { ends, clear: () => ends.clear() } as unknown as EndSelection;
+		expectUndoRoundTrip(doc, history, () =>
+			removeSelection(part, selection, ['SCAF', 'STAP'], history)
 		);
 	});
 });

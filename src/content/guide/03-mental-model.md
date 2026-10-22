@@ -2,7 +2,7 @@
 title: Mental Model
 description: Documents, Parts, DesignRegions, planes, virtual helices, oligos, segments, and ends
 category: guide
-order: 2
+order: 3
 slug: mental-model
 ---
 

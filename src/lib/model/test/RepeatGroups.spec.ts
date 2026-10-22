@@ -13,6 +13,7 @@ import {
 	breakOligoCmd,
 	fillSequenceToOligoCmd,
 	moveOligoEndCmd,
+	paintOligoCmd,
 	removeOligoCmd,
 } from '$lib/commands/strands';
 import {
@@ -204,6 +205,25 @@ describe('repeat groups: mirror oligos', () => {
 
 		addSkipOrInsertionCmd({ segment: onlySegment(top), atIndex: 5, count: -1 }, history);
 
+		for (const mirror of mirrorsOf(part())) expect(onlySegment(mirror).slotSeq(26)).toBe('');
+	});
+
+	it('edits one strand of a duplex original with a skip', () => {
+		const { history, part, vh } = setup();
+		const top = part().createOligo(vh, 0, 9);
+		const bottom = part().createOligo(vh, 9, 0);
+		createRepeatGroupCmd({ part: part(), oligos: [top, bottom], bpOffset: 21 }, history);
+		addSkipOrInsertionCmd({ segment: onlySegment(top), atIndex: 5, count: -1 }, history);
+		const mirrorOfBottom = mirrorsOf(part()).find((m) => m.mirrorOf?.sourceOligoId === bottom.id)!;
+
+		// Only top's copy is rebuilt; bottom's kept copy already holds the paired skip.
+		paintOligoCmd({ oligo: top, color: '#123456' }, history);
+		moveOligoEndCmd({ part: part(), end: onlySegment(top).threePrime, toIdx: 10 }, history);
+
+		const mirrorOfTop = mirrorsOf(part()).find((m) => m.mirrorOf?.sourceOligoId === top.id)!;
+		expect(mirrorOfTop.color).toBe('#123456');
+		expect(range(mirrorOfTop)).toEqual([21, 31]);
+		expect(mirrorsOf(part())).toContain(mirrorOfBottom);
 		for (const mirror of mirrorsOf(part())) expect(onlySegment(mirror).slotSeq(26)).toBe('');
 	});
 

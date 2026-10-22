@@ -2,6 +2,7 @@ import { createContext } from 'svelte';
 
 import FoldnanoDocument, { type DocSnapshot } from '$lib/model/document.svelte';
 import { DocumentFormatError, migrateDocumentJson } from '$lib/model/documentFormat';
+import { repairDocumentJson } from '$lib/model/documentRepair';
 import { HistoryStack } from '$lib/commands/history.svelte';
 import {
 	StorageManager,
@@ -33,6 +34,7 @@ import { isTabSyncSupported, TabSync } from '$lib/services/tabSync.svelte';
 import { reportError } from '$lib/errorReporting';
 import {
 	describeLoadFailure,
+	notifyDocumentRepairs,
 	toBackupEntries,
 	type BackupEntry,
 	type DocumentLoadFailure,
@@ -251,6 +253,23 @@ export class EditorDocumentSession {
 		}
 	}
 
+	/** Writes a load-time repair back so it sticks, keeping the replaced stored copy as a backup. */
+	async #persistRepair(repairs: string[], options: { backup: boolean }): Promise<void> {
+		if (repairs.length === 0) return;
+		notifyDocumentRepairs(repairs);
+		if (!this.isTabOwner) return;
+		const docId = this.#currentDoc.id;
+		const ok = await this.#storageManager.saveDocument(
+			docId,
+			$state.snapshot(this.#currentDoc),
+			options.backup ? { backup: { reason: 'before_repair' } } : undefined
+		);
+		if (!ok) return;
+		const persistedAt = await this.#storedSaveTime(docId);
+		this.#lastLocalPersistAt = persistedAt;
+		this.#historyStack.markSaved(persistedAt);
+	}
+
 	#checkRemoteAheadInBackground(docId: string): void {
 		void githubStorageProvider.checkRemoteState(docId).then((state) => {
 			if (this.#currentDoc.id !== docId) return;
@@ -388,8 +407,11 @@ export class EditorDocumentSession {
 			if (!docData) return false;
 
 			let restoredDoc: FoldnanoDocument;
+			let repairs: string[];
 			try {
-				restoredDoc = FoldnanoDocument.fromJSON(docData);
+				const repaired = repairDocumentJson(migrateDocumentJson(docData));
+				repairs = repaired.repairs;
+				restoredDoc = FoldnanoDocument.fromJSON(repaired.snapshot);
 			} catch (e) {
 				reportError(e, 'document-load', { notify: false });
 				this.#loadFailure = describeLoadFailure(docId, docData, e);
@@ -410,6 +432,7 @@ export class EditorDocumentSession {
 				restoreLastSaveTime: lastModified,
 				loadPersistedContext: true,
 			});
+			await this.#persistRepair(repairs, { backup: true });
 
 			if (fileMeta) {
 				this.#checkRemoteAheadInBackground(restoredDoc.id);
@@ -578,7 +601,8 @@ export class EditorDocumentSession {
 				snapshot = { ...snapshot, id: crypto.randomUUID() };
 			}
 
-			const doc = FoldnanoDocument.fromJSON(snapshot);
+			const { snapshot: repairedSnapshot, repairs } = repairDocumentJson(snapshot);
+			const doc = FoldnanoDocument.fromJSON(repairedSnapshot);
 			syncNameWithPath(doc, path);
 			const saved = await this.#storageManager.saveDocument(doc.id, snapshot, { backup });
 			if (!saved) throw new Error('Failed to save the GitHub file in this browser');
@@ -606,6 +630,9 @@ export class EditorDocumentSession {
 				restoreLastSaveTime: now,
 				loadPersistedContext: true,
 			});
+			// GitHub keeps the unrepaired version; saving after the sync stamp marks the repair as
+			// a local change to commit.
+			await this.#persistRepair(repairs, { backup: false });
 
 			return true;
 		} catch (e) {
@@ -670,7 +697,8 @@ export class EditorDocumentSession {
 		this.#isLoading = true;
 		try {
 			await this.#prepareForGitOperation('overwrite');
-			const snapshot = await githubStorageProvider.pullDocument(this.#currentDoc.id, reason);
+			const pulled = await githubStorageProvider.pullDocument(this.#currentDoc.id, reason);
+			const { snapshot, repairs } = repairDocumentJson(pulled);
 			const doc = FoldnanoDocument.fromJSON(snapshot);
 			const now = await this.#storedSaveTime(doc.id);
 
@@ -695,6 +723,7 @@ export class EditorDocumentSession {
 				restoreLastSaveTime: now,
 				loadPersistedContext: true,
 			});
+			await this.#persistRepair(repairs, { backup: false });
 
 			return true;
 		} catch (e) {

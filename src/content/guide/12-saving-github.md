@@ -2,7 +2,7 @@
 title: Saving And GitHub
 description: IndexedDB, autosave, saved documents, GitHub connection, files, branches, staging, commits, conflicts, and backups
 category: guide
-order: 11
+order: 12
 slug: saving-github
 ---
 
