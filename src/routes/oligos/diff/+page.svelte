@@ -114,6 +114,7 @@
 	function label(column: OligoReportColumn): string {
 		const labels: Record<OligoReportColumn, string> = {
 			oligoKey: 'OligoKey',
+			name: 'Name',
 			start: 'Start',
 			end: 'End',
 			sequence: 'Sequence',

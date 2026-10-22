@@ -82,6 +82,18 @@ While a duplicate or mirror copy is following the pointer:
 
 In the **Split region** tool, `Escape` cancels and returns to Select.
 
+## Script Editor
+
+Only active while you type in the [Script Lab](/docs/guide/script-lab) editor (or another plugin's code editor). Because these keys go to the editor, press `?` outside it to open the workspace help.
+
+| Key | Action |
+| --- | --- |
+| `Ctrl/Cmd + Enter` | run the script |
+| `Ctrl + Space` | show completions |
+| `Ctrl/Cmd + /` | toggle comment |
+| `Option/Alt + ↑` / `↓` | move the line up / down |
+| `Ctrl/Cmd + Shift + K` | delete the line |
+
 ## 3D View
 
 Only active while the 3D view is the active viewer.

@@ -185,6 +185,31 @@ export class PyodideWorkerBridge {
 		});
 	}
 
+	/** Distribution packages that provide `code`'s imports (see RESOLVE_IMPORTS). */
+	resolveImports(requestId: string, code: string): Promise<string[]> {
+		return new Promise<string[]>((resolve, reject) => {
+			const timeoutId = setTimeout(() => {
+				this.pending.delete(requestId);
+				reject(new Error(`resolveImports timed out (requestId=${requestId})`));
+			}, this.timeoutDefault);
+
+			this.pending.set(requestId, {
+				resolve: (response) => {
+					if (response.type === 'IMPORTS_RESOLVED') resolve(response.packages);
+					else if (response.type === 'IMPORTS_ERROR') reject(new Error(response.error));
+				},
+				reject,
+				timeoutId,
+			});
+
+			this.ensureWorker().postMessage({
+				type: 'RESOLVE_IMPORTS',
+				requestId,
+				code,
+			} satisfies WorkerRequest);
+		});
+	}
+
 	/**
 	 * Run a plugin. Resolves with the PLUGIN_RESULT response on success.
 	 * Rejects with an Error (with `.traceback` and `.logs` properties) on plugin error.
@@ -306,7 +331,9 @@ export class PyodideWorkerBridge {
 			}
 
 			case 'PLUGIN_RESULT':
-			case 'PLUGIN_ERROR': {
+			case 'PLUGIN_ERROR':
+			case 'IMPORTS_RESOLVED':
+			case 'IMPORTS_ERROR': {
 				const pending = this.pending.get(msg.requestId);
 				if (pending) {
 					clearTimeout(pending.timeoutId);

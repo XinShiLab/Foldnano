@@ -63,7 +63,8 @@ CSV exporter and rejects circular oligos.
 
 `/oligos/diff` compares two local saved documents by each oligo's canonical
 5'→3' segment endpoint signature. The table-facing `OligoKey` is a short stable
-hash of that signature, not the persisted oligo UUID.
+hash of that signature, not the persisted oligo UUID. Oligo names are only a
+compared column (a rename shows as changed); they never drive matching.
 
 ## Loading a Design from an External URL
 

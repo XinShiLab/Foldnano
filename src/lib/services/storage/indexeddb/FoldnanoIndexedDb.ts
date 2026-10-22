@@ -306,9 +306,18 @@ export class FoldnanoIndexedDb extends Dexie implements IndexedDbPersistenceBack
 	async saveInstalledPlugin(
 		manifest: IndexedDbPluginRecord,
 		files: IndexedDbPluginFilesRecord | null,
-		isNew: boolean
+		isNew: boolean,
+		/** Refuse unless the stored manifest still has this version (another tab saved first). */
+		expectedVersion?: string
 	): Promise<void> {
 		await this.transaction('rw', this.plugins, this.pluginFiles, async () => {
+			if (expectedVersion !== undefined) {
+				const stored = await this.plugins.get(manifest.id);
+				const storedVersion = (stored?.manifest as { version?: string } | undefined)?.version;
+				if (storedVersion !== expectedVersion) {
+					throw new PluginVersionConflictError(manifest.id, expectedVersion, storedVersion);
+				}
+			}
 			if (isNew) await this.plugins.add(manifest);
 			else await this.plugins.put(manifest);
 			if (files) await this.pluginFiles.put(files);
@@ -331,6 +340,15 @@ export class FoldnanoIndexedDb extends Dexie implements IndexedDbPersistenceBack
 		} else {
 			await this.plugins.put({ id: pluginId, sidePanelCode: code });
 		}
+	}
+
+	/** Writes owned-plugin fields onto an existing record; `undefined` values clear them. */
+	async updatePluginRecord(
+		pluginId: string,
+		patch: Partial<Pick<IndexedDbPluginRecord, 'authoring' | 'draftCode'>>
+	): Promise<void> {
+		const updated = await this.plugins.update(pluginId, patch);
+		if (updated === 0) throw new Error(`Plugin "${pluginId}" is not stored in this browser.`);
 	}
 
 	async savePluginEnabled(pluginId: string, enabled: boolean): Promise<void> {
@@ -377,3 +395,19 @@ export class FoldnanoIndexedDb extends Dexie implements IndexedDbPersistenceBack
 }
 
 export const foldnanoIndexedDb = new FoldnanoIndexedDb();
+
+/** A plugin's stored version moved on since this tab loaded it, so saving would overwrite it. */
+export class PluginVersionConflictError extends Error {
+	constructor(
+		readonly pluginId: string,
+		readonly expectedVersion: string,
+		readonly storedVersion: string | undefined
+	) {
+		super(
+			storedVersion
+				? `Version ${storedVersion} of this plugin was saved in another tab. Reload this page to see it; your edits are kept as unsaved changes.`
+				: `Plugin "${pluginId}" is no longer stored in this browser.`
+		);
+		this.name = 'PluginVersionConflictError';
+	}
+}

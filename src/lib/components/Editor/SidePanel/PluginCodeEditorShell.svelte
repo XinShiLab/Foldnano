@@ -14,6 +14,7 @@
 		RotateCcw,
 		Square,
 		SquareArrowOutUpRight,
+		SquareTerminal,
 	} from '@lucide/svelte';
 	import { toast } from 'svelte-sonner';
 	import type { Component } from 'svelte';
@@ -25,6 +26,8 @@
 	import { addPythonAutocomplete } from './python-autocomplete';
 	import { bridgeForeignDocument } from './prism-foreign-document';
 	import PopOutWindow from './PopOutWindow.svelte';
+	import { isMacPlatform } from '$lib/utils/platform';
+	import { help, type GuideSlug } from '$lib/components/help/help';
 
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -59,6 +62,10 @@
 		toolbarTail?: Snippet;
 		toolbarActions?: EditorToolbarAction[];
 		output?: Snippet;
+		/** Nothing to show in the output pane yet; the shell renders a placeholder instead. */
+		outputEmpty?: boolean;
+		/** Guide page linked from the `?` workspace help entries. */
+		helpDoc?: GuideSlug;
 		onRun?: (code: string) => void | Promise<void>;
 		onStop?: () => void | Promise<void>;
 		onClearScript?: () => void | Promise<void>;
@@ -68,6 +75,10 @@
 		onCodeChange?: (code: string) => void;
 		/** Editor surface lives in a separate window; bindable so the owner can keep it alive. */
 		poppedOut?: boolean;
+		/** Names the pop-out window, one per panel (reopening reuses it); defaults to the filename. */
+		popOutKey?: string;
+		/** Blocks typing, e.g. while the owner saves what's in the editor. */
+		readOnly?: boolean;
 	}
 
 	let {
@@ -85,6 +96,8 @@
 		toolbarTail,
 		toolbarActions = [],
 		output,
+		outputEmpty = false,
+		helpDoc = 'plugins-for-users',
 		onRun,
 		onStop,
 		onClearScript,
@@ -93,6 +106,8 @@
 		onDownload,
 		onCodeChange,
 		poppedOut = $bindable(false),
+		popOutKey,
+		readOnly = false,
 	}: Props = $props();
 
 	let script = $state(code);
@@ -115,6 +130,10 @@
 		if (code !== script) {
 			syncEditorValue(code);
 		}
+	});
+
+	$effect(() => {
+		editor?.setOptions({ readOnly });
 	});
 
 	function setScript(next: string): void {
@@ -170,10 +189,15 @@
 				tabSize: 4,
 				wordWrap: false,
 				value: script,
+				readOnly,
 				onUpdate: (value) => {
 					setScript(value);
 				},
 			});
+			// Recent Chrome numbers every line 1 when prism resets the counter on the grid container.
+			const lineCounterFix = host.ownerDocument.createElement('style');
+			lineCounterFix.textContent = '.pce-wrapper{counter-reset:line}';
+			host.shadowRoot?.append(lineCounterFix);
 			addPythonAutocomplete(instance, host.shadowRoot);
 			const releaseDocument = bridgeForeignDocument(host.ownerDocument);
 
@@ -183,6 +207,16 @@
 				event.stopPropagation();
 			};
 			instance.textarea.addEventListener('keydown', stopEditorShortcutPropagation);
+
+			// Capture on the host so Run beats prism's own Mod+Enter (insert blank line below).
+			const runOnModEnter = (event: KeyboardEvent) => {
+				if (event.key !== 'Enter' || !(event.metaKey || event.ctrlKey) || event.altKey) return;
+				if (event.isComposing) return;
+				event.preventDefault();
+				event.stopPropagation();
+				if (!runDisabled) void onRun?.(script);
+			};
+			host.addEventListener('keydown', runOnModEnter, true);
 
 			// Writing-assistant extensions ignore `spellcheck=false`; these are their own opt-outs.
 			for (const [name, value] of [
@@ -199,6 +233,7 @@
 			editor = instance;
 			return () => {
 				instance.textarea.removeEventListener('keydown', stopEditorShortcutPropagation);
+				host.removeEventListener('keydown', runOnModEnter, true);
 				instance.remove();
 				releaseDocument();
 				if (editor === instance) editor = null;
@@ -213,6 +248,7 @@
 	}
 
 	const PYTHON_MINOR = PYODIDE_PYTHON_VERSION.split('.').slice(0, 2).join('.');
+	const RUN_SHORTCUT = typeof navigator !== 'undefined' && isMacPlatform() ? '⌘↵' : 'Ctrl+Enter';
 </script>
 
 {#if poppedOut}
@@ -243,7 +279,7 @@
 	</div>
 	<PopOutWindow
 		bind:this={popOutWindow}
-		name={`foldnano-code-editor-${filename}`}
+		name={`foldnano-code-editor-${popOutKey ?? filename}`}
 		title={`${title} · Foldnano`}
 		onClose={() => (poppedOut = false)}
 		onBlocked={handlePopOutBlocked}
@@ -319,6 +355,11 @@
 							title="Open the editor in a separate window"
 							aria-label="Open the editor in a separate window"
 							onclick={() => (poppedOut = true)}
+							{@attach help({
+								title: 'Pop out',
+								text: 'Move the editor and output into a separate window, for example on a second screen.',
+								doc: helpDoc,
+							})}
 						>
 							<SquareArrowOutUpRight size={12} />
 						</Button>
@@ -338,6 +379,13 @@
 					class="h-6 gap-1 px-1.5 text-[11px]"
 					onclick={() => onRun?.(script)}
 					disabled={runDisabled}
+					title="Run the script ({RUN_SHORTCUT})"
+					{@attach help({
+						key: RUN_SHORTCUT,
+						title: 'Run',
+						text: 'Run the editor contents against the open design. Starts the Python runtime first if needed.',
+						doc: helpDoc,
+					})}
 				>
 					<Play size={11} />
 					Run
@@ -348,6 +396,7 @@
 					class="h-6 gap-1 px-1.5 text-[11px]"
 					onclick={() => onStop?.()}
 					disabled={stopDisabled}
+					{@attach help({ title: 'Stop', text: 'Stop the running script.' })}
 				>
 					<Square size={11} />
 					Stop
@@ -358,6 +407,10 @@
 					class="h-6 gap-1 px-1.5 text-[11px]"
 					onclick={() => onClearScript?.()}
 					title="Clear the editor to a bare run(ctx) skeleton"
+					{@attach help({
+						title: 'Clear',
+						text: 'Replace the editor contents with a bare starting skeleton. The output is kept.',
+					})}
 				>
 					<Eraser size={11} />
 					Clear
@@ -368,6 +421,11 @@
 					class="h-6 gap-1 px-1.5 text-[11px]"
 					onclick={() => onResetPlugin?.()}
 					title="Clear run output and reset to ready state"
+					{@attach help({
+						title: 'Reset',
+						text: 'Clear the output, discard a result not yet applied, and return an errored run to ready. Your script is kept.',
+						doc: helpDoc,
+					})}
 				>
 					<RotateCcw size={11} />
 					Reset
@@ -463,7 +521,15 @@
 
 		<Resizable.PaneGroup direction="vertical" class="min-h-0 flex-1">
 			<Resizable.Pane defaultSize={58} minSize={34}>
-				<div class="flex h-full min-h-0 flex-col overflow-hidden">
+				<div
+					class="flex h-full min-h-0 flex-col overflow-hidden"
+					{@attach help({
+						area: true,
+						title: 'Script editor',
+						text: `Python with completions. ${RUN_SHORTCUT} runs it; the script is kept in this browser.`,
+						doc: helpDoc,
+					})}
+				>
 					<div class="flex items-center justify-between border-b border-border px-2.5 py-1.5">
 						<div class="flex min-w-0 items-center gap-1.5 overflow-hidden">
 							<Badge
@@ -494,8 +560,44 @@
 			<Resizable.Handle withHandle />
 
 			<Resizable.Pane defaultSize={42} minSize={24}>
-				<div class="h-full min-h-0 overflow-hidden">
-					{@render output?.()}
+				<div
+					class="flex h-full min-h-0 flex-col overflow-hidden"
+					{@attach help({
+						area: true,
+						title: 'Output',
+						text: 'Logs, results, files and proposed design changes from the last run.',
+						doc: helpDoc,
+					})}
+				>
+					<div class="flex items-center border-b border-border px-2.5 py-1.5">
+						<span class="text-[11px] font-medium text-muted-foreground">Output</span>
+					</div>
+					<div class="min-h-0 flex-1 overflow-hidden">
+						{#if outputEmpty}
+							<div
+								class="flex h-full flex-col items-center justify-center gap-1.5 px-4 text-center text-muted-foreground"
+							>
+								{#if executionState === 'running'}
+									<p class="text-xs">Running…</p>
+								{:else}
+									<SquareTerminal size={18} class="opacity-60" />
+									<p class="text-xs">Run output appears here</p>
+									<p class="max-w-64 text-[11px] opacity-80">
+										Logs, results, files and proposed design changes show up after you run the
+										script.
+									</p>
+									<p class="text-[11px] opacity-80">
+										Press <kbd
+											class="rounded border border-border bg-muted px-1 py-px font-mono text-[10px]"
+											>{RUN_SHORTCUT}</kbd
+										> to run.
+									</p>
+								{/if}
+							</div>
+						{:else}
+							{@render output?.()}
+						{/if}
+					</div>
 				</div>
 			</Resizable.Pane>
 		</Resizable.PaneGroup>

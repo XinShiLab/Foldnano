@@ -124,6 +124,7 @@ const ITERABLE_TYPES = new Set([
 	'Iterator',
 ]);
 const IDENT = /[A-Za-z_]\w*/y;
+const STRING_LITERAL = /(["'])(?:\\.|(?!\1).)*\1?/g;
 const MAX_RESOLVE_DEPTH = 8;
 
 interface PyType {
@@ -185,6 +186,103 @@ export function completePython(
 		from,
 		options: scopeCompletions(analysis, index, options.documentText ?? before, query),
 	};
+}
+
+export interface PythonSignatureHelp {
+	/** Callee as written, e.g. `part.oligos_in_region`. */
+	label: string;
+	params: string[];
+	/** Index into `params` of the argument under the caret; -1 when none applies. */
+	activeParam: number;
+	returns: string | null;
+	doc?: string;
+}
+
+/** Signature of the API call whose argument list encloses the end of `before`. */
+export function signatureHelpPython(
+	before: string,
+	options: { index?: PythonApiIndex } = {}
+): PythonSignatureHelp | null {
+	const index = options.index ?? PYTHON_API_INDEX;
+	const lineBefore = before.slice(before.lastIndexOf('\n') + 1);
+	if (isInCommentOrString(before, lineBefore)) return null;
+
+	const open = findOpenParen(before);
+	if (open < 0) return null;
+	const calleeStart = scanChainBackward(before, open);
+	const callee = before.slice(calleeStart, open);
+	const name = /[A-Za-z_]\w*$/.exec(callee)?.[0];
+	if (!name) return null;
+
+	let target: { signature: string; returns: string | null; doc?: string } | undefined;
+	if (callee.length > name.length && callee[callee.length - name.length - 1] === '.') {
+		const receiver = callee.slice(0, -name.length - 1);
+		const type = new ScopeAnalysis(before, index).evalExpression(receiver, calleeStart);
+		const member =
+			type && !type.list
+				? index.classes[type.cls]?.members.find((m) => m.name === name)
+				: undefined;
+		if (member?.kind === 'method') {
+			target = {
+				signature: member.signature ?? '()',
+				returns: member.returns ?? null,
+				doc: member.doc,
+			};
+		}
+	} else if (callee === name) {
+		target = index.functions[name];
+	}
+	if (!target) return null;
+
+	const params = splitTopLevel(target.signature.replace(/^\(|\)$/g, ''), ',').filter(Boolean);
+	const args = splitTopLevel(before.slice(open + 1).replace(STRING_LITERAL, '""'), ',');
+	return {
+		label: callee,
+		params,
+		activeParam: activeParamIndex(params, args),
+		returns: target.returns,
+		doc: target.doc || undefined,
+	};
+}
+
+/** Innermost `(` still open at the end of `text`, ignoring string contents; -1 if none. */
+function findOpenParen(text: string): number {
+	const stack: number[] = [];
+	let quote: string | null = null;
+	for (let i = 0; i < text.length; i++) {
+		const ch = text[i];
+		if (quote) {
+			if (ch === '\\') i++;
+			else if (text.startsWith(quote, i)) {
+				i += quote.length - 1;
+				quote = null;
+			}
+		} else if (ch === '"' || ch === "'") {
+			quote = text.startsWith(ch.repeat(3), i) ? ch.repeat(3) : ch;
+			i += quote.length - 1;
+		} else if (ch === '#') {
+			const eol = text.indexOf('\n', i);
+			if (eol < 0) break;
+			i = eol;
+		} else if (ch === '(' || ch === '[' || ch === '{') {
+			stack.push(ch === '(' ? i : -1);
+		} else if (ch === ')' || ch === ']' || ch === '}') {
+			stack.pop();
+		}
+	}
+	return stack.at(-1) ?? -1;
+}
+
+function activeParamIndex(params: string[], args: string[]): number {
+	const names = params.map((p) => /^\**([A-Za-z_]\w*)/.exec(p)?.[1] ?? '');
+	const keyword = /^([A-Za-z_]\w*)\s*=(?!=)/.exec(args[args.length - 1])?.[1];
+	if (keyword) return names.indexOf(keyword);
+	// `*` and `/` are markers, not positional slots.
+	const positional = params.flatMap((p, i) => (p === '*' || p === '/' ? [] : [i]));
+	const varArgs = params.findIndex((p) => /^\*[A-Za-z_]/.test(p));
+	const slot = positional[args.length - 1];
+	if (varArgs >= 0 && (slot === undefined || slot > varArgs)) return varArgs;
+	return slot ?? -1;
 }
 
 function isInCommentOrString(before: string, lineBefore: string): boolean {
@@ -282,8 +380,8 @@ function splitTopLevel(text: string, sep: string): string[] {
 	let last = 0;
 	for (let i = 0; i < text.length; i++) {
 		const ch = text[i];
-		if (ch === '[' || ch === '(') depth++;
-		else if (ch === ']' || ch === ')') depth--;
+		if (ch === '[' || ch === '(' || ch === '{') depth++;
+		else if (ch === ']' || ch === ')' || ch === '}') depth--;
 		else if (ch === sep && depth === 0) {
 			parts.push(text.slice(last, i));
 			last = i + 1;

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { help } from '$lib/components/help/help';
 	import { getEditorViewContext } from '../context/EditorViewContext.svelte';
 	import { getEditorDocumentSession } from '../context/EditorDocumentSession.svelte';
 	import type { PythonPlugin } from '$lib/plugin/types';
@@ -12,7 +13,11 @@
 		Loader,
 		RotateCcw,
 		FolderOpen,
+		FilePen,
+		Download,
 	} from '@lucide/svelte';
+	import * as Dialog from '$lib/components/ui/dialog/index.js';
+	import { exportOwnedPlugin, needsBackup } from '$lib/plugin/ownedPluginActions';
 	import PluginRunDialog from './PluginRunDialog.svelte';
 	import PluginActivationConfirmDialog from './PluginActivationConfirmDialog.svelte';
 	import { PluginActivationGate } from './PluginActivationGate.svelte';
@@ -24,6 +29,7 @@
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Switch } from '$lib/components/ui/switch/index.js';
+	import PluginIcon from './PluginIcon.svelte';
 
 	const editorCtx = getEditorViewContext();
 	const registry = $derived(editorCtx.pluginRegistry);
@@ -91,8 +97,33 @@
 		return isRunError || (plugin.status === 'active' && hasRunOutput);
 	}
 
+	let pendingRemove: PythonPlugin | null = $state(null);
+
 	function removePlugin(plugin: PythonPlugin) {
+		// A plugin made here has no other copy unless the user exported it.
+		if (plugin.authoring) {
+			pendingRemove = plugin;
+			return;
+		}
 		registry.remove(plugin.manifest.id);
+	}
+
+	function confirmRemove() {
+		const plugin = pendingRemove;
+		pendingRemove = null;
+		if (!plugin) return;
+		editorCtx.closePluginEditor(plugin.manifest.id);
+		registry.remove(plugin.manifest.id);
+	}
+
+	async function exportPlugin(plugin: PythonPlugin) {
+		try {
+			await exportOwnedPlugin(registry, plugin.manifest.id);
+		} catch (e) {
+			toast.error("Couldn't export the plugin", {
+				description: e instanceof Error ? e.message : String(e),
+			});
+		}
 	}
 
 	function toggleBuiltinEnabled(plugin: PythonPlugin, enabled: boolean) {
@@ -159,7 +190,15 @@
 	}
 </script>
 
-<div class="flex h-full flex-col overflow-hidden text-sm">
+<div
+	class="flex h-full flex-col overflow-hidden text-sm"
+	{@attach help({
+		area: true,
+		title: 'Plugins',
+		text: 'Python tools that generate, edit or analyse designs, run in your browser. Install them from the Hub or a .zip file.',
+		doc: 'plugins-for-users',
+	})}
+>
 	<!-- Header -->
 	<div class="flex h-9 items-center justify-between border-b border-border px-3 py-2">
 		<span class="text-xs font-semibold tracking-wide uppercase">Plugins</span>
@@ -171,6 +210,11 @@
 					class="h-6 gap-1 px-2 text-xs"
 					onclick={() => localFileInput.click()}
 					title="Install plugin from a local .zip file"
+					{@attach help({
+						title: 'Import zip',
+						text: 'Install a plugin from a .zip file on your computer.',
+						doc: 'plugins-for-users',
+					})}
 				>
 					<FolderOpen size={13} />
 					Import zip
@@ -181,8 +225,20 @@
 
 	<Tabs.Root bind:value={activeTab} class="flex flex-1 flex-col overflow-hidden">
 		<Tabs.List variant="line" class="w-full border-b border-border">
-			<Tabs.Trigger value="mine" class="flex-1 text-xs">My Plugins</Tabs.Trigger>
-			<Tabs.Trigger value="hub" class="flex-1 text-xs">Hub</Tabs.Trigger>
+			<Tabs.Trigger
+				value="mine"
+				class="flex-1 text-xs"
+				{@attach help({
+					title: 'My Plugins',
+					text: 'Installed plugins: activate, run, reset or remove them.',
+				})}>My Plugins</Tabs.Trigger
+			>
+			<Tabs.Trigger
+				value="hub"
+				class="flex-1 text-xs"
+				{@attach help({ title: 'Hub', text: 'Plugins you can install with one click.' })}
+				>Hub</Tabs.Trigger
+			>
 		</Tabs.List>
 
 		<Tabs.Content value="hub" class="mt-0 flex-1 overflow-hidden p-0">
@@ -221,10 +277,21 @@
 									<span class="h-[13px] w-[13px]"></span>
 								{/if}
 
+								{#if plugin.iconSvg}
+									<PluginIcon svg={plugin.iconSvg} size={14} class="text-muted-foreground" />
+								{/if}
 								<!-- Name + version -->
 								<span class="flex-1 truncate font-medium text-foreground"
 									>{plugin.manifest.name}</span
 								>
+								{#if plugin.authoring}
+									<span
+										class="shrink-0 rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+										title="You made this plugin in this browser, so you can edit it."
+									>
+										Mine
+									</span>
+								{/if}
 								{#if plugin.origin === 'builtin'}
 									<span
 										class="shrink-0 rounded bg-blue-100 px-1.5 py-0.5 text-[10px] text-blue-700 dark:bg-blue-950 dark:text-blue-300"
@@ -236,6 +303,10 @@
 										onCheckedChange={(v) => toggleBuiltinEnabled(plugin, v)}
 										class="h-4 w-7 shrink-0"
 										title={plugin.enabled ? 'Disable this plugin' : 'Enable this plugin'}
+										{@attach help({
+											title: 'Enable',
+											text: 'Turn this built-in plugin on or off. Off hides its panel and actions.',
+										})}
 									/>
 								{/if}
 								<span class="shrink-0 text-xs text-gray-400">{plugin.manifest.version}</span>
@@ -291,6 +362,10 @@
 											size="sm"
 											class="h-6 gap-1 border-blue-200 bg-blue-50 px-2 text-xs text-blue-700 hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300 dark:hover:bg-blue-900"
 											onclick={() => openPluginSidePanel(plugin)}
+											{@attach help({
+												title: 'Open Panel',
+												text: "Open this plugin's own side panel.",
+											})}
 										>
 											Open Panel
 										</Button>
@@ -301,6 +376,10 @@
 											size="sm"
 											class="h-6 gap-1 px-2 text-xs"
 											onclick={() => activatePlugin(plugin)}
+											{@attach help({
+												title: 'Activate',
+												text: 'Load the plugin into the Python runtime so it can run.',
+											})}
 										>
 											Activate
 										</Button>
@@ -316,6 +395,10 @@
 												size="sm"
 												class="h-6 gap-1 border-blue-200 bg-blue-50 px-2 text-xs text-blue-700 hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300 dark:hover:bg-blue-900"
 												onclick={() => runPlugin(plugin)}
+												{@attach help({
+													title: 'Run',
+													text: 'Run the plugin on the open design. Any design change it proposes waits for you to apply it.',
+												})}
 												disabled={coordinator.pendingApply?.pluginId === plugin.manifest.id}
 												title={isCadnanoPlugin && activeRegion
 													? `Run on region: ${activeRegion.name}`
@@ -347,6 +430,7 @@
 											class="h-6 gap-1 px-2 text-xs"
 											onclick={() => coordinator.stopPlugin(plugin.manifest.id)}
 											title="Stop running plugin"
+											{@attach help({ title: 'Stop', text: 'Stop the running plugin.' })}
 										>
 											<Square size={11} />
 											Stop
@@ -359,9 +443,48 @@
 											class="h-6 gap-1 px-2 text-xs"
 											onclick={() => resetPlugin(plugin)}
 											title="Clear run output and reset to ready state"
+											{@attach help({
+												title: 'Reset',
+												text: 'Clear the output, discard a result not yet applied, and return an errored run to ready.',
+											})}
 										>
 											<RotateCcw size={11} />
 											Reset
+										</Button>
+									{/if}
+									{#if plugin.authoring && !plugin.manifest.sidePanel}
+										<Button
+											variant="outline"
+											size="sm"
+											class="h-6 gap-1 px-2 text-xs"
+											onclick={() => editorCtx.openPluginEditor(plugin.manifest.id)}
+											title="Edit this plugin's code"
+											{@attach help({
+												title: 'Edit',
+												text: 'Open this plugin in its own editor to change, test and save new versions.',
+												doc: 'script-lab',
+											})}
+										>
+											<FilePen size={11} />
+											Edit
+										</Button>
+										<Button
+											variant="outline"
+											size="sm"
+											class="h-6 gap-1 px-2 text-xs {needsBackup(plugin)
+												? 'border-amber-300 text-amber-700 dark:border-amber-700 dark:text-amber-300'
+												: ''}"
+											onclick={() => void exportPlugin(plugin)}
+											title={needsBackup(plugin)
+												? `v${plugin.manifest.version} isn't backed up. Download it as a zip.`
+												: `Download v${plugin.manifest.version} as a zip`}
+											{@attach help({
+												title: 'Export',
+												text: 'Download this plugin as a zip. Clearing browser data deletes the in-browser copy.',
+											})}
+										>
+											<Download size={11} />
+											Export
 										</Button>
 									{/if}
 									{#if plugin.origin !== 'builtin'}
@@ -371,6 +494,10 @@
 											class="h-6 gap-1 px-2 text-xs hover:border-red-300 hover:text-red-500"
 											onclick={() => removePlugin(plugin)}
 											title="Remove plugin"
+											{@attach help({
+												title: 'Remove',
+												text: 'Uninstall this plugin from this browser.',
+											})}
 										>
 											<Trash2 size={11} />
 											Remove
@@ -402,4 +529,40 @@
 		onRun={handleRunWithParams}
 		onCancel={() => (pendingRunPlugin = null)}
 	/>
+{/if}
+
+{#if pendingRemove}
+	{@const plugin = pendingRemove}
+	<Dialog.Root
+		open={true}
+		onOpenChange={(v) => {
+			if (!v) pendingRemove = null;
+		}}
+	>
+		<Dialog.Content class="sm:max-w-sm">
+			<Dialog.Header>
+				<Dialog.Title>Remove "{plugin.manifest.name}"?</Dialog.Title>
+				<Dialog.Description>
+					You made this plugin in this browser. Removing it deletes the only copy here. Export it
+					first if you may want it back.
+				</Dialog.Description>
+			</Dialog.Header>
+			{#if plugin.draftCode !== null}
+				<p
+					class="rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300"
+				>
+					It has unsaved edits. Export saves v{plugin.manifest.version} without them; to keep them, cancel
+					and use <strong>Save version</strong> in its editor first.
+				</p>
+			{/if}
+			<Dialog.Footer>
+				<Button variant="outline" onclick={() => (pendingRemove = null)}>Cancel</Button>
+				<Button variant="outline" onclick={() => void exportPlugin(plugin)}>
+					<Download size={13} />
+					Export first
+				</Button>
+				<Button variant="destructive" onclick={confirmRemove}>Remove</Button>
+			</Dialog.Footer>
+		</Dialog.Content>
+	</Dialog.Root>
 {/if}

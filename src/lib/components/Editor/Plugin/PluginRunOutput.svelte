@@ -1,3 +1,18 @@
+<script lang="ts" module>
+	import type { PythonPlugin } from '$lib/plugin/types';
+
+	/** Whether this component would render anything for `plugin`; keep in sync with its sections. */
+	export function hasRunOutput(plugin: PythonPlugin, pendingApplyPluginId: string | null): boolean {
+		return (
+			plugin.status === 'error' ||
+			plugin.logs.length > 0 ||
+			plugin.pluginResult != null ||
+			Object.keys(plugin.artifacts).length > 0 ||
+			pendingApplyPluginId === plugin.manifest.id
+		);
+	}
+</script>
+
 <script lang="ts">
 	import { Download, X } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -6,7 +21,6 @@
 	import { getEditorDocumentSession } from '../context/EditorDocumentSession.svelte';
 	import PluginDiffPreview from './PluginDiffPreview.svelte';
 	import { RUN_FAILED_WITHOUT_MESSAGE } from '$lib/plugin/PluginCoordinator.svelte';
-	import type { PythonPlugin } from '$lib/plugin/types';
 
 	let { plugin }: { plugin: PythonPlugin } = $props();
 

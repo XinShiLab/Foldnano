@@ -459,3 +459,215 @@ describe('PluginRegistry isPluginBusyForInstall', () => {
 		expect(registry.isPluginBusyForInstall('any-id')).toEqual({ busy: false });
 	});
 });
+
+describe('PluginRegistry owned plugins', () => {
+	function makeDb() {
+		return {
+			loadAllPlugins: vi.fn().mockResolvedValue([]),
+			saveInstalledPlugin: vi.fn().mockResolvedValue(undefined),
+			updatePluginRecord: vi.fn().mockResolvedValue(undefined),
+			deletePlugin: vi.fn().mockResolvedValue(undefined),
+			deletePluginFiles: vi.fn().mockResolvedValue(undefined),
+		};
+	}
+
+	function makeOwnedManifest(version = '1.0.0'): PluginManifest {
+		return {
+			schemaVersion: 1,
+			id: 'local.abc12345',
+			name: 'Mine',
+			version,
+			format: 'foldnano_mini',
+			applyStrategy: 'replayMutationLog',
+		};
+	}
+
+	async function makeRegistry(db = makeDb()) {
+		const registry = new PluginRegistry(db as unknown as FoldnanoIndexedDb);
+		registry.setBusyCheck(() => ({ busy: false }));
+		await registry.ready;
+		return { registry, db };
+	}
+
+	it('stores ownership on the record, not the manifest', async () => {
+		const { registry, db } = await makeRegistry();
+		const plugin = await registry.registerNew(makeOwnedManifest(), null, {
+			authoring: { source: 'scriptLab' },
+		});
+		expect(plugin.authoring).toEqual({ source: 'scriptLab' });
+		expect(db.saveInstalledPlugin.mock.calls[0][0]).toMatchObject({
+			id: 'local.abc12345',
+			authoring: { source: 'scriptLab' },
+		});
+	});
+
+	it('keeps ownership and the draft when an owned plugin is replaced', async () => {
+		const { registry, db } = await makeRegistry();
+		const first = await registry.registerNew(makeOwnedManifest(), null, {
+			authoring: { source: 'scriptLab' },
+		});
+		first.draftCode = 'draft';
+		const { buildPluginZip, pluginFilesRecord } = await import('./ownedPlugins');
+		const next = makeOwnedManifest('1.0.1');
+		const replaced = await registry.replaceConfirmed(
+			next,
+			pluginFilesRecord(next, buildPluginZip(next, 'def run(ctx): pass'))
+		);
+		expect(replaced.authoring).toEqual({ source: 'scriptLab' });
+		expect(replaced.draftCode).toBe('draft');
+		expect(db.saveInstalledPlugin.mock.calls[1][0]).toMatchObject({ draftCode: 'draft' });
+	});
+
+	it('clears the draft when an owned version is saved', async () => {
+		const { registry, db } = await makeRegistry();
+		const first = await registry.registerNew(makeOwnedManifest(), null, {
+			authoring: { source: 'scriptLab' },
+		});
+		first.draftCode = 'draft';
+		const saved = await registry.saveOwnedVersion(makeOwnedManifest('1.0.1'), {
+			id: 'local.abc12345',
+			manifestVersion: '1.0.1',
+			wheels: [],
+			cachedAt: 0,
+		});
+		expect(saved.draftCode).toBeNull();
+		expect(saved.manifest.version).toBe('1.0.1');
+		expect(db.saveInstalledPlugin.mock.calls[1][0]).not.toHaveProperty('draftCode');
+	});
+
+	it('refuses owned saves and drafts for plugins not made here', async () => {
+		const { registry } = await makeRegistry();
+		await registry.registerNew(makeOwnedManifest(), null);
+		await expect(
+			registry.saveOwnedVersion(makeOwnedManifest('1.0.1'), {
+				id: 'local.abc12345',
+				manifestVersion: '1.0.1',
+				wheels: [],
+				cachedAt: 0,
+			})
+		).rejects.toThrow(/not made in this browser/);
+		await expect(registry.persistDraft('local.abc12345', 'x')).rejects.toThrow();
+	});
+
+	it('restores ownership and the draft from storage', async () => {
+		const db = makeDb();
+		db.loadAllPlugins.mockResolvedValueOnce([
+			{
+				id: 'local.abc12345',
+				manifest: makeOwnedManifest(),
+				authoring: { source: 'scriptLab', lastExportedVersion: '1.0.0' },
+				draftCode: 'draft',
+			},
+		]);
+		const { registry } = await makeRegistry(db);
+		const plugin = registry.get('local.abc12345');
+		expect(plugin?.authoring).toEqual({ source: 'scriptLab', lastExportedVersion: '1.0.0' });
+		expect(plugin?.draftCode).toBe('draft');
+	});
+
+	it('records the exported version', async () => {
+		const { registry, db } = await makeRegistry();
+		await registry.registerNew(makeOwnedManifest(), null, { authoring: { source: 'scriptLab' } });
+		await registry.markExported('local.abc12345', '1.0.0');
+		expect(registry.get('local.abc12345')?.authoring?.lastExportedVersion).toBe('1.0.0');
+		expect(db.updatePluginRecord).toHaveBeenCalledWith('local.abc12345', {
+			authoring: { source: 'scriptLab', lastExportedVersion: '1.0.0' },
+		});
+	});
+});
+
+describe('PluginRegistry owned plugins against a real database', () => {
+	const dbs: FoldnanoIndexedDb[] = [];
+
+	afterEach(async () => {
+		for (const db of dbs.splice(0)) {
+			db.close();
+			await db.delete();
+		}
+	});
+
+	async function freshDb(name = `test-owned-${crypto.randomUUID()}`): Promise<FoldnanoIndexedDb> {
+		const { FoldnanoIndexedDb } = await import('$lib/services/storage/indexeddb/FoldnanoIndexedDb');
+		const db = new FoldnanoIndexedDb(name);
+		dbs.push(db);
+		return db;
+	}
+
+	async function registryOn(db: FoldnanoIndexedDb): Promise<PluginRegistry> {
+		const registry = new PluginRegistry(db);
+		registry.setBusyCheck(() => ({ busy: false }));
+		await registry.ready;
+		return registry;
+	}
+
+	async function ownedPackage(version: string, code: string, extra: Record<string, string> = {}) {
+		const { buildOwnedManifest, pluginFilesRecord } = await import('./ownedPlugins');
+		const { zipSync, strToU8 } = await import('fflate');
+		const manifest = buildOwnedManifest({
+			id: 'local.abc12345',
+			name: 'Mine',
+			version,
+			requirements: [],
+		});
+		const zip = zipSync({
+			'fplugin.json': strToU8(JSON.stringify(manifest)),
+			'plugin.py': strToU8(code),
+			...Object.fromEntries(Object.entries(extra).map(([k, v]) => [k, strToU8(v)])),
+		});
+		return { manifest, files: pluginFilesRecord(manifest, zip) };
+	}
+
+	it('refuses a save from a tab whose loaded version is stale', async () => {
+		const name = `test-owned-${crypto.randomUUID()}`;
+		const dbA = await freshDb(name);
+		const tabA = await registryOn(dbA);
+		const v100 = await ownedPackage('1.0.0', 'v100');
+		await tabA.registerNew(v100.manifest, v100.files, { authoring: { source: 'scriptLab' } });
+
+		const { FoldnanoIndexedDb, PluginVersionConflictError } =
+			await import('$lib/services/storage/indexeddb/FoldnanoIndexedDb');
+		const dbB = new FoldnanoIndexedDb(name);
+		const tabB = await registryOn(dbB);
+
+		for (const version of ['1.0.1', '1.0.2']) {
+			const next = await ownedPackage(version, version);
+			await tabA.saveOwnedVersion(next.manifest, next.files);
+		}
+		const stale = await ownedPackage('1.0.1', 'stale');
+		await expect(tabB.saveOwnedVersion(stale.manifest, stale.files)).rejects.toBeInstanceOf(
+			PluginVersionConflictError
+		);
+		dbB.close();
+
+		const stored = await dbA.loadPluginFiles('local.abc12345');
+		expect(stored?.manifestVersion).toBe('1.0.2');
+	});
+
+	it('ends ownership when replaced by a package the editor would strip', async () => {
+		const registry = await registryOn(await freshDb());
+		const v100 = await ownedPackage('1.0.0', 'v100');
+		const plugin = await registry.registerNew(v100.manifest, v100.files, {
+			authoring: { source: 'scriptLab' },
+		});
+		plugin.draftCode = 'draft';
+
+		const multiFile = await ownedPackage('1.1.0', 'import helper', { 'helper.py': 'x = 1' });
+		const replaced = await registry.replaceConfirmed(multiFile.manifest, multiFile.files);
+		expect(replaced.authoring).toBeNull();
+		expect(replaced.draftCode).toBeNull();
+	});
+
+	it('keeps ownership and the draft when replaced by an editable package', async () => {
+		const registry = await registryOn(await freshDb());
+		const v100 = await ownedPackage('1.0.0', 'v100');
+		const plugin = await registry.registerNew(v100.manifest, v100.files, {
+			authoring: { source: 'scriptLab' },
+		});
+		plugin.draftCode = 'draft';
+
+		const next = await ownedPackage('1.0.0', 'same version, new code');
+		const replaced = await registry.replaceConfirmed(next.manifest, next.files);
+		expect(replaced.authoring).toEqual({ source: 'scriptLab' });
+		expect(replaced.draftCode).toBe('draft');
+	});
+});

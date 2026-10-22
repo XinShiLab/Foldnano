@@ -203,4 +203,46 @@ describe('EditorViewContext', () => {
 			'1.0.0'
 		);
 	});
+
+	describe('owned plugin editors', () => {
+		const owned = (id: string): PluginManifest => ({
+			schemaVersion: 2,
+			id,
+			name: id,
+			version: '1.0.0',
+			format: 'foldnano_mini',
+			applyStrategy: 'replayMutationLog',
+		});
+
+		it('keeps several editors open at once', () => {
+			const editorViewContext = new EditorViewContext();
+			editorViewContext.openPluginEditor('local.aaaaaaaa');
+			editorViewContext.openPluginEditor('local.bbbbbbbb');
+
+			expect([...editorViewContext.pluginEditorIds]).toEqual(['local.aaaaaaaa', 'local.bbbbbbbb']);
+			expect(editorViewContext.sidePanelTab).toBe('plugin:local.bbbbbbbb');
+
+			editorViewContext.poppedOutPluginPanels.add('local.bbbbbbbb');
+			editorViewContext.closePluginEditor('local.bbbbbbbb');
+			expect([...editorViewContext.pluginEditorIds]).toEqual(['local.aaaaaaaa']);
+			expect(editorViewContext.poppedOutPluginPanels.has('local.bbbbbbbb')).toBe(false);
+			expect(editorViewContext.sidePanelTab).toBe('PLUGIN');
+		});
+
+		it('reopens the editor of every owned plugin with a draft after a reload', async () => {
+			const { foldnanoIndexedDb } =
+				await import('$lib/services/storage/indexeddb/FoldnanoIndexedDb');
+			const authoring = { source: 'scriptLab' as const };
+			vi.mocked(foldnanoIndexedDb.loadAllPlugins).mockResolvedValueOnce([
+				{ id: 'local.aaaaaaaa', manifest: owned('local.aaaaaaaa'), authoring, draftCode: 'a' },
+				{ id: 'local.bbbbbbbb', manifest: owned('local.bbbbbbbb'), authoring },
+				{ id: 'local.cccccccc', manifest: owned('local.cccccccc'), authoring, draftCode: 'c' },
+			]);
+			const editorViewContext = new EditorViewContext();
+			await editorViewContext.pluginRegistry.ready;
+			await Promise.resolve();
+
+			expect([...editorViewContext.pluginEditorIds]).toEqual(['local.aaaaaaaa', 'local.cccccccc']);
+		});
+	});
 });

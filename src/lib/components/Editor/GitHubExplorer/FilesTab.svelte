@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { help } from '$lib/components/help/help';
 	import {
 		LoaderCircle,
 		AlertCircle,
@@ -104,15 +105,25 @@
 		<div class="flex flex-wrap gap-1.5 pl-5">
 			<button
 				class="rounded border border-amber-300 bg-background px-2 py-0.5 font-medium hover:bg-amber-100"
-				onclick={() => onOpenDiff(null)}>Review changes</button
+				onclick={() => onOpenDiff(null)}
+				{@attach help({
+					title: 'Review changes',
+					text: 'Compare your local design with the GitHub version.',
+				})}>Review changes</button
 			>
 			<button
 				class="rounded border border-amber-300 bg-background px-2 py-0.5 font-medium hover:bg-amber-100"
-				onclick={onOpenCommitDialog}>Commit local</button
+				onclick={onOpenCommitDialog}
+				{@attach help({ title: 'Commit local', text: 'Commit your local version to GitHub.' })}
+				>Commit local</button
 			>
 			<button
 				class="rounded border border-amber-300 bg-background px-2 py-0.5 font-medium hover:bg-amber-100 disabled:opacity-50"
 				onclick={() => explorerState.doPull('before_pull')}
+				{@attach help({
+					title: 'Discard & pull',
+					text: 'Drop your local changes and load the GitHub version. A local backup is saved first.',
+				})}
 				disabled={explorerState.pulling}
 			>
 				{#if explorerState.pulling}<LoaderCircle size={11} class="animate-spin" />{:else}Discard &
@@ -132,6 +143,7 @@
 			class="rounded border border-blue-200 bg-background px-2 py-0.5 font-medium hover:bg-blue-100 disabled:opacity-50"
 			onclick={() => explorerState.pullCurrentFile()}
 			disabled={explorerState.pulling}
+			{@attach help({ title: 'Pull', text: 'Load the newer GitHub version of this design.' })}
 		>
 			{#if explorerState.pulling}<LoaderCircle size={11} class="animate-spin" />{:else}Pull{/if}
 		</button>
@@ -153,6 +165,10 @@
 	<button
 		class="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-blue-600"
 		title="New design file"
+		{@attach help({
+			title: 'New design file',
+			text: 'Create an empty design file in the selected folder.',
+		})}
 		onclick={onOpenNewFileDialog}
 	>
 		<FilePlus size={13} />

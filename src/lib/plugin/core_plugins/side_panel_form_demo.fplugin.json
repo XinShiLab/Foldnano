@@ -1,16 +1,16 @@
 {
-	"schemaVersion": 1,
+	"schemaVersion": 2,
 	"id": "side-panel-form-demo",
 	"name": "Side Panel Form Demo",
-	"version": "1.0.1",
+	"version": "1.0.2",
 	"description": "Demo plugin that uses a host-rendered form side panel.",
 	"format": "foldnano_json",
 	"applyStrategy": "previewOnly",
+	"icon": "icon.svg",
 	"entrypointUrl": "/plugins/side_panel_form_demo/side_panel_form_demo.zip",
 	"sidePanel": {
 		"type": "form",
 		"title": "Form Demo",
-		"icon": "analysis",
 		"form": {
 			"submitLabel": "Analyze",
 			"fields": [

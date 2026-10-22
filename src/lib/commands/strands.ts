@@ -919,3 +919,18 @@ export const toggleOligoAsScaffoldCmd = (
 		}
 	});
 };
+
+export type RenameOligoParams = {
+	oligo: Oligo;
+	name: string;
+};
+
+/** Names are free-form labels: not unique, may be empty. Whitespace is trimmed. */
+export const renameOligoCmd = ({ oligo, name }: RenameOligoParams, history: HistoryStack): void => {
+	const next = name.trim();
+	if (next === oligo.name) return;
+	history.tx('Rename oligo', (rec) => {
+		rec.field(oligoRef(oligo), 'name', oligo.name, next);
+		oligo.name = next;
+	});
+};

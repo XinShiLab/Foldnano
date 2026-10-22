@@ -22,6 +22,7 @@
 
 	const columns: ColumnDef[] = [
 		{ key: 'oligoKey', label: 'OligoKey' },
+		{ key: 'name', label: 'Name' },
 		{ key: 'start', label: 'Start' },
 		{ key: 'end', label: 'End' },
 		{ key: 'sequence', label: 'Sequence' },

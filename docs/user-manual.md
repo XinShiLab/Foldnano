@@ -328,6 +328,11 @@ The select tool panel and toolbar filters control whether selection expands to:
 Region headers, VH tags, VH grid cells, and the cross-section cursor are always
 interactive in select mode even if strand filters are narrow.
 
+Clicking an oligo or segment shows its oligo's details in the panel, including an
+editable **Name** field (gray background). Names are optional labels for your own use
+and for the CSV `Name` column; they don't have to be unique and most oligos have none.
+Mirror oligos show their source's name read-only.
+
 ### Moving selected ends
 
 Drag a selection left or right to move the selected ends together by a single
@@ -542,6 +547,8 @@ Notes:
 
 - cadnano export is only valid for cadnano-compatible lattice parts
 - freeform edits are preserved by Foldnano JSON, not cadnano JSON
+- sequence CSV starts with a `Name` column (the optional oligo name; empty when
+  unset, not unique)
 - sequence CSV export requires explicit 5' and 3' ends; designs with circular
   scaffold or staple oligos must be linearized before export
 - oxDNA export can use relaxed positions when enabled

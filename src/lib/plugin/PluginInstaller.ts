@@ -1,6 +1,8 @@
 import { strFromU8 } from 'fflate';
 import { classifyManifest, validateManifest } from './manifestValidation';
 import type { PluginManifest } from './types';
+import { isOwnedEditablePackage, isRestorableOwnedZip } from './ownedPlugins';
+import { bundledIconSvg } from './pluginIcon';
 import type { PluginRegistry } from './PluginRegistry.svelte';
 import type { IndexedDbPluginFilesRecord } from '$lib/services/storage/indexedDbTypes';
 
@@ -33,6 +35,10 @@ function isBundledWheelRequirement(req: string): boolean {
 interface ProcessedPluginZip {
 	manifest: PluginManifest;
 	files: IndexedDbPluginFilesRecord | null;
+	/** A local zip exported from a plugin made with Script Lab; can be restored as editable. */
+	restorable: boolean;
+	/** The owned-plugin editor could edit this package (see `isOwnedEditablePackage`). */
+	ownedEditable: boolean;
 }
 
 /** Side-effect-free: no persistence, no registry access. */
@@ -89,6 +95,9 @@ function processPluginZip(
 		throw new Error('No plugin.py found at the zip root.');
 	}
 
+	// Checked here for a readable install error; the registry reads it again to store it.
+	if (manifest.icon) bundledIconSvg(manifest.icon, files[manifest.icon]);
+
 	// Wheels shipped inside the zip are referenced as bare filenames in
 	// requirements. URL / absolute-path wheels stay activate-time fetches.
 	const wheels: Array<{ url: string; data: Uint8Array }> = [];
@@ -121,11 +130,20 @@ function processPluginZip(
 			? { ...manifest, entrypointUrl: opts.sourceUrl }
 			: manifest;
 
-	return { manifest: registeredManifest, files: filesRecord };
+	const fileNames = Object.keys(files);
+	const restorable = !opts.sourceUrl && !runtimeCode && isRestorableOwnedZip(manifest, fileNames);
+	const ownedEditable = !runtimeCode && isOwnedEditablePackage(manifest, fileNames);
+
+	return { manifest: registeredManifest, files: filesRecord, restorable, ownedEditable };
 }
 
 export type PreparedInstall =
-	| { status: 'ready'; manifest: PluginManifest; files: IndexedDbPluginFilesRecord | null }
+	| {
+			status: 'ready';
+			manifest: PluginManifest;
+			files: IndexedDbPluginFilesRecord | null;
+			restorable?: boolean;
+	  }
 	| { status: 'blocked-builtin'; message: string }
 	| { status: 'blocked-busy'; message: string }
 	| {
@@ -133,6 +151,9 @@ export type PreparedInstall =
 			incoming: PluginManifest;
 			files: IndexedDbPluginFilesRecord | null;
 			existing: PluginManifest;
+			restorable?: boolean;
+			/** Replacing a plugin made here with a package its editor can't handle. */
+			endsEditing?: boolean;
 	  };
 
 type InstallReadinessRegistry = Pick<PluginRegistry, 'get' | 'isPluginBusyForInstall'>;
@@ -140,7 +161,9 @@ type InstallReadinessRegistry = Pick<PluginRegistry, 'get' | 'isPluginBusyForIns
 function classifyReadiness(
 	manifest: PluginManifest,
 	files: IndexedDbPluginFilesRecord | null,
-	registry: InstallReadinessRegistry
+	registry: InstallReadinessRegistry,
+	restorable = false,
+	ownedEditable = false
 ): PreparedInstall {
 	const existing = registry.get(manifest.id);
 	if (existing?.origin === 'builtin') {
@@ -156,8 +179,15 @@ function classifyReadiness(
 			message: `Cannot install "${manifest.id}": ${busy.reason ?? 'currently busy'}.`,
 		};
 	}
-	if (!existing) return { status: 'ready', manifest, files };
-	return { status: 'needs-confirm', incoming: manifest, files, existing: existing.manifest };
+	if (!existing) return { status: 'ready', manifest, files, restorable };
+	return {
+		status: 'needs-confirm',
+		incoming: manifest,
+		files,
+		existing: existing.manifest,
+		restorable,
+		endsEditing: Boolean(existing.authoring) && !ownedEditable,
+	};
 }
 
 function prepareZipBytesInstall(
@@ -165,8 +195,8 @@ function prepareZipBytesInstall(
 	registry: InstallReadinessRegistry,
 	opts: { sourceUrl?: string; expectedId?: string } = {}
 ): PreparedInstall {
-	const { manifest, files } = processPluginZip(zipBytes, opts);
-	return classifyReadiness(manifest, files, registry);
+	const { manifest, files, restorable, ownedEditable } = processPluginZip(zipBytes, opts);
+	return classifyReadiness(manifest, files, registry, restorable, ownedEditable);
 }
 
 export async function prepareLocalZipInstall(

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { help } from '$lib/components/help/help';
 	import type { CommitSummary } from './commitSummary';
 	import {
 		LoaderCircle,
@@ -154,12 +155,14 @@
 					<button
 						class="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 group-hover:opacity-100 hover:bg-accent hover:text-red-500"
 						title="Unstage"
+						{@attach help({ title: 'Unstage', text: 'Leave this file out of the next commit.' })}
 						onclick={() => unstage(entry.path)}><Minus size={11} /></button
 					>
 				{:else}
 					<button
 						class="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 group-hover:opacity-100 hover:bg-accent hover:text-green-600"
 						title="Stage"
+						{@attach help({ title: 'Stage', text: 'Include this file in the next commit.' })}
 						onclick={() => stage(entry.path)}><Plus size={11} /></button
 					>
 				{/if}
@@ -193,6 +196,10 @@
 					<button
 						class="rounded p-0.5 text-xs text-muted-foreground hover:bg-muted hover:text-red-500"
 						title="Unstage all"
+						{@attach help({
+							title: 'Unstage all',
+							text: 'Move every staged file back to Changes.',
+						})}
 						onclick={unstageAll}><Minus size={11} /></button
 					>
 				{/if}
@@ -216,6 +223,10 @@
 					<button
 						class="rounded p-0.5 text-xs text-muted-foreground hover:bg-muted hover:text-green-600"
 						title="Stage all"
+						{@attach help({
+							title: 'Stage all',
+							text: 'Include every changed file in the next commit.',
+						})}
 						onclick={stageAll}><Plus size={11} /></button
 					>
 				{/if}
@@ -243,7 +254,11 @@
 									creatingBranch = true;
 									newBranchName = '';
 									branchError = '';
-								}}><GitBranch size={11} /> New branch</button
+								}}
+								{@attach help({
+									title: 'New branch',
+									text: 'Create a branch from the current one and switch to it, so you commit there instead.',
+								})}><GitBranch size={11} /> New branch</button
 							>
 						{/if}
 					</div>
@@ -294,7 +309,11 @@
 								creatingBranch = true;
 								newBranchName = '';
 								branchError = '';
-							}}><GitBranch size={11} /> New branch</button
+							}}
+							{@attach help({
+								title: 'New branch',
+								text: 'Create a branch from the current one and switch to it, so you commit there instead.',
+							})}><GitBranch size={11} /> New branch</button
 						>
 					{:else}
 						<div class="flex flex-1 items-center gap-1.5">
@@ -354,6 +373,7 @@
 			<textarea
 				rows={3}
 				placeholder="Commit message…"
+				{@attach help({ title: 'Commit message', text: `Describe the change. ${mod}↵ commits.` })}
 				bind:value={message}
 				class="w-full resize-none rounded border border-border px-2 py-1.5 text-xs outline-none focus:border-blue-400"
 				onkeydown={(e) => {
@@ -365,6 +385,11 @@
 				class="flex w-full items-center justify-center gap-1.5 rounded bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
 				onclick={handleCommit}
 				disabled={!message.trim() || busy || staged.length === 0}
+				{@attach help({
+					title: 'Commit',
+					text: 'Save the staged files to GitHub as one commit on this branch.',
+					doc: 'saving-github',
+				})}
 			>
 				{#if busy}
 					<LoaderCircle size={12} class="animate-spin" />

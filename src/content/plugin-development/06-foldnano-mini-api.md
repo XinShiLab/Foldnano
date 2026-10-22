@@ -104,7 +104,7 @@ Each edit check above also refuses an edit to a mirror oligo, and an edit to a r
 | --- | --- | --- |
 | `oligo.id` | read‑only | Stable id, shared with the app. |
 | `oligo.color` | **settable** | Hex color `'#rrggbb'`. **Records** `set_oligo_color`. |
-| `oligo.name` | **settable** | Name or `None`. **Records** `set_oligo_name`. |
+| `oligo.name` | **settable** | Optional free-form label, or `None`. Not unique and never used for identity (use `oligo.id`); it shows in the editor, the oligo report and the CSV `Name` column. **Records** `set_oligo_name`. |
 | `oligo.is_scaffold` | **settable** | Scaffold flag. **Records** `set_oligo_is_scaffold`. |
 | `oligo.is_sequence_locked` | read‑only | Whether the sequence is locked (read-only). |
 | `oligo.segments` | read‑only | Its segments. |

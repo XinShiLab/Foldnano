@@ -91,6 +91,12 @@ export interface IndexedDbPluginRecord {
 	sidePanelCode?: string;
 	/** Persisted enable/disable toggle for builtin plugins */
 	enabled?: boolean;
+	/** Present for plugins made from Script Lab; marks them editable (`PluginAuthoring`). */
+	authoring?: { source: 'scriptLab'; lastExportedVersion?: string };
+	/** Unsaved edit of an owned plugin's plugin.py. */
+	draftCode?: string;
+	/** Validated SVG text of `manifest.icon`, read from the zip at install. */
+	iconSvg?: string;
 }
 
 /**

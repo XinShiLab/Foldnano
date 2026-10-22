@@ -405,7 +405,7 @@ const SCRIPT_LAB_ENTRYPOINT_PLACEHOLDER = `def run(ctx):
 `;
 
 export const scriptLabManifest: PluginManifest = {
-	schemaVersion: 1,
+	schemaVersion: 2,
 	id: SCRIPT_LAB_ID,
 	name: 'Script Lab',
 	version: '1.0.0',

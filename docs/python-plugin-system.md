@@ -140,7 +140,6 @@ src/lib/plugin/
     mutation_test.fplugin.json      ← demo plugin manifest (replayMutationLog, foldnano_mini)
     hello_world.fplugin.json        ← demo plugin manifest (replaceRegionKeepAnnotationsWhereMatched, cadnano_json, minimal inline entrypoint)
     pyOrigamiBreak.fplugin.json     ← demo plugin manifest (replaceRegion, cadnano_json, custom-tier: numpy/pandas/matplotlib + cadnano2_5_mini wheel)
-    side_panel_code_demo.fplugin.json ← demo plugin manifest (previewOnly, foldnano_json, codeEditor execution:"input")
     side_panel_form_demo.fplugin.json ← demo plugin manifest (previewOnly, foldnano_json, form side panel)
   scriptLabManifest.ts              ← built-in Script Lab manifest + starter templates
 
@@ -161,7 +160,6 @@ static/plugins/
     report.py                       ← demo (multi-file): CSV + summary statistics module
   hello_world/plugin.py             ← demo: minimal inline entrypoint
   pyOrigamiBreak/                   ← demo (multi-file, wheel dep): thermodynamic staple-break optimizer
-  side_panel_code_demo/plugin.py    ← demo: reads ctx.get_side_panel_code() from a codeEditor side panel (execution: "input")
   side_panel_form_demo/plugin.py    ← demo: host-rendered form side panel
   cadnano_mini/v0.1.0/*.whl         ← pinned standard-extra wheel referenced by STANDARD_ENV_EXTRAS
 ```
@@ -213,7 +211,7 @@ A plugin is declared as a JSON file:
 
 ```json
 {
-	"schemaVersion": 1,
+	"schemaVersion": 2,
 	"id": "my-router",
 	"name": "My Router",
 	"version": "1.0.0",
@@ -228,7 +226,7 @@ All fields are typed in `src/lib/plugin/types.ts`:
 
 | Field           | Type                                                   | Description                                                                                               |
 | --------------- | ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
-| `schemaVersion` | `1`                                                    | Manifest schema version. Missing = `1`; shipped manifests always write it. See § Manifest versioning.     |
+| `schemaVersion` | `1 \| 2`                                               | Manifest schema version. Missing = `1`; shipped manifests always write it. See § Manifest versioning.     |
 | `$schema`       | `string?`                                              | JSON Schema reference for editors; ignored.                                                               |
 | `x-…`           | `unknown`                                              | Author metadata, top level only; ignored.                                                                 |
 | `id`            | `string`                                               | Unique identifier and registry key; must match `PLUGIN_ID_PATTERN` (checked at install only).             |
@@ -241,6 +239,7 @@ All fields are typed in `src/lib/plugin/types.ts`:
 | `requirements`  | `string[]?`                                            | micropip packages or wheel URLs installed at activation. See **Wheel URL restrictions** below.            |
 | `network`       | `string[]?`                                            | Hosts the plugin may contact, or `["*"]`. Omitted/empty = none. Enforced by the sandbox CSP (§ Sandbox).  |
 | `description`   | `string?`                                              | Optional human-readable description.                                                                      |
+| `icon`          | `string?`                                              | v2 only. Path of an SVG inside the plugin zip; see § Plugin icons.                                        |
 | `parameters`    | `PluginParamDef[]?`                                    | User-configurable parameters shown in a dialog before each run (see below).                               |
 | `sidePanel`     | `PluginSidePanelManifest?`                             | Optional host-rendered side panel request using built-in `form` or `codeEditor` surfaces.                 |
 
@@ -254,7 +253,9 @@ All fields are typed in `src/lib/plugin/types.ts`:
 
 **Missing means 1, forever** (`DEFAULT_MANIFEST_SCHEMA_VERSION`, not the current version), like `.fn.json` files without a header. `withSchemaVersion` fills it in, so `validateManifest` returns, and `PluginRegistry` loads from IndexedDB, manifests with an explicit version. This is safe only because of two rules: unknown fields are rejected (a newer field used without declaring its version fails loudly), and **an existing field never changes meaning** in a later version; add a new field instead. A stored manifest newer than the app is flagged `needs-reinstall`.
 
-**Published schema:** `static/schemas/fplugin-v1.schema.json` (JSON Schema 2020-12), documented for authors in `src/content/plugin-development/04-plugin-manifest.md`. `manifestSchema.spec.ts` keeps it in lockstep: every shipped manifest must pass both the schema and `validateManifest`, the schema's field lists must equal the validator's, and network-entry rules must agree.
+**Published schemas:** `static/schemas/fplugin-v<N>.schema.json` (JSON Schema 2020-12), one per version and all kept online, documented for authors in `src/content/plugin-development/04-plugin-manifest.md`. `manifestSchema.spec.ts` keeps them in lockstep: every shipped manifest must pass the schema of its own `schemaVersion` and `validateManifest`, each schema's field lists must equal `manifestFieldsFor(N)`, and network-entry rules must agree.
+
+**Versions:** v1 is the original field set (`MANIFEST_V1_FIELDS`). v2 (`MANIFEST_V2_FIELDS`) adds top-level `icon`; nested objects are unchanged. A v1 manifest that uses `icon` is refused with a message naming `schemaVersion`. Owned plugins (Script Lab) always write the current version.
 
 **Bumping the version:** add the field to the validator and its field lists, raise `MANIFEST_SCHEMA_VERSION` (and the `schemaVersion` literal type), publish `fplugin-v<N>.schema.json` next to the old one, and update the author docs.
 
@@ -345,13 +346,24 @@ Rules:
 
 - `sidePanel.form.fields` uses the same field schema as `parameters`
 - `parameters` and `sidePanel.form.fields` are mutually exclusive
-- `sidePanel.icon` is limited to a host-owned enum: `form`, `code`, `analysis`
+- `sidePanel.icon` is limited to a host-owned enum: `form`, `code`, `analysis`. **Deprecated** for packaged plugins in favour of the top-level `icon` (§ Plugin icons), which wins when both are set; still honoured, and the enum won't grow. Runtime-code plugins have no zip, so it stays their only icon
 - `sidePanel.codeEditor.execution` controls what the editor contents mean:
   - `"input"` (default) — run the manifest entrypoint and pass the editor contents to Python via `ctx.get_side_panel_code()`
   - `"entrypoint"` — execute the editor contents themselves as the plugin source for that run
-- raw SVG, arbitrary asset URLs, and plugin-defined components are not supported
+- arbitrary asset URLs and plugin-defined components are not supported; the only plugin-supplied artwork is the bundled `icon`
 
 Installing a plugin with `sidePanel` adds a dedicated sidebar tab next to the built-in GitHub and Plugin tabs.
+
+### Plugin icons
+
+A v2 manifest may name an SVG inside its zip: `"icon": "icon.svg"` (`PLUGIN_ICON_PATH_PATTERN`: a relative path, no segment starting with `.`). It is drawn on the plugin's sidebar tab (in place of the `sidePanel.icon` glyph) and on its Plugins list row.
+
+- **Checked at install** (`PluginInstaller` → `bundledIconSvg` in `pluginIcon.ts`): the file must be in the zip, at most `MAX_PLUGIN_ICON_BYTES` (32 KB), parse as an SVG-namespace `<svg>` with a `viewBox`, and contain no scripts, event handlers, `foreignObject`/`image`/animation elements, DOCTYPE/entities, or references other than `#fragment`. Runtime-code manifests can't use `icon` (they have no zip).
+- **Stored, not re-read:** `PluginRegistry` reads the icon again from the files record on every install/replace/save (`readPluginIcon`) and keeps the validated text as `iconSvg` on the `plugins` record and on `PythonPlugin`. Startup loads it from the record only while the manifest still names an icon; drawing never unzips.
+- **Drawn as a CSS mask** (`PluginIcon.svelte`): a `data:` URL used as `mask-image`, filled with `currentColor`. Masks can't run scripts or fetch, and the icon follows the sidebar's muted/active colours and dark mode, so plugin icons are always one colour.
+- **Precedence:** `manifest.icon` → `sidePanel.icon` → the panel type's default glyph (`toPluginSidePanelDescriptors` in `Editor/sidePanels.ts`).
+- **Owned plugins** bundle theirs as `icon.svg`, chosen in Save as Plugin or the editor's Icon button; see `docs/script-lab.md` § Owned plugins.
+- **Not yet:** the Plugin Centre lists pointer manifests before install, so it shows no icons.
 
 ### Code-editor execution modes
 
@@ -579,7 +591,13 @@ Defined in `src/lib/plugin/worker/protocol.ts`.
     activePartIndex: number;
     paramsJson?: string;      // JSON-encoded Record<string, unknown>; omitted when no parameters
     activeRegionId?: string | null;
-    loadImports?: boolean;    // load distribution packages pluginCode imports first (code-editor runs)
+    loadImports?: boolean;    // load distribution packages pluginCode imports first (code-editor runs);
+                              // with pluginZipData too (owned-plugin draft) the zip runs, pluginCode is only scanned
+}
+
+{ type: 'RESOLVE_IMPORTS';  // which distribution packages provide code's imports (owned-plugin requirements)
+    requestId: string;
+    code: string;
 }
 ```
 
@@ -602,6 +620,9 @@ Defined in `src/lib/plugin/worker/protocol.ts`.
 }
 { type: 'PLUGIN_ERROR';  requestId: string; error: string; traceback: string }
 { type: 'PLUGIN_LOG';    requestId: string; message: string }  // streaming
+
+{ type: 'IMPORTS_RESOLVED'; requestId: string; packages: string[] }  // sorted package names
+{ type: 'IMPORTS_ERROR';    requestId: string; error: string }
 ```
 
 `PLUGIN_LOG` messages are emitted during execution and delivered to the plugin's `logs` array in real time via `PyodideWorkerBridge`'s `onLog` callback. They do **not** resolve the run Promise — only `PLUGIN_RESULT` or `PLUGIN_ERROR` do.
@@ -692,7 +713,7 @@ This means external mutations like `plugin.status = 'activating'` (done by `Plug
 
 ### Persistence
 
-The manifest is persisted for user-installed plugins. For plugins with a `codeEditor` side panel, the current editor buffer (`sidePanelCode`) is also persisted — stored as an unindexed field in the same `plugins` table record. The panel saves it through `EditorCodeSaver` (debounced, awaited, flushed on close; see `docs/script-lab.md` § Editor code persistence). Runtime state (`status`, `logs`, `artifacts`) is ephemeral.
+The manifest is persisted for user-installed plugins, with `iconSvg` when it names an icon (§ Plugin icons). Plugins made from Script Lab also carry `authoring` (ownership; makes them editable) and `draftCode` (unsaved edit) on the same record; see `docs/script-lab.md` § Owned plugins. For plugins with a `codeEditor` side panel, the current editor buffer (`sidePanelCode`) is also persisted — stored as an unindexed field in the same `plugins` table record. The panel saves it through `EditorCodeSaver` (debounced, awaited, flushed on close; see `docs/script-lab.md` § Editor code persistence). Runtime state (`status`, `logs`, `artifacts`) is ephemeral.
 
 ```typescript
 // Write path (fire-and-forget)
@@ -714,6 +735,11 @@ remove(id: string): boolean
 get(id: string): PythonPlugin | undefined
 get all(): PythonPlugin[]
 persistEditorCode(pluginId: string, code: string): Promise<void>  // rejects on failure; EditorCodeSaver shows it
+registerNew(manifest, files, { authoring? })   // authoring marks a plugin made from Script Lab
+replaceConfirmed(manifest, files)              // an owned plugin stays owned only if the editor can handle the new package
+saveOwnedVersion(manifest, files)              // owned plugins only; clears the draft; PluginVersionConflictError if another tab saved first
+persistDraft(pluginId, code | null)            // owned plugins only
+markExported(pluginId, version)
 ready: Promise<void>
 ```
 
@@ -1038,7 +1064,7 @@ The manifest inside the zip may omit `entrypointUrl`:
 
 ```json
 {
-	"schemaVersion": 1,
+	"schemaVersion": 2,
 	"id": "my-plugin",
 	"name": "My Plugin",
 	"version": "1.0.0",
@@ -1293,6 +1319,7 @@ This file is for **Foldnano developers** working on the host side of the plugin 
 - **The worker never mutates the app model.** It returns artifacts and (for `foldnano_mini`) a structured mutation log. The main thread applies them via `ResultApplicator` inside `historyStack.snapshotTx` — one undo step per plugin run.
 - **Don't change what an existing manifest field means** in a new schema version; add a new field. Unversioned manifests are read as v1, so a changed meaning would be misread silently.
 - **Don't add a manifest field without bumping `schemaVersion`** and publishing a new schema. Older apps must refuse a manifest they can't fully understand, and `manifestSchema.spec.ts` fails until the schema and validator agree.
+- **Don't render a plugin icon as markup.** No `{@html}`, inline `<svg>` or `<object>`: draw `iconSvg` through `PluginIcon.svelte` (CSS mask). Validation is defence in depth, not a sanitizer.
 - **Don't bypass `validateManifest`.** It is the only enforcement point for `format` × `applyStrategy` compatibility (e.g. `replayMutationLog*` requires `foldnano_mini`; `live` is rejected).
 - **Don't offer `pendingApply` for an unchecked result.** For non-replay strategies, `runWithOptions()` must run Result validation (`result-format-validation-*.ts`) and Design verification (`design-verification.ts`) on `result.primaryArtifact` before creating `pendingApply` — both run against a detached scratch `Part`, never `doc.parts`. `confirmApply()` still wraps the real `ResultApplicator.applyResult()` call in a try/catch (`PluginApplyError`) as a last-resort net, but it should not be the first place a malformed result is caught.
 - **Don't assume all `codeEditor` side panels execute editor code directly.** `execution: "input"` remains the default; `execution: "entrypoint"` is an explicit opt-in.

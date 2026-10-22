@@ -75,6 +75,9 @@ function makePlugin(manifest: PluginManifest): PythonPlugin {
 		sidePanelValues: {},
 		sidePanelCode: '',
 		lastRunMutationLogLength: null,
+		authoring: null,
+		draftCode: null,
+		iconSvg: null,
 	};
 }
 
@@ -1538,5 +1541,103 @@ describe('PluginCoordinator run timeout', () => {
 
 		await coordinator.activate('slow');
 		expect(bridges).toHaveLength(2);
+	});
+});
+
+describe('PluginCoordinator owned-plugin drafts', () => {
+	const ownedManifest: PluginManifest = {
+		schemaVersion: 1,
+		id: 'local.abc12345',
+		name: 'Mine',
+		version: '1.0.0',
+		format: 'foldnano_mini',
+		applyStrategy: 'replayMutationLog',
+	};
+	const DRAFT = 'import numpy\n\ndef run(ctx):\n    ctx.log("draft")\n';
+
+	function setup(owned: boolean) {
+		const plugin = makePlugin(ownedManifest);
+		plugin.resolvedCode = null;
+		plugin.resolvedZipData = new ArrayBuffer(8);
+		plugin.authoring = owned ? { source: 'scriptLab' } : null;
+		const registry = {
+			get: vi.fn((id: string) => (id === ownedManifest.id ? plugin : undefined)),
+			hasReservation: () => false,
+		} as const;
+		const bridge = {
+			initRuntime: vi.fn().mockResolvedValue(undefined),
+			resolveImports: vi.fn().mockResolvedValue(['numpy']),
+			runPlugin: vi.fn().mockResolvedValue({
+				logs: [],
+				artifacts: {},
+				pluginResult: null,
+				primaryArtifact: null,
+				mutationLog: null,
+			}),
+			terminate: vi.fn(),
+		};
+		const doc = new FoldnanoDocument('doc-plugin', 'Plugin Doc');
+		doc.parts.push(makeHoneycombPart('Original Part'));
+		const coordinator = new PluginCoordinator(
+			registry as never,
+			() => doc,
+			undefined,
+			() => null,
+			(() => bridge) as never
+		);
+		return { plugin, bridge, coordinator };
+	}
+
+	it('runs a draft as the plugin: a zip of the draft, scanned for imports', async () => {
+		const { bridge, coordinator } = setup(true);
+		await coordinator.runWithOptions(ownedManifest.id, { draftCode: DRAFT });
+
+		const sent = bridge.runPlugin.mock.calls[0][0] as {
+			pluginCode: string;
+			pluginZipData: ArrayBuffer;
+			loadImports: boolean;
+		};
+		expect(sent.pluginCode).toBe(DRAFT);
+		expect(sent.loadImports).toBe(true);
+		const { unzipSync, strFromU8 } = await import('fflate');
+		const files = unzipSync(new Uint8Array(sent.pluginZipData));
+		expect(strFromU8(files['plugin.py'])).toBe(DRAFT);
+		expect(JSON.parse(strFromU8(files['fplugin.json'])).id).toBe(ownedManifest.id);
+	});
+
+	it('keeps the icon in a draft zip of a plugin that has one', async () => {
+		const { bridge, coordinator, plugin } = setup(true);
+		const icon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"/>';
+		plugin.manifest = { ...ownedManifest, schemaVersion: 2, icon: 'icon.svg' };
+		plugin.iconSvg = icon;
+		await coordinator.runWithOptions(ownedManifest.id, { draftCode: DRAFT });
+
+		const sent = bridge.runPlugin.mock.calls[0][0] as { pluginZipData: ArrayBuffer };
+		const { unzipSync, strFromU8 } = await import('fflate');
+		const files = unzipSync(new Uint8Array(sent.pluginZipData));
+		expect(strFromU8(files['icon.svg'])).toBe(icon);
+	});
+
+	it('runs the saved zip without scanning imports when there is no draft', async () => {
+		const { bridge, coordinator, plugin } = setup(true);
+		await coordinator.run(ownedManifest.id);
+		expect(bridge.runPlugin).toHaveBeenCalledWith(
+			expect.objectContaining({ pluginZipData: plugin.resolvedZipData, loadImports: false })
+		);
+	});
+
+	it('refuses a draft run for a plugin not made in this browser', async () => {
+		const { bridge, coordinator } = setup(false);
+		await expect(
+			coordinator.runWithOptions(ownedManifest.id, { draftCode: DRAFT })
+		).rejects.toThrow(/not made in this browser/);
+		expect(bridge.runPlugin).not.toHaveBeenCalled();
+	});
+
+	it('resolves script requirements on the standard worker', async () => {
+		const { bridge, coordinator } = setup(true);
+		await expect(coordinator.resolveScriptRequirements(DRAFT)).resolves.toEqual(['numpy']);
+		expect(bridge.initRuntime).toHaveBeenCalled();
+		expect(bridge.resolveImports).toHaveBeenCalledWith(expect.any(String), DRAFT);
 	});
 });

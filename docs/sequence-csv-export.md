@@ -11,8 +11,15 @@ Sequence CSV export writes one row per oligo with explicit 5' and 3' endpoint
 labels:
 
 ```text
-Start,End,Sequence,Length,Color,Mod5Prime,Mod3Prime
+Name,Start,End,Sequence,Length,Color,Mod5Prime,Mod3Prime
 ```
+
+`Name` is `Oligo.name`: an optional label, empty for most oligos, not unique (see
+`docs/dna-model.md` § Oligo name). It comes first because ordering sheets (e.g. plate
+uploads) expect a name column next to the sequence; the exporter writes names as-is and
+never invents one for unnamed oligos. Values containing commas or quotes are CSV-quoted.
+The oligo report (`oligoReport.ts`) carries the same `name` column, so the diff page
+reports a rename as a `name` change.
 
 The exporter is intentionally an endpoint-oriented format. Every exported oligo
 must have a concrete free 5' end and free 3' end. Circular DNA is rejected before

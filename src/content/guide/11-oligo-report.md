@@ -12,7 +12,7 @@ slug: oligo-report
 
 # Oligo Report And Diff
 
-The **oligo report** is a full-page table of every oligo in a design: where it starts and ends, its sequence, length, color, and end modifications. It's the place to review staples before ordering them, and the **Oligo Diff** page compares the reports of two saved designs.
+The **oligo report** is a full-page table of every oligo in a design: its name, where it starts and ends, its sequence, length, color, and end modifications. It's the place to review staples before ordering them, and the **Oligo Diff** page compares the reports of two saved designs.
 
 ## Opening The Report
 
@@ -41,12 +41,19 @@ The table has one row per oligo, with the text tinted in the oligo's own color. 
 | Column | Contents |
 | --- | --- |
 | **OligoKey** | A short ID derived from the oligo's positions (`oligo-…`). The same routing gives the same key in any document. |
+| **Name** | The oligo's optional name, empty if it has none (see below) |
 | **Start** / **End** | 5′ and 3′ end, written `helix[base]`, for example `12[48]`. Circular oligos show `Circular`. |
 | **Sequence** | Assigned sequence, 5′ → 3′ (empty for circular oligos) |
 | **Length** | Length in nucleotides |
 | **Color** | The oligo's color swatch and hex value |
 | **Mod5Prime** / **Mod3Prime** | Terminal modification names, if any |
 | **Positions** | Every segment as `5′ end>3′ end`, in routing order |
+
+<Callout type="note">
+
+**Oligo names are optional labels.** Set them in the editor's [Select tool panel](/docs/guide/selection#naming-an-oligo) or from a plugin. They're there for your convenience and for the ordering sheet; Foldnano never uses them to identify an oligo. They don't have to be unique, and most oligos have none. The CSV's first column is `Name`, left empty for unnamed oligos. The OligoKey is the stable, position-based identifier.
+
+</Callout>
 
 Circular oligos are listed but the page warns that they're **rejected by CSV export**. Linearize them in the editor first (the **circular strand** highlight finds them, see [Selection](/docs/guide/selection#highlighting-and-hiding)).
 
@@ -66,7 +73,7 @@ The diff matches oligos by their **positions** (the same segments on the same he
 | Status | Meaning |
 | --- | --- |
 | **Unchanged** | Same positions and identical values |
-| **Changed** | Same positions, but a different sequence, color, or modification |
+| **Changed** | Same positions, but a different name, sequence, color, or modification |
 | **Only in left** | Present only in the left design (for example removed or re-routed) |
 | **Only in right** | Present only in the right design (for example added or re-routed) |
 

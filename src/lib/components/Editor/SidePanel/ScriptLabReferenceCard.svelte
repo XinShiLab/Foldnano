@@ -2,6 +2,7 @@
 	import { BookOpenText, FileCode2, FlaskConical, Layers } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
+	import { help } from '$lib/components/help/help';
 
 	interface Props {
 		onLoadMutationTemplate: () => void;
@@ -39,6 +40,11 @@
 					class="h-6 w-6 px-0"
 					title="Script Lab help and starter templates"
 					aria-label="Script Lab help"
+					{@attach help({
+						title: 'Starters and API reference',
+						text: 'Load a starter script, or look up the most used parts of the scripting API.',
+						doc: 'script-lab',
+					})}
 				>
 					<BookOpenText size={12} />
 				</Button>

@@ -72,9 +72,17 @@ The **Select:** dropdown in the panel turns a click into a "select all similar" 
 | **Same Length** | Every oligo with the clicked oligo's length | oligos |
 | **Same Modification** | Every end carrying the clicked end's modification | ends |
 
-### Hover info
+### Oligo info
 
-Below the filters, the panel shows details for the oligo or segment under the pointer: its 5′ → 3′ span (`helix[base] -> helix[base]`, or *(circular)*), length, color, whether it's the scaffold, whether its sequence is locked, and its modifications. The parent oligo is shown for a hovered segment.
+Below the filters, the panel shows details for the oligo or segment you last clicked: its name, its 5′ → 3′ span (`helix[base] -> helix[base]`, or *(circular)*), length, color, whether it's the scaffold, whether its sequence is locked, and its modifications. For a clicked segment, the panel also shows the oligo it belongs to.
+
+#### Naming an oligo
+
+The **Name** field (gray background) is editable. Type a name and press `Enter` or click away to apply it; `Escape` cancels. Each rename is a single undo step, and clearing the field removes the name.
+
+Names are **optional labels** for your own use and for downstream tools: they appear in the [oligo report](/docs/guide/oligo-report) and as the `Name` column of the sequence CSV. Most oligos have none. Foldnano doesn't check them: two oligos can share a name, and nothing in the editor depends on it. Breaking a named oligo gives every piece the same name, and joining two oligos keeps the name of the one whose 3′ end makes the connection.
+
+Mirror oligos in a [repeat group](/docs/guide/duplicates-repeat-groups) show their source's name read-only; rename the source instead.
 
 The Select panel also hosts the **Repeat groups** list when the design has linked copies; see [Duplicates And Repeat Groups](/docs/guide/duplicates-repeat-groups#the-repeat-groups-panel).
 

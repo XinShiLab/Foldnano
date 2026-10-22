@@ -12,7 +12,7 @@ slug: plugin-manifest
 
 ```json
 {
-	"schemaVersion": 1,
+	"schemaVersion": 2,
 	"id": "my-plugin",
 	"name": "My Plugin",
 	"version": "1.0.0",
@@ -20,13 +20,14 @@ slug: plugin-manifest
 	"applyStrategy": "previewOnly",
 	"entrypointUrl": "/plugins/my_plugin/my_plugin.zip",
 	"requirements": ["numpy"],
-	"description": "Optional description shown in the plugin panel."
+	"description": "Optional description shown in the plugin panel.",
+	"icon": "icon.svg"
 }
 ```
 
 | Field | Required | Notes |
 | --- | --- | --- |
-| `schemaVersion` | Recommended | Manifest schema version, currently `1`. Read as `1` when missing, but include it. Not your plugin's version; see [Versioning](#versioning-and-unknown-fields). |
+| `schemaVersion` | Recommended | Manifest schema version, currently `2`. Read as `1` when missing, but include it; `icon` needs `2`. Not your plugin's version; see [Versioning](#versioning-and-unknown-fields). |
 | `$schema` | No | Link to the [published JSON Schema](#machine-readable-schema) for editor support. Ignored by Foldnano. |
 | `id` | Yes | Unique key used by the registry. Starts with a letter, then letters, digits, `.`, `_` or `-`, up to 64 characters; kebab-case such as `my-plugin` is recommended. Checked when the plugin is installed. |
 | `name` | Yes | Display name in the panel. |
@@ -38,6 +39,7 @@ slug: plugin-manifest
 | `requirements` | No | micropip package names, bare `.whl` filenames shipped in the zip, or wheel URLs fetched at activation. |
 | `network` | No | Hosts your plugin may contact, or `["*"]` for any HTTPS host. Omit it for no network access; see [Network access](#network-access). |
 | `description` | No | Human-readable description. |
+| `icon` | No | Path of an SVG icon inside your zip, such as `"icon.svg"`. Needs `"schemaVersion": 2`; see [Plugin icon](#plugin-icon). |
 | `parameters` | No | Array of `PluginParamDef`: user-configurable inputs shown in a run dialog. |
 | `sidePanel` | No | Optional host-rendered side panel request. Supports `form` and `codeEditor` UIs. |
 | `x-…` | No | Your own metadata (for example `"x-homepage"`). Allowed at the top level only; ignored by Foldnano. |
@@ -57,7 +59,7 @@ The only case where inline `entrypoint` is allowed is a `sidePanel.codeEditor` p
 
 `schemaVersion` tells Foldnano which version of this manifest format you wrote against. It is separate from `version`, which is your plugin's own release number.
 
-- A manifest without `schemaVersion` is read as version 1, so plugins written before the Foldnano beta keep working. Include `"schemaVersion": 1` anyway: you will need to declare a version to use fields added later.
+- A manifest without `schemaVersion` is read as version 1, so plugins written before the Foldnano beta keep working. Include `"schemaVersion"` anyway: fields added later (such as `icon` in version 2) only work once you declare the version that introduced them.
 - A manifest with a higher `schemaVersion` than the running app supports is refused with a request to update Foldnano, rather than having its newer fields silently ignored.
 - Unknown fields are rejected, at every level, so a typo such as `"netwrok"` fails loudly instead of quietly doing nothing. Put your own metadata in top-level fields starting with `x-`.
 
@@ -70,8 +72,9 @@ Each manifest schema version has a JSON Schema (draft 2020-12), published with t
 | Schema version | Schema |
 | --- | --- |
 | 1 | [`/schemas/fplugin-v1.schema.json`](/schemas/fplugin-v1.schema.json) |
+| 2 | [`/schemas/fplugin-v2.schema.json`](/schemas/fplugin-v2.schema.json) (adds `icon`) |
 
-Point `$schema` in your manifest at it (for example `"$schema": "https://<foldnano-host>/schemas/fplugin-v1.schema.json"`) and editors such as VS Code will autocomplete fields and flag mistakes as you type. The schema checks structure, types and the `format`/`applyStrategy` pairing. Foldnano checks a little more when installing (allowed URLs, field defaults and ranges, parameters versus side panel forms), so a manifest can pass the schema and still be refused; the install error says why.
+Point `$schema` in your manifest at the one matching your `schemaVersion` (for example `"$schema": "https://<foldnano-host>/schemas/fplugin-v2.schema.json"`) and editors such as VS Code will autocomplete fields and flag mistakes as you type. The schema checks structure, types and the `format`/`applyStrategy` pairing. Foldnano checks a little more when installing (allowed URLs, field defaults and ranges, parameters versus side panel forms), so a manifest can pass the schema and still be refused; the install error says why.
 
 ### Network access
 
@@ -115,7 +118,25 @@ For `type: "codeEditor"`, the optional `sidePanel.codeEditor.execution` field co
 - `"input"` (default): the plugin's manifest entrypoint runs, and the editor contents are passed to Python via `ctx.get_side_panel_code()`
 - `"entrypoint"`: the editor contents themselves are executed as the plugin source for that run
 
-Use `sidePanel.icon` only with the host-owned enum values `form`, `code`, or `analysis`.
+`sidePanel.icon` (`form`, `code` or `analysis`) is deprecated for packaged plugins: bundle an SVG with the top-level `icon` instead, which wins when both are set. Code-editor plugins with `execution: "entrypoint"` have no zip, so `sidePanel.icon` remains their only icon option.
+
+### Plugin icon
+
+Give your plugin its own icon by putting an SVG file in the zip and naming it in the manifest:
+
+```json
+"schemaVersion": 2,
+"icon": "icon.svg"
+```
+
+The icon appears on your plugin's sidebar tab and on its row in the Plugins list. Foldnano checks it when the plugin is installed:
+
+- At most 32 KB, with an `<svg>` root that has `xmlns="http://www.w3.org/2000/svg"` and a `viewBox`.
+- No scripts, event handlers, `foreignObject`, `<image>` or animation elements.
+- No links to other files: `href` and `url()` may only point at an `#id` in the same file.
+- The path is relative to the zip root (`"icon.svg"` or `"assets/icon.svg"`) and ends in `.svg`.
+
+Foldnano draws the icon in a single colour that follows the app theme, so design it as a monochrome glyph. A 24×24 stroke icon in the style of [Lucide](https://lucide.dev) fits in well. Code-editor plugins with `execution: "entrypoint"` have no zip, so they can't use `icon`.
 
 ### Code-editor execution modes
 
@@ -129,7 +150,7 @@ Use this when the editor buffer is the full Python source of truth. In this mode
 
 ```json
 {
-	"schemaVersion": 1,
+	"schemaVersion": 2,
 	"id": "my-script-plugin",
 	"name": "My Script Plugin",
 	"version": "1.0.0",

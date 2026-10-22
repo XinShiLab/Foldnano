@@ -481,6 +481,23 @@ complementary. It's consumed by the StrandView's mismatch-warning overlay
 `movingEndsOps.ts` — both are UI affordances for finding and fixing mismatches
 manually, not model-level enforcement.
 
+### Oligo name
+
+`Oligo.name` is an **optional, free-form label** for the user's convenience and for
+downstream tools (the sequence CSV `Name` column, the oligo report, plugins). It is
+`''` for most oligos. Nothing in the model reads it for identity or behavior, with one
+exception: it is part of the repeat-group fingerprint, so a mirror copies its source's
+name like it copies its color.
+
+Names are **not unique** and are deliberately not checked: mirrors copy their source's
+name, breaking an oligo copies the name onto every piece (`Part` split path), joining
+keeps the 3'-side oligo's name, and plugins may set anything. Enforcing uniqueness
+would make all of those ops fail or silently rename. Use `oligo.id` for identity and
+OligoKey for cross-design matching; never key anything on the name.
+
+Edits go through `renameOligoCmd` (trims surrounding whitespace; empty clears) or the
+`set_oligo_name` plugin op.
+
 ### OligoID vs OligoKey
 
 An `Oligo` has two identifiers with different stability guarantees:
@@ -626,6 +643,7 @@ There is no backward-compat loader for pre-region documents: `Part.fromJSON()` t
 - **Use `SvelteSet`/`SvelteMap`** for any model-side collection that participates in reactivity. Plain `Set`/`Map` is fine only inside non-reactive caches (e.g. some inner `SpatialIndexService` maps — see `spatial-index.md`).
 - **Class files using `$state` / `$derived` must use `.svelte.ts`.** Otherwise the runes compile to plain function calls and explode at runtime.
 - **Don't call `translateOligoSegments` with one segment at a time.** Pass the whole moving batch in a single call — see "Moving a segment: resize vs translate" above and `commands-and-history.md`'s Boundaries section.
+- **Don't treat `Oligo.name` as an identifier or enforce its uniqueness.** It is an optional label (see "Oligo name"); use `oligo.id` / OligoKey.
 - **Don't create or allow a 1-bp segment.** Its strand can't be derived (see "Oligo And OligoSegment"). New end-move or segment-creating paths must reject 5' = 3', e.g. via `keepsSegmentDirection`; don't loosen that check to `<=`.
 - **Don't set `SegmentEnd.index` directly inside a routine that moves more than one end before resyncing slots.** The setter schedules `OligoSegment.updateSlotsAfterEndMove()` as a side effect and will run against a half-updated segment. Use `moveIndexWithoutSlotSync` and resync explicitly once every end has settled.
 

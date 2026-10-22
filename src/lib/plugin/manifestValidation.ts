@@ -22,7 +22,7 @@ import { validateNetwork } from './networkPolicy';
  * meaning changes, so older apps refuse newer manifests instead of ignoring
  * what they don't understand. See docs/python-plugin-system.md § Manifest versioning.
  */
-export const MANIFEST_SCHEMA_VERSION = 1;
+export const MANIFEST_SCHEMA_VERSION = 2;
 
 /** Top-level fields a v1 manifest may contain, besides `x-`-prefixed extensions. */
 export const MANIFEST_V1_FIELDS: readonly string[] = [
@@ -41,6 +41,14 @@ export const MANIFEST_V1_FIELDS: readonly string[] = [
 	'parameters',
 	'sidePanel',
 ];
+
+/** v2 adds `icon`. Nested objects are unchanged. */
+export const MANIFEST_V2_FIELDS: readonly string[] = [...MANIFEST_V1_FIELDS, 'icon'];
+
+/** Top-level fields a manifest of `schemaVersion` may contain. */
+export function manifestFieldsFor(schemaVersion: number): readonly string[] {
+	return schemaVersion >= 2 ? MANIFEST_V2_FIELDS : MANIFEST_V1_FIELDS;
+}
 
 /** Fields allowed inside nested v1 objects (no `x-` extensions below the top level). */
 export const MANIFEST_V1_NESTED_FIELDS = {
@@ -233,13 +241,20 @@ export const PLUGIN_ID_PATTERN = /^[A-Za-z][A-Za-z0-9._-]{0,63}$/;
 export const PLUGIN_VERSION_PATTERN =
 	/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/;
 
+/** A relative path inside the zip ending in .svg; no segment may start with "." (so no ".."). */
+export const PLUGIN_ICON_PATH_PATTERN =
+	/^(?:[A-Za-z0-9_-][A-Za-z0-9._-]*\/)*[A-Za-z0-9_-][A-Za-z0-9._-]*\.svg$/;
+
 export function validateManifest(raw: unknown, { allowNoEntrypoint = false } = {}): PluginManifest {
 	if (!raw || typeof raw !== 'object' || Array.isArray(raw))
 		throw new Error('Manifest must be a JSON object');
 	const m = raw as Record<string, unknown>;
 
 	validateSchemaVersion(m);
-	rejectUnknownFields(m, MANIFEST_V1_FIELDS, 'the manifest', true);
+	const schemaVersion = (m.schemaVersion as number | undefined) ?? DEFAULT_MANIFEST_SCHEMA_VERSION;
+	if (m.icon !== undefined && schemaVersion < 2)
+		throw new Error('"icon" needs "schemaVersion": 2 (or later) in the manifest');
+	rejectUnknownFields(m, manifestFieldsFor(schemaVersion), 'the manifest', true);
 	if (m.$schema !== undefined && typeof m.$schema !== 'string')
 		throw new Error('"$schema" must be a string');
 
@@ -373,6 +388,15 @@ export function validateManifest(raw: unknown, { allowNoEntrypoint = false } = {
 	}
 
 	if (m.network !== undefined) validateNetwork(m.network);
+
+	if (m.icon !== undefined) {
+		if (typeof m.icon !== 'string' || !PLUGIN_ICON_PATH_PATTERN.test(m.icon))
+			throw new Error(
+				`"icon" must be the path of an .svg file inside the plugin zip, e.g. "icon.svg" (got ${JSON.stringify(m.icon)})`
+			);
+		if (isRuntimeCodeManifest(m as { sidePanel?: { codeEditor?: { execution?: string } } }))
+			throw new Error('"icon" needs a packaged plugin zip; code-editor plugins can\'t bundle one');
+	}
 
 	if (m.parameters !== undefined) {
 		if (!Array.isArray(m.parameters)) throw new Error('"parameters" must be an array');

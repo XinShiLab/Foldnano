@@ -13,6 +13,15 @@
 
 	const ctx = getEditorViewContext();
 	const activeViewer = $derived(ctx.activeViewer);
+	// A popped-out editor lives in its own window, which the overlay does not cover.
+	const codeEditorOpen = $derived.by(() => {
+		if (!ctx.showSidePanel || !ctx.sidePanelTab.startsWith('plugin:')) return false;
+		const pluginId = ctx.sidePanelTab.slice('plugin:'.length);
+		const plugin = ctx.pluginRegistry.get(pluginId);
+		return (
+			plugin?.manifest.sidePanel?.type === 'codeEditor' && !ctx.poppedOutPluginPanels.has(pluginId)
+		);
+	});
 
 	let expanded = $state(rememberedExpanded);
 
@@ -31,6 +40,14 @@
 		{ keys: [panMod, 'hold'], label: 'Temporary pan' },
 		{ keys: ['?'], label: 'Toggle this help' },
 		{ keys: ['Esc'], label: 'Close help' },
+	];
+
+	const codeEditorShortcuts = [
+		{ keys: [mod, '↵'], label: 'Run script' },
+		{ keys: ['Ctrl', 'Space'], label: 'Show completions' },
+		{ keys: [mod, '/'], label: 'Toggle comment' },
+		{ keys: [panMod, '↑/↓'], label: 'Move line' },
+		{ keys: [mod, '⇧', 'K'], label: 'Delete line' },
 	];
 
 	const modeShortcuts = [
@@ -61,6 +78,24 @@
 		{ key: 'o', label: 'Oligos' },
 	];
 </script>
+
+{#snippet chordSection(title: string, rows: { keys: string[]; label: string }[])}
+	<section class="mt-3">
+		<h3 class="mb-1.5 text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">
+			{title}
+		</h3>
+		{#each rows as s (s.label)}
+			<div class="flex items-center justify-between py-0.5">
+				<span class="text-xs text-foreground">{s.label}</span>
+				<span class="flex gap-0.5">
+					{#each s.keys as k (k)}
+						<Kbd.Root>{k}</Kbd.Root>
+					{/each}
+				</span>
+			</div>
+		{/each}
+	</section>
+{/snippet}
 
 {#snippet section(title: string, rows: { key: string; label: string }[])}
 	<section class="mt-3">
@@ -103,21 +138,10 @@
 	</p>
 
 	{#if expanded}
-		<section class="mt-3">
-			<h3 class="mb-1.5 text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">
-				Global
-			</h3>
-			{#each globalShortcuts as s (s.label)}
-				<div class="flex items-center justify-between py-0.5">
-					<span class="text-xs text-foreground">{s.label}</span>
-					<span class="flex gap-0.5">
-						{#each s.keys as k (k)}
-							<Kbd.Root>{k}</Kbd.Root>
-						{/each}
-					</span>
-				</div>
-			{/each}
-		</section>
+		{@render chordSection('Global', globalShortcuts)}
+		{#if codeEditorOpen}
+			{@render chordSection('Script Editor', codeEditorShortcuts)}
+		{/if}
 
 		{@render section('Editor Modes', modeShortcuts)}
 		{#if activeViewer === 'STRAND'}

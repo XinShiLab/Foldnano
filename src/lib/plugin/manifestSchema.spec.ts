@@ -4,8 +4,8 @@ import Ajv2020 from 'ajv/dist/2020';
 import { describe, expect, it } from 'vitest';
 import {
 	MANIFEST_SCHEMA_VERSION,
-	MANIFEST_V1_FIELDS,
 	MANIFEST_V1_NESTED_FIELDS,
+	manifestFieldsFor,
 	PLUGIN_ID_PATTERN,
 	PLUGIN_VERSION_PATTERN,
 	validateManifest,
@@ -17,7 +17,9 @@ import { scriptLabManifest } from './scriptLabManifest';
 // validateManifest reject unknown fields, so this suite keeps their field lists, the shipped
 // manifests and MANIFEST_SCHEMA_VERSION from drifting apart.
 
-const SCHEMA_PATH = path.resolve(`static/schemas/fplugin-v${MANIFEST_SCHEMA_VERSION}.schema.json`);
+const schemaPath = (version: number) =>
+	path.resolve(`static/schemas/fplugin-v${version}.schema.json`);
+const SCHEMA_VERSIONS = Array.from({ length: MANIFEST_SCHEMA_VERSION }, (_, i) => i + 1);
 const SHIPPED_MANIFESTS = [
 	...fs
 		.readdirSync(path.resolve('src/lib/plugin/core_plugins'))
@@ -30,7 +32,7 @@ interface JsonSchemaObject {
 	properties: Record<string, unknown>;
 }
 
-const schema = JSON.parse(fs.readFileSync(SCHEMA_PATH, 'utf-8')) as JsonSchemaObject & {
+type ManifestJsonSchema = JsonSchemaObject & {
 	properties: { schemaVersion: { const: number } };
 	$defs: {
 		field: JsonSchemaObject & {
@@ -41,17 +43,31 @@ const schema = JSON.parse(fs.readFileSync(SCHEMA_PATH, 'utf-8')) as JsonSchemaOb
 		};
 	};
 };
-const validate = new Ajv2020({ allErrors: true }).compile(schema);
 
+// Every published version stays online for manifests that point their $schema at it.
+const schemas = new Map(
+	SCHEMA_VERSIONS.map((v) => [
+		v,
+		JSON.parse(fs.readFileSync(schemaPath(v), 'utf-8')) as ManifestJsonSchema,
+	])
+);
+const ajv = new Ajv2020({ allErrors: true });
+const validators = new Map([...schemas].map(([v, s]) => [v, ajv.compile(s)]));
+const schema = schemas.get(MANIFEST_SCHEMA_VERSION)!;
+
+/** Errors from the schema of the manifest's own schemaVersion (missing = 1). */
 function schemaErrors(manifest: unknown): unknown[] {
+	const version = (manifest as { schemaVersion?: number }).schemaVersion ?? 1;
+	const validate = validators.get(version);
+	if (!validate) return [`no published schema for version ${version}`];
 	return validate(manifest) ? [] : (validate.errors ?? []);
 }
 
 const keys = (obj: JsonSchemaObject) => Object.keys(obj.properties).sort();
 
 describe('fplugin JSON Schema', () => {
-	it('describes the current manifest schema version', () => {
-		expect(schema.properties.schemaVersion.const).toBe(MANIFEST_SCHEMA_VERSION);
+	it.each(SCHEMA_VERSIONS)('publishes fplugin-v%i.schema.json for that version', (v) => {
+		expect(schemas.get(v)!.properties.schemaVersion.const).toBe(v);
 	});
 
 	it.each(SHIPPED_MANIFESTS)('accepts shipped manifest %s (and so does the app)', (file) => {
@@ -71,8 +87,9 @@ describe('fplugin JSON Schema', () => {
 		expect(schemaErrors(scriptLabManifest)).toEqual([]);
 	});
 
-	it('lists exactly the fields validateManifest allows', () => {
-		expect(keys(schema)).toEqual([...MANIFEST_V1_FIELDS].sort());
+	it.each(SCHEMA_VERSIONS)('lists exactly the fields validateManifest allows at v%i', (v) => {
+		const schema = schemas.get(v)!;
+		expect(keys(schema)).toEqual([...manifestFieldsFor(v)].sort());
 		const { field, sidePanel } = schema.$defs;
 		expect(keys(field)).toEqual([...MANIFEST_V1_NESTED_FIELDS.field].sort());
 		expect(keys(field.properties.options.items.oneOf[1])).toEqual(
@@ -92,6 +109,34 @@ describe('fplugin JSON Schema', () => {
 		expect(schemaErrors({ ...base, netwrok: [] })).not.toEqual([]);
 		expect(schemaErrors({ ...base, 'x-homepage': 'https://example.org' })).toEqual([]);
 	});
+
+	// As found inside a plugin zip: `icon` needs a packaged plugin.
+	const PACKAGED_V2 = {
+		schemaVersion: 2,
+		id: 'icon-demo',
+		name: 'Icon Demo',
+		version: '1.0.0',
+		format: 'foldnano_json',
+		applyStrategy: 'previewOnly',
+	};
+
+	it('accepts "icon" only at schemaVersion 2, like the app', () => {
+		const v2 = { ...PACKAGED_V2, icon: 'icons/main.svg' };
+		expect(schemaErrors(v2)).toEqual([]);
+		expect(() => validateManifest(v2, { allowNoEntrypoint: true })).not.toThrow();
+		const v1 = { ...v2, schemaVersion: 1 };
+		expect(schemaErrors(v1)).not.toEqual([]);
+		expect(() => validateManifest(v1, { allowNoEntrypoint: true })).toThrow(/schemaVersion/);
+	});
+
+	it.each(['../icon.svg', '/icon.svg', 'icon.png', '.hidden/icon.svg'])(
+		'agrees with the app on icon path %j',
+		(icon) => {
+			const manifest = { ...PACKAGED_V2, icon };
+			expect(schemaErrors(manifest)).not.toEqual([]);
+			expect(() => validateManifest(manifest, { allowNoEntrypoint: true })).toThrow(/"icon"/);
+		}
+	);
 
 	it('rejects a format/applyStrategy mismatch', () => {
 		expect(schemaErrors({ ...scriptLabManifest, applyStrategy: 'replacePart' })).not.toEqual([]);

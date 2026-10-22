@@ -28,7 +28,7 @@ def run(ctx: PluginContext) -> None:
 
 ```json
 {
-	"schemaVersion": 1,
+	"schemaVersion": 2,
 	"id": "my-plugin",
 	"name": "My Plugin",
 	"version": "1.0.0",

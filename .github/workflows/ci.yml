@@ -19,7 +19,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          # The bundled cadnano2_5_mini plugin wheel is stored with Git LFS.
+          # The bundled cadnano2_5_mini plugin wheel and the doc-site screenshots are stored with Git LFS.
           lfs: true
 
       # Uses the pnpm version pinned in package.json "packageManager".

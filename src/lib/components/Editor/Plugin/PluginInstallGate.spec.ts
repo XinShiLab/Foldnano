@@ -176,7 +176,12 @@ describe('PluginInstallGate', () => {
 		);
 		await Promise.resolve();
 		await Promise.resolve();
-		expect(gate.pending).toEqual({ incoming: manifest, files: null, existing: null });
+		expect(gate.pending).toEqual({
+			incoming: manifest,
+			files: null,
+			existing: null,
+			restorable: false,
+		});
 		expect(registerNew).not.toHaveBeenCalled();
 
 		await gate.confirmPending();
@@ -223,7 +228,7 @@ describe('PluginInstallGate', () => {
 		await Promise.resolve();
 		await Promise.resolve();
 		expect(settled).toBe(false);
-		expect(gate.pending).toEqual({ incoming, files: null, existing });
+		expect(gate.pending).toEqual({ incoming, files: null, existing, restorable: false });
 
 		await gate.confirmPending();
 		const outcome = await outcomePromise;
@@ -496,5 +501,39 @@ describe('PluginInstallGate confirmation-time busy re-check (real PluginRegistry
 		const storedFiles = await db.pluginFiles.get('demo-plugin');
 		expect(Array.from(storedFiles?.entrypointZipData ?? [])).toEqual(Array.from(zipData));
 		expect(reportErrorMock).not.toHaveBeenCalled();
+	});
+});
+
+describe('PluginInstallGate restore as editable', () => {
+	it('registers a restorable install as owned only when asked', async () => {
+		const registerNew = vi.fn().mockResolvedValue(undefined);
+		const gate = new PluginInstallGate(() => makeRegistry({ registerNew }));
+		const manifest = makeManifest();
+
+		const outcome = gate.requestInstall(
+			async () => ({ status: 'ready', manifest, files: null, restorable: true }),
+			{ review: true }
+		);
+		await vi.waitFor(() => expect(gate.pending?.restorable).toBe(true));
+		await gate.confirmPending({ asEditable: true });
+		await outcome;
+		expect(registerNew).toHaveBeenCalledWith(manifest, null, {
+			authoring: { source: 'scriptLab' },
+		});
+	});
+
+	it('ignores asEditable for a zip that is not restorable', async () => {
+		const registerNew = vi.fn().mockResolvedValue(undefined);
+		const gate = new PluginInstallGate(() => makeRegistry({ registerNew }));
+		const manifest = makeManifest();
+
+		const outcome = gate.requestInstall(
+			async () => ({ status: 'ready', manifest, files: null, restorable: false }),
+			{ review: true }
+		);
+		await vi.waitFor(() => expect(gate.pending).not.toBeNull());
+		await gate.confirmPending({ asEditable: true });
+		await outcome;
+		expect(registerNew).toHaveBeenCalledWith(manifest, null);
 	});
 });

@@ -81,6 +81,7 @@ export interface PluginSidePanelCodeEditorConfig {
 export interface PluginSidePanelManifest {
 	type: PluginSidePanelType;
 	title?: string;
+	/** @deprecated Use the top-level `icon` (a bundled SVG); still honoured when that is absent. */
 	icon?: PluginSidePanelIcon;
 	form?: PluginSidePanelFormConfig;
 	codeEditor?: PluginSidePanelCodeEditorConfig;
@@ -97,7 +98,7 @@ export interface PluginSidePanelInput {
  */
 export interface PluginManifest {
 	/** Manifest schema version (MANIFEST_SCHEMA_VERSION); not the plugin's own version. */
-	schemaVersion: 1;
+	schemaVersion: 1 | 2;
 	/** Optional JSON Schema reference for editors; ignored by the app. */
 	$schema?: string;
 	/** Author-owned metadata; ignored by the app. */
@@ -125,6 +126,8 @@ export interface PluginManifest {
 	network?: string[];
 	/** Optional human-readable description */
 	description?: string;
+	/** Path of an SVG icon inside the plugin zip (schemaVersion 2). Overrides `sidePanel.icon`. */
+	icon?: string;
 	/** User-configurable parameters shown in the run dialog */
 	parameters?: PluginParamDef[];
 	/** Host-rendered side panel requested by the plugin */
@@ -163,6 +166,22 @@ export interface PythonPlugin {
 	sidePanelCode: string;
 	/** Count of foldnano_mini ops produced by the most recent run, if known. */
 	lastRunMutationLogLength: number | null;
+	/** Set for plugins the user made in this browser (Make Plugin); only these are editable. */
+	authoring: PluginAuthoring | null;
+	/** Unsaved edit of an owned plugin's plugin.py; null when there is no draft. */
+	draftCode: string | null;
+	/** Validated SVG text of `manifest.icon`, read at install; null when the plugin has none. */
+	iconSvg: string | null;
+}
+
+/**
+ * Local ownership record for a plugin made from Script Lab. Lives on the IndexedDB plugin
+ * record, never in the manifest, so a zip can't claim it.
+ */
+export interface PluginAuthoring {
+	source: 'scriptLab';
+	/** Last version the user downloaded as a zip; drives the "not backed up" hint. */
+	lastExportedVersion?: string;
 }
 
 /**

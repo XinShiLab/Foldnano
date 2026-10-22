@@ -298,7 +298,7 @@ zip my_plugin.zip fplugin.json plugin.py helper.py
 
 ```json
 {
-	"schemaVersion": 1,
+	"schemaVersion": 2,
 	"id": "my-plugin",
 	"name": "My Plugin",
 	"version": "1.0.0",
