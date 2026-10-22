@@ -2,7 +2,7 @@
 title: Plugins For Users
 description: Core plugins, Plugin Hub, manifest installs, ZIP installs, preview/apply strategies, and safety expectations
 category: guide
-order: 12
+order: 13
 slug: plugins-for-users
 ---
 

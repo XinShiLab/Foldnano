@@ -461,8 +461,13 @@ export class HistoryRecorder {
 
 		for (const patch of this.#mementos) {
 			if (sameValue(patch.before, patch.after)) continue;
-			undo.push({ kind: 'partMemento', memento: patch.before });
 			redo.push({ kind: 'partMemento', memento: patch.after });
+		}
+		// Undo unwinds scopes last-in-first-out: a scope committed later captured its "before"
+		// after earlier scopes had already mutated shared VHs, so applying it last would clobber them.
+		for (const patch of [...this.#mementos].reverse()) {
+			if (sameValue(patch.before, patch.after)) continue;
+			undo.push({ kind: 'partMemento', memento: patch.before });
 		}
 
 		for (const patch of this.#snapshots) {

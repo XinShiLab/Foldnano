@@ -121,10 +121,13 @@ src/lib/plugin/
     topology.py                     ← occupancy index (rebuilt lazily per op generation)
     lattice.py                      ← potential crossover sites (port of latticeOffsets.ts)
     editing.py                      ← editor-level edits planned on a scratch mirror copy
+    repeat.py                       ← repeat-group mirror sync (port of repeatGroups.ts) + apply_op
+    repeat_group.py                 ← MutableRepeatGroup, RepeatInstance, MirrorInfo
     transport.py                    ← offline mirror transport
     part.py, region.py, vh.py, oligo.py, plane.py
   python/tests/fixtures/foldnano_mini_parity.golden.json ← host verdicts, written by foldnanoMiniParity.spec.ts
   python/tests/fixtures/foldnano_mini_replay.golden.json ← Python log + predicted state, replayed by foldnanoMiniReplay.spec.ts
+  python/tests/fixtures/foldnano_mini_repeat_replay.golden.json ← repeat-group log + state, replayed by foldnanoMiniRepeatReplay.spec.ts
   python/example_all_ops.py         ← standalone CPython script exercising every op kind; run with `python example_all_ops.py`
   core_plugins/
     design_stats.fplugin.json       ← demo plugin manifest (previewOnly, cadnano_json)
@@ -845,7 +848,7 @@ All files are written to Pyodide's virtual filesystem at `INIT_RUNTIME` time, so
 
 - `src/lib/plugin/python/stubs/<package>/__init__.pyi`: every name in the package's `__all__`, with real signatures and full docstrings, plus the unexported helpers/aliases those names use. One file per package so an author (or their coding agent) can read the whole surface at once.
 - `src/lib/plugin/python/stubs/<package>/<module>.pyi`: re-export shims so `from foldnano.plugin import PluginContext` type-checks against the stubs.
-- `src/lib/plugin/python-api-index.generated.json`: members per class (inherited members flattened, setter-backed properties marked `settable`), function signatures and first-paragraph docs. Script Lab autocomplete reads it (`docs/script-lab.md` § API autocomplete).
+- `src/lib/plugin/python-api-index.generated.json`: members per class (inherited members flattened, setter-backed properties marked `settable`, including a subclass's `@Base.prop.setter` on an inherited property), function signatures and first-paragraph docs. Script Lab autocomplete reads it (`docs/script-lab.md` § API autocomplete).
 
 What's public is decided by each package's `__init__.py` `__all__`: a new proxy method appears once it's on an exported class; a new class needs an `__all__` entry. Point a type checker at the stubs with `MYPYPATH=src/lib/plugin/python/stubs` (or pyright `stubPath`).
 
@@ -926,7 +929,26 @@ The actual whole-part / region reconstruction (`performReplacePart`, `performRep
 | `replacePart`                                                | Deserializes the returned JSON into a new `Part` and swaps it directly into `doc.parts[partIndex]`. All UUIDs are regenerated. No annotation re-grafting.                                                                                                                                                    |
 | `replacePartKeepAnnotationsWhereMatched`                     | Deserializes the returned JSON, then re-grafts sequences, skip/insert structure, modifications, and oligo names from the pre-run foldnano snapshot onto any segment whose coordinates (VH index, strand index, 5' bp, 3' bp) are unchanged. Unmatched segments get no sequence. New Part is then swapped in. |
 | `replaceRegion` / `replaceRegionKeepAnnotationsWhereMatched` | Replaces only the active latticed region, preserves unaffected regions, restores cross-region links, and optionally re-grafts matched annotations inside the target region.                                                                                                                                  |
-| `replayMutationLog` / `replayMutationLogInRegion`            | Replays a `foldnano_mini` mutation log against the existing JS `Part` inside one history transaction. The region-scoped variant rejects any op that targets a VH outside the recorded active region.                                                                                                         |
+| `replayMutationLog` / `replayMutationLogInRegion`            | Replays a `foldnano_mini` mutation log against the existing JS `Part` inside one history transaction, through `replayMutationLog()` in `opDispatch.ts` (see below). The region-scoped variant rejects any op that targets a VH outside the recorded active region.                                           |
+
+### Mutation-log replay and repeat groups
+
+`replayMutationLog(part, log, options)` (`opDispatch.ts`) is the one replay loop:
+`ResultApplicator` and the replay specs both use it. It dispatches op by op and throws
+`MutationReplayError` naming the failing op. When the part has repeat groups it also runs
+`syncRepeatGroups` after every op except attribute writes (color, name, scaffold flag,
+modification, slot sequence), and after every group op. `foldnano_mini` rebuilds mirrors
+in Python after each op (`foldnano_mini/repeat.py` `apply_op`), so a later op in the log
+may use bases a mirror just left; syncing only at the end of the transaction would hit
+the stale mirror. Attribute writes can't move a mirror, so they wait for the
+transaction's sync (Python copies them onto mirrors in place, with the same result).
+
+`dispatchOp` refuses any op whose target oligo (by `oligoId`, `segmentId` or a `connect`
+end) is a mirror, with `MIRROR_EDIT_ERROR`; an edit that changes a mirror indirectly
+(a skip on the strand opposite) is caught by the per-op sync. Group ops carry
+Python-allocated `groupId` / `instanceId` / `name`, adopted by `createRepeatGroup` /
+`addRepeatInstance`. Mirror ids are not shared: the host gives its mirrors fresh ids
+and Python derives them as `<source id>@<instance id>`; no op refers to a mirror.
 
 ### Coordinate key for annotation matching
 
@@ -1284,4 +1306,6 @@ This file is for **Foldnano developers** working on the host side of the plugin 
 - **Don't extend the protocol without updating both sides.** The discriminated unions in `worker/protocol.ts` are the contract; main and worker must stay in lockstep.
 - **Don't special-case Script Lab inside the worker.** The "execute editor buffer as source" behavior belongs in host-side code resolution, not in Pyodide's runtime harness.
 - **`foldnano_mini` mutation logs are replayed against a snapshot taken before the run.** Don't reorder ops inside the dispatcher — replay order is part of the contract.
+- **Replay a log through `replayMutationLog`, not a bare `dispatchOp` loop.** The per-op repeat-group sync is part of the contract: Python predicts it.
+- **Keep `foldnano_mini/repeat.py` in step with `repeatGroups.ts` and `Part.canDuplicateOligosBy` / `duplicateOligos`** (`docs/repeat-units.md`); `foldnanoMiniRepeatReplay.spec.ts` replays a Python-written log on the real `Part`.
 - **Cadnano-format plugins are lattice-only.** `cadnano_json` plugins require an active `LatticedDesignRegion` — `runWithOptions()` throws before the worker even starts if the active region is freeform or missing. A freeform-only design (or a design with no lattice region active) can't drive a `cadnano_json` plugin; use `foldnano_json` or `foldnano_mini` instead.

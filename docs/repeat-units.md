@@ -6,6 +6,8 @@ covers:
   - src/lib/canvasEditor/tools/duplicate.ts
   - src/lib/components/Editor/ToolPanel/RepeatGroupPanel.svelte
   - src/lib/components/Editor/StrandView/temporalLayer/DuplicatePreview.svelte
+  - src/lib/plugin/python/foldnano_mini/repeat.py
+  - src/lib/plugin/python/foldnano_mini/repeat_group.py
 ---
 
 # Repeat Units (Duplicate + Mirror Oligos)
@@ -102,7 +104,11 @@ Implementation (reuse these for Feature 2):
 Skip/insert rule for a copied slot at its new bp: if a copy lands opposite it, both
 slot lengths must match; otherwise an existing complementary slot must be plain (a
 copied skip/insertion is mirrored onto it), and a copied skip/insertion with no
-complementary strand at all is rejected.
+complementary strand at all is rejected. One exception: an existing **mirror** whose
+slot already has the copy's length counts as paired and is left as is. The sync
+rebuilds only the changed originals of an instance, so when one strand of a duplex
+original with a skip changes, its rebuilt copy lands opposite the kept copy of the
+other strand, which already carries the matching skip.
 
 ### Repeat groups (Feature 2)
 
@@ -206,6 +212,12 @@ Cost is O(oligos) to find group members plus O(nt) of the group's originals
 for fingerprints; unchanged mirrors keep their object identity. Parts without
 groups return immediately.
 
+**Plugin replay:** `replayMutationLog` (`src/lib/plugin/opDispatch.ts`) also runs the
+sync after each replayed op except attribute writes (color, name, scaffold flag,
+modification, slot sequence), because `foldnano_mini` rebuilds mirrors after each op
+in Python: a later op in the log may use bases a mirror just left. Without it, that
+op would hit the stale mirror on the host.
+
 **History recording:** a targeted `tx` whose sync changed anything is recorded
 as a `documentSnapshot(before, after)` instead of its targeted patches (`before`
 is already captured at the start of `tx`), so the sync never has to express
@@ -266,8 +278,14 @@ exist.
 - **oxDNA / mrDNA:** `includeMirrors` (default false); the 3D Export menu shows
   "Include mirror copies" when the part has mirrors, exporting the assembled
   multimer.
-- **Plugins** see mirrors as ordinary oligos carrying `mirrorOf`. A
-  `replacePart` apply drops group data — known v1 limitation.
+- **Plugins:** `foldnano_mini` hands mirrors out as read-only `MirrorOligo` /
+  `SegmentView` proxies, rebuilds them in Python after every op (`foldnano_mini/repeat.py`,
+  a port of this sync and of `canDuplicateOligosBy` / `duplicateOligos`), and has
+  ops for the group commands (`create_repeat_group`, `add_repeat_instance`,
+  `remove_repeat_instance`, `detach_repeat_group`, `delete_repeat_group`); see
+  `docs/python-plugin-system.md`. `foldnano_json` plugins see mirrors as ordinary
+  oligos carrying `mirrorOf`. A `replacePart` apply drops group data — known v1
+  limitation.
 
 ---
 
@@ -305,3 +323,7 @@ deletes the group.
   are the same molecules as their sources. New exporters and oligo lists should
   iterate `part.realOligos`, not `part.oligos`.
 - **Don't allow mirrors of mirrors.**
+- **Keep `foldnano_mini/repeat.py` in step with this sync.** A change to the sync,
+  the fingerprint fields or `canDuplicateOligosBy` must land in the Python port too;
+  `foldnanoMiniRepeatReplay.spec.ts` replays a Python-written log on the real `Part`
+  and catches drift.

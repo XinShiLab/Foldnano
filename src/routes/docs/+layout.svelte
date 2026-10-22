@@ -10,6 +10,7 @@
 	import type { Snippet } from 'svelte';
 
 	import AlphaAccessGate from '$lib/components/AlphaAccessGate.svelte';
+	import DocsSearch from '$lib/components/docs/DocsSearch.svelte';
 	import fn from '$lib/assets/fn.svg';
 
 	import type { LayoutData } from './$types';
@@ -83,7 +84,8 @@
 					</a>
 				</nav>
 
-				<div class="ml-auto flex items-center gap-2 print:hidden">
+				<div class="ml-auto flex min-w-0 flex-1 items-center justify-end gap-2 print:hidden">
+					<DocsSearch currentCategory={activeCategory} />
 					<a
 						href={resolve('/editor')}
 						class="rounded border border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"

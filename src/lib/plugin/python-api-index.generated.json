@@ -49,6 +49,15 @@
 			"MutableSegment",
 			"MutableSegmentEnd",
 			"MutableSlot",
+			"MirrorOligo",
+			"OligoView",
+			"SegmentView",
+			"SegmentEndView",
+			"SlotView",
+			"MutableRepeatGroup",
+			"RepeatInstance",
+			"MirrorInfo",
+			"MIRROR_EDIT_ERROR",
 			"SegmentSpec",
 			"CrossoverSite",
 			"Check",
@@ -81,7 +90,20 @@
 			"MutableOligo",
 			"MutableSegment",
 			"MutableSegmentEnd",
-			"MutableSlot"
+			"MutableSlot",
+			"MirrorOligo",
+			"OligoView",
+			"SegmentView",
+			"SegmentEndView",
+			"SlotView"
+		],
+		"foldnano_mini.repeat_group": [
+			"MutableRepeatGroup",
+			"RepeatInstance",
+			"MirrorInfo"
+		],
+		"foldnano_mini.repeat": [
+			"MIRROR_EDIT_ERROR"
 		],
 		"foldnano_mini.lattice": [
 			"CrossoverSite"
@@ -902,7 +924,39 @@
 				{
 					"name": "oligos",
 					"kind": "property",
-					"type": "list[MutableOligo]"
+					"type": "list[MutableOligo | MirrorOligo]",
+					"doc": "Every oligo, including repeat groups' read-only mirror oligos. Use :attr:`real_oligos` for the ones you can edit."
+				},
+				{
+					"name": "real_oligos",
+					"kind": "property",
+					"type": "list[MutableOligo]",
+					"doc": "Every oligo except mirror oligos (the host's ``Part.realOligos``): what the oligo list and exports show."
+				},
+				{
+					"name": "repeat_groups",
+					"kind": "property",
+					"type": "list[MutableRepeatGroup]"
+				},
+				{
+					"name": "get_repeat_group",
+					"kind": "method",
+					"signature": "(group_id: str)",
+					"returns": "MutableRepeatGroup | None"
+				},
+				{
+					"name": "create_repeat_group",
+					"kind": "method",
+					"signature": "(oligos: Sequence[MutableOligo], bp_offset: int)",
+					"returns": "MutableRepeatGroup",
+					"doc": "Make ``oligos`` the originals of a new repeat group with one copy ``bp_offset`` bp along the same VHs (the editor's \"Duplicate as linked mirror copies\")."
+				},
+				{
+					"name": "can_create_repeat_group",
+					"kind": "method",
+					"signature": "(oligos: Sequence[MutableOligo], bp_offset: int)",
+					"returns": "Check",
+					"doc": "Whether :meth:`create_repeat_group` accepts this: at least one oligo, none a mirror or already in a group, and the copy placeable (no overlap, crossovers on matching lattice sites, skips/insertions paired)."
 				},
 				{
 					"name": "get_region",
@@ -920,7 +974,7 @@
 					"name": "get_oligo",
 					"kind": "method",
 					"signature": "(oligo_id: str)",
-					"returns": "MutableOligo | None"
+					"returns": "MutableOligo | MirrorOligo | None"
 				},
 				{
 					"name": "potential_xover_sites",
@@ -939,8 +993,8 @@
 					"name": "oligos_in_region",
 					"kind": "method",
 					"signature": "(region_id: str)",
-					"returns": "list[MutableOligo]",
-					"doc": "Oligos whose every segment lives in ``region_id`` (cross-region oligos excluded)."
+					"returns": "list[MutableOligo | MirrorOligo]",
+					"doc": "Oligos whose every segment lives in ``region_id`` (cross-region oligos excluded), mirror oligos included."
 				},
 				{
 					"name": "create_segment",
@@ -1632,7 +1686,7 @@
 					"name": "segments_at",
 					"kind": "method",
 					"signature": "(bp_index: int, strand_index: int | None=None)",
-					"returns": "list[MutableSegment]",
+					"returns": "list[MutableSegment | SegmentView]",
 					"doc": "Segments covering ``bp_index`` \u2014 on one strand set, or both (strand 0 first)."
 				},
 				{
@@ -1672,7 +1726,7 @@
 				{
 					"name": "segments",
 					"kind": "property",
-					"type": "list[MutableSegment]",
+					"type": "list[MutableSegment | SegmentView]",
 					"doc": "This strand's segments, sorted by their low bp."
 				},
 				{
@@ -1690,7 +1744,7 @@
 					"name": "is_index_occupied_by",
 					"kind": "method",
 					"signature": "(bp_index: int)",
-					"returns": "MutableSegment | None",
+					"returns": "MutableSegment | SegmentView | None",
 					"doc": "The segment covering ``bp_index`` on this strand, or ``None``."
 				},
 				{
@@ -1704,7 +1758,7 @@
 					"name": "segments_in_range",
 					"kind": "method",
 					"signature": "(start_index: int, end_index: int)",
-					"returns": "list[MutableSegment]",
+					"returns": "list[MutableSegment | SegmentView]",
 					"doc": "Segments overlapping the inclusive range (either order), sorted by low bp."
 				},
 				{
@@ -1718,13 +1772,8 @@
 		},
 		"MutableOligo": {
 			"module": "foldnano_mini",
-			"doc": "",
+			"doc": "A strand of linked segments: an ordinary oligo or a repeat group's original.",
 			"members": [
-				{
-					"name": "id",
-					"kind": "property",
-					"type": "str"
-				},
 				{
 					"name": "color",
 					"kind": "property",
@@ -1744,15 +1793,25 @@
 					"settable": true
 				},
 				{
-					"name": "is_sequence_locked",
+					"name": "five_modification",
 					"kind": "property",
-					"type": "bool"
+					"type": "str | None",
+					"doc": "Modification on the oligo's free 5\u2032 end (``None`` when unset or circular).",
+					"settable": true
 				},
 				{
-					"name": "is_circular",
+					"name": "three_modification",
 					"kind": "property",
-					"type": "bool",
-					"doc": "True if every segment's 3\u2032 end is connected to another segment in this oligo."
+					"type": "str | None",
+					"doc": "Modification on the oligo's free 3\u2032 end (``None`` when unset or circular).",
+					"settable": true
+				},
+				{
+					"name": "remove",
+					"kind": "method",
+					"signature": "()",
+					"returns": "None",
+					"doc": "Same as ``part.remove_oligo(oligo)``."
 				},
 				{
 					"name": "segments",
@@ -1778,25 +1837,20 @@
 					"returns": "MutableSegment | None"
 				},
 				{
-					"name": "remove",
-					"kind": "method",
-					"signature": "()",
-					"returns": "None",
-					"doc": "Same as ``part.remove_oligo(oligo)``."
+					"name": "id",
+					"kind": "property",
+					"type": "str"
 				},
 				{
-					"name": "five_modification",
+					"name": "is_sequence_locked",
 					"kind": "property",
-					"type": "str | None",
-					"doc": "Modification on the oligo's free 5\u2032 end (``None`` when unset or circular).",
-					"settable": true
+					"type": "bool"
 				},
 				{
-					"name": "three_modification",
+					"name": "is_circular",
 					"kind": "property",
-					"type": "str | None",
-					"doc": "Modification on the oligo's free 3\u2032 end (``None`` when unset or circular).",
-					"settable": true
+					"type": "bool",
+					"doc": "True if every segment's 3\u2032 end is connected to another segment in this oligo."
 				},
 				{
 					"name": "touches_regions",
@@ -1804,12 +1858,486 @@
 					"signature": "()",
 					"returns": "set[str]",
 					"doc": "Set of region IDs this oligo's segments visit (cross-region detection)."
+				},
+				{
+					"name": "is_mirror",
+					"kind": "property",
+					"type": "bool",
+					"doc": "True for a mirror oligo: a read-only copy of a repeat group's original."
+				},
+				{
+					"name": "mirror_of",
+					"kind": "property",
+					"type": "MirrorInfo | None",
+					"doc": "For a mirror: its ``(group, instance, source)``; ``None`` otherwise."
+				},
+				{
+					"name": "repeat_group",
+					"kind": "property",
+					"type": "MutableRepeatGroup | None",
+					"doc": "The repeat group this oligo is an original of (``None`` for mirrors and ordinary oligos; a mirror's group is ``mirror_of.group``)."
 				}
 			]
 		},
 		"MutableSegment": {
 			"module": "foldnano_mini",
-			"doc": "",
+			"doc": "A stretch of one strand of one VH, part of an oligo.",
+			"members": [
+				{
+					"name": "five_modification",
+					"kind": "property",
+					"type": "str | None",
+					"settable": true
+				},
+				{
+					"name": "three_modification",
+					"kind": "property",
+					"type": "str | None",
+					"settable": true
+				},
+				{
+					"name": "move_five_prime_to",
+					"kind": "method",
+					"signature": "(new_index: int)",
+					"returns": "None",
+					"doc": "Move the 5\u2032 terminus to ``new_index`` (same as ``seg.five_prime.index = new_index``)."
+				},
+				{
+					"name": "move_three_prime_to",
+					"kind": "method",
+					"signature": "(new_index: int)",
+					"returns": "None",
+					"doc": "Move the 3\u2032 terminus to ``new_index`` (same as ``seg.three_prime.index = new_index``)."
+				},
+				{
+					"name": "remove",
+					"kind": "method",
+					"signature": "()",
+					"returns": "MutableOligo | None",
+					"doc": "Same as ``part.remove_segment(seg)``."
+				},
+				{
+					"name": "five_prime",
+					"kind": "property",
+					"type": "MutableSegmentEnd"
+				},
+				{
+					"name": "three_prime",
+					"kind": "property",
+					"type": "MutableSegmentEnd"
+				},
+				{
+					"name": "oligo",
+					"kind": "property",
+					"type": "MutableOligo"
+				},
+				{
+					"name": "slots",
+					"kind": "property",
+					"type": "list[MutableSlot]"
+				},
+				{
+					"name": "slot_at",
+					"kind": "method",
+					"signature": "(bp_index: int)",
+					"returns": "MutableSlot",
+					"doc": "Return a proxy for the slot at ``bp_index`` (created on first write)."
+				},
+				{
+					"name": "id",
+					"kind": "property",
+					"type": "str"
+				},
+				{
+					"name": "oligo_id",
+					"kind": "property",
+					"type": "str"
+				},
+				{
+					"name": "vh_index",
+					"kind": "property",
+					"type": "int"
+				},
+				{
+					"name": "five_index",
+					"kind": "property",
+					"type": "int"
+				},
+				{
+					"name": "three_index",
+					"kind": "property",
+					"type": "int"
+				},
+				{
+					"name": "length",
+					"kind": "property",
+					"type": "int"
+				},
+				{
+					"name": "low_index",
+					"kind": "property",
+					"type": "int"
+				},
+				{
+					"name": "high_index",
+					"kind": "property",
+					"type": "int"
+				},
+				{
+					"name": "in_virtual_helix",
+					"kind": "property",
+					"type": "MutableVirtualHelix"
+				},
+				{
+					"name": "in_strand_index",
+					"kind": "property",
+					"type": "int",
+					"doc": "0 or 1 \u2014 which strand set of its VH this segment lives on."
+				},
+				{
+					"name": "connected_from_segment_id",
+					"kind": "property",
+					"type": "str | None"
+				},
+				{
+					"name": "connected_to_segment_id",
+					"kind": "property",
+					"type": "str | None"
+				}
+			]
+		},
+		"MutableSegmentEnd": {
+			"module": "foldnano_mini",
+			"doc": "One end of a segment \u2014 mirrors the host's ``SegmentEnd``. Setting ``index`` moves the end, like assigning ``SegmentEnd.index`` on the host.",
+			"members": [
+				{
+					"name": "index",
+					"kind": "property",
+					"type": "int",
+					"settable": true
+				},
+				{
+					"name": "can_move_to",
+					"kind": "method",
+					"signature": "(new_index: int)",
+					"returns": "Check",
+					"doc": "Port of ``SegmentEnd.canMoveTo``: within the VH length, the swept range free of other segments, the segment keeps its direction, and a constrained end only moves to a matching crossover site. Also refuses a skip/insertion bp."
+				},
+				{
+					"name": "modification",
+					"kind": "property",
+					"type": "str | None",
+					"settable": true
+				},
+				{
+					"name": "segment",
+					"kind": "property",
+					"type": "MutableSegment"
+				},
+				{
+					"name": "connected_segment",
+					"kind": "property",
+					"type": "MutableSegment | None"
+				},
+				{
+					"name": "connected_end",
+					"kind": "property",
+					"type": "MutableSegmentEnd | None",
+					"doc": "The end on the other side of this end's connection (3' \u2194 5')."
+				},
+				{
+					"name": "is_three_prime",
+					"kind": "property",
+					"type": "bool"
+				},
+				{
+					"name": "is_free",
+					"kind": "property",
+					"type": "bool"
+				},
+				{
+					"name": "is_constrained",
+					"kind": "property",
+					"type": "bool",
+					"doc": "True when this end is connected across a lattice crossover site."
+				},
+				{
+					"name": "in_virtual_helix",
+					"kind": "property",
+					"type": "MutableVirtualHelix"
+				},
+				{
+					"name": "in_strand_index",
+					"kind": "property",
+					"type": "int"
+				},
+				{
+					"name": "is_adjacent_to",
+					"kind": "method",
+					"signature": "(other: 'SegmentEndView')",
+					"returns": "bool",
+					"doc": "Port of ``SegmentEnd.isAdjacentTo``: same VH and strand, 1 bp apart."
+				}
+			]
+		},
+		"MutableSlot": {
+			"module": "foldnano_mini",
+			"doc": "One position on a segment \u2014 sequence, skip, or insertion.",
+			"members": [
+				{
+					"name": "seq",
+					"kind": "property",
+					"type": "str",
+					"settable": true
+				},
+				{
+					"name": "can_set_skip",
+					"kind": "method",
+					"signature": "()",
+					"returns": "Check",
+					"doc": "Whether ``set_skip(True)`` is allowed here."
+				},
+				{
+					"name": "can_set_insertion",
+					"kind": "method",
+					"signature": "()",
+					"returns": "Check",
+					"doc": "Whether ``set_insertion(...)`` is allowed here (same rules as a skip, but an existing insertion may be replaced)."
+				},
+				{
+					"name": "set_skip",
+					"kind": "method",
+					"signature": "(value: bool)",
+					"returns": "None"
+				},
+				{
+					"name": "remove_skip_or_insertion",
+					"kind": "method",
+					"signature": "()",
+					"returns": "None",
+					"doc": "Turn a skip or insertion back into a plain base on both strands (``OligoSegment.removeSkipOrInsertion``); a plain slot is left alone."
+				},
+				{
+					"name": "set_insertion",
+					"kind": "method",
+					"signature": "(sequence: str)",
+					"returns": "None"
+				},
+				{
+					"name": "bp_index",
+					"kind": "property",
+					"type": "int"
+				},
+				{
+					"name": "skip",
+					"kind": "property",
+					"type": "bool"
+				}
+			]
+		},
+		"MirrorOligo": {
+			"module": "foldnano_mini",
+			"doc": "A mirror oligo: the copy of a repeat group's original at one instance's offset.",
+			"members": [
+				{
+					"name": "source",
+					"kind": "property",
+					"type": "MutableOligo",
+					"doc": "The original this mirror copies (same as ``mirror_of.source``)."
+				},
+				{
+					"name": "id",
+					"kind": "property",
+					"type": "str"
+				},
+				{
+					"name": "color",
+					"kind": "property",
+					"type": "str"
+				},
+				{
+					"name": "name",
+					"kind": "property",
+					"type": "str | None"
+				},
+				{
+					"name": "is_scaffold",
+					"kind": "property",
+					"type": "bool"
+				},
+				{
+					"name": "is_sequence_locked",
+					"kind": "property",
+					"type": "bool"
+				},
+				{
+					"name": "is_circular",
+					"kind": "property",
+					"type": "bool",
+					"doc": "True if every segment's 3\u2032 end is connected to another segment in this oligo."
+				},
+				{
+					"name": "segments",
+					"kind": "property",
+					"type": "list[SegmentView]"
+				},
+				{
+					"name": "five_prime",
+					"kind": "property",
+					"type": "SegmentEndView | None",
+					"doc": "The oligo's free 5\u2032 end, or ``None`` for a circular oligo."
+				},
+				{
+					"name": "three_prime",
+					"kind": "property",
+					"type": "SegmentEndView | None",
+					"doc": "The oligo's free 3\u2032 end, or ``None`` for a circular oligo."
+				},
+				{
+					"name": "get_segment",
+					"kind": "method",
+					"signature": "(segment_id: str)",
+					"returns": "SegmentView | None"
+				},
+				{
+					"name": "five_modification",
+					"kind": "property",
+					"type": "str | None",
+					"doc": "Modification on the oligo's free 5\u2032 end (``None`` when unset or circular)."
+				},
+				{
+					"name": "three_modification",
+					"kind": "property",
+					"type": "str | None",
+					"doc": "Modification on the oligo's free 3\u2032 end (``None`` when unset or circular)."
+				},
+				{
+					"name": "touches_regions",
+					"kind": "method",
+					"signature": "()",
+					"returns": "set[str]",
+					"doc": "Set of region IDs this oligo's segments visit (cross-region detection)."
+				},
+				{
+					"name": "is_mirror",
+					"kind": "property",
+					"type": "bool",
+					"doc": "True for a mirror oligo: a read-only copy of a repeat group's original."
+				},
+				{
+					"name": "mirror_of",
+					"kind": "property",
+					"type": "MirrorInfo | None",
+					"doc": "For a mirror: its ``(group, instance, source)``; ``None`` otherwise."
+				},
+				{
+					"name": "repeat_group",
+					"kind": "property",
+					"type": "MutableRepeatGroup | None",
+					"doc": "The repeat group this oligo is an original of (``None`` for mirrors and ordinary oligos; a mirror's group is ``mirror_of.group``)."
+				}
+			]
+		},
+		"OligoView": {
+			"module": "foldnano_mini",
+			"doc": "A strand of linked segments (read-only). See :class:`MutableOligo` and :class:`MirrorOligo`.",
+			"members": [
+				{
+					"name": "id",
+					"kind": "property",
+					"type": "str"
+				},
+				{
+					"name": "color",
+					"kind": "property",
+					"type": "str"
+				},
+				{
+					"name": "name",
+					"kind": "property",
+					"type": "str | None"
+				},
+				{
+					"name": "is_scaffold",
+					"kind": "property",
+					"type": "bool"
+				},
+				{
+					"name": "is_sequence_locked",
+					"kind": "property",
+					"type": "bool"
+				},
+				{
+					"name": "is_circular",
+					"kind": "property",
+					"type": "bool",
+					"doc": "True if every segment's 3\u2032 end is connected to another segment in this oligo."
+				},
+				{
+					"name": "segments",
+					"kind": "property",
+					"type": "list[SegmentView]"
+				},
+				{
+					"name": "five_prime",
+					"kind": "property",
+					"type": "SegmentEndView | None",
+					"doc": "The oligo's free 5\u2032 end, or ``None`` for a circular oligo."
+				},
+				{
+					"name": "three_prime",
+					"kind": "property",
+					"type": "SegmentEndView | None",
+					"doc": "The oligo's free 3\u2032 end, or ``None`` for a circular oligo."
+				},
+				{
+					"name": "get_segment",
+					"kind": "method",
+					"signature": "(segment_id: str)",
+					"returns": "SegmentView | None"
+				},
+				{
+					"name": "five_modification",
+					"kind": "property",
+					"type": "str | None",
+					"doc": "Modification on the oligo's free 5\u2032 end (``None`` when unset or circular)."
+				},
+				{
+					"name": "three_modification",
+					"kind": "property",
+					"type": "str | None",
+					"doc": "Modification on the oligo's free 3\u2032 end (``None`` when unset or circular)."
+				},
+				{
+					"name": "touches_regions",
+					"kind": "method",
+					"signature": "()",
+					"returns": "set[str]",
+					"doc": "Set of region IDs this oligo's segments visit (cross-region detection)."
+				},
+				{
+					"name": "is_mirror",
+					"kind": "property",
+					"type": "bool",
+					"doc": "True for a mirror oligo: a read-only copy of a repeat group's original."
+				},
+				{
+					"name": "mirror_of",
+					"kind": "property",
+					"type": "MirrorInfo | None",
+					"doc": "For a mirror: its ``(group, instance, source)``; ``None`` otherwise."
+				},
+				{
+					"name": "repeat_group",
+					"kind": "property",
+					"type": "MutableRepeatGroup | None",
+					"doc": "The repeat group this oligo is an original of (``None`` for mirrors and ordinary oligos; a mirror's group is ``mirror_of.group``)."
+				}
+			]
+		},
+		"SegmentView": {
+			"module": "foldnano_mini",
+			"doc": "A stretch of one strand of one VH, part of an oligo (read-only).",
 			"members": [
 				{
 					"name": "id",
@@ -1844,12 +2372,12 @@
 				{
 					"name": "five_prime",
 					"kind": "property",
-					"type": "MutableSegmentEnd"
+					"type": "SegmentEndView"
 				},
 				{
 					"name": "three_prime",
 					"kind": "property",
-					"type": "MutableSegmentEnd"
+					"type": "SegmentEndView"
 				},
 				{
 					"name": "low_index",
@@ -1875,19 +2403,17 @@
 				{
 					"name": "oligo",
 					"kind": "property",
-					"type": "MutableOligo"
+					"type": "OligoView"
 				},
 				{
 					"name": "five_modification",
 					"kind": "property",
-					"type": "str | None",
-					"settable": true
+					"type": "str | None"
 				},
 				{
 					"name": "three_modification",
 					"kind": "property",
-					"type": "str | None",
-					"settable": true
+					"type": "str | None"
 				},
 				{
 					"name": "connected_from_segment_id",
@@ -1902,46 +2428,25 @@
 				{
 					"name": "slots",
 					"kind": "property",
-					"type": "list[MutableSlot]"
+					"type": "list[SlotView]"
 				},
 				{
 					"name": "slot_at",
 					"kind": "method",
 					"signature": "(bp_index: int)",
-					"returns": "MutableSlot",
+					"returns": "SlotView",
 					"doc": "Return a proxy for the slot at ``bp_index`` (created on first write)."
-				},
-				{
-					"name": "move_five_prime_to",
-					"kind": "method",
-					"signature": "(new_index: int)",
-					"returns": "None",
-					"doc": "Move the 5\u2032 terminus to ``new_index`` (same as ``seg.five_prime.index = new_index``)."
-				},
-				{
-					"name": "move_three_prime_to",
-					"kind": "method",
-					"signature": "(new_index: int)",
-					"returns": "None",
-					"doc": "Move the 3\u2032 terminus to ``new_index`` (same as ``seg.three_prime.index = new_index``)."
-				},
-				{
-					"name": "remove",
-					"kind": "method",
-					"signature": "()",
-					"returns": "MutableOligo | None",
-					"doc": "Same as ``part.remove_segment(seg)``."
 				}
 			]
 		},
-		"MutableSegmentEnd": {
+		"SegmentEndView": {
 			"module": "foldnano_mini",
-			"doc": "One end of a segment \u2014 mirrors the host's ``SegmentEnd`` (``FivePrimeEnd`` / ``ThreePrimeEnd``).",
+			"doc": "One end of a segment \u2014 mirrors the host's ``SegmentEnd`` (``FivePrimeEnd`` / ``ThreePrimeEnd``), read-only.",
 			"members": [
 				{
 					"name": "segment",
 					"kind": "property",
-					"type": "MutableSegment"
+					"type": "SegmentView"
 				},
 				{
 					"name": "is_three_prime",
@@ -1951,31 +2456,22 @@
 				{
 					"name": "index",
 					"kind": "property",
-					"type": "int",
-					"settable": true
-				},
-				{
-					"name": "can_move_to",
-					"kind": "method",
-					"signature": "(new_index: int)",
-					"returns": "Check",
-					"doc": "Port of ``SegmentEnd.canMoveTo``: within the VH length, the swept range free of other segments, the segment keeps its direction, and a constrained end only moves to a matching crossover site. Also refuses a skip/insertion bp."
+					"type": "int"
 				},
 				{
 					"name": "modification",
 					"kind": "property",
-					"type": "str | None",
-					"settable": true
+					"type": "str | None"
 				},
 				{
 					"name": "connected_segment",
 					"kind": "property",
-					"type": "MutableSegment | None"
+					"type": "SegmentView | None"
 				},
 				{
 					"name": "connected_end",
 					"kind": "property",
-					"type": "MutableSegmentEnd | None",
+					"type": "SegmentEndView | None",
 					"doc": "The end on the other side of this end's connection (3' \u2194 5')."
 				},
 				{
@@ -2002,15 +2498,15 @@
 				{
 					"name": "is_adjacent_to",
 					"kind": "method",
-					"signature": "(other: 'MutableSegmentEnd')",
+					"signature": "(other: 'SegmentEndView')",
 					"returns": "bool",
 					"doc": "Port of ``SegmentEnd.isAdjacentTo``: same VH and strand, 1 bp apart."
 				}
 			]
 		},
-		"MutableSlot": {
+		"SlotView": {
 			"module": "foldnano_mini",
-			"doc": "One position on a segment \u2014 sequence, skip, or insertion.",
+			"doc": "One position on a segment \u2014 sequence, skip, or insertion (read-only).",
 			"members": [
 				{
 					"name": "bp_index",
@@ -2020,48 +2516,106 @@
 				{
 					"name": "seq",
 					"kind": "property",
-					"type": "str",
-					"settable": true
+					"type": "str"
 				},
 				{
 					"name": "skip",
 					"kind": "property",
 					"type": "bool"
+				}
+			]
+		},
+		"MutableRepeatGroup": {
+			"module": "foldnano_mini",
+			"doc": "A repeat group (the host's ``RepeatGroup``): originals plus one copy per instance.",
+			"members": [
+				{
+					"name": "id",
+					"kind": "property",
+					"type": "str"
 				},
 				{
-					"name": "can_set_skip",
+					"name": "name",
+					"kind": "property",
+					"type": "str"
+				},
+				{
+					"name": "instances",
+					"kind": "property",
+					"type": "list[RepeatInstance]",
+					"doc": "The copies, in the order the host places them."
+				},
+				{
+					"name": "get_instance",
 					"kind": "method",
-					"signature": "()",
+					"signature": "(instance_id: str)",
+					"returns": "RepeatInstance | None"
+				},
+				{
+					"name": "originals",
+					"kind": "property",
+					"type": "list[MutableOligo]",
+					"doc": "The oligos being repeated (``oligo.repeat_group is self``)."
+				},
+				{
+					"name": "mirrors",
+					"kind": "property",
+					"type": "list[MirrorOligo]",
+					"doc": "Every mirror oligo of this group, across all instances."
+				},
+				{
+					"name": "mirrors_of",
+					"kind": "method",
+					"signature": "(instance: RepeatInstance | str)",
+					"returns": "list[MirrorOligo]",
+					"doc": "The mirror oligos of one instance (one per original)."
+				},
+				{
+					"name": "add_instance",
+					"kind": "method",
+					"signature": "(bp_offset: int)",
+					"returns": "RepeatInstance",
+					"doc": "Add a copy ``bp_offset`` bp along the originals' VHs (the panel's **Add copy**)."
+				},
+				{
+					"name": "can_add_instance",
+					"kind": "method",
+					"signature": "(bp_offset: int)",
 					"returns": "Check",
-					"doc": "Whether ``set_skip(True)`` is allowed here."
+					"doc": "Whether :meth:`add_instance` accepts this offset: not 0 or an offset the group already has, and every copy placeable (no overlap, crossovers on matching lattice sites, skips/insertions paired)."
 				},
 				{
-					"name": "can_set_insertion",
+					"name": "remove_instance",
 					"kind": "method",
-					"signature": "()",
-					"returns": "Check",
-					"doc": "Whether ``set_insertion(...)`` is allowed here (same rules as a skip, but an existing insertion may be replaced)."
+					"signature": "(instance: RepeatInstance | str)",
+					"returns": "None",
+					"doc": "Remove one copy and its mirror oligos (the \u2715 on a copy's chip). Removing the last copy deletes the group; its originals become ordinary oligos."
 				},
 				{
-					"name": "set_skip",
-					"kind": "method",
-					"signature": "(value: bool)",
-					"returns": "None"
-				},
-				{
-					"name": "remove_skip_or_insertion",
+					"name": "detach",
 					"kind": "method",
 					"signature": "()",
 					"returns": "None",
-					"doc": "Turn a skip or insertion back into a plain base on both strands (``OligoSegment.removeSkipOrInsertion``); a plain slot is left alone."
+					"doc": "Dissolve the group, keeping the mirrors as independent, editable oligos."
 				},
 				{
-					"name": "set_insertion",
+					"name": "delete",
 					"kind": "method",
-					"signature": "(sequence: str)",
-					"returns": "None"
+					"signature": "()",
+					"returns": "None",
+					"doc": "Remove the group and its mirror oligos; the originals stay as ordinary oligos."
 				}
 			]
+		},
+		"RepeatInstance": {
+			"module": "foldnano_mini",
+			"doc": "One copy of a repeat group: its id and its bp offset from the originals.",
+			"members": []
+		},
+		"MirrorInfo": {
+			"module": "foldnano_mini",
+			"doc": "What a mirror oligo copies: ``oligo.mirror_of``.",
+			"members": []
 		},
 		"SegmentSpec": {
 			"module": "foldnano_mini",

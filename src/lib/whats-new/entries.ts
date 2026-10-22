@@ -18,6 +18,16 @@ export const WHATS_NEW_REVIEWED_THROUGH = '2026-10-03T12:05:00+02:00';
 // Newest first. Edit freely; the draft script only inserts new entries at the top.
 export const WHATS_NEW: readonly WhatsNewEntry[] = [
 	{
+		date: '2026-10-22',
+		area: 'Plugins',
+		text: 'Python plugins can create and edit repeat groups (linked mirror copies) with create_repeat_group, add_instance, remove_instance, detach and delete. Mirror copies are rebuilt as the plugin edits their originals and are read-only to it.',
+	},
+	{
+		date: '2026-10-22',
+		area: 'Strand view',
+		text: 'Fixed: editing one strand of a mirrored duplex that has a skip (recoloring it, or moving an end) was refused because its copy would land opposite a skip.',
+	},
+	{
 		date: '2026-10-21',
 		area: 'Plugins',
 		text: 'Python plugins can check an edit before making it (can_create_segment, can_connect, ...), find free bases and crossover sites, and draw a multi-segment oligo in one call with create_oligo.',

@@ -22,6 +22,7 @@ import uuid
 from typing import Any, Callable, Protocol
 
 from . import mutations as M
+from . import repeat
 from .checks import InvalidOperationError
 
 
@@ -44,6 +45,7 @@ class OfflineTransport:
 
     def __init__(self, raw: dict[str, Any]) -> None:
         self._raw = copy.deepcopy(raw)
+        repeat.normalize(self._raw)
         self._log: list[dict[str, Any]] = []
 
     @property
@@ -62,7 +64,7 @@ class OfflineTransport:
         handler = _HANDLERS.get(kind)
         if handler is None:
             raise ValueError(f"OfflineTransport: unknown op kind {kind!r}")
-        handler(self._raw, op)
+        repeat.apply_op(self._raw, op, handler)
         self._log.append(op)
 
 
@@ -353,6 +355,10 @@ def _h_connect(raw: dict, op: dict) -> None:
     if oligo_a is oligo_b:
         return  # circularised or already same oligo
 
+    # Part.connectSegmentEnds: the joined oligo stays in (or joins) the repeat group.
+    if not oligo_a.get("repeatGroupId") and oligo_b.get("repeatGroupId"):
+        oligo_a["repeatGroupId"] = oligo_b["repeatGroupId"]
+
     # Insert oligo_b's remaining segments after seg_a in oligo_a, drop oligo_b.
     a_segs = oligo_a["segments"]
     a_pos = next(i for i, s in enumerate(a_segs) if s["id"] == from_seg_id)
@@ -506,6 +512,10 @@ def _h_remove_vhs(raw: dict, op: dict) -> None:
                 "name": o.get("name"),
                 "segments": comp,
             }
+            # As the host's split: the pieces keep repeat-group membership and mirror tags.
+            for key in ("repeatGroupId", "mirrorOf"):
+                if o.get(key):
+                    split[key] = o[key]
             new_oligos.append(split)
 
     raw["oligos"] = new_oligos
@@ -570,6 +580,9 @@ def _break_oligo_at(
         "name": "",
         "segments": chain,
     }
+    # Oligo.breakOligoAt: both halves of an original stay originals.
+    if oligo.get("repeatGroupId"):
+        new_oligo["repeatGroupId"] = oligo["repeatGroupId"]
     raw.setdefault("oligos", []).append(new_oligo)
     return new_oligo
 
@@ -850,4 +863,5 @@ _HANDLERS: _HandlersT = {
     M.OP_TRANSFORM_PLANE: _h_transform_plane,
     M.OP_ADD_REGION_AND_PLANE: _h_add_region_and_plane,
     M.OP_SPLIT_REGION: _h_split_region,
+    **repeat.GROUP_HANDLERS,
 }

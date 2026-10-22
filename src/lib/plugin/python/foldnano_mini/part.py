@@ -15,16 +15,28 @@ import uuid
 from typing import Any, Callable, NamedTuple, Sequence, Union
 
 from . import invariants, lattice, mutations as M
-from . import editing
+from . import editing, repeat
 from .checks import Check, InvalidOperationError
 from .editing import Scratch
 from .lattice import CrossoverSite
 from .mutations import MutationLog
-from .oligo import MutableOligo, MutableSegment, MutableSegmentEnd, MutableSlot
+from .oligo import (
+    MirrorOligo,
+    MutableOligo,
+    MutableSegment,
+    MutableSegmentEnd,
+    MutableSlot,
+    OligoView,
+    SegmentEndView,
+    SegmentView,
+    SlotView,
+)
 from .plane import MutablePlane
 from .region import FreeformRegion, LatticedRegion, MutableRegion
+from .repeat import MIRROR_EDIT_ERROR
+from .repeat_group import MirrorInfo, MutableRepeatGroup, RepeatInstance
 from .topology import TopologyIndex, slot_length, strand_index_from_direction, with_article
-from .transport import OfflineTransport, Transport
+from .transport import _HANDLERS, OfflineTransport, Transport
 from .vh import MutableVirtualHelix
 
 
@@ -152,8 +164,22 @@ class MutablePart:
     def allocate_segment_id(self) -> str:
         return self._allocate_unique_id("py-seg-", self._segment_id_exists)
 
+    def _allocate_group_id(self) -> str:
+        return self._allocate_unique_id(
+            "py-repeat-", lambda gid: repeat.find_group(self._raw, gid) is not None
+        )
+
+    def _allocate_instance_id(self) -> str:
+        used = {i["id"] for g in self._raw.get("repeatGroups", []) for i in g.get("instances", [])}
+        return self._allocate_unique_id("py-instance-", used.__contains__)
+
     def _apply(self, op: dict[str, Any]) -> None:
-        """Validate, route to transport, then accept the op into the log."""
+        """Validate, route to transport, then accept the op into the log.
+
+        The transport also rebuilds repeat-group mirrors the op affects; an op that edits a
+        mirror, or whose mirrors can't be rebuilt, raises ``InvalidOperationError`` and is
+        neither applied nor logged.
+        """
         kind = op.get("op")
         if kind not in M.KNOWN_OPS:
             raise ValueError(f"Unknown op kind {kind!r}")
@@ -168,8 +194,51 @@ class MutablePart:
             self._topology_generation = self._generation
         return self._topology_cache
 
-    def _segment_proxy(self, segment_id: str) -> MutableSegment:
+    def _segment_proxy(self, segment_id: str) -> MutableSegment | SegmentView:
+        oligo_id = self._resolve_oligo_id_for_segment(segment_id)
+        if oligo_id is not None and self._raw_oligo(oligo_id).get("mirrorOf"):
+            return SegmentView(self, oligo_id, segment_id)
         return MutableSegment(self, "", segment_id)
+
+    def _oligo_proxy(self, raw_oligo: dict[str, Any]) -> MutableOligo | MirrorOligo:
+        cls = MirrorOligo if raw_oligo.get("mirrorOf") else MutableOligo
+        return cls(self, raw_oligo["id"])
+
+    def _predict(self, op: dict[str, Any]) -> Check:
+        """Run ``op`` (with its mirror rebuild) on a throwaway copy: the reason it fails."""
+        raw = self._raw
+        work = {**raw, **{k: copy.deepcopy(raw[k]) for k in repeat._COPIED_KEYS if k in raw}}
+        try:
+            repeat.apply_op(work, op, _HANDLERS[op["op"]])
+        except InvalidOperationError as e:
+            return Check.failed(str(e))
+        return Check.passed()
+
+    def _predict_repeats(self, op: dict[str, Any]) -> Check:
+        """Like :meth:`_predict`, but only when the op touches a repeat group's oligo:
+        a mirror (refused) or an original (its mirrors must still fit after the edit)."""
+        raw = self._raw
+        if not repeat.has_repeats(raw):
+            return Check.passed()
+        touched = repeat.touched_oligos(raw, op)
+        if not any(o.get("repeatGroupId") or o.get("mirrorOf") for o in touched):
+            return Check.passed()
+        return self._predict(op)
+
+    @staticmethod
+    def _require_editable(obj: object, cls: type, message: str) -> None:
+        """``TypeError`` unless ``obj`` is a ``cls``; a mirror's view raises the mirror error."""
+        if isinstance(obj, cls):
+            return
+        if isinstance(obj, (OligoView, SegmentView, SegmentEndView, SlotView)):
+            raise InvalidOperationError(MIRROR_EDIT_ERROR)
+        raise TypeError(message)
+
+    @staticmethod
+    def _is_mirror_view(obj: object) -> bool:
+        return isinstance(obj, (MirrorOligo, SegmentView, SegmentEndView, SlotView)) and not isinstance(
+            obj, (MutableOligo, MutableSegment, MutableSegmentEnd, MutableSlot)
+        )
 
     def _resolve_vh_raw(self, vh: MutableVirtualHelix | int) -> dict[str, Any]:
         if isinstance(vh, MutableVirtualHelix):
@@ -274,8 +343,72 @@ class MutablePart:
         return [MutablePlane(self, p["id"]) for p in self._raw.get("planes", [])]
 
     @property
-    def oligos(self) -> list[MutableOligo]:
-        return [MutableOligo(self, o["id"]) for o in self._raw.get("oligos", [])]
+    def oligos(self) -> list[MutableOligo | MirrorOligo]:
+        """Every oligo, including repeat groups' read-only mirror oligos. Use
+        :attr:`real_oligos` for the ones you can edit."""
+        return [self._oligo_proxy(o) for o in self._raw.get("oligos", [])]
+
+    @property
+    def real_oligos(self) -> list[MutableOligo]:
+        """Every oligo except mirror oligos (the host's ``Part.realOligos``): what the
+        oligo list and exports show."""
+        return [MutableOligo(self, o["id"]) for o in self._raw.get("oligos", []) if not o.get("mirrorOf")]
+
+    # ------------------------------------------------------------------
+    # Repeat groups
+    # ------------------------------------------------------------------
+
+    @property
+    def repeat_groups(self) -> list[MutableRepeatGroup]:
+        return [MutableRepeatGroup(self, g["id"]) for g in self._raw.get("repeatGroups", [])]
+
+    def get_repeat_group(self, group_id: str) -> MutableRepeatGroup | None:
+        return MutableRepeatGroup(self, group_id) if repeat.find_group(self._raw, group_id) else None
+
+    def create_repeat_group(self, oligos: Sequence[MutableOligo], bp_offset: int) -> MutableRepeatGroup:
+        """Make ``oligos`` the originals of a new repeat group with one copy ``bp_offset``
+        bp along the same VHs (the editor's "Duplicate as linked mirror copies").
+
+        The copy's mirror oligos are built immediately and rebuilt after every later edit
+        to an original; a region the copy runs past grows. Add more copies with
+        ``group.add_instance``. Raises ``InvalidOperationError`` when
+        :meth:`can_create_repeat_group` refuses it.
+        """
+        op = self._create_repeat_group_op(oligos, bp_offset)
+        self._apply(op)
+        return MutableRepeatGroup(self, op["groupId"])
+
+    def can_create_repeat_group(self, oligos: Sequence[MutableOligo], bp_offset: int) -> Check:
+        """Whether :meth:`create_repeat_group` accepts this: at least one oligo, none a
+        mirror or already in a group, and the copy placeable (no overlap, crossovers on
+        matching lattice sites, skips/insertions paired)."""
+        return self._predict(self._create_repeat_group_op(oligos, bp_offset))
+
+    def _create_repeat_group_op(self, oligos: Sequence[MutableOligo], bp_offset: int) -> dict[str, Any]:
+        if isinstance(oligos, (str, bytes)) or not isinstance(oligos, Sequence):
+            raise TypeError("create_repeat_group() takes a list of oligos")
+        if any(not isinstance(o, OligoView) for o in oligos):
+            raise TypeError("create_repeat_group() takes a list of oligos")
+        if isinstance(bp_offset, bool) or not isinstance(bp_offset, int):
+            raise TypeError(f"bp_offset must be int, got {type(bp_offset).__name__}")
+        return {
+            "op": M.OP_CREATE_REPEAT_GROUP,
+            "groupId": self._allocate_group_id(),
+            "instanceId": self._allocate_instance_id(),
+            "name": repeat.next_group_name(self._raw),
+            "oligoIds": [o.id for o in oligos],
+            "bpOffset": int(bp_offset),
+        }
+
+    def _mirror_info(self, raw_oligo: dict[str, Any]) -> MirrorInfo | None:
+        tag = raw_oligo.get("mirrorOf")
+        if not tag:
+            return None
+        group = self.get_repeat_group(tag["groupId"])
+        instance = group.get_instance(tag["instanceId"]) if group is not None else None
+        if group is None or instance is None:
+            return None
+        return MirrorInfo(group, instance, MutableOligo(self, tag["sourceOligoId"]))
 
     def _build_region_proxy(self, raw_region: dict[str, Any]) -> MutableRegion:
         kind = raw_region.get("kind")
@@ -297,10 +430,10 @@ class MutablePart:
                 return MutableVirtualHelix(self, index)
         return None
 
-    def get_oligo(self, oligo_id: str) -> MutableOligo | None:
+    def get_oligo(self, oligo_id: str) -> MutableOligo | MirrorOligo | None:
         for o in self._raw.get("oligos", []):
             if o["id"] == oligo_id:
-                return MutableOligo(self, oligo_id)
+                return self._oligo_proxy(o)
         return None
 
     def potential_xover_sites(self, vh: MutableVirtualHelix | int) -> list[list[CrossoverSite]]:
@@ -313,9 +446,10 @@ class MutablePart:
     def vhs_in_region(self, region_id: str) -> list[MutableVirtualHelix]:
         return [vh for vh in self.virtual_helices if vh.region_id == region_id]
 
-    def oligos_in_region(self, region_id: str) -> list[MutableOligo]:
-        """Oligos whose every segment lives in ``region_id`` (cross-region oligos excluded)."""
-        out: list[MutableOligo] = []
+    def oligos_in_region(self, region_id: str) -> list[MutableOligo | MirrorOligo]:
+        """Oligos whose every segment lives in ``region_id`` (cross-region oligos excluded),
+        mirror oligos included."""
+        out: list[MutableOligo | MirrorOligo] = []
         for o in self.oligos:
             if o.touches_regions() == {region_id}:
                 out.append(o)
@@ -389,8 +523,8 @@ class MutablePart:
 
         Raises :class:`InvalidOperationError` when :meth:`can_connect` refuses it.
         """
-        if not isinstance(from_segment, MutableSegment) or not isinstance(to_segment, MutableSegment):
-            raise TypeError("connect() takes two MutableSegment instances")
+        for seg in (from_segment, to_segment):
+            self._require_editable(seg, MutableSegment, "connect() takes two MutableSegment instances")
         self.can_connect(from_segment, to_segment).raise_if_failed()
         self._apply(
             {
@@ -433,8 +567,7 @@ class MutablePart:
         ends are fresh). Raises :class:`InvalidOperationError` when
         :meth:`can_break_oligo` refuses it.
         """
-        if not isinstance(segment, MutableSegment):
-            raise TypeError("break_oligo() takes a MutableSegment")
+        self._require_editable(segment, MutableSegment, "break_oligo() takes a MutableSegment")
         self.can_break_oligo(segment, at_index).raise_if_failed()
         new_oligo_id = self.allocate_oligo_id()
         self._apply(
@@ -463,7 +596,7 @@ class MutablePart:
         segment = self.get_segment_at(vh, strand_index, bp_index)
         if segment is None:
             return Check.failed(self._no_strand(vh, strand_index, bp_index))
-        return self.can_break_oligo(segment, bp_index)
+        return self.can_break_oligo(segment, bp_index)  # a mirror's segment fails there
 
     # ------------------------------------------------------------------
     # Lookups by position (the editor's hit test)
@@ -522,7 +655,8 @@ class MutablePart:
             self._apply(op)
 
     def _scratch_oligo(self, oligo: MutableOligo) -> Callable[[Scratch], dict[str, Any]]:
-        if not isinstance(oligo, MutableOligo):
+        # A mirror passes here; its edit is refused when the plan runs, so can_* reports it.
+        if not isinstance(oligo, OligoView):
             raise TypeError(f"expected a MutableOligo, got {type(oligo).__name__}")
         oligo_id = oligo.id
 
@@ -612,8 +746,7 @@ class MutablePart:
 
     def remove_oligo(self, oligo: MutableOligo) -> None:
         """Remove ``oligo`` and all its segments (``Part.removeOligo``)."""
-        if not isinstance(oligo, MutableOligo):
-            raise TypeError("remove_oligo() takes a MutableOligo")
+        self._require_editable(oligo, MutableOligo, "remove_oligo() takes a MutableOligo")
         self._apply({"op": M.OP_REMOVE_OLIGO, "oligoId": oligo.id})
 
     def remove_segment(self, segment: MutableSegment) -> MutableOligo | None:
@@ -623,8 +756,7 @@ class MutablePart:
         which is returned (``None`` when nothing was downstream). Removing an oligo's only
         or first segment removes that oligo id.
         """
-        if not isinstance(segment, MutableSegment):
-            raise TypeError("remove_segment() takes a MutableSegment")
+        self._require_editable(segment, MutableSegment, "remove_segment() takes a MutableSegment")
         new_oligo_id = self.allocate_oligo_id()
         self._apply(
             {
@@ -813,6 +945,8 @@ class MutablePart:
         """Whether :meth:`connect` accepts joining ``from_segment``'s 3′ end to
         ``to_segment``'s 5′ end: different segments, both ends free, and neither end
         on a skip or insertion."""
+        if self._is_mirror_view(from_segment) or self._is_mirror_view(to_segment):
+            return Check.failed(MIRROR_EDIT_ERROR)
         if not isinstance(from_segment, MutableSegment) or not isinstance(to_segment, MutableSegment):
             raise TypeError("can_connect() takes two MutableSegment instances")
         topo = self._topology()
@@ -831,11 +965,15 @@ class MutablePart:
             kind = topo.slot_kind_at(info.vh_index, bp)
             if kind is not None:
                 return Check.failed(f"Cannot connect at VH {info.vh_index} bp {bp}: it is {with_article(kind)}")
-        return Check.passed()
+        return self._predict_repeats(
+            {"op": M.OP_CONNECT, "fromSegmentId": a.segment_id, "toSegmentId": b.segment_id}
+        )
 
     def can_break_oligo(self, segment: MutableSegment, at_index: int) -> Check:
         """Whether :meth:`break_oligo` accepts this break: ``at_index`` inside the
         segment, and a mid-segment break not leaving a new end on a skip or insertion."""
+        if self._is_mirror_view(segment):
+            return Check.failed(MIRROR_EDIT_ERROR)
         if not isinstance(segment, MutableSegment):
             raise TypeError("can_break_oligo() takes a MutableSegment")
         if isinstance(at_index, bool) or not isinstance(at_index, int):
@@ -849,7 +987,7 @@ class MutablePart:
                 f"Cannot break at bp {at_index}: outside segment {info.low}-{info.high}"
             )
         if at_index == info.three:
-            return Check.passed()
+            return self._predict_break(info.oligo_id, info.segment_id, at_index)
         next_bp = at_index + (1 if info.strand_index == 0 else -1)
         three_is_free = topo.raw_segment(segment.id)["threePrime"].get("connectedSegmentId") is None
         if next_bp == info.three and not three_is_free:
@@ -859,7 +997,22 @@ class MutablePart:
             kind = self._topology().slot_kind_at(info.vh_index, bp)
             if kind is not None:
                 return Check.failed(f"Cannot break at VH {info.vh_index} bp {bp}: it is {with_article(kind)}")
-        return Check.passed()
+        return self._predict_break(info.oligo_id, info.segment_id, at_index)
+
+    def _predict_break(self, oligo_id: str, segment_id: str, at_index: int) -> Check:
+        # Ids are only allocated when there is something to predict.
+        if not repeat.has_repeats(self._raw):
+            return Check.passed()
+        return self._predict_repeats(
+            {
+                "op": M.OP_BREAK_OLIGO,
+                "oligoId": oligo_id,
+                "segmentId": segment_id,
+                "atIndex": int(at_index),
+                "newOligoId": self.allocate_oligo_id(),
+                "newSegmentId": self.allocate_segment_id(),
+            }
+        )
 
     def _check_move_end(self, segment_id: str, is_three_prime: bool, new_index: int) -> Check:
         """Port of ``SegmentEnd.canMoveTo``, plus refusing a skip/insertion bp."""
@@ -906,7 +1059,14 @@ class MutablePart:
         kind = topo.slot_kind_at(info.vh_index, new_index)
         if kind is not None:
             return Check.failed(f"Cannot move to {where}: it is {with_article(kind)}")
-        return Check.passed()
+        return self._predict_repeats(
+            {
+                "op": M.OP_MOVE_TERMINUS,
+                "segmentId": segment_id,
+                "end": "3" if is_three_prime else "5",
+                "toIndex": new_index,
+            }
+        )
 
     def _check_skip_or_insertion(self, segment_id: str, bp: int, skip: bool) -> Check:
         topo = self._topology()
@@ -930,7 +1090,14 @@ class MutablePart:
         lengths = {slot_length(topo.raw_segment(s), bp) for s in (segment_id, comp_id)}
         if len(lengths) > 1:
             return Check.failed(f"Cannot add {what} at {where}: the two strands are out of sync")
-        return Check.passed()
+        return self._predict_repeats(
+            {
+                "op": M.OP_ADD_SKIP_OR_INSERTION,
+                "segmentId": segment_id,
+                "bpIndex": int(bp),
+                "count": -1 if skip else 1,
+            }
+        )
 
     # ------------------------------------------------------------------
     # Skips and insertions, as the editor's skip / insert tools

@@ -48,6 +48,11 @@ OP_REORDER_VH = "reorder_vh"
 OP_TRANSFORM_PLANE = "transform_plane"
 OP_ADD_REGION_AND_PLANE = "add_region_and_plane"
 OP_SPLIT_REGION = "split_region"
+OP_CREATE_REPEAT_GROUP = "create_repeat_group"
+OP_ADD_REPEAT_INSTANCE = "add_repeat_instance"
+OP_REMOVE_REPEAT_INSTANCE = "remove_repeat_instance"
+OP_DETACH_REPEAT_GROUP = "detach_repeat_group"
+OP_DELETE_REPEAT_GROUP = "delete_repeat_group"
 
 
 KNOWN_OPS: frozenset[str] = frozenset(
@@ -77,6 +82,11 @@ KNOWN_OPS: frozenset[str] = frozenset(
         OP_TRANSFORM_PLANE,
         OP_ADD_REGION_AND_PLANE,
         OP_SPLIT_REGION,
+        OP_CREATE_REPEAT_GROUP,
+        OP_ADD_REPEAT_INSTANCE,
+        OP_REMOVE_REPEAT_INSTANCE,
+        OP_DETACH_REPEAT_GROUP,
+        OP_DELETE_REPEAT_GROUP,
     }
 )
 

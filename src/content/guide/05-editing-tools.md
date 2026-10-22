@@ -2,7 +2,7 @@
 title: Editing Tools
 description: Draw, Break, Skip, Insert, Paint, Modification, Sequence, and Split Region tools in the strand viewer, with their panels
 category: guide
-order: 4
+order: 5
 slug: editing-tools
 ---
 

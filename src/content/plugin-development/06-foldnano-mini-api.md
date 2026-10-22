@@ -35,11 +35,13 @@ Arguments named `vh` take a helix object or its index. `strand_index` is 0 (base
 | API | Kind | Behaviour |
 | --- | --- | --- |
 | `part.name`, `part.id` | read‑only | The part's name and id. |
-| `part.regions`, `part.virtual_helices`, `part.oligos`, `part.planes` | read‑only | Lists of proxies for everything in the part, current as of the last edit. |
+| `part.regions`, `part.virtual_helices`, `part.oligos`, `part.planes` | read‑only | Lists of proxies for everything in the part, current as of the last edit. `part.oligos` includes repeat groups' mirror oligos, as read-only `MirrorOligo`s. |
+| `part.real_oligos` | read‑only | Every oligo except mirror oligos: the ones you can edit, and what the app's oligo list and exports show. |
+| `part.repeat_groups` | read‑only | The part's repeat groups (`MutableRepeatGroup`). |
 | `part.active_region_id`, `part.active_region` | read‑only | The region passed to `load_part` (id, and its proxy or `None`). |
 | `part.lattice_type` | read‑only | `'HONEYCOMB'`, `'SQUARE'` or `'FREEFORM'`: the first region's kind. Check `region.kind` in multi-region parts. |
 | `part.max_base` | read‑only | The first region's default length. |
-| `part.get_region(id)`, `part.get_vh(index)`, `part.get_oligo(id)` | query | The proxy with that id or index, or `None`. |
+| `part.get_region(id)`, `part.get_vh(index)`, `part.get_oligo(id)`, `part.get_repeat_group(id)` | query | The proxy with that id or index, or `None`. |
 | `part.vhs_in_region(region_id)` | query | Helices in a region. |
 | `part.oligos_in_region(region_id)` | query | Oligos whose segments all lie in that region (oligos crossing into another region are left out). |
 | `part.get_segment_at(vh, strand_index, bp)` | query | The segment covering that base on that strand, or `None`. |
@@ -75,6 +77,7 @@ Arguments named `vh` take a helix object or its index. `strand_index` is 0 (base
 | `part.add_region(kind, name, max_base, *, min_base=0, plane_origin=..., plane_u=..., plane_v=..., plane_normal=..., plane_name=None, step=None, turns_per_step=None, sub_step_size=None, twist_offset=None)` | **edit** | A new region (`'HONEYCOMB'`, `'SQUARE'` or `'FREEFORM'`) on its own new plane; lattice settings default per kind. Returns the region. **Records** `add_region_and_plane`. |
 | `part.split_region(region, split_after_vh)` | **edit** | Split a region after the given helix; the helices after it move to a new region with a copy of the plane. Returns the new region. **Records** `split_region`. |
 | `part.set_plane_transform(plane_id, origin, u, v, normal)` | **edit** | Move a plane: each vector is `(x, y, z)` or `{x, y, z}`. **Records** `transform_plane`. |
+| `part.create_repeat_group(oligos, bp_offset)` | **edit** | Make `oligos` the originals of a new repeat group with one copy `bp_offset` bases along the same helices, like the editor's **Duplicate as linked mirror copies**. The copy's mirror oligos appear at once; a region the copy runs past grows. Returns the group. **Records** `create_repeat_group`. Check: `can_create_repeat_group`. |
 
 ## `MutablePart`: checks
 
@@ -91,6 +94,9 @@ Each returns a `Check`: truthy when the edit would be accepted, with `.reason` w
 | `part.can_make_crossover(vh, strand_index, bp, to_vh)` | query | The rules listed for `make_crossover`. |
 | `part.can_add_skip_at(vh, bp)`, `part.can_add_insert_at(vh, bp)` | query | The rules listed for `add_skip_at` / `add_insert_at`. |
 | `part.can_break_at(vh, strand_index, bp)`, `part.can_break_oligo(seg, at_index)` | query | A strand at that base; the base inside the segment; no 1-nt piece; a mid-segment break not leaving an end on a skip or insertion. |
+| `part.can_create_repeat_group(oligos, bp_offset)` | query | At least one oligo, none a mirror or already in a group, and the copy placeable (see [Repeat groups](#repeat-groups)). |
+
+Each edit check above also refuses an edit to a mirror oligo, and an edit to a repeat group's original whose rebuilt copies wouldn't fit (the reason starts "Copy N of Repeat M").
 
 ## `MutableOligo`
 
@@ -107,6 +113,8 @@ Each returns a `Check`: truthy when the edit would be accepted, with `.reason` w
 | `oligo.five_prime`, `oligo.three_prime` | read‑only | Its free 5' / 3' end (`MutableSegmentEnd`), or `None` when circular. |
 | `oligo.five_modification`, `oligo.three_modification` | **settable** | The modification on its free 5' / 3' end; `None` clears. Refused on a circular oligo. **Records** `set_segment_modification`. |
 | `oligo.touches_regions()` | query | The set of region ids its segments lie in. |
+| `oligo.is_mirror` | read‑only | False for a `MutableOligo` (mirror oligos are `MirrorOligo`s). |
+| `oligo.repeat_group` | read‑only | The repeat group this oligo is an original of, or `None`. |
 | `oligo.remove()` | **edit** | Same as `part.remove_oligo(oligo)`. |
 
 ## `MutableSegment`
@@ -198,12 +206,36 @@ Each returns a `Check`: truthy when the edit would be accepted, with `.reason` w
 | `freeform_region.add_vh_at(origin, direction=(0, 0, 1), length=None)` | **edit** | A new helix at a 3D position in nm (`FreeformRegion`). **Records** `add_freeform_vh`. |
 | `plane.id`, `plane.name`, `plane.origin`, `plane.u`, `plane.v`, `plane.normal` | read‑only | A plane's placement (read-only; move it with `part.set_plane_transform`). |
 
+## Repeat groups
+
+A repeat group copies its original oligos at each instance's offset along the same helices. The copies, **mirror oligos**, are rebuilt from their originals after every edit, here and in the app, and can't be edited themselves. Edit an original and its mirrors follow: color, name, scaffold flag, modifications and bases at once, anything else by rebuilding them. If a rebuilt copy wouldn't fit (it would overlap a strand, lose a lattice crossover site, or leave a skip or insertion unpaired), the edit raises `InvalidOperationError` and nothing is recorded.
+
+| API | Kind | Behaviour |
+| --- | --- | --- |
+| `group.id`, `group.name` | read‑only | Stable id and display name (`Repeat 1`, `Repeat 2`, ...). |
+| `group.instances` | read‑only | Its copies, as `RepeatInstance(id, bp_offset)`, in the order they are placed. |
+| `group.get_instance(id)` | query | One instance by id, or `None`. |
+| `group.originals` | read‑only | The oligos being repeated. |
+| `group.mirrors`, `group.mirrors_of(instance)` | read‑only / query | All its mirror oligos, or one instance's. |
+| `group.add_instance(bp_offset)` | **edit** | Add a copy at that offset (not 0 or one the group already has); its mirrors appear at once. Returns the `RepeatInstance`. **Records** `add_repeat_instance`. Check: `group.can_add_instance(bp_offset)`. |
+| `group.remove_instance(instance)` | **edit** | Remove one copy and its mirrors. Removing the last copy deletes the group. **Records** `remove_repeat_instance`. |
+| `group.detach()` | **edit** | Dissolve the group, keeping its mirrors as ordinary, editable oligos. **Records** `detach_repeat_group`. |
+| `group.delete()` | **edit** | Remove the group and its mirrors; the originals stay as ordinary oligos. **Records** `delete_repeat_group`. |
+| `MirrorOligo` | class | A mirror oligo: the same reads as `MutableOligo`, with no setters or edits. Its segments, ends and slots are `SegmentView`, `SegmentEndView` and `SlotView`: read-only versions of the mutable proxies. Assigning to any of them raises `InvalidOperationError`. |
+| `mirror.is_mirror` | read‑only | True. |
+| `mirror.mirror_of` | read‑only | `MirrorInfo(group, instance, source)`: what it copies. |
+| `mirror.source` | read‑only | The original it copies, as a `MutableOligo`. |
+
+Joining an ordinary oligo to an original (with `connect` or a crossover) pulls it into the group; both halves of a broken original stay in it; two groups can't be joined. A mirror's id is `<source id>@<instance id>` here, stable across rebuilds, but the app gives its mirrors its own ids, so don't keep a mirror id after the run. To edit every oligo, loop over `part.real_oligos`.
+
 ## Values and errors
 
 | API | Kind | Behaviour |
 | --- | --- | --- |
 | `Check` | class | Result of a `can_*` call: truthy when allowed; `.ok`, `.reason`, and `.raise_if_failed()`. |
 | `InvalidOperationError` | class | Raised by an edit its check refuses (a `ValueError`). Nothing is recorded. |
+| `MIRROR_EDIT_ERROR` | constant | The message an edit to a mirror oligo fails with. |
+| `RepeatInstance(id, bp_offset)`, `MirrorInfo(group, instance, source)` | class | A repeat group's copy, and what a mirror oligo copies. |
 | `SegmentSpec(vh, five, three)` | class | A named `(vh, five, three)` entry for `create_oligo`. |
 | `CrossoverSite(bp_index, to_vh_index, right)` | class | One potential crossover site. |
 

@@ -73,6 +73,7 @@ hidden drafts from recent commits for a human to rewrite. See `docs/whats-new.md
 | Workspace help (`?` overlay, `help()` attachment, first visit) | `docs/workspace-help.md`                                        |
 | Routes, page wiring, multi-tab init                            | `docs/routes-guide.md`                                          |
 | Landing page (`/`), 3D hero, featured design                   | `docs/landing-page.md`                                          |
+| Doc site: search, `llms*.txt`, per-page `.md`, Ask AI menu     | `docs/doc-site.md`                                              |
 | About dialog What's New, `whats-new:draft` script              | `docs/whats-new.md`                                             |
 | Local persistence (IndexedDB schema)                           | `docs/storage-architecture.md`                                  |
 | Auto-save thresholds and triggers                              | `docs/autosave.md`                                              |

@@ -25,10 +25,22 @@ from .checks import Check, InvalidOperationError
 from .lattice import CrossoverSite
 from .loader import load_part
 from .mutations import KNOWN_OPS, MutationLog
-from .oligo import MutableOligo, MutableSegment, MutableSegmentEnd, MutableSlot
+from .oligo import (
+    MirrorOligo,
+    MutableOligo,
+    MutableSegment,
+    MutableSegmentEnd,
+    MutableSlot,
+    OligoView,
+    SegmentEndView,
+    SegmentView,
+    SlotView,
+)
 from .part import MutablePart, SegmentSpec
 from .plane import MutablePlane
 from .region import FreeformRegion, LatticedRegion, MutableRegion
+from .repeat import MIRROR_EDIT_ERROR
+from .repeat_group import MirrorInfo, MutableRepeatGroup, RepeatInstance
 from .transport import OfflineTransport, Transport
 from .vh import MutableStrandSet, MutableVirtualHelix
 
@@ -45,6 +57,15 @@ __all__ = [
     "MutableSegment",
     "MutableSegmentEnd",
     "MutableSlot",
+    "MirrorOligo",
+    "OligoView",
+    "SegmentView",
+    "SegmentEndView",
+    "SlotView",
+    "MutableRepeatGroup",
+    "RepeatInstance",
+    "MirrorInfo",
+    "MIRROR_EDIT_ERROR",
     "SegmentSpec",
     "CrossoverSite",
     "Check",

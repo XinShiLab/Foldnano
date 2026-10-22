@@ -2,7 +2,7 @@
 title: Duplicates And Repeat Groups
 description: Duplicate selected oligos, place linked mirror copies, and manage repeat groups
 category: guide
-order: 7
+order: 8
 slug: duplicates-repeat-groups
 ---
 

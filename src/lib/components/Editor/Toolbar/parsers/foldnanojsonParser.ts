@@ -1,7 +1,9 @@
 // import { CadnanoJSON, type VStrandJSON } from '$lib/model/io/cadnanoJSON';
 // import type { Part } from '$lib/model/Part';
 import FoldnanoDocument from '$lib/model/document.svelte';
-import { DocumentFormatError } from '$lib/model/documentFormat';
+import { DocumentFormatError, migrateDocumentJson } from '$lib/model/documentFormat';
+import { repairDocumentJson } from '$lib/model/documentRepair';
+import { notifyDocumentRepairs } from '../../context/documentRecovery';
 import type { DesignFileParser, FileMeta } from '.';
 
 // export async function parseCadnanoJSON(file: File): Promise<Part> {
@@ -30,7 +32,10 @@ export const foldnanojsonParser: DesignFileParser = {
 	},
 	parse(raw: Record<string, unknown>, meta: FileMeta): FoldnanoDocument {
 		try {
-			return FoldnanoDocument.fromJSON(raw);
+			const { snapshot, repairs } = repairDocumentJson(migrateDocumentJson(raw));
+			const doc = FoldnanoDocument.fromJSON(snapshot);
+			notifyDocumentRepairs(repairs);
+			return doc;
 		} catch (err) {
 			if (err instanceof DocumentFormatError) throw err;
 			throw new SyntaxError(

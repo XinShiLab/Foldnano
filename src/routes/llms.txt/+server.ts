@@ -1,68 +1,48 @@
 import type { RequestHandler } from './$types';
 import { error } from '@sveltejs/kit';
+import { docHref } from '$lib/docs/doc-markdown';
+import { DOC_CATEGORY_LABELS, type DocCategory } from '$lib/docs/doc-search';
 import { hasAlphaAccess } from '$lib/server/alphaAccess';
+import { listDocPages, TEXT_RESPONSE_HEADERS } from '$lib/server/docsContent';
 
-const modules = import.meta.glob('/src/content/**/*.md', { eager: true }) as Record<
-	string,
-	{ metadata: Record<string, unknown> }
->;
+const CATEGORY_NOTES: Record<DocCategory, string> = {
+	guide: 'Using the Foldnano editor',
+	'plugin-development': 'Writing Python plugins and Script Lab scripts',
+	contributors: 'Working on the Foldnano codebase',
+};
 
-function pathToSlug(path: string, meta: Record<string, unknown>): string {
-	const parts = path.replace('/src/content/', '').split('/');
-	const category = parts[0];
-	const slug =
-		(meta.slug as string | undefined) ?? parts[1].replace('.md', '').replace(/^\d+-/, '');
-	return `${category}/${slug}`;
-}
-
-export const GET: RequestHandler = ({ cookies }) => {
+// Links are absolute because agents often resolve site-relative links against the wrong base.
+export const GET: RequestHandler = ({ cookies, url }) => {
 	if (!hasAlphaAccess(cookies)) {
 		throw error(401, 'Beta access required');
 	}
-
-	type Entry = { order: number; line: string };
-	const guide: Entry[] = [];
-	const pluginDevelopment: Entry[] = [];
-	const contributors: Entry[] = [];
-
-	for (const [path, mod] of Object.entries(modules)) {
-		const m = mod.metadata;
-		const slug = pathToSlug(path, m);
-		const line = `- [${m.title}](/docs/${slug}): ${m.description}`;
-		const entry: Entry = { order: m.order as number, line };
-		if (m.category === 'guide') guide.push(entry);
-		else if (m.category === 'plugin-development') pluginDevelopment.push(entry);
-		else if (m.category === 'contributors') contributors.push(entry);
-	}
-
-	const sort = (arr: Entry[]) => arr.sort((a, b) => a.order - b.order).map((e) => e.line);
+	const origin = url.origin;
+	const categories = Object.keys(DOC_CATEGORY_LABELS) as DocCategory[];
 
 	const body = [
 		'# Foldnano Documentation',
 		'',
 		'> Foldnano is a browser-based DNA nanostructure editor for designing DNA origami and staple routing structures.',
 		'',
-		'## Guide',
+		'Each link below is the page as plain markdown. Human-readable pages live at the same URL without `.md`.',
 		'',
-		...sort(guide),
-		'',
-		'## Plugin Development',
-		'',
-		...sort(pluginDevelopment),
-		'',
-		'## Contributors',
-		'',
-		...sort(contributors),
-		'',
+		...categories.flatMap((category) => [
+			`## ${DOC_CATEGORY_LABELS[category]}`,
+			'',
+			...listDocPages(category).map(
+				(p) => `- [${p.title}](${origin}${docHref(p)}.md): ${p.description}`
+			),
+			'',
+		]),
 		'## Full Content',
 		'',
-		'Full content available at: /llms-full.txt',
+		`- [All documentation in one file](${origin}/llms-full.txt)`,
+		...categories.map(
+			(category) =>
+				`- [${DOC_CATEGORY_LABELS[category]} in one file](${origin}/docs/${category}/llms.txt): ${CATEGORY_NOTES[category]}`
+		),
+		'',
 	].join('\n');
 
-	return new Response(body, {
-		headers: {
-			'Content-Type': 'text/plain; charset=utf-8',
-			'Cache-Control': 'public, max-age=3600',
-		},
-	});
+	return new Response(body, { headers: TEXT_RESPONSE_HEADERS });
 };

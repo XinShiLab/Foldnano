@@ -2,7 +2,7 @@
 title: Creating A Design
 description: New documents, regions, lattice/freeform virtual helices, routing, auto-staple, and scaffold setup
 category: guide
-order: 3
+order: 4
 slug: creating-a-design
 ---
 

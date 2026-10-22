@@ -1647,8 +1647,11 @@ export class Part {
 					}
 					continue;
 				}
-				const target = this.getEntitiesAtVh(vh.id, compStrandIdx, newBp).segment?.slotForBp(newBp);
-				if (target && target.seq.length !== 1) {
+				const targetSeg = this.getEntitiesAtVh(vh.id, compStrandIdx, newBp).segment;
+				const target = targetSeg?.slotForBp(newBp);
+				// A kept mirror of a sibling original already carries the matching skip/insertion.
+				const pairedMirror = !!targetSeg?.oligo?.isMirror && target?.seq.length === slot.seq.length;
+				if (target && target.seq.length !== 1 && !pairedMirror) {
 					return fail(
 						`The copy on VH ${vh.index} would land opposite a skip or insertion at bp ${newBp}.`
 					);
@@ -1691,10 +1694,11 @@ export class Part {
 				for (const slot of seg.slots) {
 					if (slot.seq.length === 1) continue;
 					const newBp = slot.bpIndex + delta;
-					const target = this.getEntitiesAtVh(vh.id, compStrandIdx, newBp).segment?.slotForBp(
-						newBp
-					);
-					if (target) complementSyncs.push({ slot: target, len: slot.seq.length });
+					const targetSeg = this.getEntitiesAtVh(vh.id, compStrandIdx, newBp).segment;
+					const target = targetSeg?.slotForBp(newBp);
+					if (!target) continue;
+					if (targetSeg?.oligo?.isMirror && target.seq.length === slot.seq.length) continue;
+					complementSyncs.push({ slot: target, len: slot.seq.length });
 				}
 			}
 		}

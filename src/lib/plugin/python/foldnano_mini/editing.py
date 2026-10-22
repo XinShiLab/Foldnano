@@ -17,6 +17,7 @@ from __future__ import annotations
 from typing import Any, Callable
 
 from . import mutations as M
+from . import repeat
 from .checks import InvalidOperationError
 from .topology import TopologyIndex, strand_index_from_direction, with_article
 from .transport import _HANDLERS
@@ -62,7 +63,7 @@ class Scratch:
         return TopologyIndex(self.raw)
 
     def apply(self, op: dict[str, Any]) -> None:
-        _HANDLERS[op["op"]](self.raw, op)
+        repeat.apply_op(self.raw, op, _HANDLERS[op["op"]])
         self.ops.append(op)
 
     # --- mirror reads ----------------------------------------------------

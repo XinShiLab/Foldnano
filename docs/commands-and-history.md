@@ -172,6 +172,12 @@ connected entities, then stores:
 Patch replay rebuilds only that part slice, re-sorts VHs by restored `listRow`,
 and then rebuilds the spatial index.
 
+A `tx` may commit several scopes in sequence (e.g. `removeSelection` captures one per
+deleted oligo/segment). Redo replays their mementos in commit order; undo replays them in
+**reverse** order. A later scope's "before" was captured after earlier scopes had mutated
+shared VHs, so replaying it last would overwrite their strandSets and orphan the oligos
+the earlier scopes restored.
+
 ---
 
 ## Autosave
