@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { help } from '$lib/components/help/help';
 	import { hubPlugins } from '$lib/plugin/corePlugins';
 	import { classifyEnv } from '$lib/plugin/envClassification';
 	import { preparePointerInstall } from '$lib/plugin/PluginInstaller';
@@ -124,6 +125,11 @@
 							size="sm"
 							class="mt-0.5 h-6 shrink-0 gap-1 px-2 text-xs font-normal"
 							onclick={() => requestInstall(manifest)}
+							{@attach help({
+								title: 'Install',
+								text: 'Add this plugin to My Plugins. You confirm before it installs.',
+								doc: 'plugins-for-users',
+							})}
 						>
 							<Download size={11} />
 							Install

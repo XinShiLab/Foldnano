@@ -287,6 +287,8 @@ export class EditorViewContext {
 	sidePanelTab: SidePanelId = $state('GITHUB');
 	/** Plugin ids whose code editor is in a pop-out window; their panel stays mounted off-tab. */
 	poppedOutPluginPanels: SvelteSet<string> = new SvelteSet();
+	/** Owned plugins whose editor panel has a sidebar icon; open editors stay mounted off-tab. */
+	pluginEditorIds: SvelteSet<string> = new SvelteSet();
 	newFileDialogOpen: boolean = $state(false);
 	publishToGitHubDialogOpen: boolean = $state(false);
 	activeGitHubTab: 'files' | 'changes' | 'graph' = $state('files');
@@ -324,6 +326,14 @@ export class EditorViewContext {
 		this.pluginRegistry.setBusyCheck((id) => this.pluginCoordinator.isPluginBusyOrPending(id));
 		this.pluginCoordinator.setEditGate(() => this.session.isTabOwner);
 		this.pluginInstallGate = new PluginInstallGate(() => this.pluginRegistry);
+		// An unsaved draft brings its editor's icon back after a reload.
+		void this.pluginRegistry.ready.then(() => {
+			for (const plugin of this.pluginRegistry.all) {
+				if (plugin.authoring && plugin.draftCode !== null && plugin.enabled) {
+					this.pluginEditorIds.add(plugin.manifest.id);
+				}
+			}
+		});
 	}
 
 	get currentDoc(): FoldnanoDocument {
@@ -353,6 +363,19 @@ export class EditorViewContext {
 
 	setSidePanelTab(tab: SidePanelId): void {
 		this.sidePanelTab = tab;
+	}
+
+	/** Opens an owned plugin's editor panel; other open editors keep theirs. */
+	openPluginEditor(pluginId: string): void {
+		this.pluginEditorIds.add(pluginId);
+		this.openSidePanel(`plugin:${pluginId}` as const);
+	}
+
+	/** Removes the editor's sidebar icon; a stored draft is kept. */
+	closePluginEditor(pluginId: string): void {
+		this.pluginEditorIds.delete(pluginId);
+		this.poppedOutPluginPanels.delete(pluginId);
+		if (this.sidePanelTab === (`plugin:${pluginId}` as const)) this.sidePanelTab = 'PLUGIN';
 	}
 
 	toggleSidePanel(tab: SidePanelId): void {

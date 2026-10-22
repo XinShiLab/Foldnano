@@ -36,6 +36,7 @@
 
 	let placed = $state<PlacedHelp[]>([]);
 	let hovered = $state<PlacedHelp | null>(null);
+	let layer: HTMLDivElement | undefined;
 	let hoverCard = $state<HTMLElement | null>(null);
 	let viewportWidth = $state(0);
 	let viewportHeight = $state(0);
@@ -57,14 +58,28 @@
 		};
 	}
 
+	// Hover tooltips come and go with the pointer; letting them hide controls moves the captions.
+	function isTooltip(el: Element): boolean {
+		if (el.closest('[data-slot="tooltip-content"]')) return true;
+		const wrapper = el.closest('[data-bits-floating-content-wrapper]');
+		return wrapper?.querySelector(':scope > [data-slot="tooltip-content"]') != null;
+	}
+
 	function isShown(element: HTMLElement, spec: HelpSpec, box: Rect): boolean {
 		if (box.width <= 0 || box.height <= 0) return false;
 		if (box.left + box.width <= 0 || box.top + box.height <= 0) return false;
 		if (box.left >= window.innerWidth || box.top >= window.innerHeight) return false;
 		if (spec.area) return true;
 		// Controls clipped by a scrolling toolbar or covered by a floating panel fail this hit test.
-		const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
-		return hit !== null && element.contains(hit);
+		// Skip the overlay's own notes: a caption or hover card over a control must not hide it, or
+		// placement and hover feed back into visibility and the notes flicker.
+		const hit = document
+			.elementsFromPoint(box.left + box.width / 2, box.top + box.height / 2)
+			.find((el) => !layer?.contains(el) && !isTooltip(el));
+		if (hit === undefined) return false;
+		if (element.contains(hit)) return true;
+		// Disabled buttons are pointer-events: none, so the hit lands on their parent instead.
+		return element.matches(':disabled') && hit === element.parentElement;
 	}
 
 	function measure(): PlacedHelp[] {
@@ -156,6 +171,9 @@
 
 	const viewport = $derived({ width: viewportWidth, height: viewportHeight });
 
+	// Captions also keep off hoverable controls, or a caption could hide the buttons it sits on.
+	const controlObstacles = $derived(placed.filter((p) => !p.spec.area).map((p) => p.box));
+
 	const captionLayout = $derived(
 		placeNotes<NoteKey>(
 			captions.map((p): NoteRequest<NoteKey> => ({
@@ -164,7 +182,7 @@
 				...(sizes.get(p.element) ?? { width: 0, height: 0 }),
 				placement: p.spec.placement ?? 'inside',
 			})),
-			fixedObstacles,
+			[...fixedObstacles, ...controlObstacles],
 			viewport
 		)
 	);
@@ -205,6 +223,7 @@
 />
 
 <div
+	bind:this={layer}
 	class="pointer-events-none fixed inset-0 z-[998]"
 	role="dialog"
 	aria-modal="false"

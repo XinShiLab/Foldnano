@@ -7,6 +7,7 @@ import type Oligo from '../Oligo/Oligo.svelte';
 
 /** One row in the exported CSV */
 interface OligoSequenceRecord {
+	Name: string;
 	Start: string;
 	End: string;
 	Sequence: string;
@@ -58,6 +59,7 @@ export function collectPartOligoSequences(part: Part): OligoSequenceRecord[] {
 		}
 		const Sequence = oligo.sequence || '';
 		rows.push({
+			Name: oligo.name,
 			Start: formatEnd(oligo, 'five'),
 			End: formatEnd(oligo, 'three'),
 			Sequence,
@@ -85,11 +87,11 @@ function csvEscape(field: string | number): string {
 	return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
-/** Turn records into CSV string with header Start,End,Sequence,Length,Color,Mod5Prime,Mod3Prime */
+/** Turn records into CSV string with header Name,Start,End,Sequence,Length,Color,Mod5Prime,Mod3Prime */
 export function sequencesToCSV(records: OligoSequenceRecord[]): string {
-	const header = 'Start,End,Sequence,Length,Color,Mod5Prime,Mod3Prime';
+	const header = 'Name,Start,End,Sequence,Length,Color,Mod5Prime,Mod3Prime';
 	const lines = records.map((r) =>
-		[r.Start, r.End, r.Sequence, r.Length, r.Color, r.Mod5Prime, r.Mod3Prime]
+		[r.Name, r.Start, r.End, r.Sequence, r.Length, r.Color, r.Mod5Prime, r.Mod3Prime]
 			.map(csvEscape)
 			.join(',')
 	);

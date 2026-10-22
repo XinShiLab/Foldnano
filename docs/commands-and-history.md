@@ -292,6 +292,7 @@ history verifier see the true pre-drag pose).
 | `autoStapleCmd`                  | Lattice-only auto-staple                                                                                                                              |
 | `paintOligoCmd`                  | Recolor one or more oligos                                                                                                                            |
 | `toggleOligoAsScaffoldCmd`       | Toggle scaffold state                                                                                                                                 |
+| `renameOligoCmd`                 | Set or clear an oligo's optional name label (trimmed; no-op when unchanged; mirrors reject it)                                                        |
 | `setModificationCmd`             | Apply or clear end modifications                                                                                                                      |
 | `fillRandomSequenceToOligoCmd`   | Random sequence for an oligo; pass `onlyEmpty: true` to skip already-filled slots                                                                     |
 | `fillRandomSequenceToSegmentCmd` | Random sequence for one segment; `onlyEmpty` supported                                                                                                |

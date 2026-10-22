@@ -13,264 +13,144 @@ export interface WhatsNewEntry {
  * Author date of the newest commit already considered for this list. `pnpm whats-new:draft`
  * only drafts commits authored after it (author dates survive rebases; hashes don't).
  */
-export const WHATS_NEW_REVIEWED_THROUGH = '2026-10-03T12:05:00+02:00';
+export const WHATS_NEW_REVIEWED_THROUGH = '2026-10-22T22:09:56+02:00';
 
 // Newest first. Edit freely; the draft script only inserts new entries at the top.
 export const WHATS_NEW: readonly WhatsNewEntry[] = [
 	{
 		date: '2026-10-22',
 		area: 'Plugins',
-		text: 'Python plugins can create and edit repeat groups (linked mirror copies) with create_repeat_group, add_instance, remove_instance, detach and delete. Mirror copies are rebuilt as the plugin edits their originals and are read-only to it.',
+		text: 'Save as Plugin turns a Script Lab script into a plugin of your own, with an icon you pick or upload. Run it from the Plugins panel, edit several at once in their own editors, save new versions and export zip backups. Any plugin can now bundle its own icon.',
 	},
 	{
 		date: '2026-10-22',
-		area: 'Strand view',
-		text: 'Fixed: editing one strand of a mirrored duplex that has a skip (recoloring it, or moving an end) was refused because its copy would land opposite a skip.',
-	},
-	{
-		date: '2026-10-21',
 		area: 'Plugins',
-		text: 'Python plugins can check an edit before making it (can_create_segment, can_connect, ...), find free bases and crossover sites, and draw a multi-segment oligo in one call with create_oligo.',
+		text: 'Code editors autocomplete the plugin API, show the signature of the function you are calling, run with Cmd/Ctrl+Enter, and can pop out into a separate window. Line numbers show correctly again in recent Chrome.',
 	},
 	{
-		date: '2026-10-21',
+		date: '2026-10-22',
 		area: 'Plugins',
-		text: 'Python plugins can edit like the strand view: find what is at a base, break, make or drag crossovers, join oligos, fill a strand, add skips and inserts on both strands like the skip and insert tools, set end modifications on the oligo, shorten a region, and clear all skips or insertions.',
+		text: 'Python plugins can make most strand-view edits (crossovers, joins, fills, skips and inserts, end modifications), check an edit before making it, and create and edit repeat groups. A failed run always shows the Python error and traceback.',
 	},
 	{
-		date: '2026-10-21',
-		area: 'Strand view',
-		text: 'Fixed: undoing or redoing a connection that joined two strands end to end could make strands disappear until the page was reloaded.',
-	},
-	{
-		date: '2026-10-07',
-		area: 'Plugins',
-		text: 'A failed plugin run now always says why, with the Python error and its traceback, instead of only a red icon.',
-	},
-	{
-		date: '2026-10-07',
-		area: 'General',
-		text: 'Foldnano 0.9.0 beta: the source code is now open under the MIT License at github.com/XinShiLab/foldnano, with a citation file for citing it in your work.',
-	},
-	{
-		date: '2026-10-03',
-		area: 'General',
-		text: 'New Help menu (the ? icon at the top right of the toolbar) opens workspace help and links to the user guide, keyboard shortcuts, and plugin development docs.',
-	},
-	{
-		date: '2026-10-03',
-		area: 'General',
-		text: 'Saved Documents page: sort by last modified or name, show only local or GitHub designs, and switch to a compact table view.',
-	},
-	{
-		date: '2026-10-01',
-		area: '3D view',
-		text: 'The rigid-body simulation is now labelled RBS, and its button reads Relax.',
-	},
-	{
-		date: '2026-09-30',
-		area: 'Plugins',
-		text: 'Script Lab has a compact toolbar, shows the actual Python version, loads the packages a script imports, and reports failed saves instead of losing edits.',
-	},
-	{
-		date: '2026-09-30',
-		area: 'Plugins',
-		text: 'The Python runtime is updated to Pyodide 0.29.5 and served by Foldnano itself, so plugins load more reliably.',
-	},
-	{
-		date: '2026-09-30',
-		area: 'Plugins',
-		text: 'Clearer install errors: invalid plugin ids or versions, and zips made from the plugin folder instead of its files, are explained.',
-	},
-	{
-		date: '2026-09-30',
-		area: 'GitHub',
-		text: 'Backups and GitHub diffs no longer run out of memory on large designs.',
-	},
-	{
-		date: '2026-09-30',
-		area: 'General',
-		text: 'Firefox and Safari show a one-time note that Foldnano is built and tested in Chromium browsers and runs slower elsewhere.',
-	},
-	{
-		date: '2026-09-29',
-		area: 'Plugins',
-		text: 'Plugins run in an isolated sandbox and can only reach the network sources they declare, which you see before installing. Plugins install only from Foldnano itself or a local zip, and runs that time out are stopped.',
-	},
-	{
-		date: '2026-09-28',
-		area: 'Strand view',
-		text: 'Ends can no longer be dragged into a 1-base segment. cadnano files with 1-nt strands are rejected with a list of where they are, instead of loading with broken crossovers.',
-	},
-	{
-		date: '2026-09-28',
+		date: '2026-10-22',
 		area: 'Editing',
-		text: 'Undo history keeps the last 100 steps.',
+		text: 'Name your oligos in the Select panel; names appear in the sequence CSV and the oligo report. Fixed: undoing some deletions or strand joins could break or hide strands, and editing a mirrored duplex with a skip was refused. Affected designs are repaired when opened.',
 	},
 	{
-		date: '2026-09-28',
+		date: '2026-10-22',
 		area: 'General',
-		text: 'A design open in two tabs is handled more reliably: one tab edits, the others are read-only, and a tab that takes over again reloads the latest saved copy first.',
+		text: 'The Help menu (the ? icon at the top right) opens workspace help, now also covering the Source Control, Plugins and Script Lab panels. The documentation site has search (Cmd/Ctrl+K) and an Ask AI menu that copies a page as Markdown or opens it in ChatGPT or Claude.',
 	},
 	{
-		date: '2026-09-28',
+		date: '2026-10-20',
 		area: 'GitHub',
-		text: 'Going offline shows "GitHub not checked" instead of a wrong sync status, expired GitHub sign-ins renew or ask you to sign in again, and a failed conflict check no longer counts as "no conflict".',
+		text: 'The git graph is easier to follow, with straight branch lines and rounded lane changes, and a dropdown switches between branches.',
 	},
 	{
-		date: '2026-09-27',
-		area: 'Saving',
-		text: 'Failed saves are shown in a banner, the browser warns before you close a tab with unsaved work, and Foldnano asks the browser to keep its storage.',
-	},
-	{
-		date: '2026-09-27',
-		area: 'Saving',
-		text: "Each design keeps up to 5 local backups, listed in the Backups dialog and downloadable as .fn.json. A design that can't be opened shows a recovery screen where you can download its data or restore a backup.",
-	},
-	{
-		date: '2026-09-27',
-		area: 'Saving',
-		text: 'Designs record their file format version. A file saved by a newer Foldnano is refused with a clear message instead of being misread.',
-	},
-	{
-		date: '2026-09-27',
+		date: '2026-10-07',
 		area: 'General',
-		text: 'Workspace help: press ? to caption every pane and explain any control you hover over. It opens once on your first visit.',
+		text: 'Foldnano 0.9.0 beta is open source under the MIT License at github.com/XinShiLab/foldnano, with a citation file for citing it in your work.',
 	},
 	{
-		date: '2026-09-27',
+		date: '2026-10-03',
 		area: 'General',
-		text: 'Third-party licenses are listed in full, linked from the About dialog.',
+		text: 'The Saved Documents page sorts by last modified or name, filters to local or GitHub designs, and has a compact table view.',
 	},
 	{
-		date: '2026-09-26',
-		area: 'General',
-		text: 'New privacy page and notice explain what Foldnano stores and where. Usage analytics are cookieless and redact page URLs.',
-	},
-	{
-		date: '2026-09-23',
-		area: 'Strand view',
-		text: 'Duplicate selected oligos with Ctrl/Cmd + D, or place linked mirror copies that follow their originals with Ctrl/Cmd + Shift + D. Manage them in the new Repeat groups panel.',
-	},
-	{
-		date: '2026-09-23',
-		area: 'Export',
-		text: 'Mirror copies are left out of staple lists, the oligo CSV, and cadnano export. Check Include mirror copies to add them to oxDNA or mrDNA output.',
-	},
-	{
-		date: '2026-09-20',
+		date: '2026-09-30',
 		area: 'Plugins',
-		text: 'Plugin results are checked before Apply, errors are clearer, and logs are kept when a run fails.',
+		text: 'Plugins run in an isolated sandbox that only reaches the network hosts they declare, install only from Foldnano or a local zip, and stop when a run takes too long. Results are checked before you apply them, and install and run errors are clearer. Script Lab loads the packages a script imports, and the Python runtime (Pyodide 0.29.5) is served by Foldnano itself.',
+	},
+	{
+		date: '2026-09-30',
+		area: 'GitHub',
+		text: "Backups and GitHub diffs no longer run out of memory on large designs. Offline, the sync status says GitHub wasn't checked, expired sign-ins renew, and a failed conflict check no longer counts as no conflict.",
+	},
+	{
+		date: '2026-09-30',
+		area: 'General',
+		text: 'Workspace help: press ? to label every pane and explain any control you hover over. A new privacy page explains what Foldnano stores (analytics use no cookies), third-party licenses are listed in the About dialog, and Firefox and Safari show a note that Foldnano is built for Chromium browsers.',
+	},
+	{
+		date: '2026-09-28',
+		area: 'Saving',
+		text: "Each design keeps up to 5 local backups, and a design that can't be opened shows a recovery screen. Failed saves show a banner, the browser warns before you close a tab with unsaved work, and a file from a newer Foldnano is refused instead of misread. A design open in two tabs is edited in only one of them.",
+	},
+	{
+		date: '2026-09-28',
+		area: 'Strand view',
+		text: "Duplicate selected oligos with Cmd/Ctrl+D, or place linked mirror copies with Cmd/Ctrl+Shift+D and manage them in the Repeat groups panel; exports leave mirror copies out unless you include them. Undo keeps the last 100 steps, ends can't be dragged into a 1-base segment, and cadnano files with 1-nt strands are refused with their locations.",
 	},
 	{
 		date: '2026-08-30',
 		area: 'Plugins',
-		text: "Safer installs: review a plugin's details and confirm before installing or replacing it.",
+		text: "Review a plugin's details and confirm before installing or replacing it.",
 	},
 	{
 		date: '2026-08-24',
 		area: 'Export',
-		text: "cadnano export writes loop fields with cadnano's own spelling, so files open cleanly in cadnano.",
+		text: 'cadnano export writes insert (loop) fields the way cadnano expects, so files open cleanly in cadnano.',
 	},
 	{
 		date: '2026-08-10',
-		area: '3D view',
-		text: 'Modification tags are shown as markers in the 3D view.',
-	},
-	{
-		date: '2026-08-09',
 		area: 'Strand view',
-		text: 'Deleting a custom modification now removes it from every end that uses it, and modification undo, highlight, and select-all behave consistently.',
+		text: 'Modifications show as markers in the 3D view. Deleting a custom modification removes it from every end, and undo, highlighting and select-all work consistently for modifications. Re-running Auto Staple keeps existing crossovers, and a plain click in Draw mode no longer makes a crossover.',
 	},
 	{
 		date: '2026-08-03',
 		area: 'General',
-		text: 'New error log (bug icon in the toolbar): recent errors are kept in this browser and can be copied as JSON for bug reports.',
-	},
-	{
-		date: '2026-08-03',
-		area: 'Strand view',
-		text: 'Re-running Auto Staple keeps existing crossovers, and a plain click in Draw mode no longer tries to make a crossover.',
+		text: 'New error log (the bug icon in the toolbar) keeps recent errors in this browser; copy them as JSON for bug reports.',
 	},
 	{
 		date: '2026-07-24',
 		area: 'Strand view',
-		text: 'Circular Scaffold Map adds radial segment-length bars, zoom, and segment-length and crossover-span histograms.',
+		text: 'The Circular Scaffold Map adds segment-length bars, zoom, and histograms of segment lengths and crossover spans. A red marker flags paired bases that are not complementary, and blocked strand moves no longer lose content.',
 	},
 	{
 		date: '2026-07-15',
 		area: 'General',
-		text: 'Temporary pan is now hold Option / Alt on every platform.',
+		text: 'Hold Option/Alt to pan temporarily, on every platform.',
 	},
 	{
 		date: '2026-07-13',
 		area: 'Plugins',
-		text: 'Plugins that need their own Python packages run in a separate environment, so standard plugins keep sharing one fast runtime.',
-	},
-	{
-		date: '2026-07-02',
-		area: 'Strand view',
-		text: 'Sequence mismatch warning: a red marker shows paired bases that are not complementary. Blocked strand moves no longer lose content.',
+		text: 'Plugins that need extra Python packages run in a separate environment, so standard plugins keep sharing one fast runtime.',
 	},
 	{
 		date: '2026-06-25',
 		area: '3D view',
-		text: 'Load PDB protein structures as 3D overlays: place, ghost, and duplicate them. Their positions are remembered in the design.',
-	},
-	{
-		date: '2026-06-07',
-		area: '3D view',
-		text: 'The NT model is drawn with smoother tubes and no longer freezes on designs with skips at crossover sites.',
+		text: 'Load PDB protein structures as 3D overlays, then place, ghost and duplicate them; their positions are saved with the design. The nucleotide model draws smoother tubes and no longer freezes on skips at crossover sites.',
 	},
 	{
 		date: '2026-06-01',
 		area: 'General',
-		text: 'Documentation site with a user guide, an interactive editing-tools tutorial, and a plugin development guide.',
+		text: 'New documentation site with a user guide, an interactive editing-tools tutorial and a plugin development guide.',
 	},
 	{
 		date: '2026-05-31',
 		area: 'Reports',
-		text: 'Oligo report page: every oligo with its ends, sequence, length, color, and modifications, with CSV download (Save menu → View Oligos).',
+		text: 'New oligo report (Save menu → View Oligos) lists every oligo with its ends, sequence, length, color and modifications, and downloads as CSV.',
 	},
 	{
 		date: '2026-05-29',
 		area: 'Export',
-		text: 'mrDNA export, and mrDNA results can be loaded back into the 3D view as an overlay colored by sequence.',
-	},
-	{
-		date: '2026-05-28',
-		area: 'Export',
-		text: 'oxDNA export is rebuilt on a new nucleotide model, shared with mrDNA export, that handles skips and inserts.',
+		text: 'oxDNA export is rebuilt to handle skips and inserts, and new mrDNA export can load its results back into the 3D view as an overlay. Export the strand view as SVG or PNG from its toolbar.',
 	},
 	{
 		date: '2026-05-26',
 		area: 'Strand view',
-		text: 'Align free ends left or right, or justify selected segments, from the Edit toolbar.',
+		text: 'New Circular Scaffold Map shows how every staple binds the scaffold. Align or justify ends from the Edit toolbar, and apply skips and inserts across a whole region at once.',
 	},
 	{
 		date: '2026-05-16',
 		area: 'Plugins',
-		text: 'Local plugin zip imports, plugin files kept in browser storage, and broader foldnano_mini API coverage.',
-	},
-	{
-		date: '2026-05-14',
-		area: 'Strand view',
-		text: 'Skips and inserts can be applied across all virtual helices of a region.',
-	},
-	{
-		date: '2026-05-11',
-		area: 'Export',
-		text: 'Strand view SVG and PNG export with dedicated toolbar buttons.',
+		text: 'Install plugins from a local zip. Installed plugins are kept in this browser, and the foldnano_mini plugin API covers more of the design.',
 	},
 	{
 		date: '2026-05-11',
 		area: 'General',
-		text: 'Clearer save status, and a reminder that designs are stored in this browser, not on a Foldnano server.',
-	},
-	{
-		date: '2026-05-08',
-		area: 'Strand view',
-		text: 'Circular Scaffold Map: see how every staple binds the scaffold.',
+		text: 'A clearer save status, and a reminder that designs are stored in this browser, not on a Foldnano server.',
 	},
 ];
 

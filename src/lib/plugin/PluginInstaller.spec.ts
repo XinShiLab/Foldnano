@@ -21,6 +21,9 @@ function makePlugin(manifest: PluginManifest, origin: 'builtin' | 'user'): Pytho
 		sidePanelValues: {},
 		sidePanelCode: '',
 		lastRunMutationLogLength: null,
+		authoring: null,
+		draftCode: null,
+		iconSvg: null,
 	};
 }
 
@@ -234,7 +237,7 @@ describe('prepareLocalZipInstall / preparePointerInstall', () => {
 
 		const result = await preparePointerInstall(pointer, registry);
 
-		expect(result).toEqual({ status: 'ready', manifest: pointer, files: null });
+		expect(result).toEqual({ status: 'ready', manifest: pointer, files: null, restorable: false });
 		expect(fetchSpy).not.toHaveBeenCalled();
 	});
 
@@ -314,5 +317,71 @@ describe('prepareLocalZipInstall / preparePointerInstall', () => {
 		if (result.status === 'ready') {
 			expect(result.manifest.entrypointUrl).toBe('/plugins/zip_demo/zip_demo.zip');
 		}
+	});
+});
+
+describe('restoring an exported owned plugin', () => {
+	it('marks a local zip exported from an owned plugin as restorable', async () => {
+		const { buildOwnedManifest } = await import('./ownedPlugins');
+		const manifest = buildOwnedManifest({ id: 'local.abc12345', name: 'Mine', requirements: [] });
+		const zip = makeZip({
+			'fplugin.json': JSON.stringify(manifest),
+			'plugin.py': 'def run(ctx): pass',
+		});
+		const result = await prepareLocalZipInstall(makeFile(zip), makeClassifyRegistry());
+		expect(result).toMatchObject({ status: 'ready', restorable: true });
+	});
+
+	it('does not offer restore for zips without the hint or with extra files', async () => {
+		const plain = makeZip({
+			'fplugin.json': JSON.stringify(makeManifest()),
+			'plugin.py': 'def run(ctx): pass',
+		});
+		expect(await prepareLocalZipInstall(makeFile(plain), makeClassifyRegistry())).toMatchObject({
+			restorable: false,
+		});
+		const { buildOwnedManifest } = await import('./ownedPlugins');
+		const extra = makeZip({
+			'fplugin.json': JSON.stringify(
+				buildOwnedManifest({ id: 'local.abc12345', name: 'Mine', requirements: [] })
+			),
+			'plugin.py': 'def run(ctx): pass',
+			'helper.py': '',
+		});
+		expect(await prepareLocalZipInstall(makeFile(extra), makeClassifyRegistry())).toMatchObject({
+			restorable: false,
+		});
+	});
+});
+
+describe('replacing a plugin made here', () => {
+	it('flags a replacement the owned-plugin editor could not handle', async () => {
+		const { buildOwnedManifest } = await import('./ownedPlugins');
+		const manifest = buildOwnedManifest({ id: 'local.abc12345', name: 'Mine', requirements: [] });
+		const existing = {
+			manifest,
+			authoring: { source: 'scriptLab' as const },
+		} as unknown as PythonPlugin;
+		const registry = {
+			get: () => existing,
+			isPluginBusyForInstall: () => ({ busy: false }),
+		};
+		const multiFile = makeZip({
+			'fplugin.json': JSON.stringify({ ...manifest, version: '1.1.0' }),
+			'plugin.py': 'import helper',
+			'helper.py': 'x = 1',
+		});
+		expect(await prepareLocalZipInstall(makeFile(multiFile), registry)).toMatchObject({
+			status: 'needs-confirm',
+			endsEditing: true,
+		});
+		const singleFile = makeZip({
+			'fplugin.json': JSON.stringify({ ...manifest, version: '1.1.0' }),
+			'plugin.py': 'def run(ctx): pass',
+		});
+		expect(await prepareLocalZipInstall(makeFile(singleFile), registry)).toMatchObject({
+			status: 'needs-confirm',
+			endsEditing: false,
+		});
 	});
 });

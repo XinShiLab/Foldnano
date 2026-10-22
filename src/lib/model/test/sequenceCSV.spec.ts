@@ -32,6 +32,7 @@ describe('sequence CSV export', () => {
 		const records = collectPartOligoSequences(part);
 		expect(records).toEqual([
 			{
+				Name: '',
 				Start: '0[0]',
 				End: '0[3]',
 				Sequence: 'ACGT',
@@ -42,8 +43,19 @@ describe('sequence CSV export', () => {
 			},
 		]);
 		expect(sequencesToCSV(records)).toBe(
-			'Start,End,Sequence,Length,Color,Mod5Prime,Mod3Prime\n0[0],0[3],ACGT,4,#ff0000,,'
+			'Name,Start,End,Sequence,Length,Color,Mod5Prime,Mod3Prime\n,0[0],0[3],ACGT,4,#ff0000,,'
 		);
+	});
+
+	it('exports the oligo name, quoted when it contains a comma', () => {
+		const part = makeHoneycombPart('named-sequence-csv');
+		const vh = addLatticeVh(part, 0, 0);
+		const oligo = part.createOligo(vh, 0, 3, '#ff0000');
+		oligo.updateOwnSequence('ACGT');
+		oligo.name = 'core, row 1';
+
+		const csv = sequencesToCSV(collectPartOligoSequences(part));
+		expect(csv.split('\n')[1]).toBe('"core, row 1",0[0],0[3],ACGT,4,#ff0000,,');
 	});
 
 	it('rejects circular scaffold oligos', () => {

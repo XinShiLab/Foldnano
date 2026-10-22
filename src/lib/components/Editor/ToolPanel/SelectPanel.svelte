@@ -13,6 +13,7 @@
 	import type Oligo from '$lib/model/Oligo';
 	import { getModificationColor } from '$lib/model/modifications';
 	import RepeatGroupPanel from './RepeatGroupPanel.svelte';
+	import OligoNameField from './OligoNameField.svelte';
 
 	type ModificationEntry = { label: string; name: string; color: string };
 
@@ -202,28 +203,34 @@
 	{/if}
 {/snippet}
 
+{#snippet oligoInfo(oligo: Oligo, heading: string)}
+	<div class="mt-2 border-t border-border pt-2">
+		<p>{heading}</p>
+		<div class="flex items-center gap-1">
+			<span>Name:</span>
+			<OligoNameField {oligo} />
+		</div>
+		{#if oligo.isCircular}
+			<p>(circular)</p>
+		{:else}
+			<p>
+				{oligo.fivePrime?.inVirtualHelix.index}[{oligo.fivePrime?.index}] -> {oligo.threePrime
+					?.inVirtualHelix.index}[{oligo.threePrime?.index}]
+			</p>
+		{/if}
+		<p>Length: {oligo.length}</p>
+		<p>Color: <span>{@render color(oligo.color)}</span></p>
+		<p>isScaffold: {oligo.isScaffold}</p>
+		<p>isLocked: {oligo.isSequenceLocked}</p>
+		<p>Modifications: {@render modifications(oligo)}</p>
+	</div>
+{/snippet}
+
 <div
 	class="mt-2 flex-grow rounded-md border border-border p-2 font-mono text-xs text-muted-foreground"
 >
 	{#if strandCtx.hoverOligo}
-		{@const oligo = strandCtx.hoverOligo}
-		<div class="mt-2 border-t border-border pt-2">
-			<p>Selected to Oligo:</p>
-			{#if oligo.isCircular}
-				<p>(circular)</p>
-			{:else}
-				<p>
-					{oligo.fivePrime?.inVirtualHelix.index}[{oligo.fivePrime?.index}] -> {oligo.threePrime
-						?.inVirtualHelix.index}[{oligo.threePrime?.index}]
-				</p>
-			{/if}
-			<p>Length: {oligo.length}</p>
-			<p>Color: <span>{@render color(oligo.color)}</span></p>
-			<p>isScaffold: {oligo.isScaffold}</p>
-			<p>isLocked: {oligo.isSequenceLocked}</p>
-			<p>Modifications: {@render modifications(oligo)}</p>
-		</div>
-		<!-- <p>Sequence: {strandCtx.hoverOligo.sequence}</p> -->
+		{@render oligoInfo(strandCtx.hoverOligo, 'Selected Oligo:')}
 	{/if}
 	{#if strandCtx.hoverSegment}
 		<p>Selected Segment:</p>
@@ -234,26 +241,9 @@
 		</p>
 		<p>Length: {strandCtx.hoverSegment.length}</p>
 
-		{@const oligo = strandCtx.hoverSegment.oligo}
-		{#if oligo}
-			<div class="mt-2 border-t border-border pt-2">
-				<p>Belong to Oligo:</p>
-				{#if oligo.isCircular}
-					<p>(circular)</p>
-				{:else}
-					<p>
-						{oligo.fivePrime?.inVirtualHelix.index}[{oligo.fivePrime?.index}] -> {oligo.threePrime
-							?.inVirtualHelix.index}[{oligo.threePrime?.index}]
-					</p>
-				{/if}
-				<p>Length: {oligo.length}</p>
-				<p>Color: <span>{@render color(oligo.color)}</span></p>
-				<p>isScaffold: {oligo.isScaffold}</p>
-				<p>isLocked: {oligo.isSequenceLocked}</p>
-				<p>Modifications: {@render modifications(oligo)}</p>
-			</div>
+		{#if strandCtx.hoverSegment.oligo}
+			{@render oligoInfo(strandCtx.hoverSegment.oligo, 'Belongs to Oligo:')}
 		{/if}
-		<!-- <p>Sequence: {strandCtx.hoverOligo.sequence}</p> -->
 	{/if}
 	<!-- <p>Segment: 2[23] -> 2[33]</p>
   <p>End: 2[23]</p>

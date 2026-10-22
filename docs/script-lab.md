@@ -1,6 +1,8 @@
 ---
 covers:
   - src/lib/plugin/scriptLabManifest.ts
+  - src/lib/plugin/ownedPlugins.ts
+  - src/lib/plugin/ownedPluginActions.ts
   - src/lib/components/Editor/SidePanel/**
 ---
 
@@ -52,6 +54,9 @@ Primary files:
 - `src/lib/components/Editor/SidePanel/prism-foreign-document.ts`
 - `src/lib/plugin/python-completions.ts`
 - `src/lib/components/Editor/Plugin/PluginRunOutput.svelte`
+- `src/lib/plugin/ownedPlugins.ts`, `src/lib/plugin/ownedPluginActions.ts` (owned plugins)
+- `src/lib/components/Editor/SidePanel/MakePluginDialog.svelte`
+- `src/lib/components/Editor/SidePanel/OwnedPluginEditorPanel.svelte`
 
 Relevant tests:
 
@@ -59,6 +64,7 @@ Relevant tests:
 - `src/lib/plugin/PluginRegistry.spec.ts`
 - `src/lib/plugin/PluginCoordinator.spec.ts`
 - `src/lib/plugin/python-completions.spec.ts`
+- `src/lib/plugin/ownedPlugins.spec.ts`, `src/lib/plugin/ownedPluginActions.spec.ts`
 
 Related generic runtime files:
 
@@ -168,11 +174,15 @@ Current UI responsibilities:
 - `PluginCodeEditorShell`
   - generic shell: title row, toolbar, editor pane, output pane, resizable split
   - supports toolbar tail and title tail snippets
+  - output pane has a fixed `Output` header; while `outputEmpty` it shows a generic placeholder (or `Running…`) instead of the `output` snippet, so the pane is never blank before the first run
+  - registers `?` workspace-help entries (editor/output areas, Run/Stop/Clear/Reset, pop out); `helpDoc` picks the linked guide page
+  - `Mod+Enter` in the editor runs the script (same `runDisabled` gate as the button). It is a capture-phase listener on the editor host because prism's default keymap binds `Mod+Enter` to "insert blank line below"; the host listener must stay in capture or prism wins
 - `PluginCodeEditorSidePanel`
   - binds a specific plugin instance into the generic shell
   - auto-activates on Run if needed
   - provides Script Lab-specific starter loading
   - shows the "no mutation log" notice for no-op analysis runs
+  - derives `outputEmpty` from `hasRunOutput(...)` (exported from `PluginRunOutput`'s module script; keep it in sync with that component's sections)
 - `ScriptLabReferenceCard`
   - compact toolbar-adjacent help trigger
   - exposes starter actions and quick API notes
@@ -191,7 +201,7 @@ The shell's header button moves the whole editor surface (toolbar, editor, outpu
 - The mount/portal root is a `<div>` created by the opener's `document`, then appended to the popup body. Nodes keep their realm when adopted, and opener-realm `instanceof` checks (bits-ui's dev-mode portal-target check) reject popup-realm nodes like the popup's own `<body>`; a throw there aborts the whole mount.
 - `patches/paneforge@1.0.2.patch`: paneforge keeps one module-level drag-cursor `<style>` and appends it to the dragged handle's document, but removed it from the main `document.head`. A drag in the popup then threw on release, left `dragState` set (handle stuck to the cursor) and poisoned every later drag in both windows. The patch uses `element.remove()`; re-check it when upgrading paneforge.
 - `PopOutWindowContent` wraps the snippet in `BitsConfig defaultPortalTo` so menus/tooltips portal into the popup. bits-ui and paneforge otherwise resolve documents via `ownerDocument`, so they work as-is.
-- Stylesheets and `<html>` attributes (theme class) are mirrored from the opener with `MutationObserver`s (Vite HMR rewrites `<style>` in place). `<body>` is deliberately not mirrored: bits-ui scroll-lock writes there.
+- Stylesheets and `<html>` attributes (theme class) are mirrored from the opener with `MutationObserver`s (Vite HMR rewrites `<style>` in place). Cloned `<link>`s take their sheet's loaded URL: SvelteKit's SSR hrefs are relative (`./_app/…`) to the page first loaded, so after a client-side navigation (`/toc` → `/editor/<id>`) the popup's `<base>` would resolve them to a 404 in production builds. `<body>` is deliberately not mirrored: bits-ui scroll-lock writes there.
 - The editor is created by an `{@attach}` rather than `onMount`, so it is rebuilt in whichever window hosts it. The buffer survives (it lives in `plugin.sidePanelCode`); the editor's own undo history, caret and pane split do not.
 - `bridgeForeignDocument` (`prism-foreign-document.ts`) covers prism-code-editor binding to the module-level `document`: it forwards the popup's `selectionchange` to the main document and, while the popup has focus, routes `document.execCommand` to the popup's document (edits, auto-indent and bracket insertion use it).
 - Lifetime: the popup closes when the shell unmounts or the opener's `pagehide` fires; closing the popup (`pagehide`, plus a `closed` poll) docks the editor back.
@@ -207,6 +217,8 @@ The shell's header button moves the whole editor surface (toolbar, editor, outpu
 - An unresolved receiver offers nothing while typing; **Ctrl+Space** falls back to every API member so a name can still be found.
 - The data comes from `src/lib/plugin/python-api-index.generated.json` (see `docs/python-plugin-system.md` § Generated API stubs and completion index). Never hand-edit it.
 - `python-autocomplete.ts` adapts the engine to `prism-code-editor`'s `autoComplete` extension. `basicEditor` renders into a shadow root, so the popup CSS is injected there; `cursorPosition` (which `autoComplete` needs) comes from `basicEditor`'s own extension set. Completion sources are synchronous, which is why the engine can't ask Pyodide (e.g. Jedi).
+- **Signature help:** `signatureHelpPython` resolves the innermost open `(` before the caret (an API function, or a method on a receiver typed by the same inference) and reports its params plus the active one (by position, keyword, or a `*args` / keyword-only slot). `python-autocomplete.ts` shows it in an `addTooltip` above the caret on `selectionChange`; Escape dismisses it for that call. Class constructors aren't covered (the index has no `__init__` signatures).
+- The extension pins the list to an inline `width: min(25em, …)`; the injected CSS overrides it (`!important`) to 42em, capped by `100cqw` because the editor container is made an inline-size container. Labels don't shrink; the signature detail truncates instead.
 
 ---
 
@@ -344,7 +356,7 @@ The minimal manifest shape for a similar plugin is:
 
 ```json
 {
-	"schemaVersion": 1,
+	"schemaVersion": 2,
 	"id": "my-script-plugin",
 	"name": "My Script Plugin",
 	"version": "1.0.0",
@@ -417,8 +429,6 @@ Behavior:
 - the plugin's manifest `entrypoint` runs
 - it reads the user editor contents via `ctx.get_side_panel_code()`
 - the editor content is input data, not the entrypoint itself
-
-This is what the side-panel code demo does.
 
 ---
 
@@ -553,6 +563,127 @@ When maintaining Script Lab, verify at least these cases.
 
 ---
 
+## Owned plugins (Save as Plugin)
+
+**Save as Plugin** in Script Lab's toolbar packages the current script as a normal packaged plugin
+the user owns: it shows in the Plugins list, runs from there like any plugin, and gets **Edit** and
+**Export**. Possible later work: § Possible future work.
+
+**Ownership** is the local `authoring` field on the IndexedDB plugin record (`PluginAuthoring`),
+never the manifest: a zip can't claim it. Only owned plugins are editable. `PluginRegistry`
+carries it through `registerNew(..., { authoring })`, `replaceConfirmed` and `saveOwnedVersion`
+(clears the draft). Ownership also needs a package the editor can handle without losing anything
+(`isOwnedEditablePackage`: only `fplugin.json` + `plugin.py` + an optional `icon.svg` that the
+manifest names exactly when present, no side panel, and only requirements that imports can
+produce, i.e. distribution packages). The editor rebuilds the zip from those files and re-derives
+requirements, so `replaceConfirmed` with any other package
+ends ownership and drops the draft; the replace dialog warns first (`endsEditing`). This keeps
+every editable plugin standard tier.
+
+**What Make Plugin writes** (`createOwnedPlugin`): `fplugin.json` + `plugin.py`, Script Lab's run
+contract (`foldnano_mini` + `replayMutationLog`, no parameters), version `1.0.0`, and a generated
+`local.<8 chars>` id shown read-only in the dialog (renaming never changes it; the prefix keeps
+owned ids apart from distributed ones). The manifest carries `x-foldnano-authoring` as a
+restore hint only, and is written at the current manifest `schemaVersion`.
+
+**Icon.** The dialog's `PluginIconPicker` offers no icon, the curated `PLUGIN_ICON_PRESETS`
+(lucide SVGs), or an uploaded SVG checked with `validatePluginIconSvg`. Whatever is picked is
+written into the zip as `icon.svg` with `"icon": "icon.svg"` in the manifest, so a plugin never
+depends on the preset list. **Save version** keeps the current icon (`plugin.iconSvg`); the
+editor's **Icon** button calls `changeOwnedPluginIcon`, which saves the saved `plugin.py` as the
+next version with the new icon and keeps the draft. Rendering and validation: `docs/python-plugin-system.md` § Plugin icons.
+
+**Requirements come from imports, never by hand.** Packaged plugins don't get `loadImports`, so
+`PluginCoordinator.resolveScriptRequirements` asks the standard worker (`RESOLVE_IMPORTS`) which
+Pyodide distribution packages provide the script's imports, using Pyodide's lockfile import map
+(import names differ from package names: `sklearn` is `scikit-learn`). Re-derived on every
+**Save version**, so adding or removing an import just works. Distribution packages only.
+
+**Draft vs saved.** Run from the Plugins list always runs the saved zip. The editor buffer is a
+draft in `plugin.draftCode` / the record's `draftCode`, written through `EditorCodeSaver` →
+`registry.persistDraft` (a buffer equal to the saved code clears the draft). Editor runs pass
+`runWithOptions(id, { draftCode })`: the coordinator zips the draft with the plugin's own manifest
+and runs it through the normal zip path (same format, apply strategy, builtins), with
+`loadImports` so imports the draft added load without re-activation. **Save version** bumps the
+patch number (the version keys the file cache, so it only moves up) and writes through
+`saveOwnedVersion`, which checks inside the IndexedDB transaction that the stored version is still
+the one this tab loaded; if another tab saved first it throws `PluginVersionConflictError` and the
+draft stays. The editor is read-only while a save is in flight, so the saved draft is exactly what
+was on screen (a later keystroke would otherwise be cleared with the draft). The editor reloads
+the saved `plugin.py` whenever the plugin instance changes, not only the version: an import can
+replace a plugin at the same version.
+
+**Editor panel.** `OwnedPluginEditorPanel` reuses `PluginCodeEditorShell`. It is a host panel, not a
+manifest `sidePanel`: `EditorViewContext.pluginEditorIds` lists open editors (any number;
+`openPluginEditor` adds one), `getSidePanelDescriptors` adds a `plugin:<id>` descriptor with
+`isOwnedEditor` for each, and `PluginSidePanelHost` routes to the editor. `SidePanel.svelte` keeps
+every open editor mounted while hidden, like popped-out panels, so switching icons keeps its undo
+history, cursor and scroll. Each editor's pop-out window is named by plugin id (`popOutKey`), and
+`bridgeForeignDocument` counts bridged pop-out documents and routes `execCommand` to the focused
+one, so several pop-outs work at once. The header's × calls `closePluginEditor` (draft kept). After
+a reload, every owned plugin with a draft gets its icon back (with an unsaved dot). Opening a new plugin's editor from the Make Plugin dialog resets Script Lab
+to its starter script.
+
+**Backups.** The dialog downloads the zip by default; afterwards **Export** (editor header and
+Plugins list) downloads the saved version and records `authoring.lastExportedVersion`, which
+drives the amber not-backed-up state. Removing an owned plugin asks first and offers **Export
+first**; with a draft it says the export doesn't include unsaved edits. Importing a zip that
+`isRestorableOwnedZip` accepts (hint present, `isOwnedEditablePackage`, local file not a Hub URL) offers **Restore as editable** in the install
+dialog (`PluginInstallGate.confirmPending({ asEditable })`).
+
+## Possible future work
+
+Ideas worked out far enough to record but not scheduled; other priorities come first. Move an entry
+into the sections above when it is implemented, and delete it here.
+
+### Version history and Revert
+
+- Keep the last N saved zips per owned plugin (5 matches the backup count in the user-settings
+  backlog). Today only the latest saved version exists, in the `pluginFiles` record.
+- **Revert** saves the old code as a **new** version (e.g. 1.0.5 holding 1.0.3's code), never as a
+  lower number: the version keys the plugin file cache, so it must only move up, and history stays
+  linear.
+- Touches `PluginRegistry.saveOwnedVersion`, the IndexedDB plugin tables
+  (`docs/storage-architecture.md`) and `OwnedPluginEditorPanel`.
+
+### Edit a copy of a Hub plugin
+
+- Turn an installed Hub plugin into an owned, editable copy under a new `local.*` id; the original
+  stays as it is.
+- Only packages the owned-plugin editor can handle without losing anything qualify
+  (`isOwnedEditablePackage`: `fplugin.json` + `plugin.py` + optional `icon.svg`, no side panel,
+  only requirements that imports produce). Most Hub plugins fail this today, so it needs a decision
+  on what is copied, what is dropped (with a warning), and what makes a plugin ineligible.
+
+### Export to a folder, then link it in dev mode
+
+- Owned plugins live entirely in IndexedDB and suit Script Lab users; dev mode
+  (`docs/explorations/plugin-dev-mode-2026-10-21.md`) links a folder on disk and suits multi-file
+  plugins and external editors. Exporting an owned plugin as a folder and linking it would connect
+  the two.
+
+### Known limitations (accepted for now)
+
+- **Two browser tabs editing the same draft:** the last write wins, as for Script Lab's own buffer.
+  Saving a version is protected (`PluginVersionConflictError`); drafts are not.
+- **Clearing browser data deletes owned plugins and drafts.** Mitigated by the default-on backup
+  download, Export and the not-backed-up hint; it can't be removed without server storage.
+
+### Plugin Centre (future)
+
+A hosted catalogue of published plugins replacing the bundled Hub list.
+
+- **Local saves are like commits; publishing is a release.** The Centre owns the published version
+  line and requires versions to increase at submission. Local saves between publishes never reach
+  it.
+- **Installing your own published plugin** from the Centre gives a separate, non-editable entry; the
+  owned copy remains the working copy.
+- **Ids:** `local.*` ids keep owned plugins out of the Centre's id space (e.g. `author.plugin`).
+- **Icons in the listing:** the Hub/Centre list is built from pointer manifests before any zip is
+  downloaded, so plugin icons (`docs/python-plugin-system.md` § Plugin icons) only show once a
+  plugin is installed. The Centre could serve each `icon.svg` next to its zip, validated the same
+  way (`validatePluginIconSvg`) and drawn the same way (`PluginIcon.svelte`).
+
 ## Relationship To Third-Party Plugins
 
 Script Lab is intentionally a proof point for a more general host capability:
@@ -583,5 +714,9 @@ If future maintenance makes those features more generic, that is good. Script La
 - **Do not render side-panel tabs so that switching unmounts a popped-out plugin panel.** Its `PopOutWindow` closes on unmount; keep `SidePanel`'s keyed list of `poppedOutPluginPanels`.
 - **Do not move the editor's DOM nodes into the pop-out window.** Mount into it (`PopOutWindow`); moved nodes lose Svelte's delegated event handlers. Anything that portals or reads `document` directly needs to target the popup's document instead.
 - **Do not make helper UI dominate the panel.** Script Lab is an editor first; templates and reference affordances must stay compact.
+- **Do not store ownership in the manifest or trust `x-foldnano-authoring`.** It only triggers the Restore as editable question; editability is the local `authoring` record field.
+- **Do not let an owned plugin's version go down or repeat.** The version keys the plugin file cache; Save version only bumps up.
+- **Do not run an owned plugin's draft under Script Lab's rules.** Drafts run as the plugin (`draftCode`), so what works in the editor works from the Plugins list.
+- **Do not hand-edit an owned plugin's `requirements`.** They are derived from imports on create and on every save.
 - **Do not special-case Script Lab inside the worker.** The special behavior belongs on the host side when selecting `pluginCodeForRun`.
 - **Do not couple third-party plugin guidance to `origin: "builtin"`.** Built-in registration is a host packaging choice, not part of the public third-party plugin contract.

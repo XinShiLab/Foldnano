@@ -4,14 +4,20 @@
 	import PluginSidePanelHost from './PluginSidePanelHost.svelte';
 
 	const ctx = getEditorViewContext();
-	const activePanel = $derived(getSidePanelDescriptor(ctx.sidePanelTab, ctx.pluginRegistry));
+	const activePanel = $derived(
+		getSidePanelDescriptor(ctx.sidePanelTab, ctx.pluginRegistry, ctx.pluginEditorIds)
+	);
 	const ActivePanelComponent = $derived(activePanel.component);
 	const activePluginId = $derived(activePanel.kind === 'plugin' ? activePanel.pluginId : null);
-	// A popped-out panel owns its window, so it stays mounted (hidden) while another tab shows.
+	// Popped-out panels own their window and open owned-plugin editors keep their undo history,
+	// cursor and scroll, so both stay mounted (hidden) while another tab shows.
 	const pluginPanelIds = $derived.by(() => {
-		const ids = [...ctx.poppedOutPluginPanels];
-		if (activePluginId && !ids.includes(activePluginId)) ids.push(activePluginId);
-		return ids;
+		const openEditors = [...ctx.pluginEditorIds].filter(
+			(id) => ctx.pluginRegistry.get(id)?.authoring
+		);
+		const ids = [...ctx.poppedOutPluginPanels, ...openEditors];
+		if (activePluginId) ids.push(activePluginId);
+		return ids.filter((id, i) => ids.indexOf(id) === i);
 	});
 </script>
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { help } from '$lib/components/help/help';
 	import { onDestroy, onMount } from 'svelte';
 	import { LoaderCircle, RefreshCw, GitBranch, Unplug, CloudDownload } from '@lucide/svelte';
 	import { toast } from 'svelte-sonner';
@@ -187,6 +188,10 @@
 					<button
 						class="rounded p-1 text-muted-foreground hover:bg-muted hover:text-blue-600"
 						title="Pull latest from GitHub"
+						{@attach help({
+							title: 'Pull',
+							text: 'Load the latest GitHub version of the open design.',
+						})}
 						onclick={() => explorerState.pullCurrentFile()}
 						disabled={explorerState.pulling}
 					>
@@ -200,6 +205,10 @@
 				<button
 					class="rounded p-1 text-muted-foreground hover:bg-muted hover:text-muted-foreground"
 					title="Refresh file tree"
+					{@attach help({
+						title: 'Refresh',
+						text: "Reload the repository's file list from GitHub.",
+					})}
 					onclick={() => explorerState.fetchTree()}
 				>
 					<RefreshCw size={13} />
@@ -207,6 +216,10 @@
 				<button
 					class="rounded p-1 text-muted-foreground hover:bg-muted hover:text-red-500"
 					title="Disconnect repository"
+					{@attach help({
+						title: 'Disconnect',
+						text: 'Stop using this repository here. Nothing on GitHub is changed.',
+					})}
 					onclick={() => explorerState.disconnect()}
 				>
 					<Unplug size={13} />
@@ -216,7 +229,15 @@
 	</div>
 
 	<!-- Body -->
-	<div class="flex flex-1 flex-col overflow-hidden">
+	<div
+		class="flex flex-1 flex-col overflow-hidden"
+		{@attach help({
+			area: true,
+			title: 'Source Control',
+			text: 'Designs kept in a GitHub repository: open files, commit your changes, and browse branch history.',
+			doc: 'saving-github',
+		})}
+	>
 		{#if !githubAuth.authenticated}
 			<!-- Not authenticated -->
 			<div class="flex flex-col items-center gap-3 p-4 text-center">
@@ -227,7 +248,15 @@
 				<p class="text-xs text-muted-foreground">
 					Without GitHub, designs stay in this browser's IndexedDB.
 				</p>
-				<Button size="sm" onclick={() => loginWithGitHub()}>
+				<Button
+					size="sm"
+					onclick={() => loginWithGitHub()}
+					{@attach help({
+						title: 'Connect to GitHub',
+						text: 'Sign in to keep designs in a GitHub repository, with history and branches.',
+						doc: 'saving-github',
+					})}
+				>
 					<GitBranch size={14} />
 					Connect to GitHub
 				</Button>
@@ -236,7 +265,16 @@
 			<!-- Authenticated, no repo connected -->
 			<div class="flex flex-col items-center gap-3 p-4 text-center">
 				<p class="text-xs text-muted-foreground">No repository connected.</p>
-				<Button size="sm" variant="outline" onclick={() => (setupDialogOpen = true)}>
+				<Button
+					size="sm"
+					variant="outline"
+					onclick={() => (setupDialogOpen = true)}
+					{@attach help({
+						title: 'Setup Repository',
+						text: 'Pick or create the GitHub repository where your designs are kept.',
+						doc: 'saving-github',
+					})}
+				>
 					Setup Repository
 				</Button>
 			</div>
@@ -254,8 +292,20 @@
 				class="shrink-0"
 			>
 				<Tabs.List variant="line" class="w-full border-b border-border">
-					<Tabs.Trigger value="files" class="flex-1 text-xs">Files</Tabs.Trigger>
-					<Tabs.Trigger value="changes" class="flex-1 text-xs">
+					<Tabs.Trigger
+						value="files"
+						class="flex-1 text-xs"
+						{@attach help({ title: 'Files', text: 'Browse the repository and open a design.' })}
+						>Files</Tabs.Trigger
+					>
+					<Tabs.Trigger
+						value="changes"
+						class="flex-1 text-xs"
+						{@attach help({
+							title: 'Changes',
+							text: 'Local edits not yet on GitHub. Stage files and commit them here.',
+						})}
+					>
 						Changes
 						{#if explorerState.changeEntries.length > 0}
 							<span
@@ -264,7 +314,14 @@
 							>
 						{/if}
 					</Tabs.Trigger>
-					<Tabs.Trigger value="graph" class="flex-1 text-xs">Graph</Tabs.Trigger>
+					<Tabs.Trigger
+						value="graph"
+						class="flex-1 text-xs"
+						{@attach help({
+							title: 'Graph',
+							text: 'Commit history across branches. Switch to or create a branch here.',
+						})}>Graph</Tabs.Trigger
+					>
 				</Tabs.List>
 			</Tabs.Root>
 

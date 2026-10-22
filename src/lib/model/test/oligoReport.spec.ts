@@ -41,6 +41,7 @@ describe('oligo report rows', () => {
 				oligoKey: formatOligoKey(signature),
 				signature,
 				fullOligoId: '12345678-1234-1234-1234-123456789abc',
+				name: '',
 				start: '0[0]',
 				end: '0[3]',
 				sequence: 'ACGT',
@@ -84,6 +85,7 @@ describe('oligo report rows', () => {
 				oligoKey: formatOligoKey('0[0]>0[3]'),
 				signature: '0[0]>0[3]',
 				fullOligoId: 'left-id',
+				name: '',
 				start: '0[0]',
 				end: '0[3]',
 				sequence: 'AAAA',
@@ -102,5 +104,25 @@ describe('oligo report rows', () => {
 		expect(diff.changed[0].changedColumns).toEqual(['sequence']);
 		expect(diff.leftOnly).toHaveLength(0);
 		expect(diff.rightOnly).toHaveLength(0);
+	});
+
+	it('reports a renamed oligo as a name change', () => {
+		const row = {
+			oligoKey: formatOligoKey('0[0]>0[3]'),
+			signature: '0[0]>0[3]',
+			fullOligoId: 'left-id',
+			name: '',
+			start: '0[0]',
+			end: '0[3]',
+			sequence: 'AAAA',
+			length: 4,
+			color: '#ff0000',
+			mod5Prime: '',
+			mod3Prime: '',
+			positions: '0[0]>0[3]',
+			isCircular: false,
+		};
+		const diff = diffOligoReportRows([row], [{ ...row, name: 'edge-1' }]);
+		expect(diff.changed[0].changedColumns).toEqual(['name']);
 	});
 });

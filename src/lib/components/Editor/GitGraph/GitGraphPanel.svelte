@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { help } from '$lib/components/help/help';
 	import { LoaderCircle, RefreshCw, GitBranch, Plus } from '@lucide/svelte';
 	import { toast } from 'svelte-sonner';
 	import * as Select from '$lib/components/ui/select/index.js';
@@ -257,7 +258,15 @@
 					bind:value={() => repoCtx?.branch ?? '', (v) => v && switchToBranch(v)}
 					disabled={!!switching || loading}
 				>
-					<Select.Trigger size="sm" class="h-6 max-w-40 py-0" title="Switch to branch">
+					<Select.Trigger
+						size="sm"
+						class="h-6 max-w-40 py-0"
+						title="Switch to branch"
+						{@attach help({
+							title: 'Branch',
+							text: 'Switch to another branch; the file list reloads from it.',
+						})}
+					>
 						<GitBranch size={11} />
 						<span class="truncate">{switching || repoCtx.branch}</span>
 					</Select.Trigger>
@@ -279,6 +288,10 @@
 			<button
 				class="rounded p-1 text-muted-foreground hover:bg-muted hover:text-muted-foreground disabled:opacity-40"
 				title="Refresh"
+				{@attach help({
+					title: 'Refresh',
+					text: 'Reload branches and commit history from GitHub.',
+				})}
 				onclick={fetchAll}
 				disabled={loading}
 			>
@@ -478,6 +491,10 @@
 					creatingBranch = true;
 				}}
 				disabled={loading || !repoCtx}
+				{@attach help({
+					title: 'New branch',
+					text: 'Create a branch from the current one and switch to it.',
+				})}
 			>
 				<Plus size={13} />
 				New branch from <span class="font-medium">{repoCtx?.branch ?? '…'}</span>

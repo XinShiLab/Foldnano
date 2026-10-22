@@ -34,7 +34,7 @@ def run(ctx: PluginContext) -> None:
 
 ```json
 {
-	"schemaVersion": 1,
+	"schemaVersion": 2,
 	"id": "my-plugin",
 	"name": "My Plugin",
 	"version": "1.0.0",
@@ -111,7 +111,7 @@ Install-time validation enforces the supported combinations:
 
 ```json
 {
-	"schemaVersion": 1,
+	"schemaVersion": 2,
 	"id": "my-plugin",
 	"name": "My Plugin",
 	"version": "1.0.0",
@@ -126,7 +126,7 @@ Install-time validation enforces the supported combinations:
 | Field           | Required | Notes                                                                                                                                                                                                                                                                            |
 | --------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `id`            | Yes      | Unique key used by the registry: a letter, then letters, digits, `.`, `_` or `-` (at most 64). Use kebab-case.                                                                                                                                                                   |
-| `schemaVersion` | No\*     | Manifest schema version, currently `1`; read as `1` when missing, but always include it. Not your plugin's version. Unknown fields are rejected; top-level `x-` fields are allowed for your own metadata. Schema: `static/schemas/fplugin-v1.schema.json`.                       |
+| `schemaVersion` | No\*     | Manifest schema version, currently `2`; read as `1` when missing, but always include it. Not your plugin's version. Unknown fields are rejected; top-level `x-` fields are allowed for your own metadata. Schema: `static/schemas/fplugin-v1.schema.json`.                       |
 | `name`          | Yes      | Display name in the panel.                                                                                                                                                                                                                                                       |
 | `version`       | Yes      | Semver (`1.0.0`, `1.2.0-beta.1`), validated at install. **Must be bumped whenever plugin files change** (entrypoint or wheels) — the host caches file assets keyed on this version, so omitting a bump means users will run stale cached files until they clear browser storage. |
 | `format`        | Yes      | `"cadnano_json"` \| `"foldnano_json"` \| `"foldnano_mini"`. (`"live"` is reserved for a future phase and is rejected at install time — do not use it.)                                                                                                                           |
@@ -237,7 +237,17 @@ For `type: "codeEditor"`, the optional `sidePanel.codeEditor.execution` field co
 - `"input"` (default) — the plugin's manifest entrypoint runs, and the editor contents are passed to Python via `ctx.get_side_panel_code()`
 - `"entrypoint"` — the editor contents themselves are executed as the plugin source for that run
 
-Use `sidePanel.icon` only with the host-owned enum values `form`, `code`, or `analysis`. Raw SVG, arbitrary icon URLs, and plugin-defined UI are intentionally unsupported.
+### Plugin icon
+
+Bundle an SVG in your zip and name it with the top-level `icon` field (manifest `schemaVersion` 2):
+
+```json
+{ "schemaVersion": 2, "icon": "icon.svg", ... }
+```
+
+It appears on your sidebar tab and your row in the Plugins list. Requirements: at most 32 KB, an `<svg>` root with `xmlns="http://www.w3.org/2000/svg"` and a `viewBox`, and no scripts, event handlers, `foreignObject`, `<image>`, animations or links to other files (`href` and `url()` may only point at `#ids` in the same file). Foldnano draws it in a single colour that follows the app theme, so design it as a monochrome glyph (a 24×24 stroke icon like [Lucide](https://lucide.dev)'s works well). Code-editor plugins with `execution: "entrypoint"` have no zip and can't use `icon`.
+
+`sidePanel.icon` (`form`, `code` or `analysis`) is **deprecated** for packaged plugins: it still works when there is no top-level `icon`, but new plugins should bundle an SVG. Code-editor plugins with `execution: "entrypoint"` have no zip, so for them `sidePanel.icon` remains the only option. Arbitrary icon URLs and plugin-defined UI are intentionally unsupported.
 
 ### Choosing a code-editor execution mode
 
@@ -276,7 +286,7 @@ Minimal manifest shape:
 
 ```json
 {
-	"schemaVersion": 1,
+	"schemaVersion": 2,
 	"id": "my-script-plugin",
 	"name": "My Script Plugin",
 	"version": "1.0.0",
@@ -1282,7 +1292,7 @@ submitted form values may first be converted to the expected type.
 
 ```json
 {
-	"schemaVersion": 1,
+	"schemaVersion": 2,
 	"id": "my-filter",
 	"name": "My Filter",
 	"version": "1.0.0",
@@ -1384,7 +1394,6 @@ n_helices = int(ctx.get_param("n_helices", 8))
 | `staple_colorizer_mini` | `foldnano_mini` | `replayMutationLogInRegion`                | `foldnano_mini` port of `staple_colorizer`; recolors active region only; one undo step                                                                                           |
 | `mutation_test`         | `foldnano_mini` | `replayMutationLog`                        | Exercises a broad slice of the `foldnano_mini` op vocabulary; used to verify JS replay end-to-end                                                                                |
 | `pyOrigamiBreak`        | `cadnano_json`  | `replaceRegion`                            | Real-world custom-tier plugin: `numpy`/`pandas`/`matplotlib` + the `cadnano2_5_mini` standard-extra wheel; thermodynamic staple-break optimization with a 9-parameter run dialog |
-| `side_panel_code_demo`  | `foldnano_json` | `previewOnly`                              | `sidePanel.type: "codeEditor"` with `execution: "input"` (the default) — manifest entrypoint runs, editor contents read via `ctx.get_side_panel_code()`                          |
 | `side_panel_form_demo`  | `foldnano_json` | `previewOnly`                              | `sidePanel.type: "form"` — manifest-declared fields render in a dedicated sidebar tab instead of the popup run dialog                                                            |
 
 Source files: `static/plugins/<plugin_name>/plugin.py` (or zip for `crossover_analyzer` / `pyOrigamiBreak`)
@@ -1483,7 +1492,7 @@ files are in the zip:
 
 ```json
 {
-	"schemaVersion": 1,
+	"schemaVersion": 2,
 	"id": "my-local-plugin",
 	"name": "My Local Plugin",
 	"version": "1.0.0",

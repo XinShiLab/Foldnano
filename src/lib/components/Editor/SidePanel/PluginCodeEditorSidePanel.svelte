@@ -1,9 +1,12 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import { Package } from '@lucide/svelte';
+	import { Button } from '$lib/components/ui/button/index.js';
+	import { help } from '$lib/components/help/help';
 	import PluginCodeEditorShell from './PluginCodeEditorShell.svelte';
 	import ScriptLabReferenceCard from './ScriptLabReferenceCard.svelte';
-	import PluginRunOutput from '../Plugin/PluginRunOutput.svelte';
+	import MakePluginDialog from './MakePluginDialog.svelte';
+	import PluginRunOutput, { hasRunOutput } from '../Plugin/PluginRunOutput.svelte';
 	import PluginRunDialog from '../Plugin/PluginRunDialog.svelte';
 	import PluginActivationConfirmDialog from '../Plugin/PluginActivationConfirmDialog.svelte';
 	import { PluginActivationGate } from '../Plugin/PluginActivationGate.svelte';
@@ -33,19 +36,6 @@
 	const executionState = $derived(
 		plugin.status === 'running' ? 'running' : plugin.status === 'error' ? 'stopped' : 'ready'
 	);
-	const toolbarActions = $derived(
-		isScriptLab
-			? [
-					{
-						id: 'make-plugin',
-						label: 'Make Plugin',
-						icon: Package,
-						disabled: true,
-						tooltip: 'Coming next: package the current Script Lab file as a reusable plugin.',
-					},
-				]
-			: []
-	);
 	const showNoMutationNotice = $derived(
 		Boolean(
 			isScriptLab &&
@@ -54,6 +44,11 @@
 			plugin.lastRunMutationLogLength === 0 &&
 			editorCtx.pluginCoordinator.pendingApply?.pluginId !== plugin.manifest.id
 		)
+	);
+
+	const outputEmpty = $derived(
+		!showNoMutationNotice &&
+			!hasRunOutput(plugin, editorCtx.pluginCoordinator.pendingApply?.pluginId ?? null)
 	);
 
 	const activationGate = new PluginActivationGate(
@@ -68,6 +63,13 @@
 	type PendingCodeRun = { readonly code: string; readonly filename: string };
 	let pendingCodeRun: PendingCodeRun | null = $state(null);
 	let showRunDialog = $state(false);
+	let showMakePlugin = $state(false);
+
+	/** Script Lab is the scratchpad again once its script lives on as a plugin. */
+	function openNewPluginEditor(newPluginId: string) {
+		plugin.sidePanelCode = initialCode;
+		editorCtx.openPluginEditor(newPluginId);
+	}
 
 	async function handleRun(code: string) {
 		plugin.sidePanelCode = code;
@@ -205,11 +207,13 @@
 	title={panelTitle}
 	description={panelDescription}
 	{filename}
+	popOutKey={plugin.manifest.id}
 	code={plugin.sidePanelCode}
 	{executionState}
+	{outputEmpty}
+	helpDoc={isScriptLab ? 'script-lab' : 'plugins-for-users'}
 	runDisabled={plugin.status === 'activating' || pendingCodeRun !== null || showRunDialog}
 	stopDisabled={plugin.status !== 'running'}
-	{toolbarActions}
 	onRun={handleRun}
 	onStop={handleStop}
 	onClearScript={handleClearScript}
@@ -240,6 +244,22 @@
 	{/snippet}
 	{#snippet toolbarTail()}
 		{#if isScriptLab}
+			<Button
+				size="xs"
+				variant="outline"
+				class="h-6 gap-1 px-1.5 text-[11px]"
+				disabled={!plugin.sidePanelCode.trim()}
+				onclick={() => (showMakePlugin = true)}
+				title="Package this script as a plugin you can run from the Plugins panel and keep editing"
+				{@attach help({
+					title: 'Save as Plugin',
+					text: 'Package this script as a plugin in the Plugins panel. You can run it from there and keep editing it in its own editor.',
+					doc: 'script-lab',
+				})}
+			>
+				<Package size={11} />
+				Save as Plugin
+			</Button>
 			<ScriptLabReferenceCard
 				onLoadMutationTemplate={loadMutationTemplate}
 				onLoadAnalysisTemplate={loadAnalysisTemplate}
@@ -269,3 +289,11 @@
 {/if}
 
 <PluginActivationConfirmDialog gate={activationGate} />
+
+{#if isScriptLab}
+	<MakePluginDialog
+		bind:open={showMakePlugin}
+		code={plugin.sidePanelCode}
+		onOpenEditor={openNewPluginEditor}
+	/>
+{/if}

@@ -1,5 +1,5 @@
 import { SvelteMap } from 'svelte/reactivity';
-import type { PythonPlugin, PluginManifest, PluginStatus } from './types';
+import type { PythonPlugin, PluginAuthoring, PluginManifest, PluginStatus } from './types';
 import { classifyManifest, MANIFEST_SCHEMA_VERSION, withSchemaVersion } from './manifestValidation';
 import {
 	foldnanoIndexedDb,
@@ -10,11 +10,26 @@ import type {
 	IndexedDbPluginFilesRecord,
 } from '$lib/services/storage/indexedDbTypes';
 import { builtinPlugins } from './corePlugins';
+import { isOwnedEditablePackage, pluginZipFileNames } from './ownedPlugins';
+import { readPluginIcon } from './pluginIcon';
 
 export type PluginBusyCheck = (pluginId: string) => { busy: boolean; reason?: string };
 
-function toRecord(manifest: PluginManifest): IndexedDbPluginRecord {
-	return { id: manifest.id, manifest: manifest as unknown as object };
+function toRecord(
+	manifest: PluginManifest,
+	iconSvg: string | null,
+	owned?: { authoring: PluginAuthoring; draftCode: string | null }
+): IndexedDbPluginRecord {
+	const record: IndexedDbPluginRecord = {
+		id: manifest.id,
+		manifest: manifest as unknown as object,
+	};
+	if (iconSvg !== null) record.iconSvg = iconSvg;
+	if (owned) {
+		record.authoring = { ...owned.authoring };
+		if (owned.draftCode !== null) record.draftCode = owned.draftCode;
+	}
+	return record;
 }
 
 /**
@@ -38,6 +53,9 @@ class PluginState implements PythonPlugin {
 	sidePanelValues: Record<string, unknown> = $state({});
 	sidePanelCode: string = $state('');
 	lastRunMutationLogLength: number | null = $state(null);
+	authoring: PluginAuthoring | null = $state(null);
+	draftCode: string | null = $state(null);
+	iconSvg: string | null = $state(null);
 
 	constructor(manifest: PluginManifest, origin: 'builtin' | 'user') {
 		this.manifest = manifest;
@@ -125,7 +143,8 @@ export class PluginRegistry {
 	 *  awaited before the in-memory registry updates. */
 	async registerNew(
 		manifest: PluginManifest,
-		files: IndexedDbPluginFilesRecord | null
+		files: IndexedDbPluginFilesRecord | null,
+		opts: { authoring?: PluginAuthoring } = {}
 	): Promise<PythonPlugin> {
 		if (this.plugins.has(manifest.id)) {
 			throw new Error(`Plugin id "${manifest.id}" is already registered.`);
@@ -133,8 +152,16 @@ export class PluginRegistry {
 		this.#assertNotBusy(manifest.id);
 		this.#reservations.add(manifest.id);
 		try {
-			await this.#db.saveInstalledPlugin(toRecord(manifest), files, /* isNew */ true);
+			const owned = opts.authoring ? { authoring: opts.authoring, draftCode: null } : undefined;
+			const iconSvg = readPluginIcon(manifest, files);
+			await this.#db.saveInstalledPlugin(
+				toRecord(manifest, iconSvg, owned),
+				files,
+				/* isNew */ true
+			);
 			const plugin = new PluginState(manifest, 'user');
+			plugin.iconSvg = iconSvg;
+			plugin.authoring = opts.authoring ? { ...opts.authoring } : null;
 			this.plugins.set(manifest.id, plugin);
 			return plugin;
 		} finally {
@@ -143,10 +170,44 @@ export class PluginRegistry {
 	}
 
 	/** Replaces an existing, non-builtin plugin. Refuses for a builtin id or a missing existing
-	 *  plugin — use registerNew() for those. */
+	 *  plugin — use registerNew() for those. An owned plugin stays owned and keeps its draft while
+	 *  the incoming package is one its editor can handle (`isOwnedEditablePackage`); otherwise it
+	 *  stops being editable, so a save can't drop files or requirements the editor doesn't know. */
 	async replaceConfirmed(
 		manifest: PluginManifest,
 		files: IndexedDbPluginFilesRecord | null
+	): Promise<PythonPlugin> {
+		const existing = this.plugins.get(manifest.id);
+		const keepsOwnership =
+			Boolean(existing?.authoring) && isOwnedEditablePackage(manifest, pluginZipFileNames(files));
+		return this.#replace(manifest, files, {
+			keepsOwnership,
+			draftCode: keepsOwnership ? (existing?.draftCode ?? null) : null,
+		});
+	}
+
+	/** Saves an owned plugin's new version and sets its draft (cleared by default). Refuses with
+	 *  `PluginVersionConflictError` when another tab saved a version since this one loaded. */
+	async saveOwnedVersion(
+		manifest: PluginManifest,
+		files: IndexedDbPluginFilesRecord,
+		draftCode: string | null = null
+	): Promise<PythonPlugin> {
+		const existing = this.plugins.get(manifest.id);
+		if (!existing?.authoring) {
+			throw new Error(`"${manifest.id}" was not made in this browser, so it can't be edited.`);
+		}
+		return this.#replace(manifest, files, {
+			keepsOwnership: true,
+			draftCode,
+			expectedVersion: existing.manifest.version,
+		});
+	}
+
+	async #replace(
+		manifest: PluginManifest,
+		files: IndexedDbPluginFilesRecord | null,
+		opts: { keepsOwnership: boolean; draftCode: string | null; expectedVersion?: string }
 	): Promise<PythonPlugin> {
 		const existing = this.plugins.get(manifest.id);
 		if (existing?.origin === 'builtin') {
@@ -158,13 +219,44 @@ export class PluginRegistry {
 		this.#assertNotBusy(manifest.id);
 		this.#reservations.add(manifest.id);
 		try {
-			await this.#db.saveInstalledPlugin(toRecord(manifest), files, /* isNew */ false);
+			const authoring = opts.keepsOwnership ? existing.authoring : null;
+			const owned = authoring ? { authoring, draftCode: opts.draftCode } : undefined;
+			const iconSvg = readPluginIcon(manifest, files);
+			await this.#db.saveInstalledPlugin(
+				toRecord(manifest, iconSvg, owned),
+				files,
+				/* isNew */ false,
+				opts.expectedVersion
+			);
 			const plugin = new PluginState(manifest, 'user');
+			plugin.iconSvg = iconSvg;
+			if (authoring) {
+				plugin.authoring = { ...authoring };
+				plugin.draftCode = opts.draftCode;
+			}
 			this.plugins.set(manifest.id, plugin);
 			return plugin;
 		} finally {
 			this.#reservations.delete(manifest.id);
 		}
+	}
+
+	/** Writes (or with null, clears) an owned plugin's stored draft; the caller owns
+	 *  `plugin.draftCode`. Rejects on failure so the editor can show it isn't saved. */
+	persistDraft(pluginId: string, code: string | null): Promise<void> {
+		if (!this.plugins.get(pluginId)?.authoring) {
+			return Promise.reject(new Error(`"${pluginId}" is not an editable plugin.`));
+		}
+		return this.#db.updatePluginRecord(pluginId, { draftCode: code ?? undefined });
+	}
+
+	/** Records that `version` was downloaded as a backup zip. */
+	async markExported(pluginId: string, version: string): Promise<void> {
+		const plugin = this.plugins.get(pluginId);
+		if (!plugin?.authoring) return;
+		const authoring: PluginAuthoring = { ...plugin.authoring, lastExportedVersion: version };
+		await this.#db.updatePluginRecord(pluginId, { authoring });
+		plugin.authoring = authoring;
 	}
 
 	/** Remove a plugin by ID. */
@@ -235,6 +327,13 @@ export class PluginRegistry {
 				if (plugin) {
 					if (record.sidePanelCode !== undefined) plugin.sidePanelCode = record.sidePanelCode;
 					if (record.enabled !== undefined) plugin.enabled = record.enabled;
+					if (record.iconSvg && plugin.origin === 'user' && plugin.manifest.icon)
+						plugin.iconSvg = record.iconSvg;
+					if (record.authoring && plugin.origin === 'user') {
+						plugin.authoring = { ...record.authoring };
+						// An empty draft can't run and only hides the saved code; treat it as none.
+						plugin.draftCode = record.draftCode || null;
+					}
 				}
 			}
 		} catch (e) {

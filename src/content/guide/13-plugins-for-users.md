@@ -47,7 +47,7 @@ The **Hub** tab lists the curated **Core Plugins**, each with its description an
 | **Staple Colorizer** / **Staple Colorizer (mini)** | Recolors all staples with a configurable HSL palette | Yes |
 | **Nick Remover** | Joins adjacent staple nicks (consecutive 3′/5′ ends on the same helix) | Yes |
 | **pyOrigamiBreak: Staple Auto-Break** | Optimizes staple break positions with thermodynamic scoring (Mauthe et al., PNAS 2023) | Yes |
-| **Hello World**, **Mutation Test**, **Side Panel Code Demo**, **Side Panel Form Demo** | Examples for plugin authors | Some |
+| **Hello World**, **Mutation Test**, **Side Panel Form Demo** | Examples for plugin authors | Some |
 
 ### My Plugins
 
@@ -64,6 +64,8 @@ Each installed plugin is a card showing its name, version, and badges:
 | **Reset** | Clears the run output and returns the plugin to ready |
 | **Remove** | Uninstalls the plugin (built-in plugins can't be removed) |
 | **Open Panel** | For plugins with their own side panel, opens it |
+| **Edit** | For plugins you made with [Script Lab](/docs/guide/script-lab#saving-a-script-as-a-plugin) (marked **Mine**), opens the plugin in its own editor |
+| **Export** | For plugins you made, downloads the saved version as a `.zip` backup |
 
 At the top, **Import zip** installs a `.zip` plugin from your computer. A card that says *Plugin format changed* needs to be re-imported as a zip or reinstalled from the Hub.
 

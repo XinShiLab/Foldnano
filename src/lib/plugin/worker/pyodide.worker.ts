@@ -48,6 +48,7 @@ interface PyodideInterface {
 	loadPackage(names: string | string[]): Promise<void>;
 	/** Loads distribution packages the code imports; returns only packages newly loaded. */
 	loadPackagesFromImports(code: string): Promise<Array<{ name: string; version: string }>>;
+	readonly lockfile: { packages: Record<string, { name: string; imports: string[] }> };
 	globals: PyodideGlobals;
 	FS: PyodideFS;
 }
@@ -548,6 +549,39 @@ workerCtx.onmessage = (event) => {
 	handleRequest(msg);
 };
 
+/** Same lookup `loadPackagesFromImports` does, without loading anything. */
+function resolveImports(requestId: string, code: string): void {
+	if (!pyodide) {
+		post({ type: 'IMPORTS_ERROR', requestId, error: 'Runtime not initialized' });
+		return;
+	}
+	try {
+		pyodide.globals.set('_resolve_imports_code', code);
+		const found = pyodide.runPython(
+			'from pyodide.code import find_imports\nfind_imports(_resolve_imports_code)'
+		) as { toJs(): string[]; destroy(): void };
+		const imports = found.toJs();
+		found.destroy();
+		pyodide.globals.delete('_resolve_imports_code');
+		const byImport = new Map<string, string>();
+		for (const pkg of Object.values(pyodide.lockfile.packages)) {
+			for (const name of pkg.imports) byImport.set(name, pkg.name);
+		}
+		const packages = new Set<string>();
+		for (const name of imports) {
+			const pkg = byImport.get(name.split('.')[0]);
+			if (pkg) packages.add(pkg);
+		}
+		post({ type: 'IMPORTS_RESOLVED', requestId, packages: [...packages].sort() });
+	} catch (e) {
+		post({
+			type: 'IMPORTS_ERROR',
+			requestId,
+			error: e instanceof Error ? e.message : String(e),
+		});
+	}
+}
+
 function handleRequest(msg: WorkerRequest): void {
 	switch (msg.type) {
 		case 'INIT_RUNTIME':
@@ -555,6 +589,9 @@ function handleRequest(msg: WorkerRequest): void {
 			break;
 		case 'INSTALL_PLUGIN':
 			void installPlugin(msg.requestId, msg.micropipPackages, msg.preloadedWheels);
+			break;
+		case 'RESOLVE_IMPORTS':
+			resolveImports(msg.requestId, msg.code);
 			break;
 		case 'RUN_PLUGIN': {
 			const task = () => {

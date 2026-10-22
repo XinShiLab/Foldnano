@@ -50,12 +50,21 @@ export interface RunPluginRequest {
 	activeRegionId?: string | null;
 	/**
 	 * Load the Pyodide distribution packages `pluginCode` imports before running it. Set for
-	 * code-editor source, which has no manifest `requirements` to install at activation.
+	 * code-editor source, which has no manifest `requirements` to install at activation. With
+	 * `pluginZipData` too (an owned plugin's draft), the zip runs and `pluginCode` is only scanned.
 	 */
 	loadImports?: boolean;
 }
 
-export type WorkerRequest = InitRuntimeRequest | InstallPluginRequest | RunPluginRequest;
+/** Map a script's imports to the Pyodide distribution packages that provide them. */
+export interface ResolveImportsRequest {
+	type: 'RESOLVE_IMPORTS';
+	requestId: string;
+	code: string;
+}
+
+export type WorkerRequest =
+	InitRuntimeRequest | InstallPluginRequest | RunPluginRequest | ResolveImportsRequest;
 
 /** Sandbox bootstrap → worker: carries the MessagePort all protocol traffic then uses. */
 export const SANDBOX_PORT_HANDOFF = 'SANDBOX_PORT_HANDOFF';
@@ -117,6 +126,19 @@ export interface PluginErrorResponse {
 	logs: string[];
 }
 
+export interface ImportsResolvedResponse {
+	type: 'IMPORTS_RESOLVED';
+	requestId: string;
+	/** Distribution package names, sorted; imports no package provides are left out. */
+	packages: string[];
+}
+
+export interface ImportsErrorResponse {
+	type: 'IMPORTS_ERROR';
+	requestId: string;
+	error: string;
+}
+
 /** Streaming log line emitted during plugin execution */
 export interface PluginLogResponse {
 	type: 'PLUGIN_LOG';
@@ -131,4 +153,6 @@ export type WorkerResponse =
 	| InstallErrorResponse
 	| PluginResultResponse
 	| PluginErrorResponse
+	| ImportsResolvedResponse
+	| ImportsErrorResponse
 	| PluginLogResponse;

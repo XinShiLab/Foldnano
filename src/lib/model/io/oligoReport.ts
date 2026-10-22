@@ -9,6 +9,7 @@ import {
 
 export const OLIGO_REPORT_COLUMNS = [
 	'oligoKey',
+	'name',
 	'start',
 	'end',
 	'sequence',
@@ -25,6 +26,7 @@ export interface OligoReportRow {
 	oligoKey: string;
 	signature: string;
 	fullOligoId: string;
+	name: string;
 	start: string;
 	end: string;
 	sequence: string;
@@ -68,6 +70,7 @@ export function collectPartOligoReportRows(part: Part): OligoReportRow[] {
 			oligoKey: formatOligoKey(signature),
 			signature,
 			fullOligoId: oligo.id,
+			name: oligo.name,
 			start: isCircular ? 'Circular' : formatEnd(oligo, 'five'),
 			end: isCircular ? 'Circular' : formatEnd(oligo, 'three'),
 			sequence: isCircular ? '' : oligo.sequence || '',

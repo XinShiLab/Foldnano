@@ -30,10 +30,11 @@ Core plugins can be switched off again but not removed.
 
 | Control | What it does |
 | --- | --- |
-| **Run** | Runs the current editor contents. Activates the Python runtime first if needed. |
+| **Run** | Runs the current editor contents (shortcut: `Cmd + Enter` on Mac, `Ctrl + Enter` elsewhere, while the editor has focus). Activates the Python runtime first if needed. |
 | **Stop** | Stops a running script |
 | **Clear** | Clears the editor down to a minimal `run(ctx)` skeleton that loads the design |
 | **Reset** | Clears the output pane, discards an unapplied result, and returns an errored run to ready (same as **Reset** in the Plugins panel) |
+| **Save as Plugin** | Packages the script as a plugin you can run from the Plugins panel and keep editing (see [Saving A Script As A Plugin](#saving-a-script-as-a-plugin)) |
 | **Help** (book icon) | Loads a starter script and shows a quick API reference (below) |
 | **More** (**⋯**) | Opens a menu with the editor font size (**A−** / **A+**), **Restore default script** (the Mutation Starter), and **Download**, which saves the script as a `.py` file |
 | **Pop out** (arrow icon, next to **Python**) | Moves the editor and output into a separate browser window (see [Working In A Separate Window](#working-in-a-separate-window)) |
@@ -89,7 +90,7 @@ For the full API, see [Plugin API](/docs/plugin-development/plugin-api).
 
 ## Output And Apply
 
-After a run, the output pane shows tabs for whatever the script produced:
+Before the first run, the output pane shows a short note saying where results will appear. After a run, it shows tabs for whatever the script produced:
 
 | Tab | Contents |
 | --- | --- |
@@ -114,6 +115,42 @@ If you edit the design after a run, the pending result is marked **stale** becau
 
 </Callout>
 
+## Saving A Script As A Plugin
+
+When a script does what you want, click **Save as Plugin** to keep it as a plugin of its own:
+
+1. Give it a **Name** and, if you like, a **Description** and an **Icon**. Pick one of the built-in icons or click the upload button to use your own SVG file (up to 32 KB). The icon shows in the icon rail and the Plugins list, drawn in the theme's colour. The **ID** is generated for you; it identifies the plugin, so backups and restores stay matched to it.
+2. Leave **Download a backup (.zip)** on. The plugin lives in this browser's storage, so clearing browser data deletes it; importing the zip brings it back.
+3. Click **Save plugin**. The packages your script imports (such as `numpy`) are recorded with it.
+4. Click **Open in editor** to keep working on it, or **Done**. Opening the editor resets Script Lab to its starter script, ready for the next idea.
+
+The plugin appears under **My Plugins** with a **Mine** badge. **Run** there always uses the last saved version, like any other plugin. It has no input form: to change a value, edit the script.
+
+### Editing Your Plugin
+
+**Edit** on the plugin's card opens it in its own editor, with its own icon in the icon rail. It works like Script Lab, plus:
+
+| Control | What it does |
+| --- | --- |
+| **Run** | Runs your edits as the plugin. The version badge says *unsaved changes* while you have edits. |
+| **Save version** | Saves your edits as the next version (1.0.0, then 1.0.1, …). Packages you added or removed imports for are updated. |
+| **Discard** | Drops your edits and goes back to the saved version |
+| **Export** | Downloads the saved version as a `.zip`. It turns amber when the saved version isn't backed up yet. |
+| **Icon** | Picks a different icon, or removes it. This saves the next version right away; your unsaved edits stay as they are. |
+| **×** | Closes the editor. Your edits are kept; open it again with **Edit**. |
+
+Edits are stored as you type, so a reload doesn't lose them; after a reload, the editor of every plugin with unsaved edits is back in the icon rail. You can have several plugin editors open at once, each with its own icon in the icon rail and its own pop-out window; switching between them keeps each editor's undo history and cursor. While **Save version** runs, the editor is locked for a moment so what you saved is exactly what you see.
+
+If the same plugin is open in two tabs and you save it in one, saving in the other is refused; reload that tab first. Its unsaved edits are kept.
+
+To move a plugin to another browser or computer, **Export** it and use **Import zip** in the Plugins panel there. Leave **Restore as editable** on in the install dialog to keep editing it. Replacing a plugin you made with a zip that has extra files, a side panel, or packages that don't ship with the runtime makes it a regular plugin you can no longer edit here; the install dialog warns you first.
+
+<Callout type="warning">
+
+**Remove** deletes the only copy of a plugin you made. Export it first if you might want it back. **Export** saves the last saved version, not unsaved edits: use **Save version** first to keep them.
+
+</Callout>
+
 ## Every Run Starts Fresh
 
 Each run executes the editor contents in a fresh Python namespace against a fresh snapshot of the design. Variables from a previous run are **not** kept, so a script's result depends only on its own code and the current design. The Python runtime itself stays loaded between runs, so later runs start faster.
@@ -122,4 +159,4 @@ Each run executes the editor contents in a fresh Python namespace against a fres
 
 Scripts can import the scientific packages that ship with the Python runtime, such as `numpy`, `scipy` and `networkx`. Script Lab loads them on the first run that imports them, and the Console shows a line such as `[env] loaded numpy` followed by its version. That first run takes a few seconds longer.
 
-Packages that don't ship with the runtime can't be imported from Script Lab, because scripts have no internet access. The Console says so when an import fails. To use such a package, turn the script into a plugin zip and list the package under `requirements` (see the [plugin quickstart](/docs/plugin-development/plugin-quickstart)).
+Packages that don't ship with the runtime can't be imported from Script Lab, because scripts have no internet access. The Console says so when an import fails. **Save as Plugin** only records packages that ship with the runtime, so to use another package, write a plugin zip by hand and list the package under `requirements` (see the [plugin quickstart](/docs/plugin-development/plugin-quickstart)).

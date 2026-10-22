@@ -20,6 +20,7 @@ import { PluginApplyError, PluginValidationError } from './plugin-result-errors'
 import { validateResultShape as validateCadnanoResultShape } from './result-format-validation-cadnano-json';
 import { validateResultShape as validateFoldnanoResultShape } from './result-format-validation-foldnano-json';
 import { verifyDesign, type DesignVerificationInput } from './design-verification';
+import { buildPluginZip } from './ownedPlugins';
 import type { PartJSON } from './result-replacement-operations';
 
 export const RUN_FAILED_WITHOUT_MESSAGE =
@@ -154,12 +155,24 @@ export class PluginCoordinator {
 	 * Custom tier: claims the single slot; the caller must have evicted any
 	 * previous owner via evictCustomSlotFor() first.
 	 */
+	private getStandardBridge(): PyodideWorkerBridge {
+		// Standard tier is network-free by construction (see classifyEnv).
+		this.standardBridge ??= this.makeBridge(buildSandboxCsp([]));
+		return this.standardBridge;
+	}
+
+	/**
+	 * Pyodide distribution packages that provide `code`'s imports: the `requirements` an owned
+	 * plugin is packaged with, so it loads what the script loaded under Script Lab.
+	 */
+	async resolveScriptRequirements(code: string): Promise<string[]> {
+		const bridge = this.getStandardBridge();
+		await bridge.initRuntime();
+		return bridge.resolveImports(`resolve-imports:${this._mintResultToken()}`, code);
+	}
+
 	private ensureBridgeFor(plugin: PythonPlugin): PyodideWorkerBridge {
-		if (classifyEnv(plugin.manifest) === 'standard') {
-			// Standard tier is network-free by construction (see classifyEnv).
-			this.standardBridge ??= this.makeBridge(buildSandboxCsp([]));
-			return this.standardBridge;
-		}
+		if (classifyEnv(plugin.manifest) === 'standard') return this.getStandardBridge();
 		if (this.customSlot && this.customSlot.envOwner.pluginId !== plugin.manifest.id) {
 			throw new Error(
 				`The custom plugin environment is in use by "${this.customSlot.envOwner.pluginId}" — ` +
@@ -434,6 +447,8 @@ export class PluginCoordinator {
 		options?: {
 			params?: Record<string, unknown>;
 			sidePanelInput?: PluginSidePanelInput | null;
+			/** Owned plugins only: run this plugin.py instead of the saved one, as the plugin. */
+			draftCode?: string;
 		}
 	): Promise<void> {
 		if (this.registry.hasReservation(pluginId)) {
@@ -456,6 +471,13 @@ export class PluginCoordinator {
 			throw new Error(`Plugin has no resolved code`);
 		if (entrypointFromEditor !== null && entrypointFromEditor.trim() === '')
 			throw new Error('The script editor is empty. Write a run(ctx) function before running.');
+		const draftCode = options?.draftCode ?? null;
+		if (draftCode !== null && !plugin.authoring)
+			throw new Error(
+				`"${plugin.manifest.name}" was not made in this browser, so it has no draft.`
+			);
+		if (draftCode !== null && draftCode.trim() === '')
+			throw new Error('The plugin editor is empty. Write a run(ctx) function before running.');
 		if (this.pendingApply && this.pendingApply.pluginId !== pluginId) {
 			throw new Error(
 				`"${plugin.manifest.name}" cannot run while "${this.pendingApply.pluginId}" has an unapplied result. Apply or discard it first.`
@@ -530,10 +552,15 @@ export class PluginCoordinator {
 					activeRegionId = this.getActiveRegion?.()?.id ?? null;
 				}
 			}
+			// A draft runs as the plugin (same manifest, zip path and builtins); its code is also
+			// scanned for imports, standing in for requirements the draft may have added.
 			const result = await bridge.runPlugin({
 				requestId,
-				pluginCode: pluginCodeForRun ?? undefined,
-				pluginZipData: plugin.resolvedZipData,
+				pluginCode: draftCode ?? pluginCodeForRun ?? undefined,
+				pluginZipData:
+					draftCode !== null
+						? (buildPluginZip(plugin.manifest, draftCode, plugin.iconSvg).buffer as ArrayBuffer)
+						: plugin.resolvedZipData,
 				pluginLabel: plugin.manifest.name,
 				format: plugin.manifest.format,
 				cadnanoJsonIn,
@@ -546,7 +573,7 @@ export class PluginCoordinator {
 					? JSON.stringify(options.sidePanelInput)
 					: undefined,
 				activeRegionId,
-				loadImports: entrypointFromEditor !== null,
+				loadImports: entrypointFromEditor !== null || draftCode !== null,
 			});
 
 			plugin.logs = [envStamp, ...result.logs];

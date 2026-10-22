@@ -1,6 +1,11 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { describe, it, expect } from 'vitest';
-import { completePython, parseTypeAnnotation, PYTHON_API_INDEX } from './python-completions';
+import {
+	completePython,
+	parseTypeAnnotation,
+	PYTHON_API_INDEX,
+	signatureHelpPython,
+} from './python-completions';
 
 // Keeps the Python sources in this spec's import graph so `vitest --changed` reruns the drift check.
 const PYTHON_SOURCES = import.meta.glob('./python/{foldnano,foldnano_mini}/*.py', {
@@ -143,5 +148,55 @@ describe('generated Python API artifacts', () => {
 		expect(() =>
 			execFileSync('python3', ['scripts/gen_python_api.py', '--check'], { encoding: 'utf-8' })
 		).not.toThrow();
+	});
+});
+
+describe('signatureHelpPython', () => {
+	const help = (before: string) => signatureHelpPython(before);
+
+	it('shows a method signature right after the open paren', () => {
+		const out = help(HEADER + '    part.break_at(');
+		expect(out?.label).toBe('part.break_at');
+		expect(out?.params).toEqual([
+			'vh: MutableVirtualHelix | int',
+			'strand_index: int',
+			'bp_index: int',
+		]);
+		expect(out?.activeParam).toBe(0);
+	});
+
+	it('tracks the active argument by position and by keyword', () => {
+		expect(help(HEADER + '    part.break_at(vh, 0, ')?.activeParam).toBe(2);
+		expect(help(HEADER + '    part.create_segment(0, 1, 2, is_scaffold=')?.activeParam).toBe(4);
+	});
+
+	it('ignores commas nested in brackets and strings', () => {
+		expect(help(HEADER + '    part.create_segment(f(1, 2), "a,b", ')?.activeParam).toBe(2);
+	});
+
+	it('maps arguments past a bare `*` to keyword-only params', () => {
+		expect(help(HEADER + "    part.add_region('square', 'r', 64, min_base=")?.activeParam).toBe(4);
+	});
+
+	it('resolves module-level API functions', () => {
+		const out = help('from foldnano_mini import load_part\npart = load_part(s, ');
+		expect(out?.label).toBe('load_part');
+		expect(out?.returns).toBe('MutablePart');
+		expect(out?.activeParam).toBe(1);
+	});
+
+	it('uses the innermost open call', () => {
+		expect(help(HEADER + '    part.break_at(part.oligos_in_region(')?.label).toBe(
+			'part.oligos_in_region'
+		);
+		expect(help(HEADER + '    part.break_at(part.oligos_in_region(x), ')?.label).toBe(
+			'part.break_at'
+		);
+	});
+
+	it('returns null outside calls, for unknown callees, and in comments', () => {
+		expect(help(HEADER + '    part.break_at(1, 2, 3)')).toBeNull();
+		expect(help(HEADER + '    unknown_thing(')).toBeNull();
+		expect(help(HEADER + '    # part.break_at(')).toBeNull();
 	});
 });

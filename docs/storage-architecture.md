@@ -187,7 +187,7 @@ Relevant responsibilities:
 
 | Table         | Key  | Contents                                                                                                                                                                                                                                        |
 | ------------- | ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `plugins`     | `id` | Plugin manifest + side-panel editor code + builtin enable/disable toggle                                                                                                                                                                        |
+| `plugins`     | `id` | Plugin manifest + side-panel editor code + builtin enable/disable toggle + for plugins made from Script Lab, `authoring` (ownership) and `draftCode` (unsaved edit) + `iconSvg` (validated bundled icon, unindexed)                             |
 | `pluginFiles` | `id` | Cached plugin file assets: entrypoint `.py` text or `.zip` bytes + pre-fetched `.whl` wheel bytes, keyed by plugin ID. Invalidated when `manifest.version` changes. Also used as the sole file source for locally installed plugins (zip drop). |
 
 ### Diagnostics

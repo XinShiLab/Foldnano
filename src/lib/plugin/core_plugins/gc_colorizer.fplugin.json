@@ -1,10 +1,11 @@
 {
-	"schemaVersion": 1,
+	"schemaVersion": 2,
 	"id": "gc-colorizer",
 	"name": "GC Colorizer",
-	"version": "1.0.1",
+	"version": "1.0.2",
 	"format": "foldnano_json",
 	"applyStrategy": "replacePartKeepAnnotationsWhereMatched",
+	"icon": "icon.svg",
 	"entrypointUrl": "/plugins/gc_colorizer/gc_colorizer.zip",
 	"description": "Colors each staple by its GC content: blue for GC-rich, red for AT-rich. Requires sequences to be assigned. Demonstrates foldnano_json round-trip mutation."
 }

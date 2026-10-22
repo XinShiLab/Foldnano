@@ -10,6 +10,10 @@ export interface PendingInstall {
 	files: IndexedDbPluginFilesRecord | null;
 	/** The installed version being replaced, or null for a new install awaiting review. */
 	existing: PluginManifest | null;
+	/** An exported owned plugin; a new install may restore it as editable. */
+	restorable: boolean;
+	/** Replacing a plugin made here with a package its editor can't handle. */
+	endsEditing?: boolean;
 }
 
 export interface InstallRequestOptions {
@@ -68,6 +72,7 @@ export class PluginInstallGate {
 							incoming: prepared.manifest,
 							files: prepared.files,
 							existing: null,
+							restorable: prepared.restorable ?? false,
 						});
 					}
 					try {
@@ -86,6 +91,8 @@ export class PluginInstallGate {
 						incoming: prepared.incoming,
 						files: prepared.files,
 						existing: prepared.existing,
+						restorable: prepared.restorable ?? false,
+						...(prepared.endsEditing ? { endsEditing: true } : {}),
 					});
 			}
 		} finally {
@@ -100,7 +107,8 @@ export class PluginInstallGate {
 		});
 	}
 
-	async confirmPending(): Promise<void> {
+	/** `asEditable` restores a restorable new install as an owned, editable plugin. */
+	async confirmPending({ asEditable = false }: { asEditable?: boolean } = {}): Promise<void> {
 		const pending = this.pending;
 		const resolve = this.#resolvePending;
 		if (!pending || !resolve) return;
@@ -118,7 +126,14 @@ export class PluginInstallGate {
 			if (pending.existing) {
 				await this.#getRegistry().replaceConfirmed(pending.incoming, pending.files);
 			} else {
-				await this.#getRegistry().registerNew(pending.incoming, pending.files);
+				const registry = this.#getRegistry();
+				if (asEditable && pending.restorable) {
+					await registry.registerNew(pending.incoming, pending.files, {
+						authoring: { source: 'scriptLab' },
+					});
+				} else {
+					await registry.registerNew(pending.incoming, pending.files);
+				}
 			}
 			resolve({ status: 'installed', manifest: pending.incoming });
 		} catch (e) {

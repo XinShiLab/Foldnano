@@ -107,7 +107,12 @@
 			for (const original of source.head.querySelectorAll(STYLE_SELECTOR)) {
 				const clone = clones.get(original);
 				if (!clone) {
-					clones.set(original, target.head.appendChild(target.importNode(original, true)));
+					const copy = target.importNode(original, true);
+					// SSR'd hrefs are relative to the load-time URL, not the post-navigation <base>.
+					if (original instanceof HTMLLinkElement && original.sheet?.href) {
+						copy.setAttribute('href', original.sheet.href);
+					}
+					clones.set(original, target.head.appendChild(copy));
 				} else if (clone.textContent !== original.textContent) {
 					// Vite HMR rewrites <style> contents in place.
 					clone.textContent = original.textContent;

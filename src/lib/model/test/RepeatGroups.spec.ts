@@ -15,6 +15,7 @@ import {
 	moveOligoEndCmd,
 	paintOligoCmd,
 	removeOligoCmd,
+	renameOligoCmd,
 } from '$lib/commands/strands';
 import {
 	addRepeatInstanceCmd,
@@ -236,6 +237,30 @@ describe('repeat groups: mirror oligos', () => {
 		removeOligoCmd({ part: part(), oligo: a }, history);
 
 		expect(mirrorsOf(part()).map((m) => m.mirrorOf?.sourceOligoId)).toEqual([b.id]);
+	});
+
+	it('copies a renamed original onto its mirrors (names are not unique), in one undo step', () => {
+		const { history, part, vh } = setup();
+		const src = part().createOligo(vh, 0, 9);
+		createRepeatGroupCmd({ part: part(), oligos: [src], bpOffset: 21 }, history);
+
+		renameOligoCmd({ oligo: src, name: '  edge-1 ' }, history);
+
+		expect(part().getOligoById(src.id)?.name).toBe('edge-1');
+		expect(mirrorsOf(part()).map((m) => m.name)).toEqual(['edge-1']);
+		history.undoOnce();
+		expect(part().getOligoById(src.id)?.name).toBe('');
+		expect(mirrorsOf(part()).map((m) => m.name)).toEqual(['']);
+	});
+
+	it('rejects renaming a mirror directly', () => {
+		const { history, part, vh } = setup();
+		const src = part().createOligo(vh, 0, 9);
+		createRepeatGroupCmd({ part: part(), oligos: [src], bpOffset: 21 }, history);
+		const [mirror] = mirrorsOf(part());
+
+		expect(() => renameOligoCmd({ oligo: mirror, name: 'x' }, history)).toThrow();
+		expect(mirrorsOf(part())[0].name).toBe('');
 	});
 
 	it('adds and removes instances, detaches, and deletes groups', () => {

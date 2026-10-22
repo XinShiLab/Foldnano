@@ -1,6 +1,7 @@
 import {
 	Blocks,
 	FileCodeCorner,
+	FilePen,
 	GitPullRequestArrow,
 	SlidersHorizontal,
 	Workflow,
@@ -34,6 +35,13 @@ export interface PluginSidePanelDescriptor extends BaseSidePanelDescriptor {
 	kind: 'plugin';
 	id: PluginSidePanelId;
 	pluginId: string;
+	description?: string;
+	/** An owned plugin's editor: opened on demand from the Plugins list and closable. */
+	isOwnedEditor: boolean;
+	/** The owned plugin has unsaved edits. */
+	hasDraft: boolean;
+	/** The plugin's bundled icon; drawn instead of `icon` when set. */
+	iconSvg: string | null;
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	component: Component<any>;
 	componentProps: { pluginId: string };
@@ -79,16 +87,21 @@ export function toPluginSidePanelId(pluginId: string): PluginSidePanelId {
 	return `plugin:${pluginId}`;
 }
 
-export function getSidePanelDescriptors(registry: PluginRegistry): SidePanelDescriptor[] {
+/** `openEditorIds`: owned plugins whose editor panel is open (`EditorViewContext.pluginEditorIds`). */
+export function getSidePanelDescriptors(
+	registry: PluginRegistry,
+	openEditorIds: ReadonlySet<string> = new Set()
+): SidePanelDescriptor[] {
 	return [
 		...builtInSidePanels,
-		...registry.all.flatMap((plugin) => toPluginSidePanelDescriptors(plugin)),
+		...registry.all.flatMap((plugin) => toPluginSidePanelDescriptors(plugin, openEditorIds)),
 	];
 }
 
 export function getSidePanelDescriptor(
 	id: SidePanelId,
-	registry: PluginRegistry
+	registry: PluginRegistry,
+	openEditorIds: ReadonlySet<string> = new Set()
 ): SidePanelDescriptor {
 	if (id === 'GITHUB' || id === 'PLUGIN') {
 		return getBuiltInSidePanelDescriptor(id);
@@ -96,18 +109,37 @@ export function getSidePanelDescriptor(
 
 	const pluginId = id.slice('plugin:'.length);
 	const plugin = registry.get(pluginId);
-	if (!plugin || !plugin.manifest.sidePanel || !plugin.enabled) {
-		return getBuiltInSidePanelDescriptor('GITHUB');
-	}
-
-	return buildPluginSidePanelDescriptor(plugin);
+	const [descriptor] = plugin ? toPluginSidePanelDescriptors(plugin, openEditorIds) : [];
+	return descriptor ?? getBuiltInSidePanelDescriptor('GITHUB');
 }
 
-function toPluginSidePanelDescriptors(plugin: PythonPlugin): PluginSidePanelDescriptor[] {
-	if (!plugin.manifest.sidePanel || !plugin.enabled) {
-		return [];
+function toPluginSidePanelDescriptors(
+	plugin: PythonPlugin,
+	openEditorIds: ReadonlySet<string>
+): PluginSidePanelDescriptor[] {
+	if (!plugin.enabled) return [];
+	if (plugin.manifest.sidePanel) return [buildPluginSidePanelDescriptor(plugin)];
+	if (plugin.authoring && openEditorIds.has(plugin.manifest.id)) {
+		return [buildOwnedEditorDescriptor(plugin)];
 	}
-	return [buildPluginSidePanelDescriptor(plugin)];
+	return [];
+}
+
+function buildOwnedEditorDescriptor(plugin: PythonPlugin): PluginSidePanelDescriptor {
+	return {
+		kind: 'plugin',
+		id: toPluginSidePanelId(plugin.manifest.id),
+		pluginId: plugin.manifest.id,
+		description: plugin.manifest.description,
+		title: `Edit: ${plugin.manifest.name}`,
+		ariaLabel: `Toggle the editor for ${plugin.manifest.name}`,
+		icon: FilePen,
+		component: PluginSidePanelHost,
+		componentProps: { pluginId: plugin.manifest.id },
+		isOwnedEditor: true,
+		hasDraft: plugin.draftCode !== null,
+		iconSvg: plugin.iconSvg,
+	};
 }
 
 function buildPluginSidePanelDescriptor(plugin: PythonPlugin): PluginSidePanelDescriptor {
@@ -116,11 +148,15 @@ function buildPluginSidePanelDescriptor(plugin: PythonPlugin): PluginSidePanelDe
 		kind: 'plugin',
 		id: toPluginSidePanelId(plugin.manifest.id),
 		pluginId: plugin.manifest.id,
+		description: plugin.manifest.description,
 		title: panel.title ?? plugin.manifest.name,
 		ariaLabel: `Toggle ${panel.title ?? plugin.manifest.name} panel`,
 		icon: sidePanelIconComponent(panel.icon ?? defaultSidePanelIcon(panel.type)),
 		component: PluginSidePanelHost,
 		componentProps: { pluginId: plugin.manifest.id },
+		isOwnedEditor: false,
+		hasDraft: false,
+		iconSvg: plugin.iconSvg,
 	};
 }
 

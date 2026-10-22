@@ -33,16 +33,30 @@ skipped.
   to the element's `title` / `aria-label`.
 - **Notes never overlap.** `placeNotes()` (`helpLayout.ts`, pure and unit-tested) lays out every
   caption after its size is measured: it starts at the preferred `placement`, slides along that
-  side or tries another until clear of earlier notes and the pinned cards (shortcut card,
-  exit pill). The hover card is placed last so hovering never moves captions. A note that
+  side or tries another until clear of earlier notes, the pinned cards (shortcut card,
+  exit pill) and every visible hoverable control, so a caption never hides the buttons under it
+  (the sidebar's "Side panels" caption used to cover the Script Lab toolbar). The hover card is placed last so hovering never moves captions. A note that
   ends up away from its target gets a dashed leader line (`leaderLine()`) back to it.
 - **Shortcut card** (`ShortcutCard.svelte`) is collapsed by default to leave room for notes; its
   expanded state is remembered for the session.
 - **Visibility.** Non-area controls are shown only if `elementFromPoint` at their centre lands
   inside them, which hides controls clipped by scrolling toolbars or covered by floating panels.
+  A disabled control is `pointer-events: none`, so for it a hit on its direct parent also counts;
+  otherwise buttons like **Stop** before a run would have no hover card.
+  The hit test skips the overlay's own notes (`elementsFromPoint`, first hit outside the layer).
+  Counting them makes visibility depend on note placement, which depends on visibility: captions
+  snapped back over toolbars and the hover card flickered on and off over its own control.
+  Hover tooltips (`data-slot="tooltip-content"` and their bits-ui floating wrapper) are skipped
+  for the same reason; menus and popovers still count, since they really cover controls.
 - **Root filter.** The registry is module-level because attachments run after component init, where
   `getContext` is unavailable. `WorkspaceHelp` only shows entries inside its `root` element, so
   editor components reused elsewhere (docs tutorial) never leak into the editor's overlay.
+- **Side panels.** Source Control and Plugins each have one area caption on their body and hover
+  cards on their controls. The sidebar strip itself is a plain hover card, not an area caption:
+  as a caption it sat on top of whichever panel was open, and the panel contents matter more.
+- **Code-editor panels** (Script Lab and other `codeEditor` plugins) register their panes and
+  toolbar in `PluginCodeEditorShell`; the shortcut card adds a Script Editor section while such a
+  panel is open and docked. A popped-out editor window gets no overlay.
 - **Mode descriptions** reuse `MODE_TUTORIAL_INFO` from the docs tutorial data, so the mode buttons
   and the docs describe modes with the same text.
 

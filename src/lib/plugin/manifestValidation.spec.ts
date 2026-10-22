@@ -78,9 +78,9 @@ describe('validateManifest', () => {
 		});
 
 		it('refuses a manifest newer than this app, before looking at its fields', () => {
-			expect(() => validateManifest({ ...base(), schemaVersion: 2, permissions: {} })).toThrow(
-				/needs a newer version of Foldnano/
-			);
+			expect(() =>
+				validateManifest({ ...base(), schemaVersion: MANIFEST_SCHEMA_VERSION + 1, permissions: {} })
+			).toThrow(/needs a newer version of Foldnano/);
 		});
 
 		it.each(['1', 0, 1.5])('rejects schemaVersion %j', (schemaVersion) => {
@@ -88,7 +88,16 @@ describe('validateManifest', () => {
 		});
 
 		it('matches the published version constant', () => {
-			expect(MANIFEST_SCHEMA_VERSION).toBe(1);
+			expect(MANIFEST_SCHEMA_VERSION).toBe(2);
+		});
+
+		it('accepts "icon" at v2 and refuses it at v1', () => {
+			expect(validateManifest({ ...base(), schemaVersion: 2, icon: 'icon.svg' }).icon).toBe(
+				'icon.svg'
+			);
+			expect(() => validateManifest({ ...base(), icon: 'icon.svg' })).toThrow(
+				/"icon" needs "schemaVersion": 2/
+			);
 		});
 	});
 
