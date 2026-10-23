@@ -402,7 +402,7 @@ class MutablePart:
     def reorder_vh(self, vh: MutableVirtualHelix | int, target_region_row: int) -> None:
         """Reorder ``vh`` within its region to ``target_region_row`` (0-based)."""
 
-    def set_plane_transform(self, plane_id: str, origin: tuple[float, float, float] | list[float] | dict, u: tuple[float, float, float] | list[float] | dict, v: tuple[float, float, float] | list[float] | dict, normal: tuple[float, float, float] | list[float] | dict) -> None:
+    def set_plane_transform(self, plane_id: str, origin: tuple[float, float, float] | list[float] | dict[str, float], u: tuple[float, float, float] | list[float] | dict[str, float], v: tuple[float, float, float] | list[float] | dict[str, float], normal: tuple[float, float, float] | list[float] | dict[str, float]) -> None:
         """
         Update the 3D pose of the plane identified by ``plane_id``.
 
@@ -597,10 +597,10 @@ class MutableVirtualHelix:
     def parity_is_even(self) -> bool: ...
 
     @property
-    def local_frame(self) -> dict | None: ...
+    def local_frame(self) -> dict[str, Any] | None: ...
 
     @local_frame.setter
-    def local_frame(self, value: dict | None) -> None: ...
+    def local_frame(self, value: dict[str, Any] | None) -> None: ...
 
     def move_to(self, col: int, row: int) -> None:
         """

@@ -13,10 +13,20 @@ export interface WhatsNewEntry {
  * Author date of the newest commit already considered for this list. `pnpm whats-new:draft`
  * only drafts commits authored after it (author dates survive rebases; hashes don't).
  */
-export const WHATS_NEW_REVIEWED_THROUGH = '2026-10-22T22:09:56+02:00';
+export const WHATS_NEW_REVIEWED_THROUGH = '2026-10-23T20:58:12+02:00';
 
 // Newest first. Edit freely; the draft script only inserts new entries at the top.
 export const WHATS_NEW: readonly WhatsNewEntry[] = [
+	{
+		date: '2026-10-23',
+		area: 'Plugins',
+		text: 'Plugin dev mode: link a plugin folder on your computer from the new Dev tab in the Plugins panel, edit it in your own editor, and run it on your design without zipping or reinstalling. Linking an empty folder opens a New plugin form that writes a working starter plugin, with API stubs for editor autocomplete. print() output appears while the plugin runs, and Check and Zip package the folder when it is ready. Needs a Chromium-based browser.',
+	},
+	{
+		date: '2026-10-23',
+		area: 'General',
+		text: 'Arrow keys pan the strand view, the SCAF/STAP filters also apply to clicks and marquee selections, and exports are named after the design. Plus fixes for numpy plugins and tool panels, and new plugin API reference pages.',
+	},
 	{
 		date: '2026-10-23',
 		area: 'Plugins',

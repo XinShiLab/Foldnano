@@ -124,7 +124,7 @@ Apply the currently selected **terminal modification** (for example a 5′/3′ 
 The panel shows the **Active** modification and lists:
 
 - **Builtin** modifications (Thiol, Biotin, Cy3, Cy5), each with its marker color,
-- **Custom** modifications for this design. Click **+**, enter a **Name** (for example `Azide`), pick a **Color**, and click **Add**. The **✕** on a custom modification deletes it; if it's already used, a dialog says how many ends carry it and removes it from all of them when you confirm.
+- **Custom** modifications for this design. Click **+**, enter a **Name** (for example `Azide`), pick a **Color**, and click **Add** (or press `Enter`). Hover a custom modification to show its **✕**, which deletes it; if it's already used, a dialog says how many ends carry it and removes it from all of them when you confirm.
 - **Remove mode**: clicking an end then clears its modification.
 
 Custom modifications are saved with the design. Modification sites can be surfaced later with the "with modifications" highlight (see [Selection](/docs/guide/selection#highlighting-and-hiding)).

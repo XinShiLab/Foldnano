@@ -164,6 +164,18 @@ sys.stderr = _log_capture
 # Snapshot of modules present after runtime init — used to clean up zip plugin
 # modules between runs so the second run always imports fresh code.
 _base_modules = set(sys.modules.keys())
+
+def _is_plugin_module(module, plugin_run):
+    # The plugin entry module, or anything whose file or package path is inside plugin_run.
+    if getattr(module, '__name__', None) == '_plugin':
+        return True
+    prefix = plugin_run + '/'
+    if (getattr(module, '__file__', None) or '').startswith(prefix):
+        return True
+    try:
+        return any(str(p).startswith(prefix) for p in (getattr(module, '__path__', None) or []))
+    except Exception:
+        return False
 `;
 
 /**
@@ -189,6 +201,7 @@ import json as _json
 import base64 as _b64
 
 _log_capture.clear()
+_log_capture.set_sink(_stream_log)
 
 _ns = None
 _run_success = False
@@ -200,13 +213,14 @@ _run_logs_json = '[]'
 try:
     if _plugin_zip:
         import zipfile as _zf, sys as _zsys, importlib.util as _ilu, shutil as _shutil
-        # Remove any modules loaded by a previous zip run so the second run
-        # always imports fresh code (avoids stale sys.modules cache).
-        for _k in list(_zsys.modules.keys()):
-            if _k not in _base_modules:
-                del _zsys.modules[_k]
         import os as _os
         _plugin_run = '/plugin_run'
+        # Drop the modules a previous zip run imported from the plugin itself, so this run
+        # imports fresh code. Installed packages stay: extensions such as numpy refuse to
+        # load twice per process ("cannot load module more than once per process").
+        for _k, _m in list(_zsys.modules.items()):
+            if _k not in _base_modules and _is_plugin_module(_m, _plugin_run):
+                del _zsys.modules[_k]
         while _plugin_run in _zsys.path:
             _zsys.path.remove(_plugin_run)
         # Clear stale files so a removed/renamed module can't still be imported.
@@ -277,6 +291,7 @@ except BaseException as _exc:
         _run_logs_json = _json.dumps(_log_capture.get_lines())
     except Exception:
         _run_logs_json = '[]'
+_log_capture.set_sink(None)
 `;
 
 // ---------------------------------------------------------------------------
@@ -400,6 +415,7 @@ const RUN_GLOBALS = [
 	'_run_traceback',
 	'_result_payload',
 	'_run_logs_json',
+	'_stream_log',
 ] as const;
 
 async function runPlugin(
@@ -449,6 +465,10 @@ async function runPlugin(
 		pyodide.globals.set('_params_json', paramsJson ?? undefined);
 		pyodide.globals.set('_side_panel_input_json', sidePanelInputJson ?? undefined);
 		pyodide.globals.set('_active_region_id', activeRegionId ?? undefined);
+		// Each printed line reaches the panel while the run is still going (bridge onLog).
+		pyodide.globals.set('_stream_log', (message: string) =>
+			post({ type: 'PLUGIN_LOG', requestId, message })
+		);
 
 		blockedHosts = new Set();
 		await pyodide.runPythonAsync(RUN_HARNESS);

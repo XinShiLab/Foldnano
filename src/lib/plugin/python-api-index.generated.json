@@ -125,7 +125,7 @@
 		"parse_cadnano_json": {
 			"module": "foldnano",
 			"signature": "(json_str: str)",
-			"returns": "dict",
+			"returns": "dict[str, Any]",
 			"doc": "Parse a cadnano JSON string into a Python dict."
 		},
 		"parse_foldnano_json": {
@@ -202,7 +202,7 @@
 				{
 					"name": "set_result_mutation_log",
 					"kind": "method",
-					"signature": "(log: list[dict])",
+					"signature": "(log: list[dict[str, Any]])",
 					"returns": "None",
 					"doc": "Store a foldnano_mini mutation log to be replayed against the host's canonical ``Part`` under one undo step (apply strategy ``replayMutationLog`` / ``replayMutationLogInRegion``)."
 				},
@@ -223,7 +223,7 @@
 				{
 					"name": "set_result",
 					"kind": "method",
-					"signature": "(data: dict)",
+					"signature": "(data: dict[str, Any])",
 					"returns": "None",
 					"doc": "Store a structured result dict that will be displayed in the plugin output panel."
 				},
@@ -235,14 +235,14 @@
 				{
 					"name": "params",
 					"kind": "property",
-					"type": "dict",
+					"type": "dict[str, Any]",
 					"doc": "All parameter values passed from the UI."
 				},
 				{
 					"name": "get_param",
 					"kind": "method",
-					"signature": "(key: str, default=None)",
-					"returns": null,
+					"signature": "(key: str, default: Any=None)",
+					"returns": "Any",
 					"doc": "Return a single parameter value, or *default* if not set."
 				},
 				{
@@ -424,7 +424,7 @@
 				{
 					"name": "from_json",
 					"kind": "method",
-					"signature": "(vh_json: dict)",
+					"signature": "(vh_json: dict[str, Any])",
 					"returns": "VirtualHelixProxy"
 				},
 				{
@@ -478,7 +478,7 @@
 				{
 					"name": "from_json",
 					"kind": "method",
-					"signature": "(oligo_json: dict)",
+					"signature": "(oligo_json: dict[str, Any])",
 					"returns": "OligoProxy"
 				},
 				{
@@ -496,7 +496,7 @@
 				{
 					"name": "touches_regions",
 					"kind": "method",
-					"signature": "(part)",
+					"signature": "(part: PartData)",
 					"returns": "set[str]",
 					"doc": "Return the set of region IDs this oligo's segments visit."
 				}
@@ -559,7 +559,7 @@
 				{
 					"name": "from_json",
 					"kind": "method",
-					"signature": "(seg_json: dict)",
+					"signature": "(seg_json: dict[str, Any])",
 					"returns": "OligoSegmentProxy"
 				},
 				{
@@ -644,7 +644,7 @@
 				{
 					"name": "from_json",
 					"kind": "method",
-					"signature": "(region_json: dict)",
+					"signature": "(region_json: dict[str, Any])",
 					"returns": "RegionProxy"
 				},
 				{
@@ -721,7 +721,7 @@
 				{
 					"name": "from_json",
 					"kind": "method",
-					"signature": "(region_json: dict)",
+					"signature": "(region_json: dict[str, Any])",
 					"returns": "RegionProxy"
 				}
 			]
@@ -788,7 +788,7 @@
 				{
 					"name": "from_json",
 					"kind": "method",
-					"signature": "(region_json: dict)",
+					"signature": "(region_json: dict[str, Any])",
 					"returns": "RegionProxy"
 				},
 				{
@@ -835,7 +835,7 @@
 				{
 					"name": "from_json",
 					"kind": "method",
-					"signature": "(plane_json: dict)",
+					"signature": "(plane_json: dict[str, Any])",
 					"returns": "PlaneProxy"
 				}
 			]
@@ -1209,7 +1209,7 @@
 				{
 					"name": "set_plane_transform",
 					"kind": "method",
-					"signature": "(plane_id: str, origin: tuple[float, float, float] | list[float] | dict, u: tuple[float, float, float] | list[float] | dict, v: tuple[float, float, float] | list[float] | dict, normal: tuple[float, float, float] | list[float] | dict)",
+					"signature": "(plane_id: str, origin: tuple[float, float, float] | list[float] | dict[str, float], u: tuple[float, float, float] | list[float] | dict[str, float], v: tuple[float, float, float] | list[float] | dict[str, float], normal: tuple[float, float, float] | list[float] | dict[str, float])",
 					"returns": "None",
 					"doc": "Update the 3D pose of the plane identified by ``plane_id``."
 				},
@@ -1660,7 +1660,7 @@
 				{
 					"name": "local_frame",
 					"kind": "property",
-					"type": "dict | None",
+					"type": "dict[str, Any] | None",
 					"settable": true
 				},
 				{

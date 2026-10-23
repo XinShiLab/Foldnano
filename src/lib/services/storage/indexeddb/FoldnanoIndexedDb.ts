@@ -5,6 +5,7 @@ import type {
 	IndexedDbDocumentContextRecord,
 	IndexedDbDocumentRecord,
 	IndexedDbDocumentSnapshotRecord,
+	IndexedDbFileHandleRecord,
 	IndexedDbGitHubFileRecord,
 	IndexedDbGitHubRepoContextRecord,
 	IndexedDbLocalBackupRecord,
@@ -13,6 +14,7 @@ import type {
 	IndexedDbMigrationRecord,
 	IndexedDbPluginRecord,
 	IndexedDbPluginFilesRecord,
+	IndexedDbSettingRecord,
 } from '../indexedDbTypes';
 import {
 	FOLDNANO_INDEXED_DB_NAME,
@@ -90,6 +92,8 @@ export class FoldnanoIndexedDb extends Dexie implements IndexedDbPersistenceBack
 	pluginFiles!: Table<IndexedDbPluginFilesRecord, string>;
 	errorLogs!: Table<ErrorLogRecord, string>;
 	localBackups!: Table<IndexedDbLocalBackupRecord, string>;
+	fileHandles!: Table<IndexedDbFileHandleRecord, string>;
+	settings!: Table<IndexedDbSettingRecord, string>;
 
 	constructor(name = FOLDNANO_INDEXED_DB_NAME) {
 		super(name);
@@ -154,8 +158,13 @@ export class FoldnanoIndexedDb extends Dexie implements IndexedDbPersistenceBack
 				await local.bulkDelete(stale);
 			});
 
-		this.version(FOLDNANO_INDEXED_DB_VERSION).stores({
+		this.version(7).stores({
 			githubBackups: null,
+		});
+
+		this.version(FOLDNANO_INDEXED_DB_VERSION).stores({
+			fileHandles: 'id, purpose',
+			settings: 'key',
 		});
 	}
 
@@ -342,10 +351,12 @@ export class FoldnanoIndexedDb extends Dexie implements IndexedDbPersistenceBack
 		}
 	}
 
-	/** Writes owned-plugin fields onto an existing record; `undefined` values clear them. */
+	/** Writes fields onto an existing plugin record; `undefined` values clear them. */
 	async updatePluginRecord(
 		pluginId: string,
-		patch: Partial<Pick<IndexedDbPluginRecord, 'authoring' | 'draftCode'>>
+		patch: Partial<
+			Pick<IndexedDbPluginRecord, 'authoring' | 'draftCode' | 'manifest' | 'iconSvg' | 'linked'>
+		>
 	): Promise<void> {
 		const updated = await this.plugins.update(pluginId, patch);
 		if (updated === 0) throw new Error(`Plugin "${pluginId}" is not stored in this browser.`);
@@ -370,6 +381,26 @@ export class FoldnanoIndexedDb extends Dexie implements IndexedDbPersistenceBack
 
 	async deletePluginFiles(id: string): Promise<void> {
 		await this.pluginFiles.delete(id);
+	}
+
+	async saveFileHandle(record: IndexedDbFileHandleRecord): Promise<void> {
+		await this.fileHandles.put(record);
+	}
+
+	async loadFileHandle(id: string): Promise<IndexedDbFileHandleRecord | null> {
+		return (await this.fileHandles.get(id)) ?? null;
+	}
+
+	async deleteFileHandle(id: string): Promise<void> {
+		await this.fileHandles.delete(id);
+	}
+
+	async getSetting<T>(key: string): Promise<T | undefined> {
+		return (await this.settings.get(key))?.value as T | undefined;
+	}
+
+	async setSetting(key: string, value: unknown): Promise<void> {
+		await this.settings.put({ key, value });
 	}
 
 	async addErrorLog(record: ErrorLogRecord): Promise<void> {

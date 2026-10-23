@@ -32,7 +32,7 @@ Example (foldnano_json mode)::
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal, Optional, Union
+from typing import Any, Literal, Optional, Union
 
 RegionKind = Literal['HONEYCOMB', 'SQUARE', 'FREEFORM']
 
@@ -51,7 +51,7 @@ __all__ = [
 ]
 
 
-def parse_cadnano_json(json_str: str) -> dict:
+def parse_cadnano_json(json_str: str) -> dict[str, Any]:
     """
     Parse a cadnano JSON string into a Python dict.
 
@@ -107,7 +107,7 @@ class _Vec3:
     z: float
 
     @classmethod
-    def from_json(cls, j: dict) -> '_Vec3': ...
+    def from_json(cls, j: dict[str, Any]) -> '_Vec3': ...
 
 
 class PluginContext:
@@ -161,7 +161,7 @@ class PluginContext:
     def set_result_foldnano_json(self, json_str: str) -> None:
         """Store the plugin's output as a Foldnano JSON string (Part.toJSON() format)."""
 
-    def set_result_mutation_log(self, log: list[dict]) -> None:
+    def set_result_mutation_log(self, log: list[dict[str, Any]]) -> None:
         """
         Store a foldnano_mini mutation log to be replayed against the host's
         canonical ``Part`` under one undo step (apply strategy
@@ -182,7 +182,7 @@ class PluginContext:
         be downloaded from the plugin output panel.
         """
 
-    def set_result(self, data: dict) -> None:
+    def set_result(self, data: dict[str, Any]) -> None:
         """
         Store a structured result dict that will be displayed in the plugin output panel.
 
@@ -193,10 +193,10 @@ class PluginContext:
     def format(self) -> str: ...
 
     @property
-    def params(self) -> dict:
+    def params(self) -> dict[str, Any]:
         """All parameter values passed from the UI."""
 
-    def get_param(self, key: str, default=None):
+    def get_param(self, key: str, default: Any=None) -> Any:
         """Return a single parameter value, or *default* if not set."""
 
     @property
@@ -265,7 +265,7 @@ class PartData:
 
     active_region_id: Optional[str]
 
-    def __init__(self, name: str, id: str, lattice_type: str, max_base: int, virtual_helices: list[VirtualHelixProxy], oligos: list[OligoProxy], raw: dict, regions: Optional[list[RegionProxy]]=None, planes: Optional[list[PlaneProxy]]=None, active_region_id: Optional[str]=None) -> None: ...
+    def __init__(self, name: str, id: str, lattice_type: str, max_base: int, virtual_helices: list[VirtualHelixProxy], oligos: list[OligoProxy], raw: dict[str, Any], regions: Optional[list[RegionProxy]]=None, planes: Optional[list[PlaneProxy]]=None, active_region_id: Optional[str]=None) -> None: ...
 
     def get_vh(self, index: int) -> VirtualHelixProxy | None:
         """Return the VirtualHelixProxy with the given VH index, or None."""
@@ -344,7 +344,7 @@ class VirtualHelixProxy:
     list_row: Optional[int]
 
     @classmethod
-    def from_json(cls, vh_json: dict) -> 'VirtualHelixProxy': ...
+    def from_json(cls, vh_json: dict[str, Any]) -> 'VirtualHelixProxy': ...
 
     @property
     def is_freeform(self) -> bool:
@@ -397,7 +397,7 @@ class OligoProxy:
     segments: list[OligoSegmentProxy]
 
     @classmethod
-    def from_json(cls, oligo_json: dict) -> 'OligoProxy': ...
+    def from_json(cls, oligo_json: dict[str, Any]) -> 'OligoProxy': ...
 
     @property
     def sequence(self) -> str:
@@ -410,7 +410,7 @@ class OligoProxy:
         segment's 5' end (circular oligo).
         """
 
-    def touches_regions(self, part) -> set[str]:
+    def touches_regions(self, part: PartData) -> set[str]:
         """
         Return the set of region IDs this oligo's segments visit.
 
@@ -473,7 +473,7 @@ class OligoSegmentProxy:
     sequence: str
 
     @classmethod
-    def from_json(cls, seg_json: dict) -> 'OligoSegmentProxy': ...
+    def from_json(cls, seg_json: dict[str, Any]) -> 'OligoSegmentProxy': ...
 
     @property
     def is_free_five_prime(self) -> bool:
@@ -538,7 +538,7 @@ class RegionProxy:
     default_max_base: int
 
     @classmethod
-    def from_json(cls, region_json: dict) -> 'RegionProxy': ...
+    def from_json(cls, region_json: dict[str, Any]) -> 'RegionProxy': ...
 
     @property
     def supports_lattice_grid(self) -> bool: ...
@@ -591,4 +591,4 @@ class PlaneProxy:
     normal: _Vec3
 
     @classmethod
-    def from_json(cls, plane_json: dict) -> 'PlaneProxy': ...
+    def from_json(cls, plane_json: dict[str, Any]) -> 'PlaneProxy': ...

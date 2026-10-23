@@ -149,11 +149,11 @@ class MutableVirtualHelix:
         return coords["row"] % 2 == coords["col"] % 2
 
     @property
-    def local_frame(self) -> dict | None:
+    def local_frame(self) -> dict[str, Any] | None:
         return self._raw().get("localFrame")
 
     @local_frame.setter
-    def local_frame(self, value: dict | None) -> None:
+    def local_frame(self, value: dict[str, Any] | None) -> None:
         if value is not None and not isinstance(value, dict):
             raise TypeError(f"localFrame must be dict or None, got {type(value).__name__}")
         self._part._apply(

@@ -14,7 +14,7 @@ parse_foldnano_json(json_str, active_region_id=None)
 from __future__ import annotations
 
 import json
-from typing import Optional
+from typing import Any, Optional
 
 from .vh import VirtualHelixProxy
 from .oligo import OligoProxy
@@ -63,7 +63,7 @@ class PartData:
         max_base: int,
         virtual_helices: list[VirtualHelixProxy],
         oligos: list[OligoProxy],
-        raw: dict,
+        raw: dict[str, Any],
         regions: Optional[list[RegionProxy]] = None,
         planes: Optional[list[PlaneProxy]] = None,
         active_region_id: Optional[str] = None,
@@ -151,7 +151,7 @@ class PartData:
         )
 
 
-def parse_cadnano_json(json_str: str) -> dict:
+def parse_cadnano_json(json_str: str) -> dict[str, Any]:
     """
     Parse a cadnano JSON string into a Python dict.
 

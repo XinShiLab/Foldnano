@@ -73,3 +73,21 @@ def test_truncates_a_long_line_written_without_newlines():
 
     lines = _capture(body)
     assert len(lines) == 1 and lines[0].endswith("… [line truncated]")
+
+
+def test_sink_receives_each_kept_line_as_it_completes():
+    cap = LogCapture()
+    streamed: list[str] = []
+    cap.set_sink(streamed.append)
+    with contextlib.redirect_stdout(cap):
+        print("one")
+        assert streamed == ["one"]
+        print("", end="")
+        print("two", end="")
+    assert streamed == ["one"]
+    assert cap.get_lines() == ["one", "two"]
+    assert streamed == ["one", "two"]
+    cap.set_sink(None)
+    with contextlib.redirect_stdout(cap):
+        print("three")
+    assert streamed == ["one", "two"]

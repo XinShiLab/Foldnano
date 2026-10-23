@@ -1,5 +1,12 @@
 import { SvelteMap } from 'svelte/reactivity';
-import type { PythonPlugin, PluginAuthoring, PluginManifest, PluginStatus } from './types';
+import type {
+	LinkedPluginInfo,
+	PythonPlugin,
+	PluginAuthoring,
+	PluginManifest,
+	PluginOrigin,
+	PluginStatus,
+} from './types';
 import { classifyManifest, MANIFEST_SCHEMA_VERSION, withSchemaVersion } from './manifestValidation';
 import {
 	foldnanoIndexedDb,
@@ -38,8 +45,9 @@ function toRecord(
  * automatically propagate to the UI.
  */
 class PluginState implements PythonPlugin {
-	manifest: PluginManifest;
-	origin: 'builtin' | 'user';
+	// Raw: replaced whole when a linked folder is re-read; a deep proxy can't be stored in IndexedDB.
+	manifest: PluginManifest = $state.raw() as PluginManifest;
+	origin: PluginOrigin;
 	enabled: boolean = $state(false);
 	status: PluginStatus = $state('registered');
 	resolvedCode: string | null = $state(null);
@@ -56,11 +64,12 @@ class PluginState implements PythonPlugin {
 	authoring: PluginAuthoring | null = $state(null);
 	draftCode: string | null = $state(null);
 	iconSvg: string | null = $state(null);
+	linked: LinkedPluginInfo | null = $state(null);
 
-	constructor(manifest: PluginManifest, origin: 'builtin' | 'user') {
+	constructor(manifest: PluginManifest, origin: PluginOrigin) {
 		this.manifest = manifest;
 		this.origin = origin;
-		this.enabled = origin === 'user';
+		this.enabled = origin !== 'builtin';
 		this.resolvedCode = manifest.entrypoint ?? null;
 		this.paramValues = Object.fromEntries(
 			(manifest.parameters ?? []).map((p) => [p.id, p.default ?? null])
@@ -213,6 +222,11 @@ export class PluginRegistry {
 		if (existing?.origin === 'builtin') {
 			throw new Error(`Cannot replace built-in plugin "${manifest.id}".`);
 		}
+		if (existing?.origin === 'linked') {
+			throw new Error(
+				`"${manifest.id}" is linked to a folder in dev mode. Unlink it before installing a zip with the same id.`
+			);
+		}
 		if (!existing) {
 			throw new Error(`Cannot replace "${manifest.id}" because it is not installed.`);
 		}
@@ -241,6 +255,73 @@ export class PluginRegistry {
 		}
 	}
 
+	/**
+	 * Registers a plugin read from a linked folder (dev mode). Refuses an id that is already
+	 * registered in any form: the id keys runs, worker slots and pending results.
+	 */
+	async registerLinked(
+		manifest: PluginManifest,
+		files: IndexedDbPluginFilesRecord,
+		link: { handleId: string; folderName: string }
+	): Promise<PythonPlugin> {
+		const existing = this.plugins.get(manifest.id);
+		if (existing) {
+			throw new Error(
+				existing.origin === 'linked'
+					? `"${manifest.id}" is already linked from the folder "${existing.linked?.folderName}".`
+					: `A plugin with id "${manifest.id}" is already installed. Remove it before linking a folder with the same id.`
+			);
+		}
+		this.#assertNotBusy(manifest.id);
+		this.#reservations.add(manifest.id);
+		try {
+			const iconSvg = readPluginIcon(manifest, files);
+			const record: IndexedDbPluginRecord = { id: manifest.id, manifest, linked: { ...link } };
+			if (iconSvg !== null) record.iconSvg = iconSvg;
+			await this.#db.savePlugin(record);
+			const plugin = new PluginState(manifest, 'linked');
+			plugin.iconSvg = iconSvg;
+			plugin.linked = { ...link, access: 'granted', lastReadAt: Date.now() };
+			this.plugins.set(manifest.id, plugin);
+			return plugin;
+		} finally {
+			this.#reservations.delete(manifest.id);
+		}
+	}
+
+	/**
+	 * Swaps in the manifest just read from a linked plugin's folder, keeping run state. Remembered
+	 * parameter and form values survive for fields that still exist; new fields take defaults.
+	 */
+	refreshLinked(manifest: PluginManifest, files: IndexedDbPluginFilesRecord): void {
+		const plugin = this.plugins.get(manifest.id);
+		if (plugin?.origin !== 'linked' || !plugin.linked) {
+			throw new Error(`"${manifest.id}" is not a linked plugin.`);
+		}
+		const iconSvg = readPluginIcon(manifest, files);
+		plugin.manifest = manifest;
+		plugin.iconSvg = iconSvg;
+		plugin.paramValues = mergeFieldValues(manifest.parameters ?? [], plugin.paramValues);
+		plugin.sidePanelValues = mergeFieldValues(
+			manifest.sidePanel?.form?.fields ?? [],
+			plugin.sidePanelValues
+		);
+		plugin.linked = { ...plugin.linked, access: 'granted', lastReadAt: Date.now() };
+		this.#db
+			.updatePluginRecord(manifest.id, { manifest, iconSvg: iconSvg ?? undefined })
+			.catch((e) => console.warn('[PluginRegistry] Failed to save linked manifest:', e));
+	}
+
+	/** Points a linked plugin at a new folder handle (Re-link after a move or denied access). */
+	async relinkFolder(id: string, link: { handleId: string; folderName: string }): Promise<void> {
+		const plugin = this.plugins.get(id);
+		if (plugin?.origin !== 'linked' || !plugin.linked) {
+			throw new Error(`"${id}" is not a linked plugin.`);
+		}
+		await this.#db.updatePluginRecord(id, { linked: { ...link } });
+		plugin.linked = { ...link, access: 'granted', lastReadAt: null };
+	}
+
 	/** Writes (or with null, clears) an owned plugin's stored draft; the caller owns
 	 *  `plugin.draftCode`. Rejects on failure so the editor can show it isn't saved. */
 	persistDraft(pluginId: string, code: string | null): Promise<void> {
@@ -266,6 +347,11 @@ export class PluginRegistry {
 		const deleted = this.plugins.delete(id);
 		if (deleted) {
 			this.#deletePlugin(id);
+			if (plugin?.linked) {
+				this.#db
+					.deleteFileHandle(plugin.linked.handleId)
+					.catch((e) => console.warn('[PluginRegistry] Failed to delete folder handle:', e));
+			}
 			this.#db
 				.deletePluginFiles(id)
 				.catch((e) => console.warn('[PluginRegistry] Failed to delete plugin files:', e));
@@ -313,7 +399,10 @@ export class PluginRegistry {
 				if (stored && !this.plugins.has(record.id)) {
 					// Records from before versioning carry no schemaVersion.
 					const manifest = withSchemaVersion(stored) as PluginManifest;
-					const state = new PluginState(manifest, 'user');
+					const state = new PluginState(manifest, record.linked ? 'linked' : 'user');
+					if (record.linked) {
+						state.linked = { ...record.linked, access: 'unknown', lastReadAt: null };
+					}
 					// Records installed under the pre-zip plugin format, or by a newer app,
 					// cannot be activated — flag them for re-import instead.
 					if (
@@ -327,7 +416,7 @@ export class PluginRegistry {
 				if (plugin) {
 					if (record.sidePanelCode !== undefined) plugin.sidePanelCode = record.sidePanelCode;
 					if (record.enabled !== undefined) plugin.enabled = record.enabled;
-					if (record.iconSvg && plugin.origin === 'user' && plugin.manifest.icon)
+					if (record.iconSvg && plugin.origin !== 'builtin' && plugin.manifest.icon)
 						plugin.iconSvg = record.iconSvg;
 					if (record.authoring && plugin.origin === 'user') {
 						plugin.authoring = { ...record.authoring };
@@ -345,4 +434,17 @@ export class PluginRegistry {
 	persistEditorCode(pluginId: string, code: string): Promise<void> {
 		return this.#db.savePluginEditorState(pluginId, code);
 	}
+}
+
+/** Values for `fields`: the remembered value where the field still exists, else its default. */
+function mergeFieldValues(
+	fields: ReadonlyArray<{ id: string; default?: unknown }>,
+	previous: Record<string, unknown>
+): Record<string, unknown> {
+	return Object.fromEntries(
+		fields.map((field) => [
+			field.id,
+			Object.hasOwn(previous, field.id) ? previous[field.id] : (field.default ?? null),
+		])
+	);
 }

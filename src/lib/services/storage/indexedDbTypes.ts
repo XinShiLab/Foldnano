@@ -3,7 +3,7 @@ import type { GitHubFileMetadata, GitHubRepoContext } from './githubTypes';
 import type { GitHubLocalOnlyEntry } from './stores/GitHubExplorerStateStore';
 
 export const FOLDNANO_INDEXED_DB_NAME = 'foldnano-db';
-export const FOLDNANO_INDEXED_DB_VERSION = 7;
+export const FOLDNANO_INDEXED_DB_VERSION = 8;
 
 export const FOLDNANO_INDEXED_DB_STORES = {
 	documents: 'documents',
@@ -62,6 +62,28 @@ export interface IndexedDbLocalFolderEntryRecord {
 	path: string;
 }
 
+/**
+ * A File System Access handle the user granted (`src/lib/services/fileAccess/`). Handles are
+ * structured-cloneable; the files themselves are never stored. Permission is per tab and session.
+ */
+export interface IndexedDbFileHandleRecord {
+	id: string;
+	kind: 'file' | 'directory';
+	/** Which feature linked it; the store itself attaches no meaning. */
+	purpose: 'plugin-dev' | 'design';
+	/** Folder or file name at link time, for display when the handle can't be read. */
+	name: string;
+	handle: FileSystemHandle;
+	createdAt: number;
+	lastUsedAt: number;
+}
+
+/** Small app-level preference keyed by name (e.g. plugin dev mode). */
+export interface IndexedDbSettingRecord {
+	key: string;
+	value: unknown;
+}
+
 export interface IndexedDbMigrationRecord {
 	key: string;
 	version: number;
@@ -97,6 +119,8 @@ export interface IndexedDbPluginRecord {
 	draftCode?: string;
 	/** Validated SVG text of `manifest.icon`, read from the zip at install. */
 	iconSvg?: string;
+	/** Plugin dev mode: the manifest is the last one read from this linked folder. */
+	linked?: { handleId: string; folderName: string };
 }
 
 /**

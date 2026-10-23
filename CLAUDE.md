@@ -76,6 +76,7 @@ hidden drafts from recent commits for a human to rewrite. See `docs/whats-new.md
 | Doc site: search, `llms*.txt`, per-page `.md`, Ask AI menu        | `docs/doc-site.md`                                              |
 | About dialog What's New, `whats-new:draft` script                 | `docs/whats-new.md`                                             |
 | Local persistence (IndexedDB schema)                              | `docs/storage-architecture.md`                                  |
+| File System Access layer (linked folders/files on disk)           | `docs/file-access.md`                                           |
 | Auto-save thresholds and triggers                                 | `docs/autosave.md`                                              |
 | Multi-tab ownership (`TabSync`)                                   | `docs/multi-tab-protection.md`                                  |
 | GitHub auth, API proxy, sync flows                                | `docs/github-integration.md`                                    |
