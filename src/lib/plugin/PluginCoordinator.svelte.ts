@@ -110,6 +110,9 @@ export class PluginCoordinator {
 	/** Linked plugins whose folder is being read for a run, so a double click can't start two. */
 	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- non-reactive bookkeeping
 	private _linkedRunReads = new Set<string>();
+	/** Bumped when dev mode drops the dev worker; a linked activation or run that sees it change
+	 *  while awaiting its folder read is cancelled. */
+	private _devEpoch = 0;
 
 	private _nextResultToken = 0;
 	private _mintResultToken(): string {
@@ -305,6 +308,7 @@ export class PluginCoordinator {
 
 	/** Dev mode turned off: drop the dev worker; its owner needs activating again. */
 	releaseLinkedEnvironment(): void {
+		this._devEpoch++;
 		const slot = this.devSlot;
 		if (!slot) return;
 		this.devSlot = null;
@@ -401,6 +405,11 @@ export class PluginCoordinator {
 	 * A missing/mismatched record means the plugin must be re-installed.
 	 */
 	async activate(pluginId: string): Promise<void> {
+		return this.activateWith(pluginId);
+	}
+
+	/** `activate`, optionally from a linked folder read the caller already made (one snapshot). */
+	private async activateWith(pluginId: string, linkedRead?: LinkedFolderRead): Promise<void> {
 		if (this.registry.hasReservation(pluginId)) {
 			throw new Error(
 				`Cannot activate plugin "${pluginId}": plugin installation or replacement is currently in progress.`
@@ -418,20 +427,25 @@ export class PluginCoordinator {
 		plugin.status = 'activating';
 		plugin.errorMessage = null;
 
+		const linked = plugin.origin === 'linked';
+		const devEpoch = this._devEpoch;
+		const devReleased = () => linked && this._devEpoch !== devEpoch;
+		let claimedDevSlot = false;
 		try {
 			// Load cached file assets once. The record is valid only when its
 			// manifestVersion matches the current manifest. A linked plugin's files come
 			// fresh from its folder instead and are never cached.
-			const linked = plugin.origin === 'linked';
 			let filesRecord: IndexedDbPluginFilesRecord | null = null;
 			let linkedEnv: string | null = null;
 			if (linked) {
-				const read = await this.readLinked(plugin);
-				this.registry.refreshLinked(read.manifest, read.files);
+				const read = linkedRead ?? (await this.readLinked(plugin));
+				if (devReleased()) throw new Error('Plugin dev mode was turned off.');
+				if (!linkedRead) this.registry.refreshLinked(read.manifest, read.files);
 				filesRecord = read.files;
 				linkedEnv = read.envFingerprint;
 				this.evictDevSlotFor(plugin, linkedEnv);
-				this._linkedEnvFingerprints.set(pluginId, linkedEnv);
+				// Recorded again only once the environment is installed, so a failed install is rebuilt.
+				this._linkedEnvFingerprints.delete(pluginId);
 			} else {
 				try {
 					filesRecord = await foldnanoIndexedDb.loadPluginFiles(pluginId);
@@ -475,6 +489,7 @@ export class PluginCoordinator {
 
 			// Step 2: ensure the tier's Pyodide worker is running (no-op if ready)
 			const bridge = this.ensureBridgeFor(plugin);
+			claimedDevSlot = linked;
 			await bridge.initRuntime();
 
 			// Step 3: resolve requirements — separate micropip packages from wheels.
@@ -534,6 +549,10 @@ export class PluginCoordinator {
 						.catch((e) => console.warn('[PluginCoordinator] Failed to cache plugin files:', e));
 				}
 
+				// A stop or dev mode going off during the wheel fetches terminated this bridge, and
+				// installing would spawn a fresh worker on it that nothing owns or terminates.
+				if (devReleased()) throw new Error('Plugin dev mode was turned off.');
+				if (this._stoppedPluginIds.has(pluginId)) throw new Error('Activation was stopped.');
 				await bridge.installPlugin(pluginId, micropipPackages, preloadedWheels);
 			} else if (cacheNeedsWrite && !linked) {
 				// No requirements but entrypoint was freshly fetched — save cache.
@@ -542,9 +561,23 @@ export class PluginCoordinator {
 					.catch((e) => console.warn('[PluginCoordinator] Failed to cache plugin files:', e));
 			}
 
+			if (devReleased()) throw new Error('Plugin dev mode was turned off.');
+			if (linked && linkedEnv !== null) {
+				this._linkedEnvFingerprints.set(pluginId, linkedEnv);
+				if (this.devSlot) this.devSlot.envOwner.envFingerprint = linkedEnv;
+			}
 			this._stoppedPluginIds.delete(pluginId);
 			plugin.status = 'active';
 		} catch (e) {
+			// A half-built dev environment is never reused: Pyodide can't uninstall what got in.
+			if (claimedDevSlot) this.dropDevSlotOf(pluginId);
+			if (devReleased()) {
+				// Dev mode went off mid-activation; it already set the status (deactivated).
+				this._stoppedPluginIds.delete(pluginId);
+				if (plugin.status === 'activating') plugin.status = 'registered';
+				plugin.errorMessage = null;
+				return;
+			}
 			if (this._stoppedPluginIds.delete(pluginId)) {
 				// Worker was deliberately terminated mid-activation (custom-slot
 				// eviction or stop) — not an error; the plugin is back to square one.
@@ -552,12 +585,24 @@ export class PluginCoordinator {
 				plugin.errorMessage = null;
 				return;
 			}
+			// Without resolved code, Reset leaves the plugin needing Activate instead of reporting
+			// it ready over an environment that never finished installing.
+			plugin.resolvedCode = null;
+			plugin.resolvedZipData = undefined;
 			// Preserve 'needs-reinstall' (set above for legacy/missing-file cases);
 			// everything else is a genuine activation error.
 			if (plugin.status !== 'needs-reinstall') plugin.status = 'error';
 			plugin.errorMessage = e instanceof Error ? e.message : String(e);
 			throw e;
 		}
+	}
+
+	/** Terminate the dev worker if `pluginId` holds it. */
+	private dropDevSlotOf(pluginId: string): void {
+		const slot = this.devSlot;
+		if (slot?.envOwner.pluginId !== pluginId) return;
+		this.devSlot = null;
+		slot.bridge.terminate();
 	}
 
 	/**
@@ -621,12 +666,17 @@ export class PluginCoordinator {
 				throw new Error(`"${plugin.manifest.name}" is already starting.`);
 			}
 			this._linkedRunReads.add(pluginId);
+			const devEpoch = this._devEpoch;
 			try {
 				const read = await this.readLinked(plugin);
+				// Dev mode was turned off while the folder was read: nothing runs.
+				if (this._devEpoch !== devEpoch) return;
 				this.registry.refreshLinked(read.manifest, read.files);
-				// A changed environment, or a dev worker that died (stop, timeout), is rebuilt here.
+				// A changed environment, or a dev worker that died (stop, timeout), is rebuilt here,
+				// from this same read so the zip that runs matches the manifest it was built for.
 				if (!this.ownsDevSlot(plugin, read.envFingerprint)) {
-					await this.activate(pluginId);
+					await this.activateWith(pluginId, read);
+					if (this._devEpoch !== devEpoch) return;
 				}
 				linkedZip = read.zip;
 			} finally {
@@ -830,13 +880,15 @@ export class PluginCoordinator {
 				// Deliberate worker termination (user stop or custom-slot eviction).
 				// Bridge-mates were already reset by the initiator (stopPlugin /
 				// evictCustomSlotFor) — only this plugin's state is handled here.
-				plugin.status = 'registered';
+				// A linked plugin stopped because dev mode went off stays deactivated.
+				const devModeOff = plugin.origin === 'linked' && !plugin.enabled;
+				plugin.status = devModeOff ? 'deactivated' : 'registered';
 				plugin.errorMessage = null;
 				plugin.errorTraceback = null;
 				if (this.pendingApply?.pluginId === pluginId) this.pendingApply = null;
 				// Auto-reactivate plugins with no requirements (e.g. ScriptLab) so
 				// the user can run again without a manual "Activate" click
-				if ((plugin.manifest.requirements?.length ?? 0) === 0) {
+				if (!devModeOff && (plugin.manifest.requirements?.length ?? 0) === 0) {
 					this.activate(pluginId).catch(() => {});
 				}
 				return;
