@@ -19,7 +19,7 @@ In plain-CPython tests you can construct PluginContext directly::
 from __future__ import annotations
 
 import json as _json
-from typing import Union
+from typing import Any, Union
 
 #: Total size of all artifacts from one run. Larger outputs belong in the primary result or a
 #: download the plugin splits up; the host refuses to carry more to the page.
@@ -142,7 +142,7 @@ class PluginContext:
     # foldnano_mini mode
     # ------------------------------------------------------------------
 
-    def set_result_mutation_log(self, log: list[dict]) -> None:
+    def set_result_mutation_log(self, log: list[dict[str, Any]]) -> None:
         """
         Store a foldnano_mini mutation log to be replayed against the host's
         canonical ``Part`` under one undo step (apply strategy
@@ -197,7 +197,7 @@ class PluginContext:
             )
         self.artifacts[name] = data
 
-    def set_result(self, data: dict) -> None:
+    def set_result(self, data: dict[str, Any]) -> None:
         """
         Store a structured result dict that will be displayed in the plugin output panel.
 
@@ -216,11 +216,11 @@ class PluginContext:
         return self._format
 
     @property
-    def params(self) -> dict:
+    def params(self) -> dict[str, Any]:
         """All parameter values passed from the UI."""
         return self._params
 
-    def get_param(self, key: str, default=None):
+    def get_param(self, key: str, default: Any = None) -> Any:
         """Return a single parameter value, or *default* if not set."""
         return self._params.get(key, default)
 

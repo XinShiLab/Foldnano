@@ -664,7 +664,7 @@ into the sections above when it is implemented, and delete it here.
 ### Export to a folder, then link it in dev mode
 
 - Owned plugins live entirely in IndexedDB and suit Script Lab users; dev mode
-  (`docs/explorations/plugin-dev-mode-2026-10-21.md`) links a folder on disk and suits multi-file
+  (`docs/python-plugin-system.md` § Plugin dev mode) links a folder on disk and suits multi-file
   plugins and external editors. Exporting an owned plugin as a folder and linking it would connect
   the two.
 

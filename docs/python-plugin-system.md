@@ -796,7 +796,7 @@ Dependency isolation follows a two-tier model. `classifyEnv(manifest)` in `src/l
 - **`standard`** — no declared `network`, and every `requirements` entry is either an unversioned name from the pinned Pyodide distribution or a standard-extra name (no other wheels). Plugins with no requirements (e.g. Script Lab) are trivially standard.
 - **`custom`** — anything else: declared network access (keeps the shared worker network-free), off-dist package names (their versions float on PyPI; `pypiRequirements` lists them), any version specifier (even one matching the dist version), or any `.whl` entry.
 
-**Standard tier** shares one persistent worker. Installs are conflict-free by construction — every member package's version is determined by the Pyodide pin — so the installed union just grows; switching between standard plugins never reinstalls. Plugin _code_ stays isolated per run (fresh module namespace, `sys.modules` purge), but **library state** (`np.seterr`, `pd.set_option`, …) is shared — hence the "don't mutate global library configuration" rule in the dev guide.
+**Standard tier** shares one persistent worker. Installs are conflict-free by construction — every member package's version is determined by the Pyodide pin — so the installed union just grows; switching between standard plugins never reinstalls. Plugin _code_ stays isolated per run (fresh module namespace; the plugin's own modules are dropped from `sys.modules` each run, installed packages stay loaded), but **library state** (`np.seterr`, `pd.set_option`, …) is shared — hence the "don't mutate global library configuration" rule in the dev guide.
 
 **Custom tier** gets one dedicated worker with single-active semantics: activating custom plugin B evicts custom plugin A (confirm dialog if A is busy or holds an unapplied result; silent toast if idle). The custom→custom switch cost (teardown + reinstall) is accepted and surfaced in the UI. Custom-tier churn never touches the standard worker. Total residency is bounded at two Pyodide instances.
 
@@ -856,6 +856,68 @@ For `sidePanel.type: "codeEditor"` plugins, `runWithOptions(...)` may also recei
 
 This override happens on the main thread in `PluginCoordinator`; the worker does not special-case Script Lab or any other plugin.
 
+### Plugin dev mode (linked folders)
+
+A plugin author links a plugin folder on disk and runs it as-is: edit in their own editor, click
+Run. Chromium only (File System Access API, `docs/file-access.md`).
+
+- **`PluginDevMode`** (`PluginDevMode.svelte.ts`, on `EditorViewContext.pluginDevMode`) owns the
+  dev mode setting (`settings` table), linking, re-linking and unlinking folders, and folder
+  permission. Turning dev mode off stops, deactivates and hides every linked plugin.
+- **`readLinkedPluginFolder`** (`linkedPluginFolder.ts`) walks the folder (ignoring dot-files and
+  dot-folders, `__pycache__`, `node_modules`, `venv`/`env`, `*.pyc`, `*.zip`; capped at
+  `MAX_PLUGIN_ZIP_BYTES` and `MAX_LINKED_FOLDER_FILES`), zips it and runs it through the same
+  `processPluginZip` an install uses, so validation, icons and bundled wheels behave identically.
+  It also returns an `envFingerprint` over requirements, network and wheel bytes.
+- **Registry:** linked plugins have `origin: 'linked'` and `plugin.linked` (handle id, folder name,
+  access). Their `plugins` record stores the last manifest read and the handle id, never files;
+  there is no `pluginFiles` record. `refreshLinked()` swaps the manifest in place and keeps
+  remembered parameter values for fields that still exist. An id can't be both linked and
+  installed: `registerLinked()` refuses a registered id and installs report `blocked-linked`.
+- **Coordinator:** `setLinkedFolderReader()` (wired to `PluginDevMode.readFolder`). `activate()`
+  reads the folder instead of the file cache; every `run()` reads it again before the status
+  changes and sends that zip. A changed manifest id refuses the run.
+- **Dev environment:** linked plugins never use the standard or custom tier. They run in a third
+  worker slot (`devSlot`) owned by `{ pluginId, envFingerprint, csp }`. Code-only edits keep the
+  warm worker (the harness purges plugin modules each run); any change of requirements, network
+  or bundled wheels, or a dev worker that died, makes `run()` rebuild it through `activate()`.
+  This sidesteps what a shared worker can't do (uninstall packages, change its CSP). Stopping or
+  timing out a linked plugin kills only the dev worker. One linked plugin owns it at a time;
+  activating another evicts the first (`getActivationImpact` reports it like the custom slot).
+  `restartLinkedEnvironment()` rebuilds it on request; `releaseLinkedEnvironment()` drops it
+  when dev mode turns off. The run log's stamp reads `dev (would run as: <tier>)` so the author
+  still sees where an installed copy would run.
+- **UI:** the Plugins panel's **Dev** tab (`PluginDevPanel.svelte`) holds the dev mode switch,
+  **Link plugin folder…**, and each linked plugin's folder bar (Restart env, Re-link, Unlink) above
+  the same plugin row My Plugins renders (`pluginRow` snippet in `PluginPanel.svelte`). Linked
+  plugins never appear in My Plugins. Everything below the switch is inert while dev mode is off;
+  in non-Chromium browsers the switch is disabled with an explanation.
+- **New plugin:** **Link plugin folder…** on a folder without `fplugin.json`
+  (`PluginDevMode.inspectFolder`) opens `NewPluginDialog.svelte`. `pluginScaffold.ts` builds the
+  manifest through `validateManifest` (with `$schema` pointing at `static/schemas/fplugin-v2.schema.json`
+  for editor checking); `STRATEGIES_FOR_FORMAT` mirrors the format/strategy pairing validation
+  enforces (a spec keeps them equal). `createPlugin()` asks for `readwrite` from the Create click,
+  writes `fplugin.json`, a starter `plugin.py` per format and strategy unless one exists, and
+  optionally the API stubs under `.foldnano-stubs/` plus `pyrightconfig.json` (`stubPath`,
+  `typeCheckingMode: standard`, `reportMissingModuleSource: none`, since the packages have no
+  source outside Foldnano's runtime), then links the
+  folder without a second review. Stubs and `pyrightconfig.json` are ignored by linked runs.
+- **Check and Zip:** `checkLinkedPluginFolder` (`PluginDevMode.checkFolder`) lists independent
+  problems together (no `plugin.py` or `run(ctx)`, unparsable `fplugin.json`), then the install
+  validation's first manifest error, then notes: PyPI packages, why the plugin would be custom
+  tier, wheels shipped but not in `requirements`, size near the cap, ignored top-level entries.
+  `exportZip()` downloads the zip a run would send.
+- **Review:** `PluginDevMode.setReviewer()` (wired to `LinkedPluginReviewGate`, whose dialog is
+  mounted once in `Editor.svelte` so a run from any panel can ask) is asked when a folder is linked
+  and whenever a re-read changes `requirements` or `network` (`changesEnvironmentDisclosure`);
+  declining throws `LinkedPluginChangeDeclinedError` and nothing runs.
+- **Permission:** `readFolder()` calls `ensureAccess()` first, so it prompts from the Activate/Run
+  click. A refused prompt sets `linked.access` to `denied`/`prompt`; a moved or deleted folder sets
+  `missing` and asks for Re-link.
+- **Tracebacks:** for linked plugins the coordinator rewrites `/plugin_run/` in the error message
+  and traceback to the folder name (`linkedFolderPaths`), so `File "my-plugin/helpers.py", line 3`
+  points at the author's file.
+
 ---
 
 ## The `foldnano` And `foldnano_mini` Python Packages
@@ -896,7 +958,9 @@ _ctx = PluginContext(
 _ns.run(_ctx)
 ```
 
-stdout and stderr are redirected to a `LogCapture` (`foldnano/_log_capture.py`, host-internal). It buffers `write()` calls and splits on newlines, because `print('a', 'b')` arrives as four writes: each log entry is one printed line, blank lines are dropped, and an unterminated last line is kept. Lines are returned in `logs` after the run completes; the worker does not currently send streaming `PLUGIN_LOG` messages, although the bridge still handles them.
+Packaged (zip) plugins are extracted to `/plugin_run/` and `plugin.py` is loaded from there. Before each zip run the harness drops from `sys.modules` only the modules loaded from the plugin itself (`_is_plugin_module`: file or package path under `/plugin_run/`), so edited, renamed or deleted plugin modules never linger. Installed packages stay imported: compiled extensions such as numpy 2.x refuse a second load in one process ("cannot load module more than once per process"), which an earlier purge of every post-init module caused on a plugin's second run.
+
+stdout and stderr are redirected to a `LogCapture` (`foldnano/_log_capture.py`, host-internal). It buffers `write()` calls and splits on newlines, because `print('a', 'b')` arrives as four writes: each log entry is one printed line, blank lines are dropped, and an unterminated last line is kept. During a run the harness sets a sink (`set_sink`, a JS callback `_stream_log`) so each kept line is also posted as `PLUGIN_LOG` the moment it completes; the panel shows it before the run ends. The full list still comes back in `logs` with the result and replaces the streamed lines, together with lines only the host adds (loaded packages, blocked requests).
 
 This isolation matters especially for `execution: "entrypoint"` plugins such as Script Lab:
 
@@ -1312,6 +1376,8 @@ Coverage: `initRuntime` idempotency, RUNTIME_ERROR retry, concurrent installs an
 
 ## Boundaries / Don'ts
 
+- **Never pass a folder handle to the worker.** Linked plugins cross into the sandbox as zip bytes, exactly like installed ones.
+- **Don't cache a linked plugin's files.** `activate()` skips `pluginFiles` writes for `origin: 'linked'`; the folder is the only source.
 - Don't hand-edit `python/stubs/**` or `python-api-index.generated.json`; change the Python source (signature, annotation, docstring, `__all__`) and regenerate.
 
 This file is for **Foldnano developers** working on the host side of the plugin system. Plugin authors should read the doc site's Plugin Development pages (`src/content/plugin-development/`).

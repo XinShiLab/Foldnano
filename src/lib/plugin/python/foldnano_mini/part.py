@@ -1192,10 +1192,10 @@ class MutablePart:
     def set_plane_transform(
         self,
         plane_id: str,
-        origin: tuple[float, float, float] | list[float] | dict,
-        u: tuple[float, float, float] | list[float] | dict,
-        v: tuple[float, float, float] | list[float] | dict,
-        normal: tuple[float, float, float] | list[float] | dict,
+        origin: tuple[float, float, float] | list[float] | dict[str, float],
+        u: tuple[float, float, float] | list[float] | dict[str, float],
+        v: tuple[float, float, float] | list[float] | dict[str, float],
+        normal: tuple[float, float, float] | list[float] | dict[str, float],
     ) -> None:
         """Update the 3D pose of the plane identified by ``plane_id``.
 

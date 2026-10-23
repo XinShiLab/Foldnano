@@ -5,6 +5,11 @@
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
 	import * as Popover from '$lib/components/ui/popover/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
+	import { Badge } from '$lib/components/ui/badge/index.js';
+	import { Input } from '$lib/components/ui/input/index.js';
+	import { Label } from '$lib/components/ui/label/index.js';
+	import { Toggle } from '$lib/components/ui/toggle/index.js';
+	import * as ToggleGroup from '$lib/components/ui/toggle-group/index.js';
 	import { getModificationColor, type ModificationDef } from '$lib/model/modifications';
 	import type { Part } from '$lib/model/Part';
 	import { setCustomModificationsCmd, removeCustomModificationCmd } from '$lib/commands/strands';
@@ -31,6 +36,22 @@
 	function clearModification() {
 		modiCtx.currentModification = null;
 	}
+
+	// bg-muted alone is too faint to show which chip is chosen.
+	const CHIP_CLASS =
+		'h-6 gap-1.5 text-xs data-[state=on]:border-primary data-[state=on]:bg-primary/10';
+
+	// Builtin and custom chips are one single-choice set. Clicking the chosen chip again would
+	// deselect it (value ''); keep the current choice instead of silently entering remove mode.
+	const modificationValue = {
+		get: () => modiCtx.currentModification?.name ?? '',
+		set: (name: string) => {
+			const mod =
+				modiCtx.builtinModifications.find((m) => m.name === name) ??
+				part.customModifications.find((m) => m.name === name);
+			if (mod) selectModification(mod);
+		},
+	};
 
 	function addCustomModification() {
 		const name = newName.trim();
@@ -77,116 +98,116 @@
 
 {#snippet swatch(colorString: string)}
 	<span
-		class="inline-block h-3 w-3 flex-none rounded-full border border-black/10"
+		class="inline-block size-2.5 flex-none rounded-full border border-black/10"
 		style="background-color: {colorString};"
 	></span>
 {/snippet}
 
-<div class="space-y-2">
+<div class="space-y-1">
 	<p class="font-medium">Active:</p>
-	<div class="flex items-center gap-2">
-		{#if modiCtx.currentModification}
-			<span
-				class="flex h-7 items-center gap-1.5 rounded border border-blue-300 bg-blue-50 px-2 text-sm font-medium dark:border-blue-700 dark:bg-blue-950 dark:text-blue-200"
-			>
-				{@render swatch(
-					getModificationColor(modiCtx.currentModification.name, part.customModifications)
-				)}
-				{modiCtx.currentModification.name}
-			</span>
-		{:else}
-			<span
-				class="flex h-7 items-center gap-1 rounded border border-red-200 bg-red-50 px-2 text-sm dark:border-red-800 dark:bg-red-950 dark:text-red-200"
-			>
-				<Eraser size={14} />
-				Remove
-			</span>
-		{/if}
-	</div>
+	{#if modiCtx.currentModification}
+		<Badge variant="outline" class="h-6 gap-1.5 text-xs">
+			{@render swatch(
+				getModificationColor(modiCtx.currentModification.name, part.customModifications)
+			)}
+			{modiCtx.currentModification.name}
+		</Badge>
+	{:else}
+		<Badge variant="destructive" class="h-6 gap-1.5 text-xs"><Eraser />Remove</Badge>
+	{/if}
 </div>
 
 <div class="space-y-1">
 	<p class="font-medium">Builtin:</p>
-	<div class="flex flex-wrap gap-1">
+	<ToggleGroup.Root
+		type="single"
+		variant="outline"
+		size="sm"
+		spacing={1}
+		class="flex-wrap"
+		bind:value={modificationValue.get, modificationValue.set}
+	>
 		{#each modiCtx.builtinModifications as mod (mod.name)}
-			<!-- svelte-ignore a11y_click_events_have_key_events -->
-			<!-- svelte-ignore a11y_no_static_element_interactions -->
-			<div
-				class="flex cursor-pointer items-center gap-1.5 rounded border px-1.5 py-0.5 transition-colors
-					{modiCtx.currentModification?.name === mod.name
-					? 'border-blue-400 bg-blue-100'
-					: 'border-border hover:bg-muted'}"
-				onclick={() => selectModification(mod)}
-			>
+			<ToggleGroup.Item value={mod.name} class="{CHIP_CLASS} px-2">
 				{@render swatch(mod.color)}
-				<span class="text-xs">{mod.name}</span>
-			</div>
+				{mod.name}
+			</ToggleGroup.Item>
 		{/each}
-	</div>
+	</ToggleGroup.Root>
 </div>
 
 <div class="space-y-1">
 	<div class="flex items-center justify-between">
 		<p class="font-medium">Custom:</p>
-		<button
-			class="rounded px-1 py-0.5 text-muted-foreground transition hover:bg-amber-100 hover:text-foreground dark:hover:bg-amber-900"
+		<Button
+			variant="ghost"
+			size="icon-xs"
+			aria-label="Add a custom modification"
+			aria-expanded={showAddForm}
 			onclick={() => (showAddForm = !showAddForm)}
 		>
-			<Plus size={12} />
-		</button>
+			<Plus />
+		</Button>
 	</div>
 
 	{#if part.customModifications.length > 0}
-		<div class="flex flex-wrap gap-1">
+		<ToggleGroup.Root
+			type="single"
+			variant="outline"
+			size="sm"
+			spacing={1}
+			class="flex-wrap"
+			bind:value={modificationValue.get, modificationValue.set}
+		>
 			{#each part.customModifications as mod (mod.name)}
-				<!-- svelte-ignore a11y_click_events_have_key_events -->
-				<!-- svelte-ignore a11y_no_static_element_interactions -->
-				<div
-					class="group flex cursor-pointer items-center gap-1.5 rounded border px-1.5 py-0.5 transition-colors
-						{modiCtx.currentModification?.name === mod.name
-						? 'border-blue-400 bg-blue-100 dark:border-blue-600 dark:bg-blue-950 dark:text-blue-200'
-						: 'border-border hover:bg-muted'}"
-					onclick={() => selectModification(mod)}
-				>
-					{@render swatch(getModificationColor(mod.name, part.customModifications))}
-					<span class="text-xs">{mod.name}</span>
+				<span class="group/mod relative">
+					<ToggleGroup.Item value={mod.name} class="{CHIP_CLASS} pr-5 pl-2">
+						{@render swatch(getModificationColor(mod.name, part.customModifications))}
+						{mod.name}
+					</ToggleGroup.Item>
 					<button
-						class="ml-0.5 hidden rounded text-muted-foreground group-hover:inline-flex hover:text-red-500"
-						onclick={(e: MouseEvent) => {
-							e.stopPropagation();
-							removeCustomModification(mod);
-						}}
+						type="button"
+						aria-label="Remove {mod.name}"
+						class="absolute top-1/2 right-1 hidden -translate-y-1/2 text-muted-foreground group-hover/mod:inline-flex hover:text-destructive focus-visible:inline-flex"
+						onclick={() => removeCustomModification(mod)}
 					>
 						<X size={10} />
 					</button>
-				</div>
+				</span>
 			{/each}
-		</div>
+		</ToggleGroup.Root>
 	{:else if !showAddForm}
 		<p class="text-xs text-muted-foreground">No custom modifications. Click + to add.</p>
 	{/if}
 
 	{#if showAddForm}
-		<div class="flex items-end gap-1 rounded border border-border bg-muted p-1.5">
-			<label class="flex-1">
-				<span class="text-[10px] text-muted-foreground">Name</span>
-				<input
-					type="text"
+		<div class="flex items-end gap-1.5 border border-border bg-muted/50 p-1.5">
+			<div class="flex-1 space-y-1">
+				<Label for="new-modification-name" class="text-[10px] text-muted-foreground">Name</Label>
+				<Input
+					id="new-modification-name"
 					bind:value={newName}
 					placeholder="e.g. Azide"
-					class="w-full rounded border border-border bg-background px-1.5 py-0.5 text-xs text-foreground"
+					class="h-7 text-xs"
+					onkeydown={(e: KeyboardEvent) => {
+						if (e.key === 'Enter') addCustomModification();
+					}}
 				/>
-			</label>
-			<div>
+			</div>
+			<div class="space-y-1">
 				<span class="block text-[10px] text-muted-foreground">Color</span>
 				<Popover.Root>
 					<Popover.Trigger>
 						{#snippet child({ props })}
-							<div
+							<Button
 								{...props}
-								class="h-5 w-8 cursor-pointer rounded border border-border"
-								style="background-color: {newColor};"
-							></div>
+								variant="outline"
+								size="icon-sm"
+								aria-label="Pick a color"
+								class="p-1"
+							>
+								<span class="size-full" style="background-color: {newColor};"></span>
+							</Button>
 						{/snippet}
 					</Popover.Trigger>
 					<Popover.Content class="w-auto p-2">
@@ -202,29 +223,23 @@
 					</Popover.Content>
 				</Popover.Root>
 			</div>
-			<button
-				class="rounded bg-blue-500 px-2 py-0.5 text-xs text-white hover:bg-blue-600 disabled:opacity-50"
-				disabled={!newName.trim()}
-				onclick={addCustomModification}
-			>
-				Add
-			</button>
+			<Button size="sm" disabled={!newName.trim()} onclick={addCustomModification}>Add</Button>
 		</div>
 	{/if}
 </div>
 
-<div class="pt-1">
-	<button
-		class="flex items-center gap-1 rounded border border-border px-2 py-0.5 text-xs transition-colors
-			{modiCtx.currentModification === null
-			? 'border-red-300 bg-red-50 dark:border-red-700 dark:bg-red-950 dark:text-red-300'
-			: 'hover:bg-red-50 dark:hover:bg-red-950 dark:hover:text-red-300'}"
-		onclick={clearModification}
-	>
-		<Eraser size={12} />
-		Remove mode
-	</button>
-</div>
+<Toggle
+	variant="outline"
+	size="sm"
+	class="mt-1 h-7 gap-1 px-2 text-xs data-[state=on]:border-destructive/40 data-[state=on]:bg-destructive/10 data-[state=on]:text-destructive"
+	pressed={modiCtx.currentModification === null}
+	onPressedChange={(on) => {
+		if (on) clearModification();
+	}}
+>
+	<Eraser />
+	Remove mode
+</Toggle>
 
 <Dialog.Root bind:open={removeDialogOpen}>
 	<Dialog.Content>

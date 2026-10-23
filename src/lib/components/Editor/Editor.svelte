@@ -41,6 +41,7 @@
 	import ToolPanel from './ToolPanel/ToolPanel.svelte';
 	import BackupsDialog from './BackupsDialog.svelte';
 	import PluginInstallConfirmDialog from './Plugin/PluginInstallConfirmDialog.svelte';
+	import LinkedPluginReviewDialog from './Plugin/LinkedPluginReviewDialog.svelte';
 	// import { createTx } from '$lib/canvasEditor/services/tx';
 	// import ReactiveDoc from '../../states/doc.svelte';
 	import { removeSelection, startDuplicate } from './strandActions';
@@ -776,3 +777,4 @@
 
 <BackupsDialog bind:open={editorViewContext.showBackups} />
 <PluginInstallConfirmDialog gate={editorViewContext.pluginInstallGate} />
+<LinkedPluginReviewDialog gate={editorViewContext.linkedPluginReviewGate} />

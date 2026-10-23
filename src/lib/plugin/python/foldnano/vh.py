@@ -8,7 +8,7 @@ VH properties through this object rather than indexing the raw dict.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Any, Optional
 
 
 @dataclass
@@ -50,7 +50,7 @@ class VirtualHelixProxy:
     list_row: Optional[int] = field(default=None)
 
     @classmethod
-    def from_json(cls, vh_json: dict) -> "VirtualHelixProxy":
+    def from_json(cls, vh_json: dict[str, Any]) -> "VirtualHelixProxy":
         coords = vh_json.get("latticeCoords")
         row = coords["row"] if coords else None
         col = coords["col"] if coords else None

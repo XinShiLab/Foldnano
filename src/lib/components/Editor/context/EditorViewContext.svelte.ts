@@ -7,6 +7,8 @@ import type { Category, EditorMode, LeafTarget } from '$lib/canvasEditor/core/mo
 import { PluginCoordinator } from '$lib/plugin/PluginCoordinator.svelte';
 import { PluginRegistry } from '$lib/plugin/PluginRegistry.svelte';
 import { PluginInstallGate } from '../Plugin/PluginInstallGate.svelte';
+import { PluginDevMode } from '$lib/plugin/PluginDevMode.svelte';
+import { LinkedPluginReviewGate } from '../Plugin/LinkedPluginReviewGate.svelte';
 import type { SegmentEnd, OligoSegment } from '$lib/model/Oligo';
 import type Oligo from '$lib/model/Oligo';
 import type { Part } from '$lib/model/Part';
@@ -310,6 +312,8 @@ export class EditorViewContext {
 	session: EditorDocumentSession;
 	pluginCoordinator: PluginCoordinator;
 	pluginInstallGate: PluginInstallGate;
+	pluginDevMode: PluginDevMode;
+	linkedPluginReviewGate = new LinkedPluginReviewGate();
 
 	constructor() {
 		this.session = new EditorDocumentSession({
@@ -328,6 +332,9 @@ export class EditorViewContext {
 		this.pluginRegistry.setBusyCheck((id) => this.pluginCoordinator.isPluginBusyOrPending(id));
 		this.pluginCoordinator.setEditGate(() => this.session.isTabOwner);
 		this.pluginInstallGate = new PluginInstallGate(() => this.pluginRegistry);
+		this.pluginDevMode = new PluginDevMode(this.pluginRegistry, () => this.pluginCoordinator);
+		this.pluginCoordinator.setLinkedFolderReader((plugin) => this.pluginDevMode.readFolder(plugin));
+		this.pluginDevMode.setReviewer((review) => this.linkedPluginReviewGate.request(review));
 		// An unsaved draft brings its editor's icon back after a reload.
 		void this.pluginRegistry.ready.then(() => {
 			for (const plugin of this.pluginRegistry.all) {

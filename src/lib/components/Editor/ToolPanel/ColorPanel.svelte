@@ -46,11 +46,11 @@
 </script>
 
 {#snippet color(colorString: string)}
-	<div class="w-6 rounded-sm bg-transparent p-0.5">
+	<div class="rounded-sm bg-transparent p-0.5">
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<!-- svelte-ignore a11y_click_events_have_key_events -->
 		<div
-			class="flex h-5 w-5 flex-none cursor-pointer rounded-sm"
+			class="aspect-square w-full cursor-pointer rounded-sm"
 			style="background-color: {colorString};"
 			title={colorString}
 			onclick={() => setCurrentColor(colorString)}
@@ -59,9 +59,9 @@
 	</div>
 {/snippet}
 {#snippet selectedColor(colorString: string)}
-	<div class="w-6 rounded-sm bg-muted p-0.5">
+	<div class="rounded-sm bg-muted p-0.5">
 		<div
-			class="flex h-5 w-5 flex-none cursor-pointer rounded-sm"
+			class="aspect-square w-full cursor-pointer rounded-sm"
 			style="background-color: {colorString};"
 			title={colorString}
 			use:draggable={{ container: 'color', dragData: colorString }}
@@ -69,25 +69,25 @@
 	</div>
 {/snippet}
 {#snippet placeholder()}
-	<div class="w-6 rounded-sm p-0.5">
-		<div class="ph flex h-5 w-5 flex-none rounded-sm border border-dashed border-border"></div>
+	<div class="rounded-sm p-0.5">
+		<div class="ph aspect-square w-full rounded-sm border border-dashed border-border"></div>
 	</div>
 {/snippet}
 
 {#snippet placeholderActive()}
 	<div class="rounded-sm p-0.5">
-		<div class="flex h-5 w-5 flex-none rounded-sm border border-dashed border-sky-300"></div>
+		<div class="aspect-square w-full rounded-sm border border-dashed border-sky-300"></div>
 	</div>
 {/snippet}
 
 <div class="space-y-1">
 	<p class="font-medium">Active:</p>
-	{@render selectedColor(colorContext.currentColor)}
+	<div class="w-6">{@render selectedColor(colorContext.currentColor)}</div>
 </div>
 <div class="space-y-1">
 	<p class="font-medium">Saved colors (drop here to save):</p>
 	<div
-		class="grid w-fit grid-cols-10 gap-1"
+		class="grid grid-cols-10 gap-0.5"
 		use:droppable={{
 			container: 'savedColor',
 			callbacks: {
@@ -127,7 +127,7 @@
 			<RefreshCw size={12} class="cursor-pointer" />
 		</button>
 	</div>
-	<div class="grid w-fit grid-cols-10 gap-1">
+	<div class="grid grid-cols-10 gap-0.5">
 		{#each randomColors as colorCand, _i (_i)}
 			{#if colorCand === colorContext.currentColor}
 				{@render selectedColor(colorCand)}
@@ -138,6 +138,7 @@
 	</div>
 </div>
 
+<!-- The picker is --picker-width + 54px wide; 176px leaves room for a scrollbar in the w-70 panel. -->
 <div class="cp-wrapper px-0 pt-2">
 	<ColorPicker
 		bind:hex={colorContext.currentColor}
@@ -146,13 +147,12 @@
 		isTextInput={false}
 		--input-size="0px"
 		--picker-height="100px"
-		--picker-width="200px"
+		--picker-width="176px"
 	/>
 </div>
 
 <Separator.Root class="mt-3" />
-<!-- w-0 min-w-full: wrap to the swatch grid's width instead of widening the panel. -->
-<p class="w-0 min-w-full pt-2 text-xs text-muted-foreground">
+<p class="pt-2 text-xs text-muted-foreground">
 	{#if selectedOligoCount > 0}
 		<span class="font-medium text-foreground"
 			>{selectedOligoCount} oligo{selectedOligoCount === 1 ? '' : 's'} selected.</span

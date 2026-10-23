@@ -239,7 +239,8 @@
 					</button>
 				</div>
 
-				<div class="min-h-0 flex-1 overflow-y-auto">
+				<!-- overflow-x-hidden: shadcn Switch's enlarged hit area (after:-inset-x-3) pokes past a flush-right edge. -->
+				<div class="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
 					<PanelToRender {part} />
 				</div>
 			</div>

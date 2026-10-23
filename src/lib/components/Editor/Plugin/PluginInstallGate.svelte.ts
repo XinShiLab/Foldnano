@@ -83,6 +83,7 @@ export class PluginInstallGate {
 					}
 					return { status: 'installed', manifest: prepared.manifest };
 				case 'blocked-builtin':
+				case 'blocked-linked':
 				case 'blocked-busy':
 					reportError(new InvalidOperationError(prepared.message), ERROR_CONTEXT);
 					return { status: 'blocked' };

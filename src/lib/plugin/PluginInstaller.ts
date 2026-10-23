@@ -42,7 +42,7 @@ interface ProcessedPluginZip {
 }
 
 /** Side-effect-free: no persistence, no registry access. */
-function processPluginZip(
+export function processPluginZip(
 	zipBytes: Uint8Array,
 	opts: { sourceUrl?: string; expectedId?: string } = {}
 ): ProcessedPluginZip {
@@ -145,6 +145,7 @@ export type PreparedInstall =
 			restorable?: boolean;
 	  }
 	| { status: 'blocked-builtin'; message: string }
+	| { status: 'blocked-linked'; message: string }
 	| { status: 'blocked-busy'; message: string }
 	| {
 			status: 'needs-confirm';
@@ -170,6 +171,12 @@ function classifyReadiness(
 		return {
 			status: 'blocked-builtin',
 			message: `"${manifest.id}" is a built-in plugin and cannot be replaced.`,
+		};
+	}
+	if (existing?.origin === 'linked') {
+		return {
+			status: 'blocked-linked',
+			message: `"${manifest.id}" is linked to a folder in dev mode. Unlink it before installing a zip with the same id.`,
 		};
 	}
 	const busy = registry.isPluginBusyForInstall(manifest.id);

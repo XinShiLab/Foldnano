@@ -14,7 +14,12 @@ Segment connection model (mirrors the TypeScript model):
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Any
+
 from dataclasses import dataclass, field
+
+if TYPE_CHECKING:
+    from foldnano.io import PartData
 
 
 @dataclass
@@ -60,7 +65,7 @@ class OligoSegmentProxy:
     sequence: str
 
     @classmethod
-    def from_json(cls, seg_json: dict) -> "OligoSegmentProxy":
+    def from_json(cls, seg_json: dict[str, Any]) -> "OligoSegmentProxy":
         five = seg_json["fivePrime"]
         three = seg_json["threePrime"]
         return cls(
@@ -121,7 +126,7 @@ class OligoProxy:
     segments: list[OligoSegmentProxy] = field(default_factory=list)
 
     @classmethod
-    def from_json(cls, oligo_json: dict) -> "OligoProxy":
+    def from_json(cls, oligo_json: dict[str, Any]) -> "OligoProxy":
         return cls(
             id=oligo_json["id"],
             color=oligo_json["color"],
@@ -151,7 +156,7 @@ class OligoProxy:
             and last.connected_to_segment_id == first.id
         )
 
-    def touches_regions(self, part) -> set[str]:
+    def touches_regions(self, part: PartData) -> set[str]:
         """
         Return the set of region IDs this oligo's segments visit.
 

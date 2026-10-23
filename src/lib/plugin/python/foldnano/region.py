@@ -13,7 +13,7 @@ Constructed by ``foldnano.io.parse_foldnano_json()``.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import Any, Literal
 
 
 RegionKind = Literal["HONEYCOMB", "SQUARE", "FREEFORM"]
@@ -60,7 +60,7 @@ class RegionProxy:
     default_max_base: int = 42
 
     @classmethod
-    def from_json(cls, region_json: dict) -> "RegionProxy":
+    def from_json(cls, region_json: dict[str, Any]) -> "RegionProxy":
         kind = region_json["kind"]
         if kind in ("HONEYCOMB", "SQUARE"):
             return LatticedRegionProxy._build(region_json)
@@ -70,7 +70,7 @@ class RegionProxy:
         return cls._build(region_json)
 
     @classmethod
-    def _build(cls, j: dict) -> "RegionProxy":
+    def _build(cls, j: dict[str, Any]) -> "RegionProxy":
         return cls(
             id=j["id"],
             name=j.get("name", ""),
@@ -100,7 +100,7 @@ class LatticedRegionProxy(RegionProxy):
     """
 
     @classmethod
-    def _build(cls, j: dict) -> "LatticedRegionProxy":
+    def _build(cls, j: dict[str, Any]) -> "LatticedRegionProxy":
         return cls(
             id=j["id"],
             name=j.get("name", ""),
@@ -125,7 +125,7 @@ class FreeformRegionProxy(RegionProxy):
     """Freeform region — VHs are placed by ``localFrame`` rather than lattice coords."""
 
     @classmethod
-    def _build(cls, j: dict) -> "FreeformRegionProxy":
+    def _build(cls, j: dict[str, Any]) -> "FreeformRegionProxy":
         return cls(
             id=j["id"],
             name=j.get("name", ""),

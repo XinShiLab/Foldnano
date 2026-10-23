@@ -22,6 +22,24 @@ gate titles, a use-with-caution note); drop the "beta" badge at 1.0.
 
 ## After the beta
 
+- Plugin dev mode follow-ups. Linking, the dev worker, the Dev tab, log streaming and folder
+  paths in tracebacks landed 2026-10-23 on `feat/plugin_devMode`
+  (`docs/python-plugin-system.md` § Plugin dev mode). (1) Done: tested in Chrome
+  against the real worker on 2026-10-23, all checks passed
+  (`docs/code_review/plugin-dev-mode-manual-test-2026-10-23.md`); still untested: PyPI packages
+  and bundled wheels in a linked folder. (2) Step 6 landed the same day (New plugin
+  dialog, starter files, API stubs, Check, Zip). Still open: listing _every_ manifest error (needs
+  `validateManifest` to collect instead of throw), filling the manifest from `pyproject.toml`,
+  an "update stubs" action, and exporting an owned plugin to a folder. (3) Decide whether to support `.fpluginignore` on top of the default ignore list. (4) Offline tests in
+  the generated folder (discussed 2026-10-23, deferred: another front to maintain): `tests/`
+  with a `conftest.py` `run_plugin(design, params, active_region_id)` helper and a starter
+  `test_plugin.py` per format/strategy (mutation-log replay self-check, result shape,
+  `previewOnly` sets only `plugin_result`), sample `.foldnano.json` / `.cadnano.json` designs, a
+  Dev-tab **Save open design as test design** button (active region for `cadnano_json`; accept
+  a document's `parts[0]` or a bare Part). Needs the real packages (vendored
+  `.foldnano-runtime/` now, or the planned PyPI package; prefer waiting for PyPI), `tests/` and
+  `conftest.py` in the linked-folder ignore list, and stating the limits (host-side validation,
+  repeat groups, `pyodide.http` are not covered offline).
 - Pyodide 314 (Python 3.14) follow-ups. The upgrade landed 2026-10-23 on `chore/pyodide-314`:
   the sandbox now starts a `data:` module worker, verified in Chromium only. (1) Check Firefox
   and Safari boot it in the opaque-origin iframe and enforce its CSP, and check the self-hosted

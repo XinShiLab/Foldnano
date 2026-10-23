@@ -139,8 +139,8 @@ export interface PluginManifest {
  */
 export interface PythonPlugin {
 	manifest: PluginManifest;
-	/** Whether the plugin ships with the app or was installed by the user. */
-	origin: 'builtin' | 'user';
+	/** Ships with the app, installed by the user, or linked to a folder on disk (dev mode). */
+	origin: PluginOrigin;
 	/** Whether the user has opted in to this plugin. Builtin plugins default to false (opt-in). */
 	enabled: boolean;
 	status: PluginStatus;
@@ -172,6 +172,23 @@ export interface PythonPlugin {
 	draftCode: string | null;
 	/** Validated SVG text of `manifest.icon`, read at install; null when the plugin has none. */
 	iconSvg: string | null;
+	/** Set exactly when `origin === 'linked'`. */
+	linked?: LinkedPluginInfo | null;
+}
+
+export type PluginOrigin = 'builtin' | 'user' | 'linked';
+
+/** Folder access for a linked plugin, as last seen; 'unknown' until checked this session. */
+export type LinkedFolderAccess = 'unknown' | 'granted' | 'prompt' | 'denied' | 'missing';
+
+/** Plugin dev mode: the folder a linked plugin is read from on each activate/run. */
+export interface LinkedPluginInfo {
+	/** Key of the folder handle in the `fileHandles` table. */
+	handleId: string;
+	folderName: string;
+	access: LinkedFolderAccess;
+	/** When the folder was last read successfully in this tab. */
+	lastReadAt: number | null;
 }
 
 /**

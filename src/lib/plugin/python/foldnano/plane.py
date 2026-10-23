@@ -7,6 +7,8 @@ DesignRegion lives in. Constructed by ``foldnano.io.parse_foldnano_json()``.
 
 from __future__ import annotations
 
+from typing import Any
+
 from dataclasses import dataclass
 
 
@@ -19,7 +21,7 @@ class _Vec3:
     z: float
 
     @classmethod
-    def from_json(cls, j: dict) -> "_Vec3":
+    def from_json(cls, j: dict[str, Any]) -> "_Vec3":
         return cls(x=float(j["x"]), y=float(j["y"]), z=float(j["z"]))
 
 
@@ -48,7 +50,7 @@ class PlaneProxy:
     normal: _Vec3
 
     @classmethod
-    def from_json(cls, plane_json: dict) -> "PlaneProxy":
+    def from_json(cls, plane_json: dict[str, Any]) -> "PlaneProxy":
         return cls(
             id=plane_json["id"],
             name=plane_json.get("name", ""),

@@ -73,7 +73,7 @@ Documents are stored as **plain objects** (not JSON strings). Stringification ha
 ### `FoldnanoIndexedDb`
 
 The Dexie database wrapper. Schema (versioned incrementally — `FOLDNANO_INDEXED_DB_VERSION` in
-`src/lib/services/storage/indexedDbTypes.ts` is currently `4`):
+`src/lib/services/storage/indexedDbTypes.ts` is currently `8`):
 
 ```ts
 db.version(1).stores({
@@ -93,7 +93,11 @@ db.version(3).stores({ pluginFiles: 'id' });
 db.version(4).stores({ errorLogs: 'id, timestamp' });
 db.version(5).stores({ localBackups: 'id, [docId+createdAt]' });
 db.version(6).stores({}).upgrade(/* githubBackups rows -> localBackups, see Backups */);
-db.version(FOLDNANO_INDEXED_DB_VERSION /* 7 */).stores({ githubBackups: null });
+db.version(7).stores({ githubBackups: null });
+db.version(FOLDNANO_INDEXED_DB_VERSION /* 8 */).stores({
+	fileHandles: 'id, purpose',
+	settings: 'key',
+});
 ```
 
 `documents` is a lightweight index/listing record. `documentSnapshots` holds the full plain snapshot object. Saving a document atomically writes both in a single Dexie transaction.
@@ -185,10 +189,17 @@ Relevant responsibilities:
 
 ### Plugin state and file cache
 
-| Table         | Key  | Contents                                                                                                                                                                                                                                        |
-| ------------- | ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `plugins`     | `id` | Plugin manifest + side-panel editor code + builtin enable/disable toggle + for plugins made from Script Lab, `authoring` (ownership) and `draftCode` (unsaved edit) + `iconSvg` (validated bundled icon, unindexed)                             |
-| `pluginFiles` | `id` | Cached plugin file assets: entrypoint `.py` text or `.zip` bytes + pre-fetched `.whl` wheel bytes, keyed by plugin ID. Invalidated when `manifest.version` changes. Also used as the sole file source for locally installed plugins (zip drop). |
+| Table         | Key  | Contents                                                                                                                                                                                                                                                                                                                   |
+| ------------- | ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `plugins`     | `id` | Plugin manifest + side-panel editor code + builtin enable/disable toggle + for plugins made from Script Lab, `authoring` (ownership) and `draftCode` (unsaved edit) + `iconSvg` (validated bundled icon, unindexed) + for dev-mode linked plugins, `linked` (folder handle id and name; the manifest is the last one read) |
+| `pluginFiles` | `id` | Cached plugin file assets: entrypoint `.py` text or `.zip` bytes + pre-fetched `.whl` wheel bytes, keyed by plugin ID. Invalidated when `manifest.version` changes. Also used as the sole file source for locally installed plugins (zip drop).                                                                            |
+
+### File handles and settings
+
+| Table         | Key   | Contents                                                                                                                                                                                                           |
+| ------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `fileHandles` | `id`  | File System Access handles the user granted (`purpose`: `plugin-dev` or `design`), never the files themselves. Permission is per tab and session, so a stored handle may need a prompt. See `docs/file-access.md`. |
+| `settings`    | `key` | Small app-level preferences (`{ key, value }`), e.g. plugin dev mode.                                                                                                                                              |
 
 ### Diagnostics
 

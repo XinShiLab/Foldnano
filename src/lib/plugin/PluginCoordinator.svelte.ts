@@ -22,6 +22,10 @@ import { validateResultShape as validateFoldnanoResultShape } from './result-for
 import { verifyDesign, type DesignVerificationInput } from './design-verification';
 import { buildPluginZip } from './ownedPlugins';
 import type { PartJSON } from './result-replacement-operations';
+import type { LinkedFolderRead } from './linkedPluginFolder';
+
+/** Reads a linked plugin's folder (dev mode), asking for access when needed. */
+export type LinkedFolderReader = (plugin: PythonPlugin) => Promise<LinkedFolderRead>;
 
 export const RUN_FAILED_WITHOUT_MESSAGE =
 	'The plugin run failed without an error message. See the traceback and log below.';
@@ -79,6 +83,11 @@ export class PluginCoordinator {
 		bridge: PyodideWorkerBridge;
 		envOwner: { pluginId: string; version: string; csp: string };
 	} | null = null;
+	/** Dev mode: the worker of the active linked plugin, rebuilt whenever its environment changes. */
+	private devSlot: {
+		bridge: PyodideWorkerBridge;
+		envOwner: { pluginId: string; envFingerprint: string; csp: string };
+	} | null = null;
 	private getDoc: (() => FoldnanoDocument) | undefined;
 	private getHistory: (() => HistoryStack) | undefined;
 	private getActiveRegion: (() => DesignRegion | null) | undefined;
@@ -93,6 +102,14 @@ export class PluginCoordinator {
 	 *  Non-reactive bookkeeping; the UI never reads it. */
 	// eslint-disable-next-line svelte/prefer-svelte-reactivity
 	private _stoppedPluginIds = new Set<string>();
+
+	private readLinkedFolder: LinkedFolderReader | undefined;
+	/** Environment each linked plugin was activated with (`envFingerprint`). */
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- non-reactive bookkeeping
+	private _linkedEnvFingerprints = new Map<string, string>();
+	/** Linked plugins whose folder is being read for a run, so a double click can't start two. */
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- non-reactive bookkeeping
+	private _linkedRunReads = new Set<string>();
 
 	private _nextResultToken = 0;
 	private _mintResultToken(): string {
@@ -119,6 +136,23 @@ export class PluginCoordinator {
 	 */
 	setEditGate(canEdit: () => boolean): void {
 		this.canEditDoc = canEdit;
+	}
+
+	/** Wires plugin dev mode: how linked plugins' folders are read. */
+	setLinkedFolderReader(reader: LinkedFolderReader): void {
+		this.readLinkedFolder = reader;
+	}
+
+	private async readLinked(plugin: PythonPlugin): Promise<LinkedFolderRead> {
+		if (!this.readLinkedFolder) throw new Error('Plugin dev mode is not available here.');
+		const read = await this.readLinkedFolder(plugin);
+		if (read.manifest.id !== plugin.manifest.id) {
+			throw new Error(
+				`The folder now declares the id "${read.manifest.id}" instead of "${plugin.manifest.id}". ` +
+					'Unlink it and link the folder again to use the new id.'
+			);
+		}
+		return read;
 	}
 
 	/** The sandbox CSP a plugin runs under: its declared network plus PyPI if needed. */
@@ -172,6 +206,7 @@ export class PluginCoordinator {
 	}
 
 	private ensureBridgeFor(plugin: PythonPlugin): PyodideWorkerBridge {
+		if (plugin.origin === 'linked') return this.ensureDevBridgeFor(plugin);
 		if (classifyEnv(plugin.manifest) === 'standard') return this.getStandardBridge();
 		if (this.customSlot && this.customSlot.envOwner.pluginId !== plugin.manifest.id) {
 			throw new Error(
@@ -187,6 +222,94 @@ export class PluginCoordinator {
 			this.customSlot.envOwner = envOwner;
 		}
 		return this.customSlot.bridge;
+	}
+
+	/** The dev slot for a linked plugin; the caller evicted any other owner (evictDevSlotFor). */
+	private ensureDevBridgeFor(plugin: PythonPlugin): PyodideWorkerBridge {
+		if (this.devSlot && this.devSlot.envOwner.pluginId !== plugin.manifest.id) {
+			throw new Error(
+				`The dev environment is in use by "${this.devSlot.envOwner.pluginId}". ` +
+					`Activate "${plugin.manifest.name}" to take it over.`
+			);
+		}
+		const csp = this.sandboxCspFor(plugin);
+		const envOwner = {
+			pluginId: plugin.manifest.id,
+			envFingerprint: this._linkedEnvFingerprints.get(plugin.manifest.id) ?? '',
+			csp,
+		};
+		if (!this.devSlot) this.devSlot = { bridge: this.makeBridge(csp), envOwner };
+		else this.devSlot.envOwner = envOwner;
+		return this.devSlot.bridge;
+	}
+
+	/** True when the dev slot already runs `plugin` with exactly this environment. */
+	private ownsDevSlot(plugin: PythonPlugin, envFingerprint: string): boolean {
+		const owner = this.devSlot?.envOwner;
+		return (
+			owner !== undefined &&
+			owner.pluginId === plugin.manifest.id &&
+			owner.envFingerprint === envFingerprint &&
+			owner.csp === this.sandboxCspFor(plugin)
+		);
+	}
+
+	/**
+	 * Free the dev slot for `plugin` unless it already holds `plugin`'s environment. Unlike the
+	 * custom slot, any change of requirements, network or bundled wheels rebuilds the worker:
+	 * packages can't be uninstalled from a live Pyodide and the CSP is fixed at worker start.
+	 */
+	private evictDevSlotFor(plugin: PythonPlugin, envFingerprint: string): void {
+		const slot = this.devSlot;
+		if (!slot || this.ownsDevSlot(plugin, envFingerprint)) return;
+		this.devSlot = null;
+		const ownerId = slot.envOwner.pluginId;
+		if (ownerId !== plugin.manifest.id) this.resetEvictedOwner(ownerId);
+		slot.bridge.terminate();
+	}
+
+	/** An evicted slot owner goes back to 'registered'; a run or activation in flight is a stop. */
+	private resetEvictedOwner(ownerId: string): void {
+		const owner = this.registry.get(ownerId);
+		if (owner && (owner.status === 'running' || owner.status === 'activating')) {
+			this._stoppedPluginIds.add(ownerId);
+		}
+		if (this.pendingApply?.pluginId === ownerId) this.pendingApply = null;
+		if (
+			owner &&
+			(owner.status === 'active' || owner.status === 'activating' || owner.status === 'running')
+		) {
+			owner.status = 'registered';
+			owner.errorMessage = null;
+			owner.errorTraceback = null;
+		}
+	}
+
+	/**
+	 * Rebuild a linked plugin's dev environment from scratch (fresh worker, requirements
+	 * reinstalled), e.g. after module-level state got stuck.
+	 */
+	async restartLinkedEnvironment(pluginId: string): Promise<void> {
+		const plugin = this.registry.get(pluginId);
+		if (plugin?.origin !== 'linked') throw new Error(`"${pluginId}" is not a linked plugin.`);
+		const busy = this.isPluginBusyOrPending(pluginId);
+		if (busy.busy) throw new Error(`Cannot restart "${plugin.manifest.name}": ${busy.reason}.`);
+		const slot = this.devSlot;
+		if (slot?.envOwner.pluginId === pluginId) {
+			this.devSlot = null;
+			slot.bridge.terminate();
+		}
+		plugin.status = 'registered';
+		await this.activate(pluginId);
+	}
+
+	/** Dev mode turned off: drop the dev worker; its owner needs activating again. */
+	releaseLinkedEnvironment(): void {
+		const slot = this.devSlot;
+		if (!slot) return;
+		this.devSlot = null;
+		this.resetEvictedOwner(slot.envOwner.pluginId);
+		slot.bridge.terminate();
 	}
 
 	/**
@@ -206,11 +329,20 @@ export class PluginCoordinator {
 			requiresConfirmation: false,
 		};
 		const plugin = this.registry.get(pluginId);
-		if (!plugin || classifyEnv(plugin.manifest) === 'standard') return none;
-		const slot = this.customSlot;
-		if (!slot) return none;
-		if (this.ownsCustomSlot(plugin)) return none;
-		const owner = this.registry.get(slot.envOwner.pluginId);
+		if (!plugin) return none;
+		let ownerId: string;
+		if (plugin.origin === 'linked') {
+			// Activation rebuilds a changed environment of the same plugin silently.
+			if (!this.devSlot || this.devSlot.envOwner.pluginId === pluginId) return none;
+			ownerId = this.devSlot.envOwner.pluginId;
+		} else {
+			if (classifyEnv(plugin.manifest) === 'standard') return none;
+			const slot = this.customSlot;
+			if (!slot) return none;
+			if (this.ownsCustomSlot(plugin)) return none;
+			ownerId = slot.envOwner.pluginId;
+		}
+		const owner = this.registry.get(ownerId);
 		if (!owner) return none;
 		const ownerResident =
 			owner.status === 'active' || owner.status === 'activating' || owner.status === 'running';
@@ -250,22 +382,9 @@ export class PluginCoordinator {
 		const slot = this.customSlot;
 		if (!slot) return;
 		if (this.ownsCustomSlot(plugin)) return;
-		const ownerId = slot.envOwner.pluginId;
-		const owner = this.registry.get(ownerId);
-		if (owner && (owner.status === 'running' || owner.status === 'activating')) {
-			this._stoppedPluginIds.add(ownerId);
-		}
-		if (this.pendingApply?.pluginId === ownerId) this.pendingApply = null;
 		this.customSlot = null;
+		this.resetEvictedOwner(slot.envOwner.pluginId);
 		slot.bridge.terminate();
-		if (
-			owner &&
-			(owner.status === 'active' || owner.status === 'activating' || owner.status === 'running')
-		) {
-			owner.status = 'registered';
-			owner.errorMessage = null;
-			owner.errorTraceback = null;
-		}
 	}
 
 	/**
@@ -293,19 +412,32 @@ export class PluginCoordinator {
 		// Custom tier: free the single custom worker slot before any status
 		// change. The UI is responsible for confirming destructive evictions
 		// first (getActivationImpact).
-		if (classifyEnv(plugin.manifest) === 'custom') this.evictCustomSlotFor(plugin);
+		if (plugin.origin !== 'linked' && classifyEnv(plugin.manifest) === 'custom')
+			this.evictCustomSlotFor(plugin);
 
 		plugin.status = 'activating';
 		plugin.errorMessage = null;
 
 		try {
 			// Load cached file assets once. The record is valid only when its
-			// manifestVersion matches the current manifest.
+			// manifestVersion matches the current manifest. A linked plugin's files come
+			// fresh from its folder instead and are never cached.
+			const linked = plugin.origin === 'linked';
 			let filesRecord: IndexedDbPluginFilesRecord | null = null;
-			try {
-				filesRecord = await foldnanoIndexedDb.loadPluginFiles(pluginId);
-			} catch {
-				// Cache read failure is non-fatal — treat as a miss.
+			let linkedEnv: string | null = null;
+			if (linked) {
+				const read = await this.readLinked(plugin);
+				this.registry.refreshLinked(read.manifest, read.files);
+				filesRecord = read.files;
+				linkedEnv = read.envFingerprint;
+				this.evictDevSlotFor(plugin, linkedEnv);
+				this._linkedEnvFingerprints.set(pluginId, linkedEnv);
+			} else {
+				try {
+					filesRecord = await foldnanoIndexedDb.loadPluginFiles(pluginId);
+				} catch {
+					// Cache read failure is non-fatal — treat as a miss.
+				}
 			}
 			const cacheHit = filesRecord?.manifestVersion === plugin.manifest.version;
 
@@ -396,14 +528,14 @@ export class PluginCoordinator {
 					}
 				}
 
-				if (cacheNeedsWrite) {
+				if (cacheNeedsWrite && !linked) {
 					foldnanoIndexedDb
 						.savePluginFiles(updatedRecord)
 						.catch((e) => console.warn('[PluginCoordinator] Failed to cache plugin files:', e));
 				}
 
 				await bridge.installPlugin(pluginId, micropipPackages, preloadedWheels);
-			} else if (cacheNeedsWrite) {
+			} else if (cacheNeedsWrite && !linked) {
 				// No requirements but entrypoint was freshly fetched — save cache.
 				foldnanoIndexedDb
 					.savePluginFiles(updatedRecord)
@@ -483,6 +615,26 @@ export class PluginCoordinator {
 				`"${plugin.manifest.name}" cannot run while "${this.pendingApply.pluginId}" has an unapplied result. Apply or discard it first.`
 			);
 		}
+		let linkedZip: Uint8Array | null = null;
+		if (plugin.origin === 'linked') {
+			if (this._linkedRunReads.has(pluginId)) {
+				throw new Error(`"${plugin.manifest.name}" is already starting.`);
+			}
+			this._linkedRunReads.add(pluginId);
+			try {
+				const read = await this.readLinked(plugin);
+				this.registry.refreshLinked(read.manifest, read.files);
+				// A changed environment, or a dev worker that died (stop, timeout), is rebuilt here.
+				if (!this.ownsDevSlot(plugin, read.envFingerprint)) {
+					await this.activate(pluginId);
+				}
+				linkedZip = read.zip;
+			} finally {
+				this._linkedRunReads.delete(pluginId);
+			}
+			if (plugin.status !== 'active')
+				throw new Error(`Plugin is not active (status=${plugin.status})`);
+		}
 		const bridge = this.ensureBridgeFor(plugin);
 
 		// Guard before any status change: a fresh document has no part until the
@@ -497,7 +649,11 @@ export class PluginCoordinator {
 		}
 
 		// Reproducibility stamp: which runtime + env tier produced this run.
-		const envStamp = `[env] pyodide-${PYODIDE_VERSION} · ${classifyEnv(plugin.manifest)}`;
+		const tier = classifyEnv(plugin.manifest);
+		const envStamp =
+			plugin.origin === 'linked'
+				? `[env] pyodide-${PYODIDE_VERSION} · dev (would run as: ${tier})`
+				: `[env] pyodide-${PYODIDE_VERSION} · ${tier}`;
 
 		plugin.status = 'running';
 		plugin.logs = [envStamp];
@@ -560,7 +716,9 @@ export class PluginCoordinator {
 				pluginZipData:
 					draftCode !== null
 						? (buildPluginZip(plugin.manifest, draftCode, plugin.iconSvg).buffer as ArrayBuffer)
-						: plugin.resolvedZipData,
+						: linkedZip !== null
+							? (linkedZip.slice().buffer as ArrayBuffer)
+							: plugin.resolvedZipData,
 				pluginLabel: plugin.manifest.name,
 				format: plugin.manifest.format,
 				cadnanoJsonIn,
@@ -694,12 +852,15 @@ export class PluginCoordinator {
 			}
 
 			plugin.status = 'error';
+			const folderPaths = (text: string) =>
+				plugin.linked ? linkedFolderPaths(text, plugin.linked.folderName) : text;
 			plugin.errorMessage =
-				(e instanceof Error ? e.message : String(e)) || RUN_FAILED_WITHOUT_MESSAGE;
-			const pythonTraceback =
+				folderPaths(e instanceof Error ? e.message : String(e)) || RUN_FAILED_WITHOUT_MESSAGE;
+			const rawTraceback =
 				e instanceof Error && 'traceback' in e
 					? (e as Error & { traceback: string }).traceback
 					: null;
+			const pythonTraceback = rawTraceback ? folderPaths(rawTraceback) : rawTraceback;
 			// No Python traceback means the failure was outside the plugin's Python: show where.
 			plugin.errorTraceback = pythonTraceback || (e instanceof Error ? (e.stack ?? null) : null);
 			console.error(`[PluginCoordinator] run of "${pluginId}" failed:`, e);
@@ -797,8 +958,12 @@ export class PluginCoordinator {
 	stopPlugin(pluginId: string): void {
 		const plugin = this.registry.get(pluginId);
 		if (!plugin || plugin.status !== 'running') return;
-		const tier = classifyEnv(plugin.manifest);
-		if (!(tier === 'standard' ? this.standardBridge : this.customSlot?.bridge)) return;
+		if (plugin.origin === 'linked') {
+			if (!this.devSlot) return;
+		} else {
+			const tier = classifyEnv(plugin.manifest);
+			if (!(tier === 'standard' ? this.standardBridge : this.customSlot?.bridge)) return;
+		}
 		this._stoppedPluginIds.add(pluginId);
 		this.terminateTierOf(plugin);
 	}
@@ -810,6 +975,12 @@ export class PluginCoordinator {
 	 */
 	private terminateTierOf(plugin: PythonPlugin): void {
 		const pluginId = plugin.manifest.id;
+		if (plugin.origin === 'linked') {
+			const slot = this.devSlot;
+			this.devSlot = null;
+			slot?.bridge.terminate();
+			return;
+		}
 		const tier = classifyEnv(plugin.manifest);
 		const bridge = tier === 'standard' ? this.standardBridge : this.customSlot?.bridge;
 		if (!bridge) return;
@@ -892,10 +1063,13 @@ export class PluginCoordinator {
 	terminate(): void {
 		const standard = this.standardBridge;
 		const custom = this.customSlot?.bridge;
+		const dev = this.devSlot?.bridge;
 		this.standardBridge = null;
 		this.customSlot = null;
+		this.devSlot = null;
 		standard?.terminate();
 		custom?.terminate();
+		dev?.terminate();
 	}
 
 	persistEditorCode(pluginId: string, code: string): Promise<void> {
@@ -906,6 +1080,11 @@ export class PluginCoordinator {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/** The worker extracts the zip to /plugin_run/; name the author's folder instead. */
+export function linkedFolderPaths(text: string, folderName: string): string {
+	return text.replaceAll('/plugin_run/', `${folderName}/`);
+}
 
 // ---------------------------------------------------------------------------
 // Summary builder
