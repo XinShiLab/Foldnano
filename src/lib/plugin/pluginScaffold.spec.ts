@@ -111,6 +111,17 @@ describe('starterPluginPy', () => {
 			expect(preview).not.toMatch(/set_result_(mutation_log|foldnano_json|cadnano_json)/);
 		}
 	});
+
+	it('escapes quotes and backslashes in the docstring', () => {
+		const py = starterPluginPy(
+			buildNewManifest(
+				fields({ name: 'Say "hi"', description: 'Reads C:\\Users\\Alice """notes"""' })
+			)
+		);
+		expect(py.split('\n')[0]).toBe(
+			String.raw`"""Say \"hi\": Reads C:\\Users\\Alice \"\"\"notes\"\"\""""`
+		);
+	});
 });
 
 describe('starterPluginFiles', () => {

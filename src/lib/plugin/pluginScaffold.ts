@@ -74,7 +74,11 @@ export function manifestFileText(manifest: PluginManifest): string {
 
 function docstring(manifest: PluginManifest): string {
 	const summary = manifest.description ? `: ${manifest.description}` : '.';
-	return `"""${manifest.name}${summary}"""`;
+	// Manifest text may hold quotes, backslashes (Windows paths) or line breaks.
+	const text = `${manifest.name}${summary}`
+		.replace(/\s*[\r\n]+\s*/g, ' ')
+		.replace(/[\\"]/g, '\\$&');
+	return `"""${text}"""`;
 }
 
 /** A runnable plugin.py for the manifest's format and strategy, with the edit point marked. */

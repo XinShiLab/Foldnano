@@ -876,7 +876,9 @@ Run. Chromium only (File System Access API, `docs/file-access.md`).
   installed: `registerLinked()` refuses a registered id and installs report `blocked-linked`.
 - **Coordinator:** `setLinkedFolderReader()` (wired to `PluginDevMode.readFolder`). `activate()`
   reads the folder instead of the file cache; every `run()` reads it again before the status
-  changes and sends that zip. A changed manifest id refuses the run.
+  changes and sends that zip. A changed manifest id refuses the run. When that read shows a
+  changed environment, `run()` activates from the same read (`activateWith`), so the zip that runs
+  always matches the manifest and requirements it was installed for.
 - **Dev environment:** linked plugins never use the standard or custom tier. They run in a third
   worker slot (`devSlot`) owned by `{ pluginId, envFingerprint, csp }`. Code-only edits keep the
   warm worker (the harness purges plugin modules each run); any change of requirements, network
@@ -885,7 +887,11 @@ Run. Chromium only (File System Access API, `docs/file-access.md`).
   timing out a linked plugin kills only the dev worker. One linked plugin owns it at a time;
   activating another evicts the first (`getActivationImpact` reports it like the custom slot).
   `restartLinkedEnvironment()` rebuilds it on request; `releaseLinkedEnvironment()` drops it
-  when dev mode turns off. The run log's stamp reads `dev (would run as: <tier>)` so the author
+  when dev mode turns off and bumps `_devEpoch`, which cancels any linked activation or run still
+  awaiting its folder read (it ends `'deactivated'`, never re-creating a worker). The slot's
+  `envFingerprint` is recorded only once activation succeeds, and a failed activation terminates
+  the half-installed worker, so the next Run rebuilds it instead of running without its packages.
+  The run log's stamp reads `dev (would run as: <tier>)` so the author
   still sees where an installed copy would run.
 - **UI:** the Plugins panel's **Dev** tab (`PluginDevPanel.svelte`) holds the dev mode switch,
   **Link plugin folder…**, and each linked plugin's folder bar (Restart env, Re-link, Unlink) above
@@ -901,7 +907,8 @@ Run. Chromium only (File System Access API, `docs/file-access.md`).
   optionally the API stubs under `.foldnano-stubs/` plus `pyrightconfig.json` (`stubPath`,
   `typeCheckingMode: standard`, `reportMissingModuleSource: none`, since the packages have no
   source outside Foldnano's runtime), then links the
-  folder without a second review. Stubs and `pyrightconfig.json` are ignored by linked runs.
+  folder without a second review. The starter's docstring escapes quotes and backslashes from the
+  name and description. Stubs and `pyrightconfig.json` are ignored by linked runs.
 - **Check and Zip:** `checkLinkedPluginFolder` (`PluginDevMode.checkFolder`) lists independent
   problems together (no `plugin.py` or `run(ctx)`, unparsable `fplugin.json`), then the install
   validation's first manifest error, then notes: PyPI packages, why the plugin would be custom
@@ -999,7 +1006,7 @@ The primary result (`primary_artifact`) and the mutation log are not capped: the
 
 ### Run timeout
 
-`runPlugin` rejects with `RunTimeoutError` after 300 s. Python can't be interrupted, so `PluginCoordinator.run()` then terminates that plugin's tier worker (`terminateTierOf`, shared with `stopPlugin`), shows the timeout as the plugin's error, and clears its resolved code so the UI offers **Activate** rather than **Run** (the environment died with the worker). Standard-tier bridge-mates are reset to `'registered'` exactly as for Stop.
+`runPlugin` rejects with `RunTimeoutError` after 300 s. Python can't be interrupted, so `PluginCoordinator.run()` then terminates that plugin's tier worker (`terminateTierOf`, shared with `stopPlugin`), shows the timeout as the plugin's error, and clears its resolved code so the UI offers **Activate** rather than **Run** (the environment died with the worker). A failed `activate()` clears resolved code the same way, so **Reset** can't return a plugin to `'active'` over an environment that never finished installing. Standard-tier bridge-mates are reset to `'registered'` exactly as for Stop.
 
 ---
 
@@ -1377,6 +1384,7 @@ Coverage: `initRuntime` idempotency, RUNTIME_ERROR retry, concurrent installs an
 ## Boundaries / Don'ts
 
 - **Never pass a folder handle to the worker.** Linked plugins cross into the sandbox as zip bytes, exactly like installed ones.
+- **Check `_devEpoch` (and `_stoppedPluginIds`) after every await in an activation or linked run** before creating or using a worker; dev mode can turn off, or a stop or eviction terminate the bridge, during a folder read, review dialog or wheel download. A terminated bridge respawns a worker on its next call, and nothing would own or terminate that one.
 - **Don't cache a linked plugin's files.** `activate()` skips `pluginFiles` writes for `origin: 'linked'`; the folder is the only source.
 - Don't hand-edit `python/stubs/**` or `python-api-index.generated.json`; change the Python source (signature, annotation, docstring, `__all__`) and regenerate.
 

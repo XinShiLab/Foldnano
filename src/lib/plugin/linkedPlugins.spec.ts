@@ -83,7 +83,10 @@ function makeBridge() {
 }
 
 /** Registry + coordinator + dev mode over in-memory storage, with `tree` linkable as a folder. */
-async function setup(tree: MemoryTree = pluginTree()) {
+async function setup(
+	tree: MemoryTree = pluginTree(),
+	onBridge?: (bridge: ReturnType<typeof makeBridge>, index: number) => void
+) {
 	const db = makeDb();
 	const registry = new PluginRegistry(db as never);
 	const doc = new FoldnanoDocument('doc', 'Doc');
@@ -96,6 +99,7 @@ async function setup(tree: MemoryTree = pluginTree()) {
 		() => null,
 		(() => {
 			const bridge = makeBridge();
+			onBridge?.(bridge, bridges.length);
 			bridges.push(bridge);
 			return bridge;
 		}) as never
@@ -399,6 +403,141 @@ describe('linked plugin errors', () => {
 		bridges[0].runPlugin.mockRejectedValueOnce(error);
 		await expect(coordinator.run(ID)).rejects.toBe(error);
 		expect(registry.get(ID)!.errorTraceback).toContain('File "my-plugin/helpers.py", line 3');
+	});
+});
+
+/** Holds the next folder read until `release()`, as a slow disk or an open review dialog would. */
+function holdNextRead(
+	coordinator: PluginCoordinator,
+	devMode: PluginDevMode
+): { release: () => void } {
+	let release!: () => void;
+	const held = new Promise<void>((resolve) => (release = resolve));
+	let first = true;
+	coordinator.setLinkedFolderReader(async (plugin) => {
+		const read = await devMode.readFolder(plugin);
+		if (first) {
+			first = false;
+			await held;
+		}
+		return read;
+	});
+	return { release };
+}
+
+describe('turning dev mode off mid-flight', () => {
+	it('cancels an activation awaiting its folder read', async () => {
+		const { devMode, coordinator, registry, bridges } = await setup();
+		await devMode.linkFolder();
+		const { release } = holdNextRead(coordinator, devMode);
+		const activation = coordinator.activate(ID);
+		await devMode.setEnabled(false);
+		release();
+		await activation;
+		expect(registry.get(ID)!.status).toBe('deactivated');
+		expect(bridges).toHaveLength(0);
+	});
+
+	it('cancels a run awaiting its folder read', async () => {
+		const { devMode, coordinator, registry, bridges } = await setup();
+		await devMode.linkFolder();
+		await coordinator.activate(ID);
+		const { release } = holdNextRead(coordinator, devMode);
+		const run = coordinator.run(ID);
+		await devMode.setEnabled(false);
+		release();
+		await run;
+		expect(registry.get(ID)!.status).toBe('deactivated');
+		expect(bridges).toHaveLength(1);
+		expect(bridges[0].runPlugin).not.toHaveBeenCalled();
+	});
+
+	it('installs nothing when dev mode goes off during a wheel download', async () => {
+		let finishDownload!: () => void;
+		const fetchMock = vi.fn(
+			() =>
+				new Promise<Response>(
+					(resolve) => (finishDownload = () => resolve(new Response(new Uint8Array(8))))
+				)
+		);
+		vi.stubGlobal('fetch', fetchMock);
+		const { devMode, coordinator, registry, bridges } = await setup(
+			pluginTree({}, { requirements: ['cadnano2_5_mini'] })
+		);
+		await devMode.linkFolder();
+		const activation = coordinator.activate(ID);
+		await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled());
+		await devMode.setEnabled(false);
+		finishDownload();
+		await activation;
+		expect(bridges[0].terminate).toHaveBeenCalled();
+		expect(bridges[0].installPlugin).not.toHaveBeenCalled();
+		expect(registry.get(ID)!.status).toBe('deactivated');
+		vi.unstubAllGlobals();
+	});
+
+	it('leaves an activation stopped mid-install deactivated, not errored', async () => {
+		let failInstall: ((e: Error) => void) | undefined;
+		const { devMode, coordinator, registry } = await setup(
+			pluginTree({}, { requirements: ['numpy'] }),
+			(bridge) =>
+				bridge.installPlugin.mockImplementationOnce(
+					() => new Promise<void>((_, reject) => (failInstall = reject))
+				)
+		);
+		await devMode.linkFolder();
+		const activation = coordinator.activate(ID);
+		await vi.waitFor(() => expect(failInstall).toBeDefined());
+		await devMode.setEnabled(false);
+		failInstall!(new Error('Worker terminated'));
+		await activation;
+		const plugin = registry.get(ID)!;
+		expect(plugin.status).toBe('deactivated');
+		expect(plugin.errorMessage).toBeNull();
+	});
+});
+
+describe('a failed dev environment install', () => {
+	it('is rebuilt by the next activation instead of reused', async () => {
+		const { devMode, coordinator, registry, bridges } = await setup(
+			pluginTree({}, { requirements: ['numpy'] }),
+			(bridge, index) => {
+				if (index === 0) bridge.installPlugin.mockRejectedValueOnce(new Error('download failed'));
+			}
+		);
+		await devMode.linkFolder();
+		await expect(coordinator.activate(ID)).rejects.toThrow('download failed');
+		expect(bridges[0].terminate).toHaveBeenCalled();
+
+		// Reset clears the error but can't make the plugin ready: it needs activating again.
+		coordinator.resetPlugin(ID);
+		expect(registry.get(ID)!.status).toBe('error');
+
+		await coordinator.activate(ID);
+		expect(bridges).toHaveLength(2);
+		expect(bridges[1].installPlugin).toHaveBeenCalledWith(ID, ['numpy'], []);
+		await coordinator.run(ID);
+		expect(bridges[1].runPlugin).toHaveBeenCalledTimes(1);
+	});
+});
+
+describe('rebuilding the dev environment for a run', () => {
+	it('activates from the same folder read the run sends', async () => {
+		const { devMode, coordinator, bridges, tree } = await setup();
+		await devMode.linkFolder();
+		await coordinator.activate(ID);
+		tree['fplugin.json'] = manifestJson({ requirements: ['numpy'] });
+		tree['plugin.py'] = 'def run(ctx): print("A")\n';
+		// Files saved after the run's read must not reach this run.
+		coordinator.setLinkedFolderReader(async (plugin) => {
+			const read = await devMode.readFolder(plugin);
+			tree['fplugin.json'] = manifestJson({ requirements: ['scipy'] });
+			tree['plugin.py'] = 'def run(ctx): print("B")\n';
+			return read;
+		});
+		await coordinator.run(ID);
+		expect(bridges[1].installPlugin).toHaveBeenCalledWith(ID, ['numpy'], []);
+		expect(sentZipFiles(bridges[1])['plugin.py']).toBe('def run(ctx): print("A")\n');
 	});
 });
 
