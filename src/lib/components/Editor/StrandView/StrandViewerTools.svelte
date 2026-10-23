@@ -26,6 +26,7 @@
 
 	import { help } from '$lib/components/help/help';
 	import { modKeySymbol } from '$lib/utils/platform';
+	import { exportBaseName } from '$lib/model/io/designFileName';
 
 	import { removeSelection, startDuplicate } from '../strandActions';
 	import { getEditorViewContext } from '../context/EditorViewContext.svelte';
@@ -319,7 +320,12 @@
 					title="Export as PNG"
 					disabled={!stage}
 					onclick={() =>
-						stage && exportStageAsPng(stage, `${ctx.currentDoc.name}_route`, exportImagePixelScale)}
+						stage &&
+						exportStageAsPng(
+							stage,
+							exportBaseName(ctx.currentDoc.name, '_route'),
+							exportImagePixelScale
+						)}
 					{@attach help({ text: 'Download the strand view as a PNG image.' })}
 				>
 					<span class="text-[10px] leading-none font-semibold">PNG</span>
@@ -328,7 +334,8 @@
 					variant="outline"
 					size="icon-sm"
 					title="Export as SVG (with sequences)"
-					onclick={() => downloadStrandViewSvg(part, `${ctx.currentDoc.name}_route.svg`)}
+					onclick={() =>
+						downloadStrandViewSvg(part, exportBaseName(ctx.currentDoc.name, '_route.svg'))}
 					{@attach help({ text: 'Download the strand view as an SVG, including sequences.' })}
 				>
 					<span class="text-[10px] leading-none font-semibold">SVG</span>

@@ -1,4 +1,4 @@
-/** Worker source bundled as a classic-script string by scripts/vite-sandbox-worker.ts. */
+/** Worker source bundled as an ES module string by scripts/vite-sandbox-worker.ts. */
 declare module '*?sandbox-worker' {
 	const source: string;
 	export default source;

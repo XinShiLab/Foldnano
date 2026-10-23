@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { FILTER_TOGGLE_CLASS, SCAF_TOGGLE_CLASS, STAP_TOGGLE_CLASS } from './filterToggleClasses';
 	import { TextAlignJustify } from '@lucide/svelte/icons';
 	import EndsIcon from '$lib/components/icons/EndsIcon.svelte';
 	import CrossoverIcon from '$lib/components/icons/CrossoverIcon.svelte';
@@ -73,7 +74,7 @@
 	>
 		<ToggleGroup.Item
 			value="SCAF"
-			class="w-12 text-xs text-sky-800 hover:text-sky-800 data-[state=on]:text-sky-800"
+			class={SCAF_TOGGLE_CLASS}
 			{@attach help({
 				key: 'c',
 				title: 'Scaffold',
@@ -84,7 +85,7 @@
 		</ToggleGroup.Item>
 		<ToggleGroup.Item
 			value="STAP"
-			class="w-12 text-xs text-red-800 hover:text-red-800 data-[state=on]:text-red-800"
+			class={STAP_TOGGLE_CLASS}
 			{@attach help({
 				key: 't',
 				title: 'Staples',
@@ -104,7 +105,7 @@
 	>
 		<ToggleGroup.Item
 			value="END"
-			class="w-10"
+			class="w-10 {FILTER_TOGGLE_CLASS}"
 			{@attach help({
 				key: 'e',
 				title: 'Ends',
@@ -115,6 +116,7 @@
 		</ToggleGroup.Item>
 		<ToggleGroup.Item
 			value="XOVER"
+			class={FILTER_TOGGLE_CLASS}
 			{@attach help({
 				key: 'x',
 				title: 'Crossovers',
@@ -125,6 +127,7 @@
 		</ToggleGroup.Item>
 		<ToggleGroup.Item
 			value="SEGMENT"
+			class={FILTER_TOGGLE_CLASS}
 			{@attach help({
 				key: 'd',
 				title: 'Segments',
@@ -135,6 +138,7 @@
 		</ToggleGroup.Item>
 		<ToggleGroup.Item
 			value="OLIGO"
+			class={FILTER_TOGGLE_CLASS}
 			onclick={onClickOligoToggle}
 			{@attach help({
 				key: 'o',

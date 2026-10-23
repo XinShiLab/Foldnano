@@ -90,7 +90,7 @@
 			doc: 'selection',
 		},
 		'Paint Tool': {
-			text: 'Pick a color, then click oligos to recolor them.',
+			text: 'Pick a color, then click an oligo. With oligos already selected, one click anywhere paints them all.',
 			doc: 'editing-tools',
 		},
 		'Modification Tool': {

@@ -14,6 +14,7 @@ import type { EditorDocumentSession } from '../context/EditorDocumentSession.sve
 import type { FileNode, ChangeEntry } from './types';
 import { buildTree, mergeLocalOnly, treeHasPath, collectPaths } from './treeUtils';
 import { FN_JSON_EXT, fileStem, isRenamableFile, validateFileStem } from './fileNaming';
+import { fnJsonPathFor } from '$lib/model/io/designFileName';
 import { summarizeCommitAll, type CommitAllResult, type CommitSummary } from './commitSummary';
 import {
 	loadLocalOnlyEntries,
@@ -306,10 +307,7 @@ export class GitHubExplorerState {
 			}
 
 			// Legacy cadnano JSON: check for fn.json conflict, then signal import dialog.
-			const fnPath = node.path.replace(
-				/\.cadnano\.json$|\.fn\.json$|\.cweb\.json$|\.json$/,
-				'.fn.json'
-			);
+			const fnPath = fnJsonPathFor(node.path);
 			const fnName = fnPath.split('/').pop()!;
 			if (
 				treeHasPath(this.fileTree, fnPath) ||

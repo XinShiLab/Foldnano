@@ -55,46 +55,46 @@ hidden drafts from recent commits for a human to rewrite. See `docs/whats-new.md
 
 ## Where to look (entry-point docs)
 
-| Topic                                                          | Doc                                                             |
-| -------------------------------------------------------------- | --------------------------------------------------------------- |
-| Top-level source layout and process layers                     | `docs/architecture.md`                                          |
-| Domain model (Part / Plane / DesignRegion / VH / Oligo)        | `docs/dna-model.md`                                             |
-| Spatial index (O(1) hit-test cache keyed by `vh.id`)           | `docs/spatial-index.md`                                         |
-| Svelte 5 runes inside classes, `SvelteSet` / snapshots         | `docs/reactivity-patterns.md`                                   |
-| Mode/tool architecture, hit testing                            | `docs/canvas-editor-tools.md`                                   |
-| Strand-view selection, hit priority                            | `docs/selection-system.md`                                      |
-| Strand viewer (2D Konva)                                       | `docs/editor-strand-viewer.md`                                  |
-| Helix / freeform plane viewers                                 | `docs/editor-helix-viewer.md`, `docs/editor-freeform-viewer.md` |
-| 3D view + plane gizmo                                          | `docs/editor-3d-view.md`                                        |
-| External structure overlay (mrDNA `.txt` / PDB `.pdb` into 3D) | `docs/editor-3d-external-overlay.md`                            |
-| Repeat units (duplicate selection, linked mirror oligos)       | `docs/repeat-units.md`                                          |
-| Rigid-body simulation (transient, render-only)                 | `docs/rigid-body-simulation.md`                                 |
-| Commands, undo/redo, history mementos                          | `docs/commands-and-history.md`                                  |
-| Workspace help (`?` overlay, `help()` attachment, first visit) | `docs/workspace-help.md`                                        |
-| Routes, page wiring, multi-tab init                            | `docs/routes-guide.md`                                          |
-| Landing page (`/`), 3D hero, featured design                   | `docs/landing-page.md`                                          |
-| Doc site: search, `llms*.txt`, per-page `.md`, Ask AI menu     | `docs/doc-site.md`                                              |
-| About dialog What's New, `whats-new:draft` script              | `docs/whats-new.md`                                             |
-| Local persistence (IndexedDB schema)                           | `docs/storage-architecture.md`                                  |
-| Auto-save thresholds and triggers                              | `docs/autosave.md`                                              |
-| Multi-tab ownership (`TabSync`)                                | `docs/multi-tab-protection.md`                                  |
-| GitHub auth, API proxy, sync flows                             | `docs/github-integration.md`                                    |
-| Build config, git hooks, license generator, docs/lint scripts  | `docs/dev-tooling.md`                                           |
-| Cadnano import/export                                          | `docs/cadnano-import.md`                                        |
-| Simulation NT model (format-agnostic nucleotide model)         | `docs/simulation-nt-model.md`                                   |
-| oxDNA export                                                   | `docs/oxdna-export.md`                                          |
-| mrDNA export                                                   | `docs/mrdna-export.md`                                          |
-| Sequence CSV export                                            | `docs/sequence-csv-export.md`                                   |
-| Script Lab (in-editor Python scripting)                        | `docs/script-lab.md`                                            |
-| Python plugin host (Foldnano-dev side)                         | `docs/python-plugin-system.md`                                  |
-| Plugin authoring (third-party authors)                         | `docs/foldnano-plugin-development-guide.md`                     |
-| End-user instructions                                          | `docs/user-manual.md`                                           |
+| Topic                                                             | Doc                                                             |
+| ----------------------------------------------------------------- | --------------------------------------------------------------- |
+| Top-level source layout and process layers                        | `docs/architecture.md`                                          |
+| Domain model (Part / Plane / DesignRegion / VH / Oligo)           | `docs/dna-model.md`                                             |
+| Spatial index (O(1) hit-test cache keyed by `vh.id`)              | `docs/spatial-index.md`                                         |
+| Svelte 5 runes inside classes, `SvelteSet` / snapshots            | `docs/reactivity-patterns.md`                                   |
+| Mode/tool architecture, hit testing                               | `docs/canvas-editor-tools.md`                                   |
+| Strand-view selection, hit priority                               | `docs/selection-system.md`                                      |
+| Strand viewer (2D Konva)                                          | `docs/editor-strand-viewer.md`                                  |
+| Helix / freeform plane viewers                                    | `docs/editor-helix-viewer.md`, `docs/editor-freeform-viewer.md` |
+| 3D view + plane gizmo                                             | `docs/editor-3d-view.md`                                        |
+| External structure overlay (mrDNA `.txt` / PDB `.pdb` into 3D)    | `docs/editor-3d-external-overlay.md`                            |
+| Repeat units (duplicate selection, linked mirror oligos)          | `docs/repeat-units.md`                                          |
+| Rigid-body simulation (transient, render-only)                    | `docs/rigid-body-simulation.md`                                 |
+| Commands, undo/redo, history mementos                             | `docs/commands-and-history.md`                                  |
+| Workspace help (`?` overlay, `help()` attachment, first visit)    | `docs/workspace-help.md`                                        |
+| Routes, page wiring, multi-tab init                               | `docs/routes-guide.md`                                          |
+| Landing page (`/`), 3D hero, featured design                      | `docs/landing-page.md`                                          |
+| Doc site: search, `llms*.txt`, per-page `.md`, Ask AI menu        | `docs/doc-site.md`                                              |
+| About dialog What's New, `whats-new:draft` script                 | `docs/whats-new.md`                                             |
+| Local persistence (IndexedDB schema)                              | `docs/storage-architecture.md`                                  |
+| Auto-save thresholds and triggers                                 | `docs/autosave.md`                                              |
+| Multi-tab ownership (`TabSync`)                                   | `docs/multi-tab-protection.md`                                  |
+| GitHub auth, API proxy, sync flows                                | `docs/github-integration.md`                                    |
+| Build config, git hooks, license generator, docs/lint scripts     | `docs/dev-tooling.md`                                           |
+| Cadnano import/export                                             | `docs/cadnano-import.md`                                        |
+| Simulation NT model (format-agnostic nucleotide model)            | `docs/simulation-nt-model.md`                                   |
+| oxDNA export                                                      | `docs/oxdna-export.md`                                          |
+| mrDNA export                                                      | `docs/mrdna-export.md`                                          |
+| Sequence CSV export                                               | `docs/sequence-csv-export.md`                                   |
+| Script Lab (in-editor Python scripting)                           | `docs/script-lab.md`                                            |
+| Python plugin host (Foldnano-dev side)                            | `docs/python-plugin-system.md`                                  |
+| Plugin authoring (third-party authors; API refs are test-checked) | `src/content/plugin-development/*.md`                           |
+| End-user instructions (the doc site's user guide)                 | `src/content/guide/*.md`                                        |
 
 Each per-area doc ends with a "Boundaries / Don'ts" section — load the relevant doc before non-trivial edits in that area.
 
 ### Keeping docs in sync
 
-Each `docs/*.md` declares the code it describes in front matter (`covers:` globs; `status: snapshot` for dated reviews).
+Each `docs/*.md` declares the code it describes in front matter (`covers:` globs; `status: snapshot` for dated reviews). Doc-site pages in `src/content/guide/` and `src/content/plugin-development/` can declare `covers:` too; that is how UI and plugin-API files map to the public page explaining them. The plugin API reference pages (Context, Parse, foldnano_mini) are also checked name-by-name by `pnpm test:python`.
 
 - **Update the covering doc in the same commit** when you change behavior, public names, ownership, or a boundary in its area. `pnpm docs:check --file <path>` tells you which doc that is; the pre-commit hook warns about covered code staged without its doc.
 - **After renaming or moving a symbol/file**, grep `docs/` and `src/content/` for the old name.

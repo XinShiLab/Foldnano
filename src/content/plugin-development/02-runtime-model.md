@@ -4,11 +4,16 @@ description: How Foldnano loads, runs, scopes, and applies Python plugins
 category: plugin-development
 order: 2
 slug: runtime-model
+covers:
+  - src/lib/plugin/envClassification.ts
+  - src/lib/plugin/networkPolicy.ts
+  - src/lib/plugin/worker/pyodideConfig.ts
+  - src/lib/plugin/sizeLimits.ts
 ---
 
 # Runtime Model
 
-Foldnano plugins run in a browser Python runtime ([Pyodide](https://pyodide.org/en/0.29.4/index.html), CPython compiled to WebAssembly) hosted by a Web Worker. The main editor remains the owner of the real model; Python receives a serialized input and returns either analysis output or an explicit result to apply.
+Foldnano plugins run in a browser Python runtime ([Pyodide](https://pyodide.org/en/314.0.7/index.html), CPython compiled to WebAssembly) hosted by a Web Worker. The main editor remains the owner of the real model; Python receives a serialized input and returns either analysis output or an explicit result to apply.
 
 ## Runtime Pipeline
 
@@ -21,6 +26,8 @@ Foldnano plugins run in a browser Python runtime ([Pyodide](https://pyodide.org/
 7. The host receives logs, artifacts, JSON results, or a mutation result.
 8. Mutating results are applied only through the selected apply strategy.
 
+If `run()` raises, the run ends with an error: the panel shows the traceback, and the log keeps every line written before the exception. Nothing is applied. To report a problem more readably, catch it and log a message instead, for example around `ctx.get_part_as_foldnano_json()`, which raises `RuntimeError` when the manifest declares another format. A result can also be refused after a clean run; see [When a Result Can't Be Applied](/docs/plugin-development/plugin-formats#when-a-result-cant-be-applied).
+
 Plugins installed under the old, pre-unification shapes (inline `entrypoint` on a normal plugin, or a raw `.py` `entrypointUrl`) are flagged `needs-reinstall` and cannot be activated. Re-import the zip to fix.
 
 ## Environment Tiers
@@ -29,18 +36,20 @@ Your `requirements` and `network` decide which of two Python runtimes your plugi
 
 Within the standard environment, your plugin's own code runs in a fresh namespace each run, but installed libraries and their state are shared with other standard plugins. Do not mutate global library configuration (`np.seterr`, `pd.set_option`, monkey-patching shared modules): it leaks into every other standard plugin's runs; if unavoidable, save and restore the setting inside `run(ctx)`. Prefer staying standard-tier: avoid unnecessary version pins, and ship wheels only for libraries missing from the Pyodide distribution.
 
-Foldnano currently pins **Pyodide 0.29.5** (Python 3.13); the About dialog shows the version your copy runs. The package names and exact versions available in the standard environment are listed in [Packages in Pyodide 0.29](https://pyodide.org/en/0.29.4/usage/packages-in-pyodide.html) (0.29.5 ships the same packages as 0.29.4; machine-readable: [`pyodide-lock.json`](https://cdn.jsdelivr.net/pyodide/v0.29.5/full/pyodide-lock.json)). Develop and test against these versions. Anything importable but not on that list is a pure-Python package micropip fetches from PyPI at its latest version, which classifies your plugin custom-tier.
+Foldnano currently pins **Pyodide 314.0.7** (Python 3.14); the About dialog shows the version your copy runs. The package names and exact versions available in the standard environment are listed in [Packages in Pyodide 314.0.7](https://pyodide.org/en/314.0.7/usage/packages-in-pyodide.html) (machine-readable: [`pyodide-lock.json`](https://cdn.jsdelivr.net/pyodide/v314.0.7/full/pyodide-lock.json)). Develop and test against these versions. Anything importable but not on that list is a pure-Python package micropip fetches from PyPI at its latest version, which classifies your plugin custom-tier.
 
-Bundled wheels must match this runtime. Pure-Python wheels (`py3-none-any`) work across Pyodide versions; a wheel with compiled code must be built for Pyodide 0.29 (platform tag `pyemscripten_2025_0_wasm32` or `pyodide_2025_0_wasm32`). Wheels built for the earlier Pyodide 0.27 (`pyodide_2024_0`) no longer load.
+Bundled wheels must match this runtime. Pure-Python wheels (`py3-none-any`) work across Pyodide versions; a wheel with compiled code must be built for Python 3.14 and Pyodide 314 (`cp314` with platform tag `pyemscripten_2026_0_wasm32`). Wheels built for Pyodide 0.29 (Python 3.13, `pyemscripten_2025_0` or `pyodide_2025_0`) or earlier no longer load.
+
+Pyodide now numbers its releases after the Python version they ship (314 is Python 3.14) and plans one new major release a year. When Foldnano moves to a new one, the distribution packages move with it (Pyodide 314 brought pandas 3, for example), so test your plugin again after an upgrade.
 
 ## Writing Python That Runs In Pyodide
 
 Pyodide is CPython in WebAssembly, and most pure-Python code just works, but the browser sandbox has real limits that surface as runtime errors in plugins. Before debugging in Foldnano, check the upstream Pyodide 0.29 documentation:
 
-- [Pyodide documentation](https://pyodide.org/en/0.29.4/index.html): entry point for everything below.
-- [Python compatibility and WASM constraints](https://pyodide.org/en/0.29.4/usage/wasm-constraints.html): what does not work in the browser, including no `threading`/`multiprocessing` (they import but can't spawn), no `subprocess`, no blocking `socket` networking (so `requests`-style HTTP calls fail), and other removed or stubbed stdlib modules.
-- [Loading packages and micropip](https://pyodide.org/en/0.29.4/usage/loading-packages.html): how `requirements` entries are actually installed, and which wheels micropip accepts (pure-Python wheels from PyPI, or Pyodide/emscripten builds).
-- [Pyodide FAQ](https://pyodide.org/en/0.29.4/usage/faq.html): common patterns and workarounds, including HTTP requests from Python.
+- [Pyodide documentation](https://pyodide.org/en/314.0.7/index.html): entry point for everything below.
+- [Python compatibility and WASM constraints](https://pyodide.org/en/314.0.7/usage/wasm-constraints.html): what does not work in the browser, including no `threading`/`multiprocessing` (they import but can't spawn), no `subprocess`, no blocking `socket` networking (so `requests`-style HTTP calls fail), and other removed or stubbed stdlib modules.
+- [Loading packages and micropip](https://pyodide.org/en/314.0.7/usage/loading-packages.html): how `requirements` entries are actually installed, and which wheels micropip accepts (pure-Python wheels from PyPI, or Pyodide/emscripten builds).
+- [Pyodide FAQ](https://pyodide.org/en/314.0.7/usage/faq.html): common patterns and workarounds, including HTTP requests from Python.
 
 Rule of thumb: keep plugins CPU-bound and self-contained, reading the design from `ctx`, computing, and returning results or a mutation log. If a library spawns threads or touches the network at import time, it will not survive the worker even if it installs cleanly.
 

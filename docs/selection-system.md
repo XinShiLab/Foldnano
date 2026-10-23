@@ -77,6 +77,14 @@ User-facing toggles still cover:
 - crossovers
 - segments
 
+Strand hits carry a `SCAF` / `STAP` category (from `oligo.isScaffold`; crossovers
+take the 3' side's oligo). `filterHitsByUserFilter` requires **both** the kind
+toggle and the category toggle for those hits; non-strand hits pass on either.
+Handlers that expand beyond the hit oligo (same-color / same-length /
+same-modification, crossover partner ends, marquee) run the final end list
+through `filterEndsByStrandType`, so the SCAF/STAP toggles hold for click and
+marquee alike.
+
 ---
 
 ## 3. Hit Priority In Select Mode

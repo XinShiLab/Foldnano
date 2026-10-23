@@ -18,6 +18,11 @@ export const WHATS_NEW_REVIEWED_THROUGH = '2026-10-22T22:09:56+02:00';
 // Newest first. Edit freely; the draft script only inserts new entries at the top.
 export const WHATS_NEW: readonly WhatsNewEntry[] = [
 	{
+		date: '2026-10-23',
+		area: 'Plugins',
+		text: 'Plugins and Script Lab now run Python 3.14 (Pyodide 314), with newer numpy, pandas 3 and matplotlib. Plugins that bundle a compiled wheel need one rebuilt for Python 3.14.',
+	},
+	{
 		date: '2026-10-22',
 		area: 'Plugins',
 		text: 'Save as Plugin turns a Script Lab script into a plugin of your own, with an icon you pick or upload. Run it from the Plugins panel, edit several at once in their own editors, save new versions and export zip backups. Any plugin can now bundle its own icon.',

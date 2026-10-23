@@ -211,6 +211,12 @@ return newPart;
 
 ## Export pipeline: `CadnanoJSON.fromPart()`
 
+**Names.** The top-level `"name"` is not trusted on import: the importer
+(`createDocumentFromImportedPart`, the URL loader) renames the Part to the
+document name, which comes from the file name. On export the toolbar writes the
+exported file name into `"name"` (cadnano2's own convention). See
+`dna-model.md` § Names.
+
 The inverse of import. For each VirtualHelix:
 
 1. Allocate `scaf[L]` and `stap[L]` arrays filled with `[-1,-1,-1,-1]`

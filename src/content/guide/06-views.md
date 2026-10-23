@@ -4,6 +4,8 @@ description: Plane, helix/freeform, strand, and 3D views, including multi-region
 category: guide
 order: 6
 slug: views
+covers:
+  - src/lib/components/Editor/ToolPanel/View3DPanel.svelte
 ---
 
 <script>
@@ -29,6 +31,8 @@ The left pane switches between Plane and 3D with the `Plane / 3D` toggle in its 
 ## Strand View
 
 The strand view is the routing canvas. Rows are grouped by **design region**, and each region gets a collapsible **header row**. Each visible virtual helix has a draggable **VH tag** at its left edge.
+
+To move around, use the **arrow keys** to pan (hold `Shift` for bigger steps), the **mouse wheel** to zoom, or hold `Option` / `Alt` and drag. **Reset view** in the strand-view toolbar returns to the default zoom. Arrow keys pan only while the strand view is the active pane (click it first).
 
 - **Click a region header** (Select mode) makes that region the **active region**; **double-click** it to collapse or expand its rows.
 - **Drag a VH tag** (Select mode) reorders that VH within its region. This changes only the *display* row; identity and crossovers are unaffected.

@@ -4,6 +4,8 @@ description: Load mrDNA results or PDB structures into the 3D view as movable re
 category: guide
 order: 10
 slug: 3d-overlays
+covers:
+  - src/lib/components/Editor/ToolPanel/View3DOverlayPanel.svelte
 ---
 
 <script>

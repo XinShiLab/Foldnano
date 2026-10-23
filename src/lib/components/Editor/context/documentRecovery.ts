@@ -1,4 +1,5 @@
 import FoldnanoDocument from '$lib/model/document.svelte';
+import { exportBaseName } from '$lib/model/io/designFileName';
 import { DocumentFormatError } from '$lib/model/documentFormat';
 import type { BackupReason, LocalBackup } from '$lib/services/storage';
 import { toast } from 'svelte-sonner';
@@ -75,8 +76,7 @@ export function backupFileName(designName: string, createdAt: number): string {
 	const d = new Date(createdAt);
 	const pad = (n: number) => String(n).padStart(2, '0');
 	const stamp = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}-${pad(d.getMinutes())}`;
-	const base = designName.trim().replace(/[\\/:*?"<>|]/g, '-') || 'design';
-	return `${base} (backup ${stamp}).fn.json`;
+	return `${exportBaseName(designName)} (backup ${stamp}).fn.json`;
 }
 
 function isReadable(snapshot: object): boolean {

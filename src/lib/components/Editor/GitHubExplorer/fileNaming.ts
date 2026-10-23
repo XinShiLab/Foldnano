@@ -1,6 +1,7 @@
+import { FN_JSON_EXT } from '$lib/model/io/designFileName';
 import type { FileNode } from './types';
 
-export const FN_JSON_EXT = '.fn.json';
+export { FN_JSON_EXT };
 
 /** Only native Foldnano files can be renamed from the explorer; this is not a general file manager. */
 export function isRenamableFile(node: FileNode): boolean {

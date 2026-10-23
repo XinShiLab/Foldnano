@@ -1,5 +1,6 @@
 import type { SegmentEnd } from '$lib/model/Oligo';
 import type { HandlerInstance } from '../../types';
+import { filterEndsByStrandType } from '../selectUtils';
 
 // create EndMoving handler
 export function createEndHandler(): HandlerInstance {
@@ -13,7 +14,7 @@ export function createEndHandler(): HandlerInstance {
 			const segment = ctx.part.getSegmentById(segmentId);
 			if (!segment) return false;
 			const endToMove = isThreePrime ? segment.threePrime : segment.fivePrime;
-			const selectedEnds: SegmentEnd[] = [endToMove];
+			let selectedEnds: SegmentEnd[] = [endToMove];
 			if (ctx.strandCtx.selectAllMode === 'SAME_MODI' && endToMove.modification !== null) {
 				const targetModi = endToMove.modification;
 				const allEnds: Set<SegmentEnd> = new Set();
@@ -27,6 +28,7 @@ export function createEndHandler(): HandlerInstance {
 				});
 
 				selectedEnds.push(...Array.from(allEnds));
+				selectedEnds = filterEndsByStrandType(selectedEnds, ctx.strandCtx.selectionFilter);
 			}
 
 			if (selectedEnds.length === 0) return false;

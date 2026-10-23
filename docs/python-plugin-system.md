@@ -33,7 +33,7 @@ MAIN THREAD
         │
   SandboxedWorker (sandboxHost.ts) ← hidden <iframe sandbox="allow-scripts">, CSP
         │  (MessagePort handed to the worker at boot)
-WEB WORKER (classic blob: worker, origin "null")
+WEB WORKER (module worker from a data: URL, origin "null")
   pyodide.worker.ts               ← Pyodide runtime, runs plugin code
         │
   /foldnano/ + /foldnano_mini/ (virtual filesystem) ← bundled Python packages
@@ -75,11 +75,11 @@ Plugins are third-party code the user chose to run, so the trust model is "like 
 
 **What it does not isolate:** plugins that share the standard-tier worker share one interpreter, so they can observe or monkeypatch each other's modules; and the plugin still receives the full design JSON and can return any result (validated before Apply as usual).
 
-**Build.** The worker is imported as a string with `?sandbox-worker` (`scripts/vite-sandbox-worker.ts`, see `docs/dev-tooling.md`): esbuild bundles it as a classic IIFE with every module of the Python packages inlined (`virtual:foldnano-python-packages`; a new `.py` file needs no worker change). Module workers fail silently in an opaque origin, so it must not go through Vite's worker pipeline. Pyodide itself is loaded with a dynamic `import()` of `pyodide.mjs` from the URLs in `INIT_RUNTIME`.
+**Build.** The worker is imported as a string with `?sandbox-worker` (`scripts/vite-sandbox-worker.ts`, see `docs/dev-tooling.md`): esbuild bundles it as one self-contained ES module with every module of the Python packages inlined (`virtual:foldnano-python-packages`; a new `.py` file needs no worker change). The iframe starts it as a module worker from a `data:` URL (`worker-src data:`): Pyodide 314+ requires a module worker, and a `blob:` module worker fails silently in an opaque origin. A `data:` worker inherits the iframe's CSP. It must not go through Vite's worker pipeline. Pyodide itself is loaded with a dynamic `import()` of `pyodide.mjs` from the URLs in `INIT_RUNTIME`.
 
-**Self-hosted Pyodide core.** The core (`pyodide.mjs`, `pyodide.asm.js`/`.wasm`, `python_stdlib.zip`, `pyodide-lock.json`; `PYODIDE_CORE_FILES`) comes from the exact-pinned `pyodide` devDependency, so `pnpm-lock.yaml` checks it, and `selfHostedPyodide()` (`scripts/vite-pyodide.ts`) emits it into the client build at `PYODIDE_CORE_PATH` (`/pyodide/v<version>/`). Distribution packages (numpy, …) still come from jsDelivr (`PYODIDE_PACKAGE_BASE_URL`, passed as `packageBaseUrl`); Pyodide checks each against the sha256 in the self-hosted lock file (`checkIntegrity`, on by default). The sandbox is cross-origin to the app, so `vercel.json` serves the core with `Access-Control-Allow-Origin: *` (and an immutable cache header; the path is versioned). The worker can't resolve app paths from its opaque origin, so the bridge resolves them (`pyodideUrls`) and sends absolute URLs in `INIT_RUNTIME`. `buildSandboxCsp` allows scripts only from the core path and connections to the core and package paths. **On loopback pages (`pnpm dev`, `pnpm preview`) the core comes from the CDN instead** (same pinned release): Chrome's local-network protection blocks the opaque-origin sandbox from fetching localhost at all, even with CORS and `Access-Control-Allow-Private-Network`. So self-hosting is exercised only on a deployed site. Vercel previews couldn't load it either: Deployment Protection redirects the sandbox's cookieless requests to the login page. So preview builds (`VERCEL_ENV=preview`, baked in as `__PYODIDE_SELF_HOSTED__` by `vite.config.ts`) also use the CDN; production self-hosts. To test self-hosting itself, build a preview without that switch and with protection off, or check production. `VITE_PYODIDE_INDEX_URL` points core and packages at another full distribution, for debugging.
+**Self-hosted Pyodide core.** The core (`pyodide.mjs`, `pyodide.asm.mjs`/`.wasm`, `python_stdlib.zip`, `pyodide-lock.json`; `PYODIDE_CORE_FILES`) comes from the exact-pinned `pyodide` devDependency, so `pnpm-lock.yaml` checks it, and `selfHostedPyodide()` (`scripts/vite-pyodide.ts`) emits it into the client build at `PYODIDE_CORE_PATH` (`/pyodide/v<version>/`). Distribution packages (numpy, …) still come from jsDelivr (`PYODIDE_PACKAGE_BASE_URL`, passed as `packageBaseUrl`); Pyodide checks each against the sha256 in the self-hosted lock file (`checkIntegrity`, on by default). The sandbox is cross-origin to the app, so `vercel.json` serves the core with `Access-Control-Allow-Origin: *` (and an immutable cache header; the path is versioned). The worker can't resolve app paths from its opaque origin, so the bridge resolves them (`pyodideUrls`) and sends absolute URLs in `INIT_RUNTIME`. `buildSandboxCsp` allows scripts only from the core path and connections to the core and package paths. **On loopback pages (`pnpm dev`, `pnpm preview`) the core comes from the CDN instead** (same pinned release): Chrome's local-network protection blocks the opaque-origin sandbox from fetching localhost at all, even with CORS and `Access-Control-Allow-Private-Network`. So self-hosting is exercised only on a deployed site. Vercel previews couldn't load it either: Deployment Protection redirects the sandbox's cookieless requests to the login page. So preview builds (`VERCEL_ENV=preview`, baked in as `__PYODIDE_SELF_HOSTED__` by `vite.config.ts`) also use the CDN; production self-hosts. To test self-hosting itself, build a preview without that switch and with protection off, or check production. `VITE_PYODIDE_INDEX_URL` points core and packages at another full distribution, for debugging.
 
-**Upgrading Pyodide.** Bump the `pyodide` devDependency (exact), `PYODIDE_VERSION` and `PYODIDE_PYTHON_VERSION` together, then run `pnpm gen:pyodide-packages` (it reads the installed lock file); `pyodideConfig.spec.ts` fails on a mismatch. JS `null` reaches Python as `jsnull` since 0.28, so the worker passes `undefined` for absent inputs. Pyodide 314+ ships an ES-module core and drops classic-worker support, which the sandbox relies on; evaluate it separately.
+**Upgrading Pyodide.** Bump the `pyodide` devDependency (exact), `PYODIDE_VERSION` and `PYODIDE_PYTHON_VERSION` together, then run `pnpm gen:pyodide-packages` (it reads the installed lock file); `pyodideConfig.spec.ts` fails on a mismatch. JS `null` reaches Python as `jsnull` since 0.28, so the worker passes `undefined` for absent inputs. Since 314 Pyodide versions follow Python (314 = Python 3.14, one major a year); a major bump changes the binary format, so compiled third-party wheels must be rebuilt, and the distribution packages move too (314 brought pandas 3). Also move `src/lib/plugin/python/.python-version` to the new Python and run `pnpm test:python`, run the bundled plugins, and update the pinned version and links in `src/content/plugin-development/`.
 
 ---
 
@@ -562,7 +562,7 @@ def run(ctx: PluginContext) -> None:
     ctx.set_result_foldnano_json(json.dumps(part._raw))
 ```
 
-See [foldnano-plugin-development-guide.md](foldnano-plugin-development-guide.md) for the complete proxy API reference and patterns.
+The complete proxy API is on the doc site's API reference pages (`src/content/plugin-development/`: Context, Parse and foldnano_mini); `tests/test_api_reference_pages.py` fails when they drift from the code.
 
 ---
 
@@ -806,7 +806,7 @@ Classification only **routes** plugins — it never refuses them (`SUPPORTED_REQ
 
 | Component        | Definition                                                                                                                                                                      |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Identity / label | The pinned Pyodide version (`PYODIDE_VERSION` in `src/lib/plugin/worker/pyodideConfig.ts`, currently `0.29.5`). Upgrading it _is_ the env version bump.                         |
+| Identity / label | The pinned Pyodide version (`PYODIDE_VERSION` in `src/lib/plugin/worker/pyodideConfig.ts`, currently `314.0.7`, Python 3.14). Upgrading it _is_ the env version bump.           |
 | Dist packages    | The package set of that Pyodide release, vendored in `src/lib/plugin/pyodideDistPackages.json` (regenerate with `pnpm gen:pyodide-packages`).                                   |
 | Standard extras  | First-party pinned wheels in `STANDARD_ENV_EXTRAS` (`envClassification.ts`). Currently: `cadnano2_5_mini` 0.1.0. Authors write the bare name; the host resolves the pinned URL. |
 
@@ -1314,7 +1314,7 @@ Coverage: `initRuntime` idempotency, RUNTIME_ERROR retry, concurrent installs an
 
 - Don't hand-edit `python/stubs/**` or `python-api-index.generated.json`; change the Python source (signature, annotation, docstring, `__all__`) and regenerate.
 
-This file is for **Foldnano developers** working on the host side of the plugin system. Plugin authors should read `foldnano-plugin-development-guide.md`.
+This file is for **Foldnano developers** working on the host side of the plugin system. Plugin authors should read the doc site's Plugin Development pages (`src/content/plugin-development/`).
 
 - **The worker never mutates the app model.** It returns artifacts and (for `foldnano_mini`) a structured mutation log. The main thread applies them via `ResultApplicator` inside `historyStack.snapshotTx` — one undo step per plugin run.
 - **Don't change what an existing manifest field means** in a new schema version; add a new field. Unversioned manifests are read as v1, so a changed meaning would be misread silently.

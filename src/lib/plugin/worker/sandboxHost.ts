@@ -5,10 +5,11 @@
  * (no `allow-same-origin`, so its origin is opaque). Plugin code therefore
  * cannot reach the app's origin: no `/api/*` with the user's cookies, no
  * IndexedDB, Web Locks or BroadcastChannel. A CSP in the iframe (inherited by
- * its blob: worker) enforces the network allowlist.
+ * its data: worker) enforces the network allowlist.
  *
  * Boot: the host posts the worker source and one end of a MessageChannel into
- * the iframe; the iframe starts a classic blob: worker and hands it the port.
+ * the iframe; the iframe starts a module worker from a data: URL and hands it
+ * the port.
  * After that, protocol traffic flows host ↔ worker directly over the port.
  *
  * See docs/python-plugin-system.md § Sandbox and
@@ -41,7 +42,7 @@ export function buildSandboxCsp(connectSources: readonly string[]): string {
 	return [
 		"default-src 'none'",
 		`script-src 'unsafe-inline' ${indexUrl} 'wasm-unsafe-eval'`,
-		'worker-src blob:',
+		'worker-src data:',
 		`connect-src ${connect.join(' ')}`,
 	].join('; ');
 }
@@ -54,8 +55,9 @@ onmessage = (e) => {
 	onmessage = null;
 	const report = (message) => parent.postMessage({ type: '${ERROR_MESSAGE}', message }, '*');
 	try {
-		const url = URL.createObjectURL(new Blob([e.data.source], { type: 'text/javascript' }));
-		const worker = new Worker(url);
+		// Pyodide 314+ needs a module worker; from a blob: URL those fail silently in an opaque origin.
+		const url = 'data:text/javascript;charset=utf-8,' + encodeURIComponent(e.data.source);
+		const worker = new Worker(url, { type: 'module' });
 		worker.onerror = (ev) => {
 			ev.preventDefault();
 			report(ev.message || 'Plugin worker failed to start');

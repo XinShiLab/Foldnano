@@ -35,6 +35,7 @@
 	} from './transformGizmo';
 	import { createPlaneOverlay, type PlaneOverlayResult } from './planeOverlay';
 	import { getEditorViewContext } from '$lib/components/Editor/context/EditorViewContext.svelte';
+	import { exportBaseName } from '$lib/model/io/designFileName';
 	import { disposeGroup } from './threeUtils';
 	import {
 		downloadScreenshot,
@@ -203,6 +204,7 @@
 	let _mouseDownPos = { x: 0, y: 0 };
 
 	const editorViewContext = getEditorViewContext();
+	const exportFileBase = $derived(exportBaseName(editorViewContext.currentDoc.name));
 
 	// ── Mouse / raycasting helpers ────────────────────────────────────────────
 
@@ -932,8 +934,7 @@
 		scene.add(planeSelector.group);
 
 		// ── Expose scene-dependent functions to parent ─────────────────────────
-		downloadFn = () =>
-			downloadScreenshot(renderer, localScene, camera, `${part.name || 'view3d'}.png`);
+		downloadFn = () => downloadScreenshot(renderer, localScene, camera, `${exportFileBase}.png`);
 
 		exportGlbFn = () => {
 			const exportGroup = buildExportScene(
@@ -945,7 +946,7 @@
 				showVH,
 				useRelaxedPositions ? (simOverrides ?? undefined) : undefined
 			);
-			exportGlb(exportGroup, `${part.name || 'view3d'}.glb`);
+			exportGlb(exportGroup, `${exportFileBase}.glb`);
 		};
 
 		exportOxDnaFn = (opts) => {
@@ -956,7 +957,7 @@
 				oxDnaDialogOpen = true;
 			} else {
 				downloadOxDnaFiles(
-					part.name || 'view3d',
+					exportFileBase,
 					exportPartToOxDna(part, overrides, 'T', pendingIncludeMirrors)
 				);
 			}
@@ -970,7 +971,7 @@
 				mrdnaDialogOpen = true;
 			} else {
 				downloadMrdnaFile(
-					part.name || 'view3d',
+					exportFileBase,
 					exportPartToMrdna(part, {
 						segPositionOverrides: overrides,
 						includeMirrors: pendingIncludeMirrors,
@@ -1147,7 +1148,7 @@
 	bind:open={oxDnaDialogOpen}
 	onConfirm={(fallback: OxDnaFallbackBase) => {
 		downloadOxDnaFiles(
-			part.name || 'view3d',
+			exportFileBase,
 			exportPartToOxDna(part, pendingExportOverrides, fallback, pendingIncludeMirrors)
 		);
 		pendingExportOverrides = undefined;
@@ -1161,7 +1162,7 @@
 	bind:open={mrdnaDialogOpen}
 	onConfirm={(fallback: MrdnaFallbackBase) => {
 		downloadMrdnaFile(
-			part.name || 'view3d',
+			exportFileBase,
 			exportPartToMrdna(part, {
 				fallbackBase: fallback,
 				segPositionOverrides: pendingExportOverrides,

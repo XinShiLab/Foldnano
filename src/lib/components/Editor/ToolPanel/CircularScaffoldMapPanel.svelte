@@ -5,6 +5,7 @@
 	import { SvelteSet } from 'svelte/reactivity';
 	import { toast } from 'svelte-sonner';
 	import { getEditorViewContext } from '../context/EditorViewContext.svelte';
+	import { exportBaseName } from '$lib/model/io/designFileName';
 	import type { Part } from '$lib/model/Part';
 	import type Oligo from '$lib/model/Oligo';
 	import type { SegmentEnd } from '$lib/model/Oligo';
@@ -158,7 +159,7 @@
 		const blob = new Blob([str], { type: 'image/svg+xml;charset=utf-8' });
 		const url = URL.createObjectURL(blob);
 		const link = document.createElement('a');
-		link.download = `scaffold-map-${part.name ?? 'design'}.svg`;
+		link.download = exportBaseName(ctx.currentDoc.name, '_scaffold-map.svg');
 		link.href = url;
 		document.body.appendChild(link);
 		link.click();

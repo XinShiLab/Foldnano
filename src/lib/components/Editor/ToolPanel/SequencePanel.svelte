@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { FILTER_TOGGLE_CLASS, SCAF_TOGGLE_CLASS, STAP_TOGGLE_CLASS } from './filterToggleClasses';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
@@ -116,7 +117,7 @@
 	<ToggleGroup.Root type="multiple" variant="outline" bind:value={strandCtx.selectionToggles}>
 		<ToggleGroup.Item
 			value="SCAF"
-			class="w-12 text-xs text-sky-800 hover:text-sky-800 data-[state=on]:text-sky-800"
+			class={SCAF_TOGGLE_CLASS}
 			{@attach help({
 				key: 'c',
 				title: 'Scaffold',
@@ -127,7 +128,7 @@
 		</ToggleGroup.Item>
 		<ToggleGroup.Item
 			value="STAP"
-			class="w-12 text-xs text-red-800 hover:text-red-800 data-[state=on]:text-red-800"
+			class={STAP_TOGGLE_CLASS}
 			{@attach help({
 				key: 't',
 				title: 'Staples',
@@ -142,6 +143,7 @@
 	<ToggleGroup.Root type="multiple" variant="outline" bind:value={strandCtx.selectionToggles}>
 		<ToggleGroup.Item
 			value="SEGMENT"
+			class={FILTER_TOGGLE_CLASS}
 			{@attach help({
 				key: 'd',
 				title: 'Segments',
@@ -152,6 +154,7 @@
 		</ToggleGroup.Item>
 		<ToggleGroup.Item
 			value="OLIGO"
+			class={FILTER_TOGGLE_CLASS}
 			{@attach help({
 				key: 'o',
 				title: 'Oligos',

@@ -3,6 +3,7 @@ import { createContext } from 'svelte';
 import FoldnanoDocument, { type DocSnapshot } from '$lib/model/document.svelte';
 import { DocumentFormatError, migrateDocumentJson } from '$lib/model/documentFormat';
 import { repairDocumentJson } from '$lib/model/documentRepair';
+import { designNameFromPath, splitDesignExtension } from '$lib/model/io/designFileName';
 import { HistoryStack } from '$lib/commands/history.svelte';
 import {
 	StorageManager,
@@ -374,7 +375,7 @@ export class EditorDocumentSession {
 		};
 		githubMetadataStore.setFileMetadata(this.#currentDoc.id, updated);
 		this.#currentFileMetadata = updated;
-		this.#currentDoc.name = basenameWithoutExt(newPath);
+		this.#currentDoc.name = designNameFromPath(newPath);
 	}
 
 	/** Local-only files have no GitHub metadata to derive the name from, so the explorer pushes it here. */
@@ -768,6 +769,8 @@ export class EditorDocumentSession {
 
 			const newDoc = new FoldnanoDocument();
 			newDoc.name = name;
+			// The name inside a cadnano file is often a stale file name; keep one name per document.
+			part.name = name;
 			newDoc.parts.push(part);
 
 			await this.#adoptDocument(newDoc, {
@@ -1076,22 +1079,14 @@ export class EditorDocumentSession {
 function deriveNewPath(oldPath: string, newName: string): string {
 	const lastSlash = oldPath.lastIndexOf('/');
 	const dir = lastSlash >= 0 ? oldPath.substring(0, lastSlash + 1) : '';
-	const filename = lastSlash >= 0 ? oldPath.substring(lastSlash + 1) : oldPath;
-	const dotIdx = filename.indexOf('.');
-	const ext = dotIdx >= 0 ? filename.substring(dotIdx) : '';
+	const { ext } = splitDesignExtension(oldPath.substring(lastSlash + 1));
 	return dir + newName + ext;
 }
 
 /** A GitHub-backed document is named after its file; the name stored inside the JSON goes stale when the file is renamed. */
 function syncNameWithPath(doc: FoldnanoDocument, path: string): void {
-	const pathName = basenameWithoutExt(path);
+	const pathName = designNameFromPath(path);
 	if (pathName && pathName !== doc.name) doc.name = pathName;
-}
-
-function basenameWithoutExt(path: string): string {
-	const filename = path.split('/').pop() ?? path;
-	const dotIdx = filename.indexOf('.');
-	return dotIdx >= 0 ? filename.substring(0, dotIdx) : filename;
 }
 
 export const [getEditorDocumentSession, setEditorDocumentSession] =

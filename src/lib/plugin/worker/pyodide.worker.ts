@@ -6,9 +6,9 @@
  *   INSTALL_PLUGIN — installs micropip requirements for a plugin
  *   RUN_PLUGIN     — executes a plugin's run(ctx) function, returns artifacts
  *
- * Runs as a classic script inside the opaque-origin plugin sandbox
+ * Runs as a data: module worker inside the opaque-origin plugin sandbox
  * (sandboxHost.ts); it is imported as a string via `?sandbox-worker`, never
- * as a module worker. Every module of the foldnano Python packages is inlined
+ * through Vite's worker pipeline. Every module of the foldnano Python packages is inlined
  * from `virtual:foldnano-python-packages` and written into Pyodide's virtual
  * filesystem at init time.
  */
@@ -293,8 +293,7 @@ function describeError(e: unknown): string {
 
 async function initRuntime(indexUrl: string, packageBaseUrl: string): Promise<void> {
 	try {
-		// A non-literal specifier stays a runtime import; dynamic import() works in the
-		// classic worker the sandbox runs.
+		// A non-literal specifier stays a runtime import of the pinned core.
 		const { loadPyodide } = (await import(`${indexUrl}pyodide.mjs`)) as {
 			loadPyodide: (opts: {
 				indexURL: string;

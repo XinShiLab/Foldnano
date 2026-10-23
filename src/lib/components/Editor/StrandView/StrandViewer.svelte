@@ -52,6 +52,7 @@
 		stage: undefined as Stage | undefined,
 		updateViewportBounds,
 		updateViewportScale,
+		panBy,
 	});
 
 	let stage = $state<Stage>();
@@ -143,6 +144,13 @@
 			width: bounds.width,
 			height: bounds.height,
 		};
+	}
+
+	function panBy(dx: number, dy: number) {
+		const node = stage?.node;
+		if (!node) return;
+		node.position({ x: node.x() + dx, y: node.y() + dy });
+		updateViewportBounds();
 	}
 
 	function updateViewportScale() {

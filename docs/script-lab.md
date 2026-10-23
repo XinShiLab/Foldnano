@@ -15,7 +15,7 @@ This file is for:
 - Foldnano developers and AI agents maintaining Script Lab itself
 - developers and agents who want to build similar third-party plugins using the host-owned `codeEditor` side panel
 
-For the general host architecture, read [python-plugin-system.md](python-plugin-system.md). For the plugin authoring API, read [foldnano-plugin-development-guide.md](foldnano-plugin-development-guide.md).
+For the general host architecture, read [python-plugin-system.md](python-plugin-system.md). For the plugin authoring API, read the doc site's plugin pages (`src/content/plugin-development/`).
 
 ---
 
@@ -314,7 +314,13 @@ Script Lab ships three built-in starters in `scriptLabManifest.ts`:
 
 - `SCRIPT_LAB_MUTATION_TEMPLATE`
 - `SCRIPT_LAB_ANALYSIS_TEMPLATE`
-- `SCRIPT_LAB_FULL_API_DEMO_TEMPLATE` — exercises every `foldnano_mini` op kind against the current active region/design (discovering VHs, oligos, and regions dynamically rather than using a fixed fixture, and using the `can_*` checks to skip a step with its reason instead of failing); see `docs/foldnano-plugin-development-guide.md` § ScriptLab Full API Demo
+- `SCRIPT_LAB_FULL_API_DEMO_TEMPLATE` — exercises every `foldnano_mini` op kind against the current active region/design (discovering VHs, oligos, and regions dynamically rather than using a fixed fixture, and using the `can_*` checks to skip a step with its reason instead of failing). Users load it from **Script Lab Help → Load Full API Demo**. It runs in sections A–I, each skipped with a `SKIPPED` line when its preconditions are missing:
+  A oligo color / name / scaffold flag; B modifications, slot sequence, skips and insertions;
+  C helix and region length; D `create_segment` and `create_oligo`; E `break_oligo` and
+  `move_terminus`; F adding lattice and freeform helices; G moving, reframing and reordering
+  helices; H plane transform, `add_region_and_plane`, `split_region`; I removing what it made.
+  It ends with `ctx.set_result_mutation_log(part.mutation_log)`, so Apply shows every op and one
+  Undo reverts them all.
 
 Why keep them in code instead of static files:
 

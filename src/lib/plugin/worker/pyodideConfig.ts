@@ -7,10 +7,10 @@
  * match. After changing it, rerun `pnpm gen:pyodide-packages` to refresh the
  * vendored dist-package list used by env classification.
  */
-export const PYODIDE_VERSION = '0.29.5';
+export const PYODIDE_VERSION = '314.0.7';
 
 /** Python version of the pinned Pyodide (its lock file's `info.python`). */
-export const PYODIDE_PYTHON_VERSION = '3.13.2';
+export const PYODIDE_PYTHON_VERSION = '3.14.2';
 
 /** Same-origin path of the self-hosted core (pyodide.mjs, asm, stdlib, lock file). */
 export const PYODIDE_CORE_PATH = `/pyodide/v${PYODIDE_VERSION}/`;

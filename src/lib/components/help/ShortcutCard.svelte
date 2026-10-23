@@ -77,6 +77,11 @@
 		{ key: 'd', label: 'Segments' },
 		{ key: 'o', label: 'Oligos' },
 	];
+
+	const strandNavShortcuts = [
+		{ keys: ['←↑↓→'], label: 'Pan view' },
+		{ keys: ['⇧', '←↑↓→'], label: 'Pan view faster' },
+	];
 </script>
 
 {#snippet chordSection(title: string, rows: { keys: string[]; label: string }[])}
@@ -145,6 +150,7 @@
 
 		{@render section('Editor Modes', modeShortcuts)}
 		{#if activeViewer === 'STRAND'}
+			{@render chordSection('Strand View', strandNavShortcuts)}
 			{@render section('Selection Filters', filterShortcuts)}
 		{/if}
 		{#if activeViewer === 'VIEW3D'}

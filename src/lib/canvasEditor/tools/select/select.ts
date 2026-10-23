@@ -4,7 +4,7 @@ import type { ViewContext } from '../../core/views';
 import { createEndHandler } from './handlers/onEnd';
 import { removeMoveEndBox } from './handlers/movingEndsOps';
 import type { HandlerInstance, WorldPt } from '../types';
-import { allowedByUserFilter } from './selectUtils';
+import { filterHitsByUserFilter } from './selectUtils';
 import { createEmptyHandler, hideMarquee } from './handlers/onEmpty';
 import { createSegmentHandler } from './handlers/onSegment';
 import { createOligoHandler } from './handlers/onOligo';
@@ -48,13 +48,7 @@ function byPriority(a: HitResult, b: HitResult) {
 function filteredHits(ctx: ViewContext, world: WorldPt, directTargetId?: string) {
 	const hits = ctx.hit.hitAt(world, directTargetId);
 	if (ctx.strandCtx.selectionFilter.size === 0) return hits; // no filtering
-	return hits
-		.filter(
-			(h) =>
-				allowedByUserFilter(h.kind, () => ctx.strandCtx.selectionFilter) ||
-				allowedByUserFilter(h.category || 'UNKNOWN', () => ctx.strandCtx.selectionFilter) // TODO: adjust as needed
-		)
-		.sort(byPriority);
+	return filterHitsByUserFilter(hits, ctx.strandCtx.selectionFilter).sort(byPriority);
 }
 
 /* ===================== Handlers (each with private state) ===================== */

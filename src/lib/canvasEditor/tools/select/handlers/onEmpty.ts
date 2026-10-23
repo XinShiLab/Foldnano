@@ -2,7 +2,12 @@ import type { TemporalPartInfo } from '$lib/components/Editor/context/types';
 import type { SegmentEnd } from '$lib/model/Oligo';
 import type { ViewContext } from '$lib/canvasEditor/core/views';
 import type { HandlerInstance, WorldPt, WorldRect } from '../../types';
-import { allowedByUserFilter, isDefined } from '../selectUtils';
+import {
+	allowedByUserFilter,
+	filterEndsByStrandType,
+	isDefined,
+	strandCategoryOf,
+} from '../selectUtils';
 import { clearAllTempParts, removeTempPartsByType } from './drawTempPartsOps';
 import { parseEndSelectId, rectFrom } from './utils';
 
@@ -34,7 +39,7 @@ export function hideMarquee(ctx: ViewContext) {
 /**  rules to include and potentially add more ends to selection (Selection only holds Ends)
  * if 'SEGMENT' is in filter, select all ends of the segments of selected ends,
  * if 'OLIGO' is in filter, select all ends of the oligos of selected ends,
- * if 'SCAF' or 'STAP' is in filter, only select ends that belong to segments that belong to oligos with isScaffold property is true
+ * only ends whose oligo type ('SCAF' = isScaffold, 'STAP' = not) is in filter are kept
  * if 'XOVER' is in filter, select all ends connected by crossovers to selected ends (check end's .connectedEnd)
  * if only 'END' is in filter, only select free ends (isFree === true)*/
 function fromHitsCandsToSelectedEnds(
@@ -47,6 +52,7 @@ function fromHitsCandsToSelectedEnds(
 		if (!segment) return;
 		const end = isThreePrime ? segment.threePrime : segment.fivePrime;
 		if (!end) return;
+		if (!ctx.strandCtx.selectionFilter.has(strandCategoryOf(end))) return;
 
 		// if only 'END' is in filter, only select free ends
 		if (allowedByUserFilter('END', () => ctx.strandCtx.selectionFilter)) {
@@ -78,7 +84,7 @@ function fromHitsCandsToSelectedEnds(
 			}
 		}
 	});
-	return endsToSelect;
+	return filterEndsByStrandType(endsToSelect, ctx.strandCtx.selectionFilter);
 }
 
 export function createEmptyHandler(): HandlerInstance {

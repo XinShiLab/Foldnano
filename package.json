@@ -1,7 +1,7 @@
 {
 	"name": "foldnano",
 	"private": true,
-	"version": "0.9.0-beta.1",
+	"version": "0.10.0-beta.1",
 	"license": "MIT",
 	"author": "Xin Shi (KU Leuven)",
 	"homepage": "https://fold.xinshilab.com",
@@ -73,7 +73,7 @@
 		"prettier": "^3.9.9",
 		"prettier-plugin-svelte": "^3.5.2",
 		"prettier-plugin-tailwindcss": "^0.8.1",
-		"pyodide": "0.29.5",
+		"pyodide": "314.0.7",
 		"rehype-slug": "^6.0.0",
 		"shadcn-svelte": "^1.7.0",
 		"shiki": "^4.4.3",

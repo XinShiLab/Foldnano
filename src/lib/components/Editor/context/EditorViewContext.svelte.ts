@@ -65,6 +65,8 @@ export interface StrandToolbarController {
 	stage: Stage | undefined;
 	updateViewportBounds: () => void;
 	updateViewportScale: () => void;
+	/** Shifts the view by screen pixels; positive dx/dy moves the content right/down. */
+	panBy: (dx: number, dy: number) => void;
 }
 
 export interface HelixToolbarController {

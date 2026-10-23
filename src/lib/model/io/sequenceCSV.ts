@@ -4,6 +4,7 @@
 import type { Part } from '../Part/Part.svelte';
 import type FoldnanoDocument from '../document.svelte';
 import type Oligo from '../Oligo/Oligo.svelte';
+import { exportBaseName } from './designFileName';
 
 /** One row in the exported CSV */
 interface OligoSequenceRecord {
@@ -98,17 +99,17 @@ export function sequencesToCSV(records: OligoSequenceRecord[]): string {
 	return [header, ...lines].join('\n');
 }
 
-/** Convenience: export one Part to CSV */
-export function exportPartSequencesToCSV(part: Part) {
+/** Convenience: export one Part to CSV, named after its document (`docName`). */
+export function exportPartSequencesToCSV(part: Part, docName: string) {
 	const csvString = sequencesToCSV(collectPartOligoSequences(part));
-	downloadCSVAsTextFile(part.name || 'part_sequences', csvString);
+	downloadCSVAsTextFile(exportBaseName(docName), csvString);
 	return;
 }
 
 /** Convenience: export entire Document to CSV */
 export function exportDocumentSequencesToCSV(doc: FoldnanoDocument) {
 	const csvString = sequencesToCSV(collectDocumentOligoSequences(doc));
-	downloadCSVAsTextFile(doc.name || 'part_sequences', csvString);
+	downloadCSVAsTextFile(exportBaseName(doc.name), csvString);
 	return;
 }
 

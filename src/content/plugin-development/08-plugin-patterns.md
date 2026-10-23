@@ -2,8 +2,10 @@
 title: Plugin Patterns
 description: Round-trip mutation, foldnano_mini mutable API, user-configurable parameters, and patterns by use case
 category: plugin-development
-order: 7
+order: 8
 slug: plugin-patterns
+covers:
+  - src/lib/plugin/fieldValidation.ts
 ---
 
 # Plugin Patterns
@@ -175,7 +177,7 @@ The whole path is checked before anything is recorded. Entries that continue eac
 
 ## User-Configurable Parameters
 
-Plugins can declare a `parameters` array in their manifest to collect user input before each run.
+Plugins can declare a `parameters` array in their manifest to collect user input before each run. The dialog remembers what was entered: the next run opens with the last values, not the manifest defaults, until the page is reloaded.
 
 ### PluginParamDef schema
 

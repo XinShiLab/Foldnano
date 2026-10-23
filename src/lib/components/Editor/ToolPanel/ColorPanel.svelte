@@ -3,11 +3,22 @@
 	import { generateOKLCHPalette } from '../../../model/colorGenerator';
 	import { RefreshCw } from '@lucide/svelte';
 	import ColorPicker from 'svelte-awesome-color-picker';
+	import * as Separator from '$lib/components/ui/separator/index.js';
 
 	import { draggable, droppable, type DragDropState } from '@thisux/sveltednd';
 
 	let editorViewContext = getEditorViewContext();
 	let colorContext = $derived(editorViewContext.strandViewContext.colorContext);
+	// Matches PaintTool: a click paints every oligo owning a selected end.
+	let selectedOligoCount = $derived.by(() => {
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- local scratch set
+		const ids = new Set<string>();
+		for (const end of editorViewContext.strandViewContext.selected.ends) {
+			const id = end.segment.oligo?.id;
+			if (id) ids.add(id);
+		}
+		return ids.size;
+	});
 	let randomColors = $state(generateOKLCHPalette(20));
 	const GRID_SIZE = 20;
 
@@ -138,6 +149,20 @@
 		--picker-width="200px"
 	/>
 </div>
+
+<Separator.Root class="mt-3" />
+<!-- w-0 min-w-full: wrap to the swatch grid's width instead of widening the panel. -->
+<p class="w-0 min-w-full pt-2 text-xs text-muted-foreground">
+	{#if selectedOligoCount > 0}
+		<span class="font-medium text-foreground"
+			>{selectedOligoCount} oligo{selectedOligoCount === 1 ? '' : 's'} selected.</span
+		>
+		Click anywhere in the strand view to paint them all.
+	{:else}
+		Click an oligo to paint it. To paint several, select them first (<kbd>v</kbd>), then switch back
+		here (<kbd>p</kbd>).
+	{/if}
+</p>
 
 <style>
 	.cp-wrapper {

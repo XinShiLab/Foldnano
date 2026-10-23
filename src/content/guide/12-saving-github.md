@@ -51,6 +51,8 @@ Backups for important work:
 
 *Saved Documents panel listing local IndexedDB documents.*
 
+A design has a single name: the document name in the toolbar. For a design saved as a file (on GitHub or as a local-only file in a repository), it is the file name without `.fn.json`, and renaming one renames the other. Every export is named after it too, for example `My design.cadnano.json`, `My design_route.svg`, or the oxDNA and CSV files.
+
 The **Saved Documents** page (`/toc`) lists every document in this browser. Each card has **Open**, **View Oligos** (the [Oligo Report](/docs/guide/oligo-report)), and **Delete**; **New Document** starts a fresh one. Above the list you can sort by last modified or by name, show only **Local** or **GitHub** documents, and switch to a compact table view. Your choice is saved in the page address, so it survives a reload or a bookmark. The editor's save status next to the document name shows whether the latest edits are stored (see [Interface Reference](/docs/guide/interface-reference#save-status)).
 
 ## Autosave

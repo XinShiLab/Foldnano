@@ -1,4 +1,5 @@
 import type { HandlerInstance } from '../../types';
+import { filterEndsByStrandType } from '../selectUtils';
 
 export function createXoverHandler(): HandlerInstance {
 	return {
@@ -15,7 +16,11 @@ export function createXoverHandler(): HandlerInstance {
 			const toSegment = ctx.part.getSegmentById(toSegmentId);
 			if (!fromSegment || !toSegment) return true;
 
-			const selectedEnds = [fromSegment.threePrime, toSegment.fivePrime];
+			const selectedEnds = filterEndsByStrandType(
+				[fromSegment.threePrime, toSegment.fivePrime],
+				ctx.strandCtx.selectionFilter
+			);
+			if (selectedEnds.length === 0) return true;
 
 			if (!evt.shiftKey) {
 				if (!ctx.strandCtx.selected.includesAll(selectedEnds)) {

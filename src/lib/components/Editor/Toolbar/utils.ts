@@ -1,4 +1,5 @@
 import type FoldnanoDocument from '$lib/model/document.svelte';
+import { exportBaseName, FN_JSON_EXT } from '$lib/model/io/designFileName';
 
 export function downloadJsonAsTextFile(jsonString: string, filename: string = 'data.txt') {
 	// Create a Blob with the JSON string
@@ -23,5 +24,5 @@ export function downloadJsonAsTextFile(jsonString: string, filename: string = 'd
 
 /** Downloads the document as a .fn.json file; the escape hatch when browser storage fails. */
 export function downloadFoldnanoJson(doc: FoldnanoDocument): void {
-	downloadJsonAsTextFile(JSON.stringify(doc.toJSON()), `${doc.name}.fn.json`);
+	downloadJsonAsTextFile(JSON.stringify(doc.toJSON()), `${exportBaseName(doc.name)}${FN_JSON_EXT}`);
 }

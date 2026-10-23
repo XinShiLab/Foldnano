@@ -1,5 +1,6 @@
-// Keeps docs/*.md in sync with the code they describe. Each doc declares the code it covers in
-// front matter (`covers:` globs); this script reports docs whose covered code changed without them.
+// Keeps docs/*.md and the doc site's guide and plugin pages in sync with the code they describe.
+// Each doc declares the code it covers in front matter (`covers:` globs); this script reports docs
+// whose covered code changed without them. Doc-site pages opt in: only those with `covers:` count.
 // Usage:
 //   pnpm docs:check                 changed-but-undocumented areas in uncommitted work (warning)
 //   pnpm docs:check --staged        same, for staged files (run by the pre-commit hook)
@@ -12,6 +13,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { matchesGlob } from 'node:path';
 
 const DOCS_DIR = 'docs';
+const SITE_DIRS = ['src/content/guide', 'src/content/plugin-development'];
 // Dated reviews and todo lists record a moment in time; they are never updated to track code.
 const SNAPSHOT_STATUS = 'snapshot';
 const IGNORED_CHANGE = /(\.spec\.ts$|\/test\/|\/tests\/|^test_files\/)/;
@@ -59,14 +61,19 @@ function parseFrontMatter(docPath: string, text: string): DocEntry {
 	return { path: docPath, covers, status, hasFrontMatter: true };
 }
 
-function loadDocs(): DocEntry[] {
-	return readdirSync(DOCS_DIR)
+function loadDir(dir: string): DocEntry[] {
+	return readdirSync(dir)
 		.filter((name) => name.endsWith('.md'))
 		.sort()
 		.map((name) => {
-			const docPath = `${DOCS_DIR}/${name}`;
+			const docPath = `${dir}/${name}`;
 			return parseFrontMatter(docPath, readFileSync(docPath, 'utf8'));
 		});
+}
+
+function loadDocs(): DocEntry[] {
+	const sitePages = SITE_DIRS.flatMap(loadDir).filter((page) => page.covers.length > 0);
+	return [...loadDir(DOCS_DIR), ...sitePages];
 }
 
 function docsCovering(docs: DocEntry[], file: string): DocEntry[] {
@@ -88,7 +95,8 @@ function reportDrift(docs: DocEntry[], changed: string[]): void {
 	const changedSet = new Set(changed);
 	const untouched = new Map<string, string[]>();
 	for (const file of changed) {
-		if (IGNORED_CHANGE.test(file) || file.startsWith(`${DOCS_DIR}/`)) continue;
+		const isDoc = [DOCS_DIR, ...SITE_DIRS].some((dir) => file.startsWith(`${dir}/`));
+		if (IGNORED_CHANGE.test(file) || isDoc) continue;
 		for (const doc of docsCovering(docs, file)) {
 			if (changedSet.has(doc.path)) continue;
 			untouched.set(doc.path, [...(untouched.get(doc.path) ?? []), file]);
@@ -106,9 +114,28 @@ function reportDrift(docs: DocEntry[], changed: string[]): void {
 	);
 }
 
+// mdsvex drops a page's whole front matter on a YAML error, and the docs routes then crash on the
+// missing metadata. The usual cause is an unquoted value containing `: `.
+function siteFrontMatterProblems(): string[] {
+	const problems: string[] = [];
+	for (const dir of readdirSync('src/content').map((d) => `src/content/${d}`)) {
+		for (const name of readdirSync(dir).filter((n) => n.endsWith('.md'))) {
+			const text = readFileSync(`${dir}/${name}`, 'utf8');
+			const header = /^---\n([\s\S]*?)\n---\n/.exec(text)?.[1] ?? '';
+			for (const line of header.split('\n')) {
+				const value = /^[A-Za-z_]+:\s+(.+)$/.exec(line)?.[1];
+				if (value && !/^['"]/.test(value) && /:\s/.test(value)) {
+					problems.push(`${dir}/${name}: front-matter value needs quotes (contains ": "): ${line}`);
+				}
+			}
+		}
+	}
+	return problems;
+}
+
 function verify(docs: DocEntry[]): number {
 	const tracked = git(['ls-files']);
-	const problems: string[] = [];
+	const problems: string[] = siteFrontMatterProblems();
 	const missing: { docPath: string; repoPath: string }[] = [];
 	for (const doc of docs) {
 		if (!doc.hasFrontMatter) {

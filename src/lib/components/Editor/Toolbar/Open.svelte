@@ -24,6 +24,7 @@
 	import { resolve } from '$app/paths';
 	import { githubExplorerStateStore } from '$lib/services/storage';
 	import { putFileContent } from '$lib/services/github/api';
+	import { stripDesignExtension } from '$lib/model/io/designFileName';
 
 	let { toggleDialog, initialFiles = [] }: { toggleDialog: () => void; initialFiles?: File[] } =
 		$props();
@@ -124,7 +125,7 @@
 		}
 		isLoading = true;
 		try {
-			const baseName = uploadedFile.name.replace(/\.cadnano\.json$|\.json$/, '');
+			const baseName = stripDesignExtension(uploadedFile.name);
 			const repoCtx = session.currentRepoContext;
 
 			let folderPath = '';

@@ -2,8 +2,10 @@
 title: foldnano_mini API Reference
 description: Every public name in foldnano_mini, what it does, and whether it reads or changes the design
 category: plugin-development
-order: 6
+order: 7
 slug: foldnano-mini-api
+covers:
+  - src/lib/plugin/python/foldnano_mini/**
 ---
 
 # foldnano_mini API Reference
@@ -28,6 +30,10 @@ Arguments named `vh` take a helix object or its index. `strand_index` is 0 (base
 | --- | --- | --- |
 | `load_part(json_str, active_region_id=None)` | function | Parse a foldnano_json string (from `ctx.get_part_as_foldnano_json()`) into a `MutablePart` with an empty log. Pass `ctx.active_region_id` through. |
 | `KNOWN_OPS` | constant | The set of op kinds the host can replay. |
+| `MutablePart`, `MutableOligo`, `MutableSegment`, `MutableSegmentEnd`, `MutableSlot`, `MutableVirtualHelix`, `MutableStrandSet` | class | The editable proxies, below. You get them from `load_part` and from each other; don't construct them. |
+| `MutableRegion`, `LatticedRegion`, `FreeformRegion`, `MutablePlane` | class | Regions and planes ([below](#regions-and-planes)). Lattice and freeform regions are subclasses; test `region.supports_lattice_grid` rather than the class. |
+| `MutableRepeatGroup`, `MirrorOligo` | class | Repeat groups and their mirror oligos ([below](#repeat-groups)). |
+| `OligoView`, `SegmentView`, `SegmentEndView`, `SlotView` | class | The read-only side of the oligo proxies: everything you can read, nothing you can change. Mirror oligos are built from these. |
 | `MutationLog`, `Transport`, `OfflineTransport` | class | The log and transport behind `MutablePart`. Plugins don't need them; `part.mutation_log` is the log to return. |
 
 ## `MutablePart`: contents and lookups
@@ -199,6 +205,7 @@ Each edit check above also refuses an edit to a mirror oligo, and an edit to a r
 | `region.vh_order`, `region.virtual_helices` | read‑only | Helix ids in display order / its helices. |
 | `region.supports_lattice_grid` | read‑only | True for honeycomb and square regions. |
 | `region.set_max_base(n)` | **edit** | Lengthen or shorten every helix in the region so it ends at `n`. The change must be a multiple of `step`; shortening is refused while strands reach that far. **Records** `set_region_max_base`. Check: `region.can_set_max_base(n)`. |
+| `region.can_set_max_base(n)` | query | Whether `set_max_base(n)` would be allowed, with the reason if not. |
 | `region.increase_length_by(delta)` | **edit** | Lengthen by a positive multiple of `step`. |
 | `region.reduce_unused_length()` | **edit** | Shorten to the strands it holds, rounded up to `step` and at least two steps, like the strand view's reduce button. |
 | `region.remove_all_skips()`, `region.remove_all_insertions()` | **edit** | Turn every skip / insertion in the region back into a plain base; returns how many. |
@@ -218,6 +225,7 @@ A repeat group copies its original oligos at each instance's offset along the sa
 | `group.originals` | read‑only | The oligos being repeated. |
 | `group.mirrors`, `group.mirrors_of(instance)` | read‑only / query | All its mirror oligos, or one instance's. |
 | `group.add_instance(bp_offset)` | **edit** | Add a copy at that offset (not 0 or one the group already has); its mirrors appear at once. Returns the `RepeatInstance`. **Records** `add_repeat_instance`. Check: `group.can_add_instance(bp_offset)`. |
+| `group.can_add_instance(bp_offset)` | query | Whether `add_instance(bp_offset)` would be allowed, with the reason if not. |
 | `group.remove_instance(instance)` | **edit** | Remove one copy and its mirrors. Removing the last copy deletes the group. **Records** `remove_repeat_instance`. |
 | `group.detach()` | **edit** | Dissolve the group, keeping its mirrors as ordinary, editable oligos. **Records** `detach_repeat_group`. |
 | `group.delete()` | **edit** | Remove the group and its mirrors; the originals stay as ordinary oligos. **Records** `delete_repeat_group`. |

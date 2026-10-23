@@ -201,6 +201,12 @@ const CASES: Record<string, Case> = {
 			strands.paintOligoCmd({ oligo: up0, color: '#abcdef' }, history)
 		);
 	},
+	renameOligoCmd: () => {
+		const { doc, up0, history } = latticeScene();
+		expectUndoRoundTrip(doc, history, () =>
+			strands.renameOligoCmd({ oligo: up0, name: '  staple A  ' }, history)
+		);
+	},
 	setModificationCmd: () => {
 		const { doc, up0, history } = latticeScene();
 		expectUndoRoundTrip(doc, history, () =>
