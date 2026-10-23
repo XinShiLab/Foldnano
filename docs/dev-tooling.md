@@ -34,12 +34,12 @@ A dirty `vite.config.ts` or `package.json` makes `vitest --changed` rerun every 
 ## Sandbox worker source (`?sandbox-worker`)
 
 `scripts/vite-sandbox-worker.ts` resolves `import source from './x.worker.ts?sandbox-worker'` to the
-worker bundled by esbuild into one classic IIFE string, with `import.meta.env` replaced by Vite's
+worker bundled by esbuild into one self-contained ES module string, with `import.meta.env` replaced by Vite's
 env object. esbuild has no `import.meta.glob`, so the plugin provides
 `virtual:foldnano-python-packages` instead: every `.py` file of the bundled Python packages
 (`foldnano`, `foldnano_mini`), read at bundle time, so a new module ships without touching the
-worker. In dev, adding or removing a module there invalidates the bundle and reloads the page. The Python plugin sandbox starts it from a `blob:`
-URL inside an opaque-origin iframe, where module workers fail silently (see
+worker. In dev, adding or removing a module there invalidates the bundle and reloads the page. The Python plugin sandbox starts it as a module worker from a
+`data:` URL inside an opaque-origin iframe, where a `blob:` module worker fails silently (see
 `docs/python-plugin-system.md` § Sandbox). It runs the same way in dev and build and registers
 every bundled input as a watch file. `esbuild` is a direct devDependency for this plugin.
 Other workers (e.g. rigid-body simulation) still use Vite's normal worker pipeline.
@@ -99,7 +99,12 @@ its environment at runtime (`$env/dynamic/private`), and Vercel deploys separate
 ## Repo-maintenance scripts
 
 - **`scripts/docs-check.ts`** (`pnpm docs:check`, `pnpm docs:verify`) — reads each doc's
-  `covers:` front matter. `docs:check` warns about covered code that changed without its doc;
+  `covers:` front matter, in `docs/*.md` and in the doc-site pages under `src/content/guide/` and
+  `src/content/plugin-development/`. Site pages opt in (only those with `covers:` are loaded);
+  they replaced the retired `docs/user-manual.md` and plugin development guide. mdsvex keeps
+  `covers:` in page metadata, but the doc site reads only named fields and the agent markdown
+  strips front matter. The three plugin API reference pages are also checked against the code by
+  `src/lib/plugin/python/tests/test_api_reference_pages.py` (`pnpm test:python`). `docs:check` warns about covered code that changed without its doc;
   `docs:verify` fails if a doc lacks front matter, a glob matches no tracked file, or a
   backticked repo path in a doc no longer exists (gitignored paths, i.e. generated outputs, are
   accepted so a fresh clone passes). `pnpm lint` runs `docs:verify`.

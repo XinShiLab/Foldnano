@@ -1,12 +1,17 @@
 ---
-title: Manifest and Context API
-description: Complete plugin manifest schema, wheel URL restrictions, side panel options, and PluginContext input/output methods
+title: Plugin Manifest
+description: Complete plugin manifest schema, wheel URL restrictions, side panel options, icons and code-editor execution modes
 category: plugin-development
 order: 4
 slug: plugin-manifest
+covers:
+  - src/lib/plugin/manifestValidation.ts
+  - src/lib/plugin/types.ts
+  - src/lib/plugin/pluginIcon.ts
+  - static/schemas/fplugin-v*.schema.json
 ---
 
-# Manifest and Context API
+# Plugin Manifest
 
 ## Manifest Reference
 
@@ -104,7 +109,7 @@ A `requirements` entry ending in `.whl` is handled one of two ways:
 
 Regular package names (e.g. `"numpy"`, `"humanize>=4"`) are installed from the Pyodide distribution or PyPI. A path, a URL, or a direct reference such as `"pkg @ https://..."` is refused for anything that isn't a `.whl`.
 
-For bare package names, prefer packages from the pinned Pyodide distribution and develop against their exact versions; see [Packages in Pyodide 0.29](https://pyodide.org/en/0.29.4/usage/packages-in-pyodide.html). Staying within that list (unversioned) keeps your plugin in the shared standard environment; see [Runtime Model → Environment Tiers](/docs/plugin-development/runtime-model) for what that means.
+For bare package names, prefer packages from the pinned Pyodide distribution and develop against their exact versions; see [Packages in Pyodide 314.0.7](https://pyodide.org/en/314.0.7/usage/packages-in-pyodide.html). Staying within that list (unversioned) keeps your plugin in the shared standard environment; see [Runtime Model → Environment Tiers](/docs/plugin-development/runtime-model) for what that means.
 
 ### Host-rendered side panels
 
@@ -170,72 +175,7 @@ Use this when the editor buffer is the full Python source of truth. In this mode
 }
 ```
 
----
 
-## PluginContext API
+## Next
 
-Every plugin receives a single `ctx: PluginContext` argument.
-
-### Input
-
-```python
-ctx.get_part_as_cadnano_json(part_index: int = 0) -> str
-    # Returns the active part as a cadnano JSON string.
-    # Only valid when manifest format == "cadnano_json".
-
-ctx.get_part_as_foldnano_json(part_index: int = 0) -> str
-    # Returns the active part as a Foldnano JSON string (Part.toJSON() schema).
-    # Only valid when format == "foldnano_json", "foldnano_mini", or "live".
-
-ctx.format -> str
-    # "cadnano_json" | "foldnano_json" | "foldnano_mini" | "live"
-
-ctx.params -> dict
-    # All parameter values confirmed in the run dialog.
-    # Keys match the `id` fields declared in manifest.parameters.
-
-ctx.get_param(key: str, default=None)
-    # Return a single parameter value, or default if the key is absent.
-
-ctx.side_panel_type -> str | None
-    # "form" | "codeEditor" when launched from a side panel.
-
-ctx.get_side_panel_code(default: str = "") -> str
-    # Returns the current code editor contents for codeEditor side panels.
-```
-
-### Output
-
-```python
-ctx.set_result_cadnano_json(json_str: str) -> None
-    # Store the modified design as cadnano JSON.
-
-ctx.set_result_foldnano_json(json_str: str) -> None
-    # Store the modified design as Foldnano JSON (Part.toJSON() schema).
-
-ctx.set_result_mutation_log(log: list[dict]) -> None
-    # Store a foldnano_mini mutation log. Only valid when format == "foldnano_mini".
-
-ctx.active_region_id -> str | None
-    # ID of the region currently active in the StrandView.
-
-ctx.log(msg: str) -> None
-    # Append a line to the plugin log (shown when the run finishes).
-    # print() output is captured too, one log line per printed line.
-    # The log keeps the first 5,000 lines (each up to 10,000 characters).
-
-ctx.write_artifact(name: str, data: str | bytes) -> None
-    # Store a named artifact (CSV, PDB, etc.).
-    # Appears as a download link in the plugin output panel.
-    # All artifacts of one run together may total at most 100 MB.
-
-ctx.set_result(data: dict) -> None
-    # Store a structured JSON-serialisable dict.
-    # Displayed in the plugin output panel as formatted JSON.
-```
-
-**Common mistakes:**
-
-- `ctx.set_artifact(...)` does not exist; use `ctx.write_artifact(name, data)`.
-- Calling `get_part_as_foldnano_json()` when the manifest declares `format: "cadnano_json"` raises a `RuntimeError`.
-- `set_result_cadnano_json` / `set_result_foldnano_json` set the _primary artifact_ that gets applied to the model. `write_artifact` stores _side artifacts_ (CSVs, reports) for download only.
+The `ctx` your `run(ctx)` receives is documented in the [Context API Reference](/docs/plugin-development/context-api).

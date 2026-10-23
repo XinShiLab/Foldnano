@@ -89,8 +89,7 @@ export default class FoldnanoDocument {
 	addNewPart(type: PartType): Part {
 		const KNOWN_TYPES: PartType[] = ['HONEYCOMB', 'SQUARE', 'FREEFORM'];
 		if (!KNOWN_TYPES.includes(type)) throw new Error(`Part type "${type}" not implemented`);
-		const shortRandomName = Math.random().toString(36).substring(2, 7);
-		const part = Part.forType(type, shortRandomName);
+		const part = Part.forType(type, `Part ${this.parts.length + 1}`);
 		this.parts.push(part);
 		return part;
 	}

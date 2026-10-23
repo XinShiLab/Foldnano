@@ -1,7 +1,7 @@
 import type { DrawingDimensions } from '../../components/Editor/StrandView/drawingDimensions';
 
 import type { Part } from '../../model/Part';
-import type { HitResult } from '../core/modes';
+import type { Category, HitResult } from '../core/modes';
 
 export interface HitTester {
 	hitRsp(world: {
@@ -30,7 +30,11 @@ export function makeETMHitTester(drawingDimensions: DrawingDimensions, part: Par
 				// additionalId has format like kind#restOfId, we need to parse it
 				const [kind, ...rest] = additionalId.split('#');
 				const id = rest.join('#');
-				const category = kind === 'REGION_HEADER' ? 'CONTROL' : 'UNKNOWN';
+				let category: Category = kind === 'REGION_HEADER' ? 'CONTROL' : 'UNKNOWN';
+				if (kind === 'XOVER') {
+					const fromOligo = part.getSegmentById(rest[0])?.oligo;
+					if (fromOligo) category = fromOligo.isScaffold ? 'SCAF' : 'STAP';
+				}
 				result.add({ kind: kind as HitResult['kind'], id, category });
 				if (category === 'CONTROL') directIsControl = true;
 			}

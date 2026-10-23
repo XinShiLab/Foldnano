@@ -1,5 +1,6 @@
 import type { SegmentEnd } from '../../../../model/Oligo';
 import type { HandlerInstance } from '../../types';
+import { filterEndsByStrandType } from '../selectUtils';
 
 export function createOligoHandler(): HandlerInstance {
 	return {
@@ -14,7 +15,7 @@ export function createOligoHandler(): HandlerInstance {
 			ctx.strandCtx.hoverOligo = oligo;
 			ctx.strandCtx.hoverSegment = null; // clear segment hover if any
 
-			const selectedEnds = Array.from(oligo.allEnds);
+			let selectedEnds = Array.from(oligo.allEnds);
 
 			// if ctx.strandCtx.selectAllMode is SAME_COLOR or SAME_MODI, select all oligos with same color/modification
 			if (ctx.strandCtx.selectAllMode === 'SAME_COLOR') {
@@ -39,6 +40,7 @@ export function createOligoHandler(): HandlerInstance {
 				selectedEnds.push(...Array.from(allEnds));
 			}
 
+			selectedEnds = filterEndsByStrandType(selectedEnds, ctx.strandCtx.selectionFilter);
 			if (selectedEnds.length === 0) return true;
 
 			if (!evt.shiftKey) {

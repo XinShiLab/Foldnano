@@ -9,6 +9,7 @@
 	import { help } from '$lib/components/help/help';
 	import { exportStageAsPng } from '../utils';
 	import EditorModeToggleGroup from '../Toolbar/EditorModeToggleGroup.svelte';
+	import { exportBaseName } from '$lib/model/io/designFileName';
 	import {
 		deleteLatticeVirtualHelicesCmd,
 		deleteFreeformVirtualHelicesCmd,
@@ -119,7 +120,8 @@
 				size="icon-sm"
 				title="Export as image"
 				disabled={!stage}
-				onclick={() => stage && exportStageAsPng(stage, `${session.currentDoc.name}_lattice`)}
+				onclick={() =>
+					stage && exportStageAsPng(stage, exportBaseName(session.currentDoc.name, '_lattice'))}
 				{@attach help({ text: 'Download the plane view as a PNG image.' })}
 			>
 				<ImageDown />

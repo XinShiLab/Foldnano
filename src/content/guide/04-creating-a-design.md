@@ -4,6 +4,11 @@ description: New documents, regions, lattice/freeform virtual helices, routing, 
 category: guide
 order: 4
 slug: creating-a-design
+covers:
+  - src/lib/components/Editor/ToolPanel/RegionCreationPanel.svelte
+  - src/lib/components/Editor/Toolbar/Open.svelte
+  - src/lib/components/Editor/Toolbar/LoadCadnanoAsRegionDialog.svelte
+  - src/lib/components/Editor/Toolbar/parsers/**
 ---
 
 <script>

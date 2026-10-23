@@ -22,8 +22,12 @@ gate titles, a use-with-caution note); drop the "beta" badge at 1.0.
 
 ## After the beta
 
-- Evaluate Pyodide 314+ (Python 3.14): its core is an ES module and it drops classic-worker
-  support, which the plugin sandbox relies on; needs its own sandbox spike and browser checks.
+- Pyodide 314 (Python 3.14) follow-ups. The upgrade landed 2026-10-23 on `chore/pyodide-314`:
+  the sandbox now starts a `data:` module worker, verified in Chromium only. (1) Check Firefox
+  and Safari boot it in the opaque-origin iframe and enforce its CSP, and check the self-hosted
+  core on production (`pyodide.asm.mjs` with the CORS header). (2) Check a bundled compiled
+  wheel's tags at install, so a wheel built for another Pyodide fails with a clear message
+  instead of at import.
 - Multi-file commits as one atomic commit via the Git Data API. Assessed
   2026-10-03: ~1–2 days (blob/tree/commit/ref proxy routes, batch conflict check against the
   branch head, per-file SHA updates, keeping the current doc's tab-owner and snapshot path).

@@ -38,7 +38,8 @@ skipped.
   (the sidebar's "Side panels" caption used to cover the Script Lab toolbar). The hover card is placed last so hovering never moves captions. A note that
   ends up away from its target gets a dashed leader line (`leaderLine()`) back to it.
 - **Shortcut card** (`ShortcutCard.svelte`) is collapsed by default to leave room for notes; its
-  expanded state is remembered for the session.
+  expanded state is remembered for the session. Its Strand View (arrow-key pan) and Selection
+  Filters sections show only while the strand pane is active, matching where those keys work.
 - **Visibility.** Non-area controls are shown only if `elementFromPoint` at their centre lands
   inside them, which hides controls clipped by scrolling toolbars or covered by floating panels.
   A disabled control is `pointer-events: none`, so for it a hit on its direct parent also counts;

@@ -37,4 +37,4 @@ Use `replayMutationLogInRegion` when a plugin must be scoped to the active regio
 - Plugin artifacts are downloads, not model mutations: an artifact a plugin produces for the user to save is not the same thing as applying a result to the live document.
 - Plugin entrypoint and requirement loading should stay explicit and reviewable: a plugin's manifest declares what it needs (Python packages, wheel URLs) up front rather than fetching arbitrary code at run time.
 
-Read `docs/python-plugin-system.md` and `docs/foldnano-plugin-development-guide.md` for deeper implementation detail.
+Read `docs/python-plugin-system.md` for deeper implementation detail, and the [Plugin Development](/docs/plugin-development/plugin-quickstart) pages for the author-facing API.

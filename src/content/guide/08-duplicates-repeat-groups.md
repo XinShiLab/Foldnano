@@ -4,6 +4,8 @@ description: Duplicate selected oligos, place linked mirror copies, and manage r
 category: guide
 order: 8
 slug: duplicates-repeat-groups
+covers:
+  - src/lib/components/Editor/ToolPanel/RepeatGroupPanel.svelte
 ---
 
 <script>

@@ -4,6 +4,9 @@ description: Complete keyboard shortcut reference for the Foldnano editor
 category: guide
 order: 16
 slug: keyboard-shortcuts
+covers:
+  - src/lib/components/Editor/Editor.svelte
+  - src/lib/components/help/ShortcutCard.svelte
 ---
 
 # Keyboard Shortcuts
@@ -52,6 +55,7 @@ strand viewer is the active viewer.
 | `Ctrl/Cmd + D` | duplicate the selected oligos (see [Duplicates And Repeat Groups](/docs/guide/duplicates-repeat-groups)) |
 | `Ctrl/Cmd + Shift + D` | place linked mirror copies of the selected oligos |
 | hold `Option` / `Alt` | temporary **pan** modifier for the active canvas |
+| arrow keys | pan the strand view (hold `Shift` for bigger steps; not while placing a duplicate) |
 | mouse wheel | zoom the active canvas |
 | `?` | toggle the workspace help |
 

@@ -4,6 +4,12 @@ description: Draw, Break, Skip, Insert, Paint, Modification, Sequence, and Split
 category: guide
 order: 5
 slug: editing-tools
+covers:
+  - src/lib/components/Editor/Toolbar/EditorModeToggleGroup.svelte
+  - src/lib/components/Editor/ToolPanel/ColorPanel.svelte
+  - src/lib/components/Editor/ToolPanel/ModificationPanel.svelte
+  - src/lib/components/Editor/ToolPanel/SequencePanel.svelte
+  - src/lib/components/Editor/ToolPanel/SkipInsertPanel.svelte
 ---
 
 <script>
@@ -25,7 +31,7 @@ Export fallback: the toolbar contains pan, select, draw, break, skip, insert, pa
 
 | Tool | Shortcut | Purpose |
 | --- | --- | --- |
-| `PAN` | hold `Option` / `Alt` | pan the active canvas without changing the active tool |
+| `PAN` | hold `Option` / `Alt`, or `←` `↑` `↓` `→` | pan the active canvas without changing the active tool (arrow keys pan the strand view only) |
 | `SELECT` | `v` | select ends, segments, oligos, crossovers, and region controls |
 | `DRAW` | `n` | create strands and crossovers |
 | `BREAK` | `b` | split an oligo at a base position (insert a nick) |
@@ -90,7 +96,12 @@ The numbered loop marks an insert of one extra base, which lengthens the strand 
 
 ## Paint
 
-Click an oligo to recolor it with the panel's current color. Painting is purely cosmetic: it changes how the oligo is drawn in the strand and 3D views and does not affect topology or sequence.
+Paint recolors oligos with the panel's **Active** color. Clicking a color in the panel only makes it the active color; the paint is applied when you click in the strand view. There are two ways to use it:
+
+- **One oligo at a time.** Switch to Paint (`p`), pick a color, then click an oligo. Keep clicking to paint more oligos with the same color.
+- **Many oligos at once.** In Select mode (`v`), select the oligos first (click, `Shift` + click, or drag a marquee). Then switch to Paint (`p`), pick a color, and click anywhere in the strand view. Every selected oligo takes the color in one undoable step, and the selection is cleared. The panel shows how many oligos are selected.
+
+Painting is purely cosmetic: it changes how the oligo is drawn in the strand and 3D views and does not affect topology or sequence.
 
 ![Paint panel open, showing active color, saved colors, random colors, and a custom color picker](/screenshots/guide/editing-tools/03-paint-panel.webp)
 

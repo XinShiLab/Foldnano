@@ -531,6 +531,36 @@ describe('EditorDocumentSession', () => {
 		expect(session.currentDoc.name).toBe('after');
 	});
 
+	it('keeps dots in file names when renaming and deriving the document name', () => {
+		const { session } = makeSession();
+		session.replaceCurrentDocumentForTesting(new FoldnanoDocument('doc-dots', 'Before'));
+		session.bindCurrentDocumentToGitHubFile({
+			path: 'v1.0/before.fn.json',
+			sha: 'sha-before',
+			owner: 'alice',
+			repo: 'designs',
+			branch: 'main',
+		});
+
+		session.applyExternalCurrentFileRename('v1.0/before.fn.json', 'v1.0/origami.v2.fn.json');
+
+		expect(session.currentDoc.name).toBe('origami.v2');
+	});
+
+	it('names an imported part after its new document', async () => {
+		const { session } = makeSession();
+		const { storage } = makeStorage();
+		session.replaceStorageManagerForTesting(storage);
+		const part = new FoldnanoDocument().addNewPart('HONEYCOMB');
+		part.name = 'Hilbert_FinalHC.json';
+
+		const { path } = await session.createDocumentFromImportedPart(part, 'Hilbert', 'designs');
+
+		expect(path).toBe('designs/Hilbert.fn.json');
+		expect(session.currentDoc.name).toBe('Hilbert');
+		expect(session.currentDoc.parts[0].name).toBe('Hilbert');
+	});
+
 	it('renames local-only files by doc id and returns a local-only rename result', async () => {
 		const { session } = makeSession();
 		const { storage } = makeStorage();

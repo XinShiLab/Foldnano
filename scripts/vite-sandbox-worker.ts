@@ -39,10 +39,11 @@ function pythonPackages(packageDirs: string[], onRead: (files: string[]) => void
 }
 
 /**
- * `import source from './x.worker.ts?sandbox-worker'` yields the worker bundled into one classic
- * IIFE string. The plugin sandbox starts it from a `blob:` URL inside an opaque-origin iframe,
- * where module workers fail silently — so it bypasses Vite's worker pipeline, identically in dev
- * and build. See docs/python-plugin-system.md § Sandbox.
+ * `import source from './x.worker.ts?sandbox-worker'` yields the worker bundled into one
+ * self-contained ES module string. The plugin sandbox starts it as a module worker from a `data:`
+ * URL inside an opaque-origin iframe (a `blob:` module worker fails silently there), so it
+ * bypasses Vite's worker pipeline, identically in dev and build. See
+ * docs/python-plugin-system.md § Sandbox.
  */
 export function sandboxWorkerSource(): Plugin {
 	let env: Record<string, unknown> = {};
@@ -76,12 +77,12 @@ export function sandboxWorkerSource(): Plugin {
 				entryPoints: [id.slice(0, -QUERY.length)],
 				bundle: true,
 				write: false,
-				format: 'iife',
+				format: 'esm',
 				target: 'es2022',
 				minify,
 				metafile: true,
 				logLevel: 'silent',
-				// A classic script has no `import.meta`; inline Vite's env object instead.
+				// A data: worker gets no Vite transform, so inline Vite's env object.
 				define: { 'import.meta.env': JSON.stringify(env) },
 				plugins: [pythonPackages(packageDirs, (files) => (pythonFiles = files))],
 			});

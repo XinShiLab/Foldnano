@@ -25,6 +25,7 @@
 	import { GitHubExplorerState } from './GitHubExplorerState.svelte';
 	import { addLocalOnlyEntry } from './localPersistence';
 	import type { FileNode } from './types';
+	import { designNameFromPath, fnJsonPathFor } from '$lib/model/io/designFileName';
 
 	const editorViewContext = getEditorViewContext();
 	const session = getEditorDocumentSession();
@@ -99,10 +100,7 @@
 		cadnanoImportDialogOpen = false;
 		const node = cadnanoImportNode;
 
-		const fnPath = node.path.replace(
-			/\.cadnano\.json$|\.fn\.json$|\.cweb\.json$|\.json$/,
-			'.fn.json'
-		);
+		const fnPath = fnJsonPathFor(node.path);
 		const fnName = fnPath.split('/').pop()!;
 		const folderPath = fnPath.includes('/') ? fnPath.split('/').slice(0, -1).join('/') : '';
 
@@ -126,7 +124,7 @@
 			for (const w of cadnanoParser.getLastWarnings()) {
 				toast.warning('Cadnano import warning', { description: w });
 			}
-			const baseName = fnName.replace(/\.fn\.json$/, '');
+			const baseName = designNameFromPath(fnPath);
 			const { docId } = await session.createDocumentFromImportedPart(part, baseName, folderPath);
 
 			addLocalOnlyEntry(repoCtx, { docId, path: fnPath, name: fnName });
@@ -372,12 +370,7 @@
 			<Dialog.Title>Open as Foldnano document?</Dialog.Title>
 			<Dialog.Description>
 				To open <code>{cadnanoImportNode?.name}</code>, a new file
-				<code
-					>{cadnanoImportNode?.path
-						.replace(/\.cadnano\.json$|\.fn\.json$|\.cweb\.json$|\.json$/, '.fn.json')
-						.split('/')
-						.pop()}</code
-				>
+				<code>{cadnanoImportNode && fnJsonPathFor(cadnanoImportNode.path).split('/').pop()}</code>
 				will be created in the same folder. All edits will be saved there; the original
 				<code>.json</code> file stays unchanged.
 			</Dialog.Description>

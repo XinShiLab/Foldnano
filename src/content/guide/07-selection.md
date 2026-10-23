@@ -4,6 +4,12 @@ description: End-based selection, lattice and freeform selection, selection filt
 category: guide
 order: 7
 slug: selection
+covers:
+  - src/lib/components/Editor/ToolPanel/SelectPanel.svelte
+  - src/lib/components/Editor/ToolPanel/OligoNameField.svelte
+  - src/lib/components/Editor/ToolPanel/filterToggleClasses.ts
+  - src/lib/components/Editor/ToolPanel/CircularScaffoldMapPanel.svelte
+  - src/lib/components/Editor/ToolPanel/scaffoldMap/**
 ---
 
 <script>

@@ -21,6 +21,9 @@ never invents one for unnamed oligos. Values containing commas or quotes are CSV
 The oligo report (`oligoReport.ts`) carries the same `name` column, so the diff page
 reports a rename as a `name` change.
 
+The CSV file is named after the document (`exportPartSequencesToCSV(part, docName)` →
+`exportBaseName`), not the Part; see `dna-model.md` § Names.
+
 The exporter is intentionally an endpoint-oriented format. Every exported oligo
 must have a concrete free 5' end and free 3' end. Circular DNA is rejected before
 download, for both scaffold and staple oligos. The scaffold is included in the

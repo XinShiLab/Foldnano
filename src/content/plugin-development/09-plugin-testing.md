@@ -2,8 +2,11 @@
 title: Testing Plugins
 description: Offline unit testing for foldnano_mini plugins using CPython, pytest fixtures, and the self-consistency replay check
 category: plugin-development
-order: 8
+order: 9
 slug: plugin-testing
+covers:
+  - src/lib/plugin/python/foldnano_mini/transport.py
+  - src/lib/plugin/python/foldnano_mini/invariants.py
 ---
 
 # Testing Plugins

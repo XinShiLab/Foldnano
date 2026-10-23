@@ -4,6 +4,15 @@ description: Every toolbar button, menu, panel, and status indicator in the Fold
 category: guide
 order: 15
 slug: interface-reference
+covers:
+  - src/lib/components/Editor/Editor.svelte
+  - src/lib/components/Editor/Toolbar/Toolbar.svelte
+  - src/lib/components/Editor/Toolbar/ActiveViewerToolbar.svelte
+  - src/lib/components/Editor/Toolbar/AboutDialog.svelte
+  - src/lib/components/Editor/Toolbar/utils.ts
+  - src/lib/components/Editor/ToolPanel/ToolPanel.svelte
+  - src/lib/components/Editor/ToolPanel/index.ts
+  - src/lib/components/Editor/StrandView/ContextMenu.svelte
 ---
 
 <script>

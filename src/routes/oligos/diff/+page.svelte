@@ -93,7 +93,7 @@
 		const part = doc?.parts[0];
 		if (!part) return;
 		try {
-			exportPartSequencesToCSV(part);
+			exportPartSequencesToCSV(part, doc.name);
 		} catch (e) {
 			toast.error('Cannot export oligo CSV', {
 				description: e instanceof Error ? e.message : 'The design cannot be exported.',

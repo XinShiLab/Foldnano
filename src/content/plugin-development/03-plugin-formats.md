@@ -4,6 +4,11 @@ description: Choosing between cadnano_json, foldnano_json, and foldnano_mini; ap
 category: plugin-development
 order: 3
 slug: plugin-formats
+covers:
+  - src/lib/plugin/result-format-validation-*.ts
+  - src/lib/plugin/result-replacement-operations.ts
+  - src/lib/plugin/ResultApplicator.ts
+  - src/lib/plugin/design-verification.ts
 ---
 
 # Formats and Apply Strategies
@@ -49,3 +54,12 @@ Install-time validation enforces the supported combinations:
 - `cadnano_json`: `previewOnly`, `replaceRegion`, `replaceRegionKeepAnnotationsWhereMatched`
 - `foldnano_json`: `previewOnly`, `replacePart`, `replacePartKeepAnnotationsWhereMatched`
 - `foldnano_mini`: `previewOnly`, `replayMutationLog`, `replayMutationLogInRegion`
+
+## When a Result Can't Be Applied
+
+For `replacePart*` and `replaceRegion*` strategies, a run that returns a result doesn't always offer **Apply**. Before it does, Foldnano checks the returned JSON twice:
+
+- **Result validation** checks its shape against the declared `format`: well-formed `vstrands` or `Part.toJSON()` data, and references that point somewhere. Small inconsistencies are repaired (for example, a connection recorded on only one side is cleared when the other end is free); malformed data is rejected.
+- **Design verification** rebuilds the result the way Apply would, on a throwaway copy, and looks for dangling references, segments outside their helix, connections that don't match up, and, for region strategies, a change to the active region's set of helices.
+
+If either check fails, the plugin panel names the offending field or id instead of showing **Apply**, and your design is untouched. So a `replaceRegion*` plugin that adds or removes a helix in the active region runs without error but never offers Apply.

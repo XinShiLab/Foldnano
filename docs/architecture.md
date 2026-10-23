@@ -116,10 +116,10 @@ src/
 | oxDNA export                                       | `oxdna-export.md`                                     |
 | mrDNA export                                       | `mrdna-export.md`                                     |
 | Python plugin host (Foldnano dev side)             | `python-plugin-system.md`                             |
-| Plugin authoring (third-party authors)             | `foldnano-plugin-development-guide.md`                |
+| Plugin authoring (third-party authors)             | the doc site, `src/content/plugin-development/*.md`   |
 | Script Lab built-in plugin + code-editor pattern   | `script-lab.md`                                       |
 | About dialog What's New + draft script             | `whats-new.md`                                        |
-| End-user instructions                              | `user-manual.md`                                      |
+| End-user instructions                              | the user guide, `src/content/guide/*.md`              |
 
 ## Cross-cutting Boundaries
 

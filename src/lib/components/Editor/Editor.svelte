@@ -54,6 +54,7 @@
 	import { parseDesignRaw, getParseWarnings, type FileMeta } from './Toolbar/parsers';
 	import { Part } from '../../model/Part';
 	import FoldnanoDocument from '../../model/document.svelte';
+	import { stripDesignExtension } from '$lib/model/io/designFileName';
 	import { onDestroy } from 'svelte';
 	import Sidebar from './Sidebar.svelte';
 	import EmptyEditorState from './EmptyEditorState.svelte';
@@ -159,8 +160,10 @@
 			} else {
 				// result is Part — wrap in a new document
 				doc = new FoldnanoDocument();
-				doc.name = filename.replace(/\.(cadnano\.json|fn\.json|json)$/i, '');
-				doc.parts.push(result as Part);
+				doc.name = stripDesignExtension(filename);
+				const part = result as Part;
+				part.name = doc.name;
+				doc.parts.push(part);
 			}
 
 			await session.loadTransientDocument(doc, rawUrl);
@@ -321,6 +324,33 @@
 	);
 	let strandPaneActive = $derived(editorViewContext.activeViewer === 'STRAND');
 
+	// Screen pixels per arrow press, so a press feels the same at any zoom.
+	const ARROW_PAN_STEP_PX = 50;
+	const ARROW_PAN_SHIFT_MULTIPLIER = 5;
+	const arrowPanDirections: Record<string, [number, number]> = {
+		ArrowLeft: [1, 0],
+		ArrowRight: [-1, 0],
+		ArrowUp: [0, 1],
+		ArrowDown: [0, -1],
+	};
+
+	function handleArrowPan(e: KeyboardEvent): boolean {
+		const direction = arrowPanDirections[e.key];
+		if (!direction || !strandPaneActive) return false;
+		// Menus and code editors consume arrows for their own navigation.
+		if (e.defaultPrevented || (e.target instanceof HTMLElement && e.target.isContentEditable)) {
+			return false;
+		}
+		if (e.metaKey || e.ctrlKey || e.altKey) return false;
+		if (editorViewContext.editorMode === 'DUPLICATE') return false;
+		const controller = editorViewContext.strandToolbarController;
+		if (!controller) return false;
+		e.preventDefault();
+		const step = ARROW_PAN_STEP_PX * (e.shiftKey ? ARROW_PAN_SHIFT_MULTIPLIER : 1);
+		controller.panBy(direction[0] * step, direction[1] * step);
+		return true;
+	}
+
 	// Force PAN mode while this tab is in read-only (not the owner).
 	$effect(() => {
 		if (!session.isTabOwner) {
@@ -362,6 +392,8 @@
 		if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
 			return;
 		}
+		// View-only, so read-only tabs can pan too.
+		if (handleArrowPan(e)) return;
 		// Block all mutations and mode changes while this tab does not own the document
 		if (!session.isTabOwner) return;
 

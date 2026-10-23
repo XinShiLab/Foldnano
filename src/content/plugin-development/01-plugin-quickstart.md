@@ -56,7 +56,7 @@ Share the `.zip` file itself, for example by email, a lab file share, or a relea
 ## What Happens When It Runs
 
 1. Foldnano reads the manifest.
-2. The plugin runtime loads the Python entrypoint in a [Pyodide](https://pyodide.org/en/0.29.4/index.html) worker (CPython in WebAssembly; see [Runtime Model](/docs/plugin-development/runtime-model) for what does and doesn't work there).
+2. The plugin runtime loads the Python entrypoint in a [Pyodide](https://pyodide.org/en/314.0.7/index.html) worker (CPython in WebAssembly; see [Runtime Model](/docs/plugin-development/runtime-model) for what does and doesn't work there).
 3. Foldnano passes the active design to Python in the format declared by the manifest.
 4. The plugin logs messages, writes artifacts, returns structured results, or returns a design mutation.
 5. If the plugin is mutating, the user chooses whether to apply the result.

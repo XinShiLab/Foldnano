@@ -57,9 +57,9 @@
 
 	function downloadCsv(): void {
 		const part = doc?.parts[0];
-		if (!part) return;
+		if (!doc || !part) return;
 		try {
-			exportPartSequencesToCSV(part);
+			exportPartSequencesToCSV(part, doc.name);
 		} catch (e) {
 			toast.error('Cannot export oligo CSV', {
 				description: e instanceof Error ? e.message : 'The design cannot be exported.',
@@ -121,7 +121,7 @@
 				<div class="flex flex-wrap items-center justify-between gap-2">
 					<p class="text-sm text-muted-foreground">
 						{rows.length} oligo{rows.length === 1 ? '' : 's'} from
-						<span class="font-medium text-foreground">{doc.parts[0].name}</span>
+						<span class="font-medium text-foreground">{doc.name}</span>
 					</p>
 					{#if rows.some((row) => row.isCircular)}
 						<p class="text-xs text-amber-700">

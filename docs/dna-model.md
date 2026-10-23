@@ -7,6 +7,7 @@ covers:
   - src/lib/model/documentFormat.ts
   - static/schemas/foldnano-v*.schema.json
   - src/lib/model/modifications.ts
+  - src/lib/model/io/designFileName.ts
 ---
 
 # DNA Model
@@ -81,6 +82,26 @@ Key methods:
 
 The model supports multiple parts, although most editor flows still operate on
 the first active part.
+
+### Names
+
+A design has one user-facing name: `FoldnanoDocument.name`. For a file-backed
+document it _is_ the file name without its design extension (`syncNameWithPath`
+re-derives it on load; renaming the document renames the file). `Part.name` is
+internal while a document holds one Part:
+
+- imports overwrite it with the document name (the `"name"` inside a cadnano
+  file is often a stale file name such as `Hilbert_FinalHC.json`);
+- `addNewPart` names parts `Part 1`, `Part 2`, ….
+
+Every export is named from the document through `exportBaseName(doc.name,
+suffix)` in `src/lib/model/io/designFileName.ts`, never from `Part.name`.
+Exported cadnano JSON stores its own file name in `"name"`, as cadnano2 does.
+Extensions are stripped with `splitDesignExtension` / `designNameFromPath`, which
+only recognise known design extensions (`.cadnano.json`, `.cweb.json`,
+`.fn.json`, `.json`), so dots inside a name (`origami.v2.fn.json`) survive.
+Multi-part export would add the part name as a suffix, as the cadnano export
+already does for regions.
 
 ---
 
@@ -629,6 +650,9 @@ There is no backward-compat loader for pre-region documents: `Part.fromJSON()` t
 ---
 
 ## Boundaries / Don'ts
+
+- **Don't name exported files after `Part.name`.** Use `exportBaseName(doc.name, …)`; the part name is not shown anywhere and goes stale.
+- **Don't strip extensions with ad hoc regexes or at the first dot.** Use the `designFileName.ts` helpers.
 
 - **Don't change the saved JSON shape without bumping `formatVersion`** and adding a migration and fixture (see "Document format version"). New fields count: an older app drops them on re-save.
 - **Don't branch on `savedWith`.** It is provenance only; `formatVersion` is the sole compatibility signal.

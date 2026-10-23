@@ -34,7 +34,7 @@ describe('buildSandboxCsp', () => {
 	it('denies by default and allows only the Pyodide paths plus the given hosts', () => {
 		const csp = buildSandboxCsp(PYPI_CONNECT_SOURCES);
 		expect(csp).toContain("default-src 'none'");
-		expect(csp).toContain('worker-src blob:');
+		expect(csp).toContain('worker-src data:');
 		expect(csp).toContain(`connect-src ${CORE_URL}`);
 		expect(csp).toContain(PACKAGE_URL);
 		expect(csp).toContain(PYPI_CONNECT_SOURCES.join(' '));
@@ -70,6 +70,14 @@ describe('SandboxedWorker', () => {
 		expect(iframe.getAttribute('sandbox')).toBe('allow-scripts');
 		expect(iframe.style.display).toBe('none');
 		expect(iframe.srcdoc).toContain(`content="${csp}"`);
+	});
+
+	it('starts a module worker from a data: URL, which Pyodide 314+ needs', () => {
+		new SandboxedWorker(buildSandboxCsp([]), { loadSource: () => Promise.resolve('') });
+		const srcdoc = sandboxIframes().at(-1)!.srcdoc;
+		expect(srcdoc).toContain("'data:text/javascript;charset=utf-8,'");
+		expect(srcdoc).toContain("new Worker(url, { type: 'module' })");
+		expect(srcdoc).not.toContain('createObjectURL');
 	});
 
 	it('boots by posting the worker source and a MessagePort into the iframe', async () => {

@@ -206,6 +206,13 @@ Select-mode priority now gives control rows precedence:
 That keeps region collapse, cross-section dragging, and VH reordering from being
 mistaken for strand selection.
 
+Arrow-key panning is not a tool: `Editor.svelte`'s body keydown handler calls
+`StrandToolbarController.panBy` while the strand pane is active. It runs before
+the tab-owner gate (panning is view-only), yields to `DUPLICATE` (which owns
+←/→) and to events already `defaultPrevented` (menus, CodeMirror). Any code
+that moves the stage must call `updateViewportBounds()` afterwards, or culling
+keeps hiding rows that scrolled into view.
+
 ---
 
 ## Region Controls

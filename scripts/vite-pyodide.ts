@@ -14,7 +14,7 @@ export const PYODIDE_CORE_PATH = `/pyodide/v${version}/`;
 /** The core files loadPyodide fetches; packages come from the CDN via the lock file. */
 export const PYODIDE_CORE_FILES: Readonly<Record<string, string>> = {
 	'pyodide.mjs': 'text/javascript',
-	'pyodide.asm.js': 'text/javascript',
+	'pyodide.asm.mjs': 'text/javascript',
 	'pyodide.asm.wasm': 'application/wasm',
 	'python_stdlib.zip': 'application/zip',
 	'pyodide-lock.json': 'application/json',

@@ -59,6 +59,7 @@
 		type RenameDocumentResult,
 	} from '../context/EditorDocumentSession.svelte';
 	import { exportPartSequencesToCSV } from '../../../model/io/sequenceCSV';
+	import { exportBaseName } from '$lib/model/io/designFileName';
 	import { help } from '$lib/components/help/help';
 	import { modKeySymbol } from '$lib/utils/platform';
 	import { goto } from '$app/navigation';
@@ -219,12 +220,16 @@
 			region,
 			part
 		);
+		const latticeRegionCount = part.getLatticedRegions().length;
+		const fileName = exportBaseName(
+			foldnanoDoc.name,
+			latticeRegionCount === 1 ? '.cadnano.json' : `.${region.name}.cadnano.json`
+		);
+		// cadnano2 stores the file's own name here.
+		cadnanoJSON.name = fileName;
 		const jsonString = JSON.stringify(cadnanoJSON);
 		const minifiedJsonString = jsonString.replace(/\s+/g, '');
-		const latticeRegionCount = part.getLatticedRegions().length;
-		const baseName =
-			latticeRegionCount === 1 ? foldnanoDoc.name : `${foldnanoDoc.name}.${region.name}`;
-		downloadJsonAsTextFile(minifiedJsonString, `${baseName}.cadnano.json`);
+		downloadJsonAsTextFile(minifiedJsonString, fileName);
 		if (droppedCrossRegionConnections > 0) {
 			toast.warning(
 				`Export complete with ${droppedCrossRegionConnections} cross-region connection(s) disconnected`,
@@ -239,7 +244,7 @@
 		const part = foldnanoDoc.parts[0];
 		if (!part) return;
 		try {
-			exportPartSequencesToCSV(part);
+			exportPartSequencesToCSV(part, foldnanoDoc.name);
 		} catch (error) {
 			editorViewContext.strandViewContext.highlightContext.circular_strand = true;
 			toast.error('Cannot export oligo CSV', {
