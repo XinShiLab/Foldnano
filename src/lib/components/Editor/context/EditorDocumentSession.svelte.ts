@@ -3,6 +3,7 @@ import { createContext } from 'svelte';
 import FoldnanoDocument, { type DocSnapshot } from '$lib/model/document.svelte';
 import { DocumentFormatError, migrateDocumentJson } from '$lib/model/documentFormat';
 import { repairDocumentJson } from '$lib/model/documentRepair';
+import { checkDocumentIntegrity } from '$lib/model/checks/integrity';
 import { designNameFromPath, splitDesignExtension } from '$lib/model/io/designFileName';
 import { HistoryStack } from '$lib/commands/history.svelte';
 import {
@@ -35,6 +36,7 @@ import { isTabSyncSupported, TabSync } from '$lib/services/tabSync.svelte';
 import { reportError } from '$lib/errorReporting';
 import {
 	describeLoadFailure,
+	notifyDesignIssues,
 	notifyDocumentRepairs,
 	toBackupEntries,
 	type BackupEntry,
@@ -237,6 +239,8 @@ export class EditorDocumentSession {
 		this.#currentDoc = doc;
 		this.#historyStack = this.#makeHistoryStack();
 		this.hooks.repairActiveRegion();
+		// Every way a design opens passes here, so this is the one place the load-time check runs.
+		notifyDesignIssues(doc.id, checkDocumentIntegrity(doc));
 
 		this.#currentFileMetadata = options.fileMetadata ?? null;
 		this.#lastLocalPersistAt = options.lastLocalPersistAt ?? null;

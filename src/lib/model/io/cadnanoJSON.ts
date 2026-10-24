@@ -4,6 +4,14 @@ import Oligo, { OligoSegment } from '../Oligo';
 import VirtualHelix from '../VirtualHelix';
 import { v4 as uuidv4 } from 'uuid';
 import type { Plane } from '../Part/Plane.svelte';
+import type { DesignIssue } from '../checks/designIssue';
+import { checkCadnanoJsonShape } from '../checks/shape/cadnanoJsonShape';
+import {
+	AmbiguousLatticeError,
+	latticeCandidates,
+	latticesByLength,
+	type CadnanoLattice,
+} from './cadnanoLattice';
 
 const isScafToStrandSetIdx = (vhIdx: number, isScaf: boolean): number => {
 	return vhIdx % 2 === 0 ? Number(!isScaf) : Number(isScaf);
@@ -63,7 +71,7 @@ class VStrand implements VStrandJSON {
 	stap_colors: Color[];
 	scaf_colors: Color[];
 	segments: [Set<SegmentInfo>, Set<SegmentInfo>];
-	/** Warnings generated during segment parsing (e.g. capped multi-base insertions). */
+	/** Warnings generated during parsing (e.g. a deletion moved off a crossover base). */
 	warnings: string[] = [];
 	// Private so it stays out of `JSON.stringify` on export (unlike `segments` / `warnings`).
 	#singleNtBpIndices: number[] = [];
@@ -256,10 +264,20 @@ class VStrand implements VStrandJSON {
 export class CadnanoJSON {
 	name: string;
 	vstrands: VStrand[];
+	// Private so it stays out of `JSON.stringify` on export.
+	#shapeIssues: DesignIssue[] = [];
 
-	/** Warnings emitted during parsing (e.g. unsupported features that were capped). */
+	/** Issues from the shape check when built with `fromRaw`; empty for pre-validated data. */
+	get shapeIssues(): readonly DesignIssue[] {
+		return this.#shapeIssues;
+	}
+
+	/** Warnings emitted during parsing: shape repairs and per-helix repairs. */
 	get warnings(): string[] {
-		return this.vstrands.flatMap((vs) => vs.warnings);
+		return [
+			...this.#shapeIssues.filter((i) => i.severity === 'warning').map((i) => i.message),
+			...this.vstrands.flatMap((vs) => vs.warnings),
+		];
 	}
 
 	constructor(name: string, vstrands: VStrandJSON[]) {
@@ -267,16 +285,47 @@ export class CadnanoJSON {
 		this.vstrands = vstrands.map((vs) => new VStrand(vs));
 	}
 
+	/** Builds from untrusted parsed JSON (files, URLs): shape-checks first; throws `DesignCheckError`. */
+	static fromRaw(raw: unknown): CadnanoJSON {
+		const { name, vstrands, issues } = checkCadnanoJsonShape(raw);
+		const cadnano = new CadnanoJSON(name, vstrands);
+		cadnano.#shapeIssues = issues;
+		return cadnano;
+	}
+
 	get info() {
 		return `Cadnano JSON Name: ${this.name}`;
 	}
 
-	private detectLatticeType(): 'SQUARE' | 'HONEYCOMB' {
+	/** Lattices this file could be; two entries mean the caller must ask (see `cadnanoLattice.ts`). */
+	latticeCandidates(): CadnanoLattice[] {
+		return latticeCandidates(this.vstrands);
+	}
+
+	/** The lattice to build with: `requested` if the file allows it, else the only candidate. */
+	private _resolveLattice(requested?: CadnanoLattice): CadnanoLattice {
 		if (this.vstrands.length === 0) throw new Error('Cadnano data contains no virtual strands.');
 		const numBases = this.vstrands[0].scaf.length;
-		if (numBases % 32 === 0) return 'SQUARE';
-		if (numBases % 21 === 0) return 'HONEYCOMB';
-		throw new Error(`Unsupported cadnano lattice (numBases=${numBases})`);
+		if (requested) {
+			if (!latticesByLength(numBases).includes(requested)) {
+				throw new Error(
+					`A ${numBases}-base design can't be ${requested.toLowerCase()}: the length isn't a multiple of its repeat.`
+				);
+			}
+			const candidates = this.latticeCandidates();
+			if (!candidates.includes(requested)) {
+				throw new Error(
+					`This design's crossovers sit on ${candidates[0].toLowerCase()} crossover sites, not ${requested.toLowerCase()} ones.`
+				);
+			}
+			return requested;
+		}
+		const candidates = this.latticeCandidates();
+		if (candidates.length === 0) {
+			throw new Error(`Unsupported cadnano lattice (numBases=${numBases})`);
+		}
+		if (candidates.length > 1) throw new AmbiguousLatticeError(numBases);
+		return candidates[0];
 	}
 
 	/** A 1-nt strand isn't a valid design element and never becomes a segment, so reject the file
@@ -292,9 +341,9 @@ export class CadnanoJSON {
 		}
 	}
 
-	toPart() {
+	toPart(options?: { lattice?: CadnanoLattice }) {
+		const typeOfLattice = this._resolveLattice(options?.lattice);
 		const numBases = this.vstrands[0].scaf.length;
-		const typeOfLattice = this.detectLatticeType();
 		this._assertNoSingleNtStrands();
 		const newPart = Part.forType(typeOfLattice, this.name, uuidv4(), numBases);
 		const region = newPart.getDefaultRegion() as LatticedDesignRegion;
@@ -308,12 +357,9 @@ export class CadnanoJSON {
 	 * VH indices are used as-is (indexOffset = 0), preserving parity and cross-region connection points.
 	 */
 	replaceRegionInPart(part: Part, region: LatticedDesignRegion): void {
-		const typeOfLattice = this.detectLatticeType();
+		// The region's own kind settles a length that fits both lattices.
+		this._resolveLattice(region.kind);
 		this._assertNoSingleNtStrands();
-		const expectedKind = typeOfLattice === 'SQUARE' ? 'SQUARE' : 'HONEYCOMB';
-		if (region.kind !== expectedKind) {
-			throw new Error(`Cannot replace ${region.kind} region with ${expectedKind} cadnano data`);
-		}
 		this._populateLatticedRegion(part, region, 0);
 	}
 
@@ -323,9 +369,13 @@ export class CadnanoJSON {
 	 * VH indices are shifted by an even offset to avoid collision with existing VHs in the part
 	 * (the parity convention used by isScafToStrandSetIdx is preserved).
 	 */
-	toRegionInPart(part: Part, plane: Plane): LatticedDesignRegion {
+	toRegionInPart(
+		part: Part,
+		plane: Plane,
+		options?: { lattice?: CadnanoLattice }
+	): LatticedDesignRegion {
+		const typeOfLattice = this._resolveLattice(options?.lattice);
 		const numBases = this.vstrands[0].scaf.length;
-		const typeOfLattice = this.detectLatticeType();
 		this._assertNoSingleNtStrands();
 		const name = part.nextRegionName(typeOfLattice);
 		const region =

@@ -170,7 +170,11 @@
 </div>
 <!-- scaffold sequence lock -->
 <div class="my-auto flex-shrink overflow-clip text-sm text-nowrap text-muted-foreground">
-	{#if isAllScaffoldSequenceLocked}
+	{#if !part?.hasScaffold}
+		<span title="No scaffold is set. Right-click an oligo and choose Set as Scaffold."
+			>No scaffold set</span
+		>
+	{:else if isAllScaffoldSequenceLocked}
 		<span class="text-green-600"
 			><Check size={16} strokeWidth={3} class="inline" /> Scaffold Sequence</span
 		>

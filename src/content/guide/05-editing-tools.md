@@ -163,7 +163,7 @@ After a fill, the panel reports how much of the input sequence was **left** over
 
 ## Scaffold Sequence Indicator
 
-The **scaffold sequence indicator** summarizes whether scaffold-labelled oligos have sequence coverage that still matches the current topology. A **red** state means the assigned sequence may be **stale** after a topology change (a moved end, new skip/insert, break, or reconnection shifted the nucleotide path).
+The **scaffold sequence indicator** summarizes whether scaffold-labelled oligos have sequence coverage that still matches the current topology. A **red** state means the assigned sequence may be **stale** after a topology change (a moved end, new skip/insert, break, or reconnection shifted the nucleotide path). **Grey** means no oligo is marked as scaffold yet, so there is nothing to track; hover it for a reminder, and right-click an oligo and choose **Set as Scaffold**. The Sequence panel shows **No scaffold set** in the same case.
 
 <Callout type="warning">
 

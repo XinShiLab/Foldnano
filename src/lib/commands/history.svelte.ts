@@ -52,6 +52,7 @@ export interface SaveResult {
 export class HistoryStack {
 	#undo: HistoryEntry[] = $state([]);
 	#redo: HistoryEntry[] = $state([]);
+	#revision = $state(0);
 	#limits: HistoryLimits = { ...DEFAULT_HISTORY_LIMITS };
 	#entryBytes = new WeakMap<HistoryEntry, number>();
 	#undoBytes = 0;
@@ -84,6 +85,11 @@ export class HistoryStack {
 		private onSaved?: () => void
 	) {
 		this.#startAutoSaveTimer();
+	}
+
+	/** Bumps on every commit, undo and redo; read it to recompute once per edit, not per drag frame. */
+	get revision(): number {
+		return this.#revision;
 	}
 
 	get numberOfUndos() {
@@ -156,6 +162,7 @@ export class HistoryStack {
 	}
 
 	#markDirty() {
+		this.#revision++;
 		this.#editsSinceLastSave++;
 		this.#updateAutoSaveStatus();
 		this.#checkAutoSave();

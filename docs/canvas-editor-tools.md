@@ -419,6 +419,8 @@ More structured transient elements (selection boxes, move previews) go through `
 
 ## Boundaries / Don'ts
 
+- **A tool that newly allows or forbids a design state changes a design check.** E.g. letting the skip tool act on crossover sites must relax `skip-insert-on-crossover`; see `design-guards.md` § Changing the checks.
+
 - **Don't mutate the model from a tool directly.** Call a command from `src/lib/commands/*` so the change goes through `historyStack.tx(...)` and lands on the undo stack.
 - **Don't read `editorMode` synchronously from `setMode`.** The controller polls `getMode()` on each event; `onExit` / `onEnter` fire on the next pointer event. If a mode change must run setup before the user clicks, do it in the component that flipped the mode.
 - **Don't call hit-testing inside a `move`/`up` phase that is already captured.** Once a sub-handler returns `true` from `down`, it owns the gesture — re-running priority dispatch will desync state.

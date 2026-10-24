@@ -651,6 +651,8 @@ There is no backward-compat loader for pre-region documents: `Part.fromJSON()` t
 
 ## Boundaries / Don'ts
 
+- **Keep the design checks in step with the model.** A new field, region kind or newly allowed / forbidden state usually changes an integrity, simulation or cadnano rule; see `design-guards.md` § Changing the checks.
+
 - **Don't name exported files after `Part.name`.** Use `exportBaseName(doc.name, …)`; the part name is not shown anywhere and goes stale.
 - **Don't strip extensions with ad hoc regexes or at the first dot.** Use the `designFileName.ts` helpers.
 

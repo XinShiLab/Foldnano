@@ -12,6 +12,7 @@
 	import { SvelteDate } from 'svelte/reactivity';
 	import { FileJson2, LoaderCircle, XIcon } from '@lucide/svelte';
 	import { parseDesignFile, getParseWarnings, LocalPluginZipFile } from './parsers';
+	import { withLatticeChoice } from './latticeChoice.svelte';
 	import { prepareLocalZipInstall, type PreparedInstall } from '$lib/plugin/PluginInstaller';
 	import PluginManifestInfo from '../Plugin/PluginManifestInfo.svelte';
 
@@ -47,7 +48,7 @@
 		if (files.length > 0) return;
 		if (files.find((f) => f.name === file.name)) return;
 		const url = URL.createObjectURL(file);
-		const parsed = parseDesignFile(file).catch((e) => Promise.reject(e));
+		const parsed = withLatticeChoice(file.name, (lattice) => parseDesignFile(file, { lattice }));
 		files.push({
 			name: file.name,
 			type: file.type,

@@ -18,6 +18,18 @@ export const WHATS_NEW_REVIEWED_THROUGH = '2026-10-23T20:58:12+02:00';
 // Newest first. Edit freely; the draft script only inserts new entries at the top.
 export const WHATS_NEW: readonly WhatsNewEntry[] = [
 	{
+		date: '2026-10-24',
+		area: 'Strand view',
+		text: "Design checks: a new shield button in the strand view toolbar marks spots the editor wouldn't create itself, and, when you turn them on, what simulation or cadnano export would refuse or lose. Click an issue in its list to jump to that helix and base. The Design Checks Reference page lists every check.",
+		draft: true,
+	},
+	{
+		date: '2026-10-24',
+		area: 'Export',
+		text: 'cadnano files are checked more closely: inconsistent files are refused with the helix and base named, small inconsistencies are repaired with a warning, and a design whose length fits both lattices (such as 672 bases) opens in the right one or asks you (links can add &lattice=honeycomb or &lattice=square). Export as cadnano JSON and cadnano plugins now list what cadnano would cut or lose before they go ahead, and simulation export says how to fix a skip or insert it refuses.',
+		draft: true,
+	},
+	{
 		date: '2026-10-23',
 		area: 'Plugins',
 		text: 'Plugin dev mode: link a plugin folder on your computer from the new Dev tab in the Plugins panel, edit it in your own editor, and run it on your design without zipping or reinstalling. Linking an empty folder opens a New plugin form that writes a working starter plugin, with API stubs for editor autocomplete. print() output appears while the plugin runs, and Check and Zip package the folder when it is ready. Needs a Chromium-based browser.',

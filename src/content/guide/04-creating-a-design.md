@@ -9,6 +9,9 @@ covers:
   - src/lib/components/Editor/Toolbar/Open.svelte
   - src/lib/components/Editor/Toolbar/LoadCadnanoAsRegionDialog.svelte
   - src/lib/components/Editor/Toolbar/parsers/**
+  - src/lib/model/checks/shape/cadnanoJsonShape.ts
+  - src/lib/model/io/cadnanoLattice.ts
+  - src/lib/components/Editor/StrandView/DesignIssuesMenu.svelte
 ---
 
 <script>
@@ -116,6 +119,42 @@ Foldnano is more flexible than classic cadnano, and a few defaults differ.
 | Non-lattice geometry | Not represented | Preserved in `.fn.json` |
 
 For compatibility import/export, cadnano `scaf` and `stap` arrays are treated as **file-format directional conventions only**; they are not the same as Foldnano's explicit scaffold label. See [Mental Model](/docs/guide/mental-model#explicit-scaffold).
+
+## Opening Cadnano Files
+
+Foldnano checks a cadnano `.json` file before opening it. Small inconsistencies are repaired, and each repair is reported in a **Cadnano import warning** message so nothing changes without you knowing. Problems that have no safe repair stop the import with a message that names the helix and base.
+
+| What Foldnano finds | What happens |
+| --- | --- |
+| A base claims a connection from a base that is empty | The claim is removed and the base becomes a free 5' (or 3') end, which is how cadnano draws it. A warning names the helix and base. |
+| A deletion (skip) on a crossover base | The deletion moves to the neighbouring base, because Foldnano doesn't allow deletions on crossover bases. A warning names both positions. |
+| An insert on a crossover base | The insert stays where it is, and the **Editor rules** design check marks it (see [Design Checks While You Edit](#design-checks-while-you-edit)). Move or remove it before simulating. |
+| A helix length that fits both honeycomb (21) and square (32), such as 672 | Foldnano picks the lattice whose crossover positions match. If the file has no crossovers to go by, you're asked to choose. |
+| Two bases that disagree about how they connect | The file isn't opened. |
+| Two helices on one lattice position, a negative lattice position, or helices of different lengths | The file isn't opened. |
+| A strand only one base long | The file isn't opened. Extend or remove it in cadnano first. |
+
+Loading a cadnano file as a region (**Add Region**, then **Load Cadnano Design as a Region**) runs the same checks. The [Design Checks Reference](/docs/guide/design-checks#opening-a-file) has the full list.
+
+Any design you open, cadnano or Foldnano, is also checked for things the editor wouldn't create itself, such as a skip on one strand and an insert on the other at the same base, or a helix whose number doesn't match its lattice position. These are listed in one warning message; the design still opens so you can fix it. A Foldnano design with helices at negative lattice positions is moved onto the grid without changing where it sits in 3D, and the message says so.
+
+## Design Checks While You Edit
+
+The **Design checks** button in the strand view toolbar (the shield, next to the scaffold indicator **S**) marks problems right on the canvas. Choose which checks to show:
+
+| Check | Default | What it marks |
+| --- | --- | --- |
+| **Editor rules** | on | Things the editor wouldn't create itself, usually from an imported file or a plugin: a skip on one strand and an insert on the other at the same base, a skip or insert on a crossover site (cadnano import already moves skips off crossover sites, so from a cadnano file this is usually an insert; Foldnano files and plugin results aren't changed on the way in), helices sharing or outside the lattice, a helix number that doesn't match its lattice position. |
+| **Simulation export** | off | What oxDNA and mrDNA export would refuse, such as a skip or insert on a base where only one strand exists. See [Simulation And Export](/docs/guide/simulation-export#nt-model). |
+| **Cadnano export** | off | What cadnano JSON can't hold for the **active region**, such as a connection from a cadnano scaffold path to a staple path. See [Exporting cadnano JSON](/docs/guide/simulation-export#exporting-cadnano-json). |
+
+![Design checks popover open from the shield button in the strand view toolbar, with the Editor rules, Simulation export and Cadnano export switches above a list of issues, and a red frame around the matching base on the canvas](/screenshots/guide/creating-a-design/06-design-checks-menu.webp)
+
+*The Design checks popover: switches on top, issues below. Click an issue to jump to its frame on the canvas.*
+
+Problems are framed in red (must be fixed before that export works) or amber (would be lost or changed). The button shows how many there are; open it to see the list, and click an entry to jump to that helix and base. Some entries, such as connections to other regions that cadnano export would cut, describe a whole region and have no spot to jump to.
+
+The marks update after each edit, undo or redo. Every check, and what to do about it, is listed in the [Design Checks Reference](/docs/guide/design-checks).
 
 ## When To Assign Scaffold Sequence
 

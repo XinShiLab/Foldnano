@@ -25,6 +25,7 @@
 	import XoverSitesAround from './CrossoverSite/XoverSitesAround.svelte';
 	import Highlights from './Highlights.svelte';
 	import MismatchMarkers from './MismatchMarkers.svelte';
+	import DesignIssueMarkers from './DesignIssueMarkers.svelte';
 	import { SkipTool } from '$lib/canvasEditor/tools/skip';
 	import { InsertTool } from '$lib/canvasEditor/tools/insert';
 	import { PaintTool } from '$lib/canvasEditor/tools/paint';
@@ -53,6 +54,7 @@
 		updateViewportBounds,
 		updateViewportScale,
 		panBy,
+		centerOn,
 	});
 
 	let stage = $state<Stage>();
@@ -151,6 +153,27 @@
 		if (!node) return;
 		node.position({ x: node.x() + dx, y: node.y() + dy });
 		updateViewportBounds();
+	}
+
+	function centerOn(vhId: string, bp: number): boolean {
+		const node = stage?.node;
+		const vh = part.getVhById(vhId);
+		if (!node || !vh) return false;
+		const strandCtx = editorViewContext.strandViewContext;
+		if (vh.regionId && strandCtx.collapsedRegionIds.includes(vh.regionId)) {
+			strandCtx.collapsedRegionIds = strandCtx.collapsedRegionIds.filter(
+				(id) => id !== vh.regionId
+			);
+		}
+		const row = d.getEffectiveDisplayRowForVh(vhId);
+		if (row === null || row.isCollapsed) return false;
+		const [top, bottom] = getBpCoordsByRowAndBpIdx(row.displayRow, bp);
+		const scale = node.scaleX() || 1;
+		const x = top[0] + sideLength / 2;
+		const y = (top[1] + bottom[1] + sideLength) / 2;
+		node.position({ x: viewerWidth / 2 - x * scale, y: viewerHeight / 2 - y * scale });
+		updateViewportBounds();
+		return true;
 	}
 
 	function updateViewportScale() {
@@ -316,6 +339,7 @@
 					<Grid {part} />
 					<MismatchMarkers {part} />
 					<StrandRoutes {part} />
+					<DesignIssueMarkers />
 					{#if editorViewContext.strandViewContext.showBlocks}
 						<BlockLayer {part} />
 					{/if}

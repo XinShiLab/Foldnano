@@ -5,7 +5,8 @@ category: plugin-development
 order: 3
 slug: plugin-formats
 covers:
-  - src/lib/plugin/result-format-validation-*.ts
+  - src/lib/plugin/result-format-validation*.ts
+  - src/lib/model/checks/shape/**
   - src/lib/plugin/result-replacement-operations.ts
   - src/lib/plugin/ResultApplicator.ts
   - src/lib/plugin/design-verification.ts
@@ -22,7 +23,9 @@ covers:
 | I need to mutate the model and preserve sequences | `foldnano_json` with `replacePartKeepAnnotationsWhereMatched` |
 | I want to write code that mutates the part directly (one undo step) | `foldnano_mini` with `replayMutationLog` / `…InRegion` |
 
-**`cadnano_json`** is a lossy format: it carries helix topology and staple colors but drops sequences, modifications, oligo names, and the explicit scaffold flag (which is re-derived from lattice parity on import).
+**`cadnano_json`** is a lossy format: it carries helix topology and staple colors but drops sequences, modifications, oligo names, and the explicit scaffold flag. cadnano's `scaf`/`stap` arrays are only a direction convention, so a `cadnano_json` result carries no scaffold flag; `replaceRegionKeepAnnotationsWhereMatched` puts it back on oligos whose segments still match, `replaceRegion` doesn't.
+
+Before a `cadnano_json` plugin runs, Foldnano checks whether the active region fits in cadnano JSON. Problems that would corrupt the plugin's input, such as a connection between a cadnano scaffold path and a staple path, always ask the user first. For `replaceRegion` strategies the user is also told what applying the result would lose (connections to other regions, repeat-group copies, and so on), since the region is then replaced by what came back. The user can cancel; the plugin doesn't run.
 
 **`foldnano_json`** is the lossless `Part.toJSON()` snapshot. It includes everything: per-slot sequences, skip/insert structure, modifications, oligo names, `isScaffold` flag, and UUIDs. It is the only format that exposes sequence data to plugins. Its shape is the same as one entry of `parts` in a `.fn.json` file; the [File Format](/docs/contributors/file-format#part) page documents every field.
 
@@ -60,6 +63,6 @@ Install-time validation enforces the supported combinations:
 For `replacePart*` and `replaceRegion*` strategies, a run that returns a result doesn't always offer **Apply**. Before it does, Foldnano checks the returned JSON twice:
 
 - **Result validation** checks its shape against the declared `format`: well-formed `vstrands` or `Part.toJSON()` data, and references that point somewhere. Small inconsistencies are repaired (for example, a connection recorded on only one side is cleared when the other end is free); malformed data is rejected.
-- **Design verification** rebuilds the result the way Apply would, on a throwaway copy, and looks for dangling references, segments outside their helix, connections that don't match up, and, for region strategies, a change to the active region's set of helices.
+- **Design verification** rebuilds the result the way Apply would, on a throwaway copy, and looks for dangling references, segments outside their helix, connections that don't match up, and, for region strategies, a change to the active region's set of helices. It also rejects designs the editor itself never produces: a skip or insert that differs between the two strands of one base, a skip or insert on a constrained crossover site, two helices on one lattice position, or a negative lattice position. A helix whose number is odd on an even lattice position (or the reverse) is only logged to the console.
 
 If either check fails, the plugin panel names the offending field or id instead of showing **Apply**, and your design is untouched. So a `replaceRegion*` plugin that adds or removes a helix in the active region runs without error but never offers Apply.

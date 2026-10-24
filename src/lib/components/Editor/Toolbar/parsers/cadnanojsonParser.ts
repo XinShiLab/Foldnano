@@ -1,6 +1,7 @@
-import { CadnanoJSON, type VStrandJSON } from '$lib/model/io/cadnanoJSON';
+import { CadnanoJSON } from '$lib/model/io/cadnanoJSON';
 import type { Part } from '$lib/model/Part';
-import type { DesignFileParser, FileMeta } from '.';
+import { AmbiguousLatticeError } from '$lib/model/io/cadnanoLattice';
+import type { DesignFileParser, FileMeta, ParseOptions } from '.';
 
 // export async function parseCadnanoJSON(file: File): Promise<Part> {
 //   // Legacy convenience wrapper
@@ -30,16 +31,15 @@ export const cadnanoParser: DesignFileParser & { getLastWarnings(): string[] } =
 			(!!raw && typeof raw === 'object' && Array.isArray(raw.vstrands) && 'name' in raw)
 		);
 	},
-	parse(raw: Record<string, unknown>, meta: FileMeta): Part {
+	parse(raw: Record<string, unknown>, meta: FileMeta, options?: ParseOptions): Part {
 		try {
-			if (!raw.name || !raw.vstrands) {
-				throw new Error("Missing required properties 'name' or 'vstrands'");
-			}
-			const parsedCadnanoJson = new CadnanoJSON(raw.name as string, raw.vstrands as VStrandJSON[]);
+			const parsedCadnanoJson = CadnanoJSON.fromRaw(raw);
 			_lastWarnings = parsedCadnanoJson.warnings;
-			const part = parsedCadnanoJson.toPart();
+			const part = parsedCadnanoJson.toPart({ lattice: options?.lattice });
 			return part;
 		} catch (err) {
+			// Callers catch this one to ask the user, so it must reach them unwrapped.
+			if (err instanceof AmbiguousLatticeError) throw err;
 			throw new SyntaxError(
 				`Invalid cadnano JSON in file "${meta.name}": ${(err as Error).message}`
 			);

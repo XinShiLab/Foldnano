@@ -94,6 +94,21 @@ describe('verifyDesign — replacePart', () => {
 		);
 	});
 
+	it('rejects a result whose two strands carry different inserts at one base', () => {
+		const part = makeHoneycombPart('Original');
+		const vh = addLatticeVh(part, 0, 0);
+		part.createOligo(vh, 0, 5, '#000000');
+		part.createOligo(vh, 5, 0, '#ffffff');
+		const json = roundTrip(part.toJSON()) as PartJSON;
+		json.oligos[0].segments[0].slots.find((slot) => slot.bpIndex === 2)!.seq = 'NN';
+
+		const input: DesignVerificationInput = { format: 'foldnano_json', data: json };
+		expectRejects(
+			() => verifyDesign(makeManifest('replacePart'), 'plugin-x', null, null, input),
+			'asymmetric-skip-insert'
+		);
+	});
+
 	it('rejects a cadnano_json result for a strategy that requires foldnano_json', () => {
 		const input: DesignVerificationInput = {
 			format: 'cadnano_json',

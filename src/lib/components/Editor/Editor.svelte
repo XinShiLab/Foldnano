@@ -53,6 +53,9 @@
 	import { resolve } from '$app/paths';
 	import { toast } from 'svelte-sonner';
 	import { parseDesignRaw, getParseWarnings, type FileMeta } from './Toolbar/parsers';
+	import LatticeChoiceDialog from './Toolbar/LatticeChoiceDialog.svelte';
+	import DesignCheckDialog from './DesignCheckDialog.svelte';
+	import { parseLatticeParam, withLatticeChoice } from './Toolbar/latticeChoice.svelte';
 	import { Part } from '../../model/Part';
 	import FoldnanoDocument from '../../model/document.svelte';
 	import { stripDesignExtension } from '$lib/model/io/designFileName';
@@ -106,7 +109,8 @@
 
 	$effect(() => {
 		if (urlLoadAttempted || !storesHydrated) return;
-		const rawUrl = new URLSearchParams(window.location.search).get('url');
+		const searchParams = new URLSearchParams(window.location.search);
+		const rawUrl = searchParams.get('url');
 		if (!rawUrl) return;
 		urlLoadAttempted = true;
 		urlLoading = true;
@@ -121,6 +125,11 @@
 			}
 			if (!['http:', 'https:'].includes(parsed.protocol)) {
 				toast.error('Only http:// and https:// URLs are supported');
+				return;
+			}
+			const lattice = parseLatticeParam(searchParams.get('lattice'));
+			if (lattice === null) {
+				toast.error('Invalid ?lattice= parameter', { description: 'Use honeycomb or square.' });
 				return;
 			}
 
@@ -146,7 +155,11 @@
 
 			let result: ReturnType<typeof parseDesignRaw>;
 			try {
-				result = parseDesignRaw(raw, meta);
+				result = await withLatticeChoice(
+					filename,
+					(chosen) => parseDesignRaw(raw, meta, { lattice: chosen }),
+					lattice
+				);
 				for (const w of getParseWarnings()) {
 					toast.warning('Cadnano import warning', { description: w });
 				}
@@ -778,3 +791,5 @@
 <BackupsDialog bind:open={editorViewContext.showBackups} />
 <PluginInstallConfirmDialog gate={editorViewContext.pluginInstallGate} />
 <LinkedPluginReviewDialog gate={editorViewContext.linkedPluginReviewGate} />
+<LatticeChoiceDialog />
+<DesignCheckDialog />

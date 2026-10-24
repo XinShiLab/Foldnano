@@ -1,4 +1,5 @@
 import type { Part } from '$lib/model/Part';
+import { assertSimulationReady } from '../checks/simulation';
 import type Oligo from '$lib/model/Oligo/Oligo.svelte';
 import type OligoSegment from '$lib/model/Oligo/OligoSegment.svelte';
 import type VirtualHelix from '$lib/model/VirtualHelix';
@@ -157,29 +158,8 @@ function collectSlotInfo(part: Part, vh: VirtualHelix): Map<number, SlotInfo> {
 	}
 	for (const [bpIndex, info] of byBp) {
 		info.isFixed = isConstrainedAnchorAt(part, vh, bpIndex);
-		validateSlotInfo(vh, bpIndex, info);
 	}
 	return byBp;
-}
-
-function validateSlotInfo(vh: VirtualHelix, bpIndex: number, info: SlotInfo): void {
-	const [len0, len1] = info.seqLenByStrand;
-	const modified0 = info.hasSlotByStrand[0] && len0 !== 1;
-	const modified1 = info.hasSlotByStrand[1] && len1 !== 1;
-	if (info.isFixed && (modified0 || modified1)) {
-		throw new Error(
-			`Cannot export simulation model: insert/skip at constrained crossover site ` +
-				`VH ${vh.index}, bp ${bpIndex}.`
-		);
-	}
-	if (modified0 || modified1) {
-		if (!info.hasSlotByStrand[0] || !info.hasSlotByStrand[1] || len0 !== len1) {
-			throw new Error(
-				`Cannot export simulation model: asymmetric insert/skip at VH ${vh.index}, ` +
-					`bp ${bpIndex}. Inserts/skips must be mirrored on both strands.`
-			);
-		}
-	}
 }
 
 export function simulationFrameForVh(part: Part, vh: VirtualHelix): VirtualHelixFrame {
@@ -350,7 +330,7 @@ function buildGeometryFrames(part: Part): Map<string, NtFrame> {
 						// and drop nucleotides into the empty gap. The natural coord preserves the gap,
 						// then a linear rescale keeps both fixed endpoints pinned (conserving total
 						// axial length/twist when the span contains inserts/skips). Fixed anchors carry
-						// no insert/skip (validateSlotInfo enforces this), so natFirst = firstBp.
+						// no insert/skip (assertSimulationReady enforces this), so natFirst = firstBp.
 						const natFirst = firstBp;
 						const natLast = lastBp + totalSpanNetOffset;
 						const nat = layer.bpIndex + (cumNetOffsetAt.get(layer.bpIndex) ?? 0) + layer.loopIndex;
@@ -457,6 +437,7 @@ export function buildSimulationNtModel(
 	part: Part,
 	options: { fallbackBase?: SimulationFallbackBase; includeMirrors?: boolean } = {}
 ): SimulationNtModel {
+	assertSimulationReady(part);
 	const fallbackBase = options.fallbackBase ?? 'T';
 	const includeMirrors = options.includeMirrors ?? true;
 	const frames = buildGeometryFrames(part);

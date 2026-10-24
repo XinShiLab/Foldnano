@@ -63,6 +63,10 @@ representation.
 - autosave counters and timer state
 - the single shared history stream for one editor session
 
+`revision` bumps on every commit, undo and redo (`#markDirty`). Views that derive something
+costly from the whole model (the design-check overlay) read it instead of the model, so they
+recompute once per edit rather than on every live mutation during a drag.
+
 ### History limits
 
 The undo stack is capped by `HistoryLimits` (`DEFAULT_HISTORY_LIMITS`: 100

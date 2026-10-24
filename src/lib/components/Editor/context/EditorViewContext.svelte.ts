@@ -1,4 +1,10 @@
-import { createContext } from 'svelte';
+import { collectDesignIssues, type DesignCheckSelection } from '$lib/model/checks/collect';
+import type { DesignIssue } from '$lib/model/checks/designIssue';
+import { designCheckPrompt } from '../designCheckPrompt.svelte';
+import { checkPartIntegrity } from '$lib/model/checks/integrity';
+import { notifyDesignIssues } from './documentRecovery';
+import type { CadnanoLattice } from '$lib/model/io/cadnanoLattice';
+import { createContext, untrack } from 'svelte';
 import type { Stage } from 'svelte-konva';
 import { SvelteSet } from 'svelte/reactivity';
 import { toast } from 'svelte-sonner';
@@ -69,6 +75,8 @@ export interface StrandToolbarController {
 	updateViewportScale: () => void;
 	/** Shifts the view by screen pixels; positive dx/dy moves the content right/down. */
 	panBy: (dx: number, dy: number) => void;
+	/** Centers the view on a helix's base, expanding its region if collapsed; false if not shown. */
+	centerOn: (vhId: string, bp: number) => boolean;
 }
 
 export interface HelixToolbarController {
@@ -184,6 +192,12 @@ const fromToggleToLeafTarget = (toggles: SelectionToggle[]): Set<LeafTarget | Ca
 	return new Set<LeafTarget | Category>(withAlwaysOn);
 };
 
+const DEFAULT_DESIGN_CHECKS: DesignCheckSelection = {
+	integrity: true,
+	simulation: false,
+	cadnano: false,
+};
+
 class StrandViewContext {
 	selected: EndSelection = $state(new EndSelection());
 	selectAllMode: SelectAllMode = $state('NONE');
@@ -227,6 +241,8 @@ class StrandViewContext {
 	warningContext: Record<CanWarn, boolean> = $state({
 		mismatch: true,
 	});
+	/** Which design checks the issue overlay shows; editor rules on, export profiles opt-in. */
+	designChecks: DesignCheckSelection = $state({ ...DEFAULT_DESIGN_CHECKS });
 	selectionToggles: SelectionToggle[] = $state(['SCAF', 'STAP', 'END', 'XOVER', 'SEGMENT']);
 	selectionFilter: Set<LeafTarget | Category> = $derived(
 		fromToggleToLeafTarget(this.selectionToggles)
@@ -270,6 +286,7 @@ export interface SerializableStrandViewContext {
 	hideContext: Record<CanHide, boolean>;
 	highlightContext: Record<CanHighlight, boolean>;
 	warningContext?: Record<CanWarn, boolean>;
+	designChecks?: DesignCheckSelection;
 	selectionToggles: SelectionToggle[];
 	collapsedRegionIds: string[];
 	csCursorIdx: number;
@@ -331,6 +348,15 @@ export class EditorViewContext {
 		);
 		this.pluginRegistry.setBusyCheck((id) => this.pluginCoordinator.isPluginBusyOrPending(id));
 		this.pluginCoordinator.setEditGate(() => this.session.isTabOwner);
+		this.pluginCoordinator.setCadnanoInputReviewer((pluginName, issues) =>
+			designCheckPrompt.ask({
+				title: `Run "${pluginName}" on this region?`,
+				description:
+					"This plugin works on cadnano JSON, which can't hold all of this region. If you apply its result, what cadnano drops is lost from the region.",
+				proceedLabel: 'Run anyway',
+				issues,
+			})
+		);
 		this.pluginInstallGate = new PluginInstallGate(() => this.pluginRegistry);
 		this.pluginDevMode = new PluginDevMode(this.pluginRegistry, () => this.pluginCoordinator);
 		this.pluginCoordinator.setLinkedFolderReader((plugin) => this.pluginDevMode.readFolder(plugin));
@@ -394,6 +420,15 @@ export class EditorViewContext {
 		}
 		this.openSidePanel(tab);
 	}
+
+	/** Issues of the checks selected in `designChecks`, recomputed once per edit (not per drag frame). */
+	designIssues: DesignIssue[] = $derived.by(() => {
+		const { integrity, simulation, cadnano } = this.strandViewContext.designChecks;
+		void this.historyStack.revision;
+		const part = this.currentDoc.parts[0];
+		const region = this.activeRegion;
+		return untrack(() => collectDesignIssues(part, region, { integrity, simulation, cadnano }));
+	});
 
 	get activeRegion(): DesignRegion | null {
 		const part = this.currentDoc.parts[0];
@@ -554,15 +589,21 @@ export class EditorViewContext {
 		this.isAddingRegionToExistingPart = false;
 	}
 
-	loadCadnanoAsRegion(cadnano: CadnanoJSON, basePlane: 'XY' | 'XZ' | 'YZ'): void {
+	loadCadnanoAsRegion(
+		cadnano: CadnanoJSON,
+		basePlane: 'XY' | 'XZ' | 'YZ',
+		lattice?: CadnanoLattice
+	): void {
 		const transform = BASIS_PLANE_TRANSFORMS[basePlane];
+		let loaded: { part: Part; regionId: string } | null = null;
 		this.historyStack.snapshotTx('Load Cadnano as region', () => {
 			let part = this.currentDoc.parts[0];
 			if (!part) {
-				part = cadnano.toPart();
+				part = cadnano.toPart({ lattice });
 				this.currentDoc.parts.push(part);
 				part.setPlaneTransform(part.getDefaultPlane().id, transform);
 				this.setActiveRegion(part.getDefaultRegion().id);
+				loaded = { part, regionId: part.getDefaultRegion().id };
 			} else {
 				const plane = new Plane(
 					part.nextPlaneName(),
@@ -572,10 +613,16 @@ export class EditorViewContext {
 					{ ...transform.v },
 					{ ...transform.normal }
 				);
-				const region = cadnano.toRegionInPart(part, plane);
+				const region = cadnano.toRegionInPart(part, plane, { lattice });
 				this.setActiveRegion(region.id);
+				loaded = { part, regionId: region.id };
 			}
 		});
+		if (loaded) {
+			const { part, regionId } = loaded;
+			// eslint-disable-next-line svelte/prefer-svelte-reactivity -- one-off scope, not state
+			notifyDesignIssues(this.currentDoc.id, checkPartIntegrity(part, new Set([regionId])));
+		}
 		for (const w of cadnano.warnings) {
 			toast.warning('Cadnano import warning', { description: w });
 		}
@@ -687,6 +734,7 @@ export class EditorViewContext {
 			hideContext: this.strandViewContext.hideContext,
 			highlightContext: this.strandViewContext.highlightContext,
 			warningContext: this.strandViewContext.warningContext,
+			designChecks: this.strandViewContext.designChecks,
 			selectionToggles: this.strandViewContext.selectionToggles,
 			collapsedRegionIds: this.strandViewContext.collapsedRegionIds,
 			csCursorIdx: this.strandViewContext.csCursorIdx,
@@ -706,6 +754,7 @@ export class EditorViewContext {
 		this.strandViewContext.hideContext = data.hideContext;
 		this.strandViewContext.highlightContext = data.highlightContext;
 		this.strandViewContext.warningContext = data.warningContext ?? { mismatch: true };
+		this.strandViewContext.designChecks = { ...DEFAULT_DESIGN_CHECKS, ...data.designChecks };
 		this.strandViewContext.selectionToggles = data.selectionToggles;
 		this.strandViewContext.collapsedRegionIds = data.collapsedRegionIds ?? [];
 		this.strandViewContext.csCursorIdx = data.csCursorIdx;

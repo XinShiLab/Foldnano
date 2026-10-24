@@ -51,7 +51,7 @@ describe('oxDNA export', () => {
 		part.createOligo(vh, 4, 0);
 		seg.skipsAndInserts = [[1, 2]];
 
-		expect(() => exportPartToOxDna(part)).toThrow(/asymmetric insert\/skip/);
+		expect(() => exportPartToOxDna(part)).toThrow(/different skip\/insert on each strand/);
 	});
 
 	it('classic topology row format: strandId base next prev', () => {

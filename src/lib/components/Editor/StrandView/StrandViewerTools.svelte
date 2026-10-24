@@ -33,6 +33,7 @@
 	import type { CanHide, CanHighlight, CanWarn } from '../context/types';
 	import type { Part } from '$lib/model/Part';
 	import EditorModeToggleGroup from '../Toolbar/EditorModeToggleGroup.svelte';
+	import DesignIssuesMenu from './DesignIssuesMenu.svelte';
 
 	import Badge from '../../ui/badge/badge.svelte';
 	import { exportStageAsPng } from '../utils';
@@ -134,6 +135,21 @@
 
 	// let exportImagePixelScale = $state(2);
 	let exportImagePixelScale = $derived(2 / ctx.strandViewContext.viewportScale);
+	// Without a scaffold flag the lock check is vacuously true, which used to read as a green "all good".
+	const scaffoldState = $derived<'none' | 'current' | 'stale'>(
+		!part.hasScaffold ? 'none' : part.isAllScaffoldSequenceLocked ? 'current' : 'stale'
+	);
+	const SCAFFOLD_BADGE_CLASS = {
+		none: 'bg-muted-foreground/60 hover:bg-muted-foreground',
+		current: 'bg-lime-800 hover:bg-lime-500 dark:bg-lime-700 dark:hover:bg-lime-500',
+		stale: 'bg-red-800 hover:bg-red-500 dark:bg-red-700 dark:hover:bg-red-500',
+	} as const;
+	const SCAFFOLD_TOOLTIP = {
+		none: 'No scaffold is set. Right-click an oligo and choose Set as Scaffold.',
+		current: 'The scaffold sequence is applied and current.',
+		stale: 'Re-apply your scaffold sequence if this is red!',
+	} as const;
+
 	// const isAllScaffoldSequenceLocked = $derived.by(() => {
 	//   if (!part || part.oligos.size === 0) return false;
 	//   if (!part.hasScaffold) return false;
@@ -186,7 +202,7 @@
 					<Tooltip.Trigger>
 						<Badge
 							class={`my-auto h-5 min-w-5 rounded-full px-1 font-mono tabular-nums
-            ${part.isAllScaffoldSequenceLocked ? 'bg-lime-800 hover:bg-lime-500 dark:bg-lime-700 dark:hover:bg-lime-500' : 'bg-red-800 hover:bg-red-500 dark:bg-red-700 dark:hover:bg-red-500'}
+            ${SCAFFOLD_BADGE_CLASS[scaffoldState]}
             transition-all duration-200 hover:cursor-pointer hover:shadow-lg
             `}
 							onclick={() => {
@@ -194,16 +210,18 @@
 							}}
 							{@attach help({
 								title: 'Scaffold sequence indicator',
-								text: 'Green when every scaffold sequence is applied and current, red when it needs re-applying. Click to highlight the scaffold.',
+								text: 'Green when every scaffold sequence is applied and current, red when it needs re-applying, grey when no oligo is marked as scaffold. Click to highlight the scaffold.',
 								doc: 'editing-tools',
 							})}>S</Badge
 						>
 					</Tooltip.Trigger>
 					<Tooltip.Content>
-						<p>Re-apply your scaffold sequence if this is red!</p>
+						<p>{SCAFFOLD_TOOLTIP[scaffoldState]}</p>
 					</Tooltip.Content>
 				</Tooltip.Root>
 			</Tooltip.Provider>
+
+			<DesignIssuesMenu />
 
 			<!-- Highlight / Hide / Remove Actions -->
 			<ButtonGroup.Root class="flex-none overflow-hidden">

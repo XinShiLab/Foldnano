@@ -1,3 +1,4 @@
+import { checkCadnanoProfile, type CadnanoProfileIssue } from '$lib/model/checks/cadnano';
 import { MAX_WHEEL_BYTES, readResponseCapped } from './sizeLimits';
 import type { PluginRegistry } from './PluginRegistry.svelte';
 import { classifyManifest, isSameOriginUrl } from './manifestValidation';
@@ -23,6 +24,12 @@ import { verifyDesign, type DesignVerificationInput } from './design-verificatio
 import { buildPluginZip } from './ownedPlugins';
 import type { PartJSON } from './result-replacement-operations';
 import type { LinkedFolderRead } from './linkedPluginFolder';
+
+/** Shown the cadnano export issues of a cadnano_json plugin's input; resolves whether to run. */
+export type CadnanoInputReviewer = (
+	pluginName: string,
+	issues: readonly CadnanoProfileIssue[]
+) => Promise<boolean>;
 
 /** Reads a linked plugin's folder (dev mode), asking for access when needed. */
 export type LinkedFolderReader = (plugin: PythonPlugin) => Promise<LinkedFolderRead>;
@@ -93,6 +100,8 @@ export class PluginCoordinator {
 	private getActiveRegion: (() => DesignRegion | null) | undefined;
 	/** False while another tab owns the document; see setEditGate. */
 	private canEditDoc: () => boolean = () => true;
+	/** Asks whether to run a cadnano_json plugin on input the export can't write faithfully. */
+	private reviewCadnanoInput: CadnanoInputReviewer | undefined;
 
 	/** Result awaiting user confirmation before being applied to the model. */
 	pendingApply: PendingApply | null = $state(null);
@@ -137,6 +146,10 @@ export class PluginCoordinator {
 	 * Gate applying results on document ownership (the editor passes `isTabOwner`). Runs stay
 	 * allowed: they don't touch the design, and read-only tabs may still use analysis plugins.
 	 */
+	setCadnanoInputReviewer(review: CadnanoInputReviewer): void {
+		this.reviewCadnanoInput = review;
+	}
+
 	setEditGate(canEdit: () => boolean): void {
 		this.canEditDoc = canEdit;
 	}
@@ -696,6 +709,21 @@ export class PluginCoordinator {
 			throw new Error(
 				`"${plugin.manifest.name}" requires an open design. Create or open a design first.`
 			);
+		}
+
+		// Before any status change, so a cancelled review leaves the plugin as it was.
+		if (plugin.manifest.format === 'cadnano_json' && this.reviewCadnanoInput) {
+			const activeRegion = this.getActiveRegion?.() ?? null;
+			if (activeRegion instanceof LatticedDesignRegion) {
+				const writesBack = plugin.manifest.applyStrategy.startsWith('replaceRegion');
+				// A read-only plugin only sees a lossy copy; one that writes back would make the loss permanent.
+				const issues = checkCadnanoProfile(part, activeRegion).filter(
+					(issue) => issue.severity === 'error' || (writesBack && issue.severity === 'warning')
+				);
+				if (issues.length > 0 && !(await this.reviewCadnanoInput(plugin.manifest.name, issues))) {
+					return;
+				}
+			}
 		}
 
 		// Reproducibility stamp: which runtime + env tier produced this run.

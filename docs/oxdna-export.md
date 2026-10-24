@@ -378,18 +378,18 @@ done
 
 Pick `sq` or `he` to match the design's lattice. Current long-bond counts:
 
-| Design                          | Foldnano | Taco | Notes                                 |
-| ------------------------------- | -------- | ---- | ------------------------------------- |
-| 8hb_2ab_8f                      | 30       | 12   |                                       |
-| Force clamp                     | 371      | 0    |                                       |
-| LargeTetrascaffold-B-3          | 318      | 36   |                                       |
-| NRs_antenna                     | 348      | 116  |                                       |
-| N_nanobase                      | 297      | 0    |                                       |
-| slottedcross                    | 410      | 4    |                                       |
-| 4FSF_25_2b_loopbackscaffold     | 304      | 164  |                                       |
-| Hilbert                         | —        | —    | no Taco reference                     |
-| righthanded_turbine_only        | —        | —    | no Taco reference                     |
-| Krishnan_NatCommun2016_pin pore | skipped  | —    | asymmetric insert/skip in legacy file |
+| Design                          | Foldnano | Taco | Notes                                    |
+| ------------------------------- | -------- | ---- | ---------------------------------------- |
+| 8hb_2ab_8f                      | 30       | 12   |                                          |
+| Force clamp                     | 371      | 0    |                                          |
+| LargeTetrascaffold-B-3          | 318      | 36   |                                          |
+| NRs_antenna                     | 348      | 116  |                                          |
+| N_nanobase                      | 297      | 0    |                                          |
+| slottedcross                    | 410      | 4    |                                          |
+| 4FSF_25_2b_loopbackscaffold     | 304      | 164  |                                          |
+| Hilbert                         | —        | —    | no Taco reference                        |
+| righthanded_turbine_only        | —        | —    | no Taco reference                        |
+| Krishnan_NatCommun2016_pin pore | skipped  | —    | insert on one strand only in legacy file |
 
 Foldnano counts are higher than tacoxDNA because the new symmetric NT model uses
 a different twist-offset convention (uniform per-region vs. per-VH in tacoxDNA),
