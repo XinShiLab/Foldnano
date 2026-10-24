@@ -22,6 +22,8 @@ src/lib/components/Editor/StrandView/
 ├── StrandViewer.svelte            # stage, camera, tool wiring
 ├── StrandRoutes.svelte            # static segment routes (sequence text)
 ├── MismatchMarkers.svelte         # sequence-mismatch warning rungs
+├── DesignIssueMarkers.svelte      # design-check issue frames (editorViewContext.designIssues)
+├── DesignIssuesMenu.svelte        # toolbar popover: check toggles + issue list (jump-to)
 ├── Accessories.svelte             # region headers, VH tags, crossovers, skips, inserts
 ├── Highlights.svelte              # dimming / hiding overlays
 ├── CrossSectionSelector.svelte    # region-scoped cursor column
@@ -109,6 +111,7 @@ Stage
 │   ├── MismatchMarkers
 │   ├── StrandRoutes
 │   │   └── OligoSegmentInPart
+│   ├── DesignIssueMarkers    # above the routes so frames aren't hidden by strands
 │   └── BlockLayer            # only when strandViewContext.showBlocks
 ├── overlay layer (listening=true)
 │   ├── EMPTY background rect
@@ -325,6 +328,21 @@ work without rewriting the underlying DNA model.
 
 ---
 
+## Design Check Overlay
+
+`EditorViewContext.designIssues` is `collectDesignIssues(part, activeRegion, designChecks)` (see
+`design-guards.md`), recomputed when `strandViewContext.designChecks`, the active region, the
+document or `historyStack.revision` change. The model is read inside `untrack`, so dragging
+(live mutations before the commit) doesn't recompute it; the commit does.
+
+- `DesignIssueMarkers` frames each `error` (red) / `warning` (amber) issue that names a helix: the
+  base column when the anchor has a `bp`, else a frame just left of the helix's first base.
+  Region-wide issues (cut cross-region links, metadata) have no spot and only appear in the list.
+- `DesignIssuesMenu` (strand toolbar, next to the scaffold indicator) holds the three toggles
+  (editor rules on by default; simulation and cadnano export opt-in, saved with the strand view
+  context) and the issue list. Clicking an issue calls `strandToolbarController.centerOn(vhId, bp)`,
+  which expands the helix's region if collapsed and centers the stage on that base.
+
 ## Boundaries / Don'ts
 
 - **Don't pass `vh.listRow` into `getEntitiesAtVh`.** Topology is keyed by `vh.id`. Use `getVisibleVhByDisplayRow(...)` to translate from a clicked row to a VH.
@@ -334,4 +352,5 @@ work without rewriting the underlying DNA model.
 - **Don't mount one component per segment for selection.** Use the batched `SelectionOverlay`. The "many mounted route components" path was deliberately retired.
 - **Don't reorder `VhGrid` / `MismatchMarkers` / `StrandRoutes` in the world layer without checking z-order.** Mount order there is bottom-to-top paint order, and it's intentional (grid under warnings under sequence text) — see Layer Architecture above.
 - **Don't viewport-cull with `{#if}` / `{#each}`.** Toggle Konva `visible` instead. Mounting/unmounting svelte-konva nodes on pan/zoom mutates the DOM every frame and pins Firefox at ~40% CPU in `RestyleManager`. See _Cull with `visible`, never with `{#if}`_ above.
-- **Don't poke at `strandViewContext.collapsedRegionIds` from inside a tool.** Toggle through the `RegionHeader` interaction so cleanup of `activeAround`, hover, and menu state runs.
+- **Don't poke at `strandViewContext.collapsedRegionIds` from inside a tool.** Toggle through the `RegionHeader` interaction so cleanup of `activeAround`, hover, and menu state runs. (`centerOn` sets it directly, but only ever expands a region, which hides nothing.)
+- **Don't read the model reactively in `designIssues`.** Keep the check inside `untrack` and depend on `historyStack.revision`; otherwise every drag frame reruns every check.

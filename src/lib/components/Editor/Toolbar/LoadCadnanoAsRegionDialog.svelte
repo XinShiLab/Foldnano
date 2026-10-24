@@ -12,7 +12,9 @@
 	import { toast } from 'svelte-sonner';
 	import { SvelteDate } from 'svelte/reactivity';
 	import { FileJson2, LoaderCircle, XIcon } from '@lucide/svelte';
-	import { CadnanoJSON, type VStrandJSON } from '$lib/model/io/cadnanoJSON';
+	import { CadnanoJSON } from '$lib/model/io/cadnanoJSON';
+	import type { CadnanoLattice } from '$lib/model/io/cadnanoLattice';
+	import { latticeChoice, LatticeChoiceCancelledError } from './latticeChoice.svelte';
 	import { getEditorViewContext } from '../context/EditorViewContext.svelte';
 	import { getEditorDocumentSession } from '../context/EditorDocumentSession.svelte';
 
@@ -32,7 +34,7 @@
 		size: number;
 		uploadedAt: number;
 		url: string;
-		parsed: Promise<CadnanoJSON>;
+		parsed: Promise<ParsedCadnano>;
 	};
 
 	const basePlanes: { value: 'XY' | 'XZ' | 'YZ'; label: string; description: string }[] = [
@@ -41,7 +43,12 @@
 		{ value: 'YZ', label: 'Side (YZ)', description: 'Sagittal — normal points right (X)' },
 	];
 
-	async function parseCadnanoFile(file: File): Promise<CadnanoJSON> {
+	interface ParsedCadnano {
+		cadnano: CadnanoJSON;
+		lattice?: CadnanoLattice;
+	}
+
+	async function parseCadnanoFile(file: File): Promise<ParsedCadnano> {
 		const text = await file.text();
 		let raw: unknown;
 		try {
@@ -49,17 +56,16 @@
 		} catch {
 			throw new Error('File is not valid JSON.');
 		}
-		if (!raw || typeof raw !== 'object') throw new Error('Empty or invalid JSON.');
-		const obj = raw as Record<string, unknown>;
-		if (!Array.isArray(obj.vstrands) || typeof obj.name !== 'string') {
-			throw new Error('Missing required cadnano fields ("name" and "vstrands").');
-		}
-		const cadnano = new CadnanoJSON(obj.name, obj.vstrands as VStrandJSON[]);
+		const cadnano = CadnanoJSON.fromRaw(raw);
 		const numBases = cadnano.vstrands[0]?.scaf.length ?? 0;
-		if (!(numBases % 32 === 0 || numBases % 21 === 0)) {
+		const candidates = cadnano.latticeCandidates();
+		if (candidates.length === 0) {
 			throw new Error(`Unsupported cadnano lattice (numBases=${numBases}).`);
 		}
-		return cadnano;
+		if (candidates.length === 1) return { cadnano };
+		const lattice = await latticeChoice.ask(file.name, numBases);
+		if (!lattice) throw new LatticeChoiceCancelledError(file.name);
+		return { cadnano, lattice };
 	}
 
 	const onUpload: FileDropZoneProps['onUpload'] = async (uploadedFiles) => {
@@ -89,10 +95,10 @@
 		files = [...files.slice(0, i), ...files.slice(i + 1)];
 	};
 
-	const onLoadClick = async (cadnano: CadnanoJSON) => {
+	const onLoadClick = async ({ cadnano, lattice }: ParsedCadnano) => {
 		isLoading = true;
 		try {
-			editorViewContext.loadCadnanoAsRegion(cadnano, selectedPlane);
+			editorViewContext.loadCadnanoAsRegion(cadnano, selectedPlane, lattice);
 			await session.saveDocumentToLocalStorage();
 		} catch (err) {
 			toast.error('Failed to load cadnano file as region', {

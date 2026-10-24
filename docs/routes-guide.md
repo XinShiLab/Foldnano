@@ -74,6 +74,10 @@ The editor accepts a `?url=` query parameter to fetch and open a design file hos
 /editor?url=https://example.com/my_design.cadnano.json
 ```
 
+An optional `&lattice=honeycomb|square` settles a cadnano file whose length fits both lattices,
+so a shared link opens without asking; without it the editor asks (see `cadnano-import.md` §
+Lattice detection). An unrecognised value, or one the file's crossovers contradict, is an error.
+
 ### State machine
 
 ```

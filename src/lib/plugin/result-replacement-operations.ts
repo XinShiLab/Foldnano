@@ -32,6 +32,7 @@ type AnnotationEntry = {
 	fivePrimeMod: string | null;
 	threePrimeMod: string | null;
 	oligoName: string;
+	oligoIsScaffold: boolean;
 };
 
 type CrossRegionLink = {
@@ -99,6 +100,9 @@ export function performReplaceRegionKeepAnnotations(
 			segment.fivePrime.modification = entry.fivePrimeMod;
 			segment.threePrime.modification = entry.threePrimeMod;
 			oligo.name = entry.oligoName;
+			// cadnano JSON has no scaffold flag, so restore it; only ever set, so an oligo the
+			// plugin joined from scaffold and staple pieces stays a scaffold.
+			if (entry.oligoIsScaffold) oligo.isScaffold = true;
 			matched++;
 		}
 	}
@@ -203,6 +207,7 @@ export function buildAnnotationMap(snapshot: PartJSON | null): Map<string, Annot
 				fivePrimeMod: segJson.fivePrime.modification ?? null,
 				threePrimeMod: segJson.threePrime.modification ?? null,
 				oligoName: oligoJson.name ?? '',
+				oligoIsScaffold: oligoJson.isScaffold ?? false,
 			});
 		}
 	}

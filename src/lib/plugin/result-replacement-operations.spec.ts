@@ -239,6 +239,18 @@ describe('performReplaceRegionKeepAnnotations', () => {
 		expect([...part.oligos][0].name).toBe('Annotated');
 	});
 
+	it('preserves the scaffold label through a region identity round-trip (cadnano has no scaffold flag)', () => {
+		const { part, region, oligo } = makeRegionFixture();
+		oligo.isScaffold = true;
+		const preRunSnapshot = roundTrip(part.toJSON()) as PartJSON;
+		const { json } = CadnanoJSON.fromRegion(region, part);
+		const cadnanoData = roundTrip(json) as { name: string; vstrands: VStrandJSON[] };
+
+		performReplaceRegionKeepAnnotations(part, region, cadnanoData, preRunSnapshot);
+
+		expect([...part.oligos][0].isScaffold).toBe(true);
+	});
+
 	it('reports unmatched region segments with "region segment(s)" wording', () => {
 		const { part, region } = makeRegionFixture();
 		const { json } = CadnanoJSON.fromRegion(region, part);

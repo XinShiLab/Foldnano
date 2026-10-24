@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { DocSnapshot } from './document.svelte';
+import { HEX_INTERHELIX_NM, SQ_INTERHELIX_NM } from './geometry3d/dnaGeometry';
 
 type PartJson = DocSnapshot['parts'][number];
 type OligoJson = PartJson['oligos'][number];
@@ -130,7 +131,66 @@ function repairPart(input: PartJson, repairs: string[]): PartJson {
 	if (unowned) repairs.push(label(`Removed ${unowned} helix entries with no matching segment`));
 	if (unlisted) repairs.push(label(`Re-linked ${unlisted} segment(s) missing from their helix`));
 
+	// 5. Lattice cells: no negative row/col (the grid and parity math assume >= 0).
+	shiftNegativeLatticeCells(part, repairs, label);
+
 	return part;
+}
+
+/** One lattice period in plane units: shifting by it moves helices onto equivalent cells. */
+function latticeStepNm(kind: string): { perCol: number; perTwoRows: number } {
+	if (kind === 'SQUARE') return { perCol: SQ_INTERHELIX_NM, perTwoRows: 2 * SQ_INTERHELIX_NM };
+	const r = HEX_INTERHELIX_NM / 2;
+	return { perCol: Math.sqrt(3) * r, perTwoRows: 6 * r };
+}
+
+const evenCeil = (n: number) => 2 * Math.ceil(n / 2);
+
+/**
+ * Moves a region's helices up/right by an even number of rows/cols (keeping cell parity) and its
+ * plane back by the same distance, so no helix moves in 3D. A plane another region also uses is
+ * copied first, so that region stays put.
+ */
+function shiftNegativeLatticeCells(
+	part: PartJson,
+	repairs: string[],
+	label: (what: string) => string
+): void {
+	for (const region of part.regions) {
+		if (region.kind !== 'SQUARE' && region.kind !== 'HONEYCOMB') continue;
+		const cells = part.virtualHelices
+			.filter((vh) => vh.regionId === region.id && vh.latticeCoords)
+			.map((vh) => vh.latticeCoords!);
+		if (cells.length === 0) continue;
+		const dRow = evenCeil(Math.max(0, -Math.min(...cells.map((c) => c.row))));
+		const dCol = evenCeil(Math.max(0, -Math.min(...cells.map((c) => c.col))));
+		if (dRow === 0 && dCol === 0) continue;
+
+		for (const cell of cells) {
+			cell.row += dRow;
+			cell.col += dCol;
+		}
+		const sharedPlane = part.regions.some((r) => r !== region && r.planeId === region.planeId);
+		const source = part.planes.find((p) => p.id === region.planeId);
+		if (source) {
+			const plane = sharedPlane ? { ...structuredClone(source), id: uuidv4() } : source;
+			if (sharedPlane) {
+				part.planes.push(plane);
+				region.planeId = plane.id;
+			}
+			const { perCol, perTwoRows } = latticeStepNm(region.kind);
+			const dx = dCol * perCol;
+			const dy = (dRow / 2) * perTwoRows;
+			for (const axis of ['x', 'y', 'z'] as const) {
+				plane.origin[axis] -= dx * plane.u[axis] + dy * plane.v[axis];
+			}
+		}
+		repairs.push(
+			label(
+				`Moved region "${region.name}" ${dRow} row(s) and ${dCol} column(s) so no helix sits at a negative lattice position; its 3D position is unchanged`
+			)
+		);
+	}
 }
 
 function connectedPieces(

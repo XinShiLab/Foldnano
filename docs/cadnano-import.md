@@ -1,6 +1,9 @@
 ---
 covers:
   - src/lib/model/io/cadnanoJSON.ts
+  - src/lib/model/io/cadnanoLattice.ts
+  - src/lib/components/Editor/Toolbar/latticeChoice.svelte.ts
+  - src/lib/components/Editor/Toolbar/LatticeChoiceDialog.svelte
   - src/lib/components/Editor/Toolbar/parsers/**
   - src/lib/components/Editor/Toolbar/LoadCadnanoAsRegionDialog.svelte
 ---
@@ -45,12 +48,30 @@ Each `vstrand` is a **virtual helix**. Its `scaf` and `stap` arrays have one ent
 
 `stap_colors` is an array of `[fivePrimeIndex, 24bitColorInt]` pairs marking the 5' end of each staple strand's color.
 
-### Lattice detection from base count
+### Lattice detection (`cadnanoLattice.ts`)
 
-The number of positions in `scaf`/`stap` reveals the lattice type:
+cadnano JSON doesn't record the lattice, so `CadnanoJSON.latticeCandidates()` infers it:
 
-- `numBases % 21 === 0` → **HONEYCOMB** (21 bases/repeat)
-- `numBases % 32 === 0` → **SQUARE** (32 bases/repeat)
+1. **Base count** (`latticesByLength`): `% 21 === 0` fits **HONEYCOMB**, `% 32 === 0` fits
+   **SQUARE**. Most lengths fit only one.
+2. **Crossover sites**, only when the length fits both (multiples of 672 = 21 × 32):
+   `crossoverSiteViolations` counts crossovers that sit on no valid crossover site of each lattice
+   (the `latticeOffsets.ts` tables, read from either end, with cell parity as in
+   `VirtualHelix.isEvenParity`). The lattice with fewer wins. On the published corpus the real lattice
+   wins by a wide margin (e.g. 0 vs 796), which `cadnanoLattice.spec.ts` checks.
+3. **A tie** (typically no crossovers) returns both; the file can't tell.
+
+`toPart` / `toRegionInPart` take an optional `{ lattice }`. Without one, a tie throws
+`AmbiguousLatticeError`. A requested lattice must fit the length and must not be contradicted by
+the crossovers (the other lattice winning), else it throws. `replaceRegionInPart` passes the
+target region's kind, so plugin results never need to ask.
+
+UI callers wrap parsing in `withLatticeChoice` (`Toolbar/latticeChoice.svelte.ts`): on
+`AmbiguousLatticeError` it asks through the `LatticeChoiceDialog` mounted in `Editor.svelte` and
+parses again with the answer (cancel → `LatticeChoiceCancelledError`). File open, GitHub explorer
+and the `?url=` loader use it (the loader also reads `?lattice=honeycomb|square`); the region dialog
+asks up front from `latticeCandidates()`. `cadnanoParser` rethrows `AmbiguousLatticeError`
+unwrapped for this.
 
 ---
 
@@ -84,6 +105,18 @@ The name is historical and misleading — `isScaf` here means "the file's `scaf`
 ---
 
 ## Import pipeline: `CadnanoJSON.toPart()`
+
+### Step 0: Shape check (untrusted input)
+
+Files, URLs, the region dialog and the landing hero build through `CadnanoJSON.fromRaw(raw)`,
+which runs the shared shape check (`checkCadnanoJsonShape`, see `design-guards.md`) and
+constructs from its cleaned copy. Errors throw `DesignCheckError` (the file parser wraps it as
+`Invalid cadnano JSON in file …`). Repairs are kept in `shapeIssues` (a private field, so it never
+reaches an exported file): one-sided pointers whose target is free are cleared (`warning`, shown
+in `warnings`), and a crossover exit pointing at its own base (Hilbert.json) is rewritten to the
+adjacent base that points to it (`info`, not shown). Plugin results get the same check through
+`result-format-validation-cadnano-json.ts`; `replaceRegionInPart` then uses the plain
+constructor on the already-cleaned data.
 
 ### Step 1: Parse raw JSON → `VStrand` objects
 
@@ -216,6 +249,10 @@ return newPart;
 document name, which comes from the file name. On export the toolbar writes the
 exported file name into `"name"` (cadnano2's own convention). See
 `dna-model.md` § Names.
+
+**Checks first.** The toolbar runs `checkCadnanoProfile` (see `design-guards.md`) before calling
+`fromRegion` and asks the user about anything it can't write faithfully; `fromRegion` itself
+doesn't check and still writes what it can.
 
 The inverse of import. For each VirtualHelix:
 
@@ -353,14 +390,19 @@ The `.fn.json` format is the application's own serialization (`FoldnanoDocument.
 | Color value sanitization  | `colorNum = thisColor[1] & 0xFFFFFF` masks to 24 bits                                             |
 | Unknown lattice type      | throws `Unsupported lattice type`                                                                 |
 | 1-nt strand               | throws, listing each helix[base]; see Step 2                                                      |
+| Malformed / inconsistent  | `fromRaw` shape check throws (shared cells, unequal lengths, conflicting pointers, …); see Step 0 |
+| Self-pointing xover exit  | `fromRaw` rewrites it to the adjacent base that points here (`info` issue)                        |
 
 ---
 
 ## Boundaries / Don'ts
 
-- **Cadnano export is region-scoped.** `CadnanoJSON.fromRegion(region)` exports a single `LatticedDesignRegion`; cross-region oligo connections are dropped and surfaced via the returned `droppedCrossRegionConnections` list. Don't try to round-trip multi-region parts through cadnano JSON.
+- **Changing `fromRegion` / `toPart` or an import repair changes the cadnano checks.** Update `checks/cadnano.ts` and the repair table in `design-guards.md`, and add a `cadnano-native-roundtrip.spec.ts` case; see `design-guards.md` § Changing the checks.
+
+- **Cadnano export is region-scoped.** `CadnanoJSON.fromRegion(region)` exports a single `LatticedDesignRegion`; cross-region oligo connections are dropped (counted in `droppedCrossRegionConnections`; users are told up front by the `cadnano-cross-region` profile issue). Don't try to round-trip multi-region parts through cadnano JSON.
 - **Don't export freeform parts as cadnano.** Cadnano has no representation for freeform geometry; `supportsCadnanoJson` is `false` for freeform regions.
 - **Don't bypass `isScafToStrandSetIdx` at the file boundary.** The cadnano `scaf`/`stap` array assignment is parity-dependent for directional round-trip; reading `scaf`/`stap` directly without this helper inverts directionality on odd VHs. Despite the name, this helper is a _file-format adapter only_ — it does not (and must not) consult or mutate `Oligo.isScaffold`. Outside `cadnanoJSON.ts` no code should look at "scaf vs stap"; use the model's `strandSets[0]` / `strandSets[1]` directly.
-- **Lattice detection is by base count** (`% 32` square, `% 21` honeycomb). Don't infer lattice from filename or other metadata.
+- **Lattice detection is by base count, then crossover sites** (see Lattice detection). Don't infer the lattice from the filename or other metadata, and don't default an ambiguous file to one lattice silently: ask through `withLatticeChoice`.
 - **Don't add a parser without registering it.** `parsers/index.ts` dispatches by `priority` order; new formats need both `parse()` and `canParse()` plus a registration entry.
+- **Build untrusted cadnano data with `CadnanoJSON.fromRaw`, not `new CadnanoJSON`.** The constructor assumes shape-checked input; only callers holding already-validated data (plugin replace ops, tests) use it directly.
 - **Native files use `.fn.json` and skip the cadnano reconstruction path.** Don't run `.fn.json` content through `CadnanoJSON.toPart()`.

@@ -1,6 +1,7 @@
 ---
 covers:
   - src/lib/model/io/simulationNtModel.ts
+  - src/lib/model/checks/simulation.ts
 ---
 
 # Simulation Nucleotide Model
@@ -128,13 +129,22 @@ The phosphate backbone position (used by `helixGeometry.ts` for the backbone tub
 
 ### 1 — Validation
 
-`collectSlotInfo` iterates all slots on each VH and checks:
+`buildSimulationNtModel` first calls `assertSimulationReady(part)` (the simulation profile in
+`src/lib/model/checks/simulation.ts`, see `design-guards.md`), which throws
+`Cannot export simulation model: <issue>` on the first of:
 
-- **Asymmetric insert/skip**: any slot with `seq.length ≠ 1` must have a
-  complementary slot at the same `bpIndex` on the opposite strand with the same
-  `seq.length`. Throws `Cannot export simulation model: asymmetric insert/skip …`.
-- **Insert/skip at constrained anchor**: any modified slot at a `isFixed` bp throws
-  `Cannot export simulation model: insert/skip at constrained crossover site …`.
+- **Different skip/insert per strand** (`asymmetric-skip-insert`, an integrity rule): both strands
+  have a slot at the base but with different `seq.length`.
+- **Skip/insert on one strand only** (`unpaired-skip-insert`, simulation-only): a modified slot whose
+  opposite strand has no segment there. The editor allows this (deleting the partner strand leaves
+  it), so it is not an integrity issue. Single-stranded DNA itself simulates fine; what the NT model
+  can't place is a one-sided skip/insert, so the message asks the user to make the ssDNA explicit
+  (ordinary strand bases, a shorter strand for a skip) or remove the skip/insert. Don't model ssDNA
+  with one-sided inserts.
+- **Skip/insert at a constrained anchor** (`skip-insert-on-crossover`, an integrity rule).
+
+oxDNA and mrDNA export and the 3D view's NT mode all build through here, so they share these
+messages; the 3D view catches the throw and falls back to strand rendering.
 
 ### 2 — Physical layer expansion
 
@@ -169,7 +179,7 @@ For a fixed-fixed span, each layer's **natural coordinate**
 `nat = bpIndex + Δ(bpIndex) + loopIndex` (the same value used for free-free spans)
 is mapped linearly onto `[firstBp, lastBp]` via
 `t = (nat − natFirst) / (natLast − natFirst)`. Because fixed anchors carry no
-insert/skip (`validateSlotInfo` enforces this), `natFirst = firstBp` and
+insert/skip (`assertSimulationReady` enforces this), `natFirst = firstBp` and
 `natLast = lastBp + totalSpanNetOffset`.
 
 - **No inserts/skips/gaps**: `nat = bpIndex`, so `coord = bpIndex` exactly — natural
@@ -253,6 +263,8 @@ strand tubes (both at `BACKBONE_RADIUS_NM`).
 ---
 
 ## Boundaries / Don'ts
+
+- **What the NT model can't place is decided in `checks/simulation.ts`, not here.** Keep `assertSimulationReady(part)` as the first call in `buildSimulationNtModel`, and when the model learns to place something new (or stops), update the profile; see `design-guards.md` § Changing the checks.
 
 - **Don't add insert/skip support for single-stranded-only positions.** Inserts/skips
   are duplex-level edits; the NT model treats ssDNA-only slots as fixed geometry.

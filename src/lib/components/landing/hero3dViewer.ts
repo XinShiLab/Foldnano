@@ -61,7 +61,7 @@ async function loadPart(designUrl: string): Promise<Part> {
 	const res = await fetch(designUrl);
 	if (!res.ok) throw new Error(`Failed to fetch design: ${res.status}`);
 	const raw = await res.json();
-	if (Array.isArray(raw.vstrands)) return new CadnanoJSON(raw.name, raw.vstrands).toPart();
+	if (Array.isArray(raw.vstrands)) return CadnanoJSON.fromRaw(raw).toPart();
 	if (Array.isArray(raw.parts) && raw.parts.length > 0) {
 		return partFromJSON(migrateDocumentJson(raw).parts[0]);
 	}

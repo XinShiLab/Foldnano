@@ -63,7 +63,7 @@ Below it, **or load an existing design** is a drop zone (click to browse). It ac
 | **View Oligos** | Saves, then opens this design's [Oligo Report](/docs/guide/oligo-report) |
 | **Backups…** | Lists this design's last 5 backups; compare one with your design, download it as `.fn.json`, or restore it (see [Backups](/docs/guide/saving-github#backups)) |
 | **Save to GitHub Repo** | Publishes this design to your connected repository (see [Saving And GitHub](/docs/guide/saving-github)) |
-| `Export as cadnano JSON — [region]` | Downloads the active lattice region as cadnano JSON (shown only for lattice regions) |
+| `Export as cadnano JSON — [region]` | Downloads the active lattice region as cadnano JSON (shown only for lattice regions), after listing anything cadnano can't hold. See [Exporting cadnano JSON](/docs/guide/simulation-export#exporting-cadnano-json) |
 | **Export as Foldnano JSON** | Downloads the full design as `.fn.json` |
 | **Export Oligos of this Part as CSV** | Downloads the oligo/sequence CSV |
 | **Other Save Options** | Placeholder, currently disabled |
@@ -96,12 +96,12 @@ The **ⓘ** next to it (*Storage info*) explains that designs are saved in this 
 **Open** accepts the same files as the start screen. Each dropped file is listed with an action:
 
 - **Foldnano `.fn.json`**: **Load** opens it.
-- **cadnano `.json`**: **Open** creates a **new `.fn.json` document** from it; the original `.json` isn't changed. When a GitHub repository is connected, **Add original to current repo folder** also stores the original file there.
+- **cadnano `.json`**: **Open** creates a **new `.fn.json` document** from it; the original `.json` isn't changed. When a GitHub repository is connected, **Add original to current repo folder** also stores the original file there. If the file could be either lattice, you're asked whether it is honeycomb or square.
 - **Plugin manifest** or **local plugin `.zip`**: shows the plugin's details and an **Install** button (see [Plugins For Users](/docs/guide/plugins-for-users)).
 
 ### Loading from a URL
 
-Opening the editor with `?url=<link to a design file>` loads that design directly. It isn't stored in the browser until you click **Click to Save Locally** in the save status and confirm **Save to Browser** in *Save this design to your browser?*. To download a copy instead, use the Save menu exports.
+Opening the editor with `?url=<link to a design file>` loads that design directly. A cadnano file doesn't record its lattice; when its helix length fits both honeycomb and square and its crossovers don't settle it, the editor asks. Add `&lattice=honeycomb` or `&lattice=square` to the link to answer in advance. It isn't stored in the browser until you click **Click to Save Locally** in the save status and confirm **Save to Browser** in *Save this design to your browser?*. To download a copy instead, use the Save menu exports.
 
 ## Icon Rail
 

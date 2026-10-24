@@ -1,19 +1,15 @@
 import { EditorError } from '$lib/errors';
+import { SHAPE_RULES } from '$lib/model/checks/designIssue';
+import { INTEGRITY_RULES } from '$lib/model/checks/integrity';
 
 export const INVARIANT_CATEGORIES = [
-	'shape',
-	'reciprocity',
-	'self-connection',
-	'slot-coverage',
-	'sequence-slot-mismatch',
-	'color-bounds',
+	...SHAPE_RULES,
+	...INTEGRITY_RULES,
 	'vh-index-set',
 	'missing-vh-mapping',
 	'missing-snapshot',
 	'missing-region',
 	'reconstruction',
-	'bounds',
-	'reference',
 	'missing-doc',
 	'missing-apply-target',
 	'apply-failed',

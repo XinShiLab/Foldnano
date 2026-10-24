@@ -50,6 +50,8 @@
 	} from '@lucide/svelte';
 	import { autoStapleCmd } from '$lib/commands/strands';
 	import { CadnanoJSON } from '$lib/model/io/cadnanoJSON';
+	import { checkCadnanoProfile } from '$lib/model/checks/cadnano';
+	import { designCheckPrompt, needsDesignCheck } from '../designCheckPrompt.svelte';
 	import { LatticedDesignRegion } from '$lib/model/Part/DesignRegion';
 	import { downloadFoldnanoJson, downloadJsonAsTextFile } from './utils';
 	import { Input } from '../../ui/input';
@@ -206,7 +208,7 @@
 		autoStapleCmd({ part, region }, history);
 	};
 
-	const exportToCadnanoJson = () => {
+	const exportToCadnanoJson = async () => {
 		const part = foldnanoDoc.parts[0];
 		if (!part) return;
 		const region = activeLatticeRegion;
@@ -216,10 +218,17 @@
 			});
 			return;
 		}
-		const { json: cadnanoJSON, droppedCrossRegionConnections } = CadnanoJSON.fromRegion(
-			region,
-			part
-		);
+		const issues = checkCadnanoProfile(part, region);
+		if (needsDesignCheck(issues)) {
+			const proceed = await designCheckPrompt.ask({
+				title: `Export "${region.name}" as cadnano JSON?`,
+				description: "cadnano JSON is a compatibility format and can't hold all of this region.",
+				proceedLabel: 'Export anyway',
+				issues,
+			});
+			if (!proceed) return;
+		}
+		const { json: cadnanoJSON } = CadnanoJSON.fromRegion(region, part);
 		const latticeRegionCount = part.getLatticedRegions().length;
 		const fileName = exportBaseName(
 			foldnanoDoc.name,
@@ -230,12 +239,6 @@
 		const jsonString = JSON.stringify(cadnanoJSON);
 		const minifiedJsonString = jsonString.replace(/\s+/g, '');
 		downloadJsonAsTextFile(minifiedJsonString, fileName);
-		if (droppedCrossRegionConnections > 0) {
-			toast.warning(
-				`Export complete with ${droppedCrossRegionConnections} cross-region connection(s) disconnected`,
-				{ description: 'The cadnano format cannot represent cross-region topology.' }
-			);
-		}
 	};
 
 	const exportToFoldnanoJson = () => downloadFoldnanoJson(foldnanoDoc);

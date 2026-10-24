@@ -7,6 +7,7 @@ vi.mock('$lib/errorReporting', () => ({
 
 import FoldnanoDocument from '$lib/model/document.svelte';
 import { makeHoneycombPart, addLatticeVh } from '$lib/model/test/testHelpers';
+import { Part } from '$lib/model/Part';
 import { HoneycombRegion } from '$lib/model/Part/DesignRegion';
 import { Plane } from '$lib/model/Part/Plane.svelte';
 import {
@@ -1639,5 +1640,90 @@ describe('PluginCoordinator owned-plugin drafts', () => {
 		await expect(coordinator.resolveScriptRequirements(DRAFT)).resolves.toEqual(['numpy']);
 		expect(bridge.initRuntime).toHaveBeenCalled();
 		expect(bridge.resolveImports).toHaveBeenCalledWith(expect.any(String), DRAFT);
+	});
+});
+
+describe('PluginCoordinator — cadnano_json input review', () => {
+	function setup(applyStrategy: PluginManifest['applyStrategy'], connectAcrossPaths: boolean) {
+		const manifest: PluginManifest = {
+			schemaVersion: 1,
+			id: 'cadnano-review',
+			name: 'Cadnano Review',
+			version: '1.0.0',
+			format: 'cadnano_json',
+			applyStrategy,
+			entrypoint: 'def run(ctx): pass',
+		};
+		const plugin = makePlugin(manifest);
+		const registry = {
+			get: vi.fn((id: string) => (id === manifest.id ? plugin : undefined)),
+			hasReservation: () => false,
+		} as const;
+		const bridge = {
+			runPlugin: vi.fn().mockResolvedValue({
+				logs: [],
+				artifacts: {},
+				pluginResult: null,
+				primaryArtifact: null,
+				mutationLog: null,
+			}),
+			terminate: vi.fn(),
+		};
+		const doc = new FoldnanoDocument('doc-cadnano-review', 'Plugin Doc');
+		// 672 bases fits both lattices: a warning, not an error, for a honeycomb region.
+		const part = Part.forType('HONEYCOMB', 'Original Part', undefined, 672);
+		doc.parts.push(part);
+		const vh0 = addLatticeVh(part, 0, 0);
+		const vh1 = addLatticeVh(part, 1, 0);
+		if (connectAcrossPaths) {
+			// VH0 strand 0 is a cadnano scaffold path, VH1 strand 0 a staple path: an error.
+			part.connectTwoOligos(part.createOligo(vh0, 0, 10), part.createOligo(vh1, 11, 20));
+		}
+		const region = part.getDefaultRegion();
+		const coordinator = new PluginCoordinator(
+			registry as never,
+			() => doc,
+			undefined,
+			() => region,
+			(() => bridge) as never
+		);
+		const review = vi.fn().mockResolvedValue(false);
+		coordinator.setCadnanoInputReviewer(review);
+		return { plugin, bridge, coordinator, review, manifest };
+	}
+
+	it('does not run when the user declines the review', async () => {
+		const { plugin, bridge, coordinator, review, manifest } = setup('replaceRegion', false);
+
+		await coordinator.run(manifest.id);
+
+		expect(review).toHaveBeenCalledTimes(1);
+		expect(review.mock.calls[0][1].map((i: { rule: string }) => i.rule)).toEqual([
+			'cadnano-lattice-length',
+		]);
+		expect(bridge.runPlugin).not.toHaveBeenCalled();
+		expect(plugin.status).toBe('active');
+	});
+
+	it('runs when the user accepts the review', async () => {
+		const { bridge, coordinator, review, manifest } = setup('replaceRegion', false);
+		review.mockResolvedValue(true);
+
+		await coordinator.run(manifest.id);
+
+		expect(bridge.runPlugin).toHaveBeenCalledTimes(1);
+	});
+
+	it('asks a read-only plugin only about errors', async () => {
+		const quiet = setup('previewOnly', false);
+		await quiet.coordinator.run(quiet.manifest.id);
+		expect(quiet.review).not.toHaveBeenCalled();
+		expect(quiet.bridge.runPlugin).toHaveBeenCalledTimes(1);
+
+		const broken = setup('previewOnly', true);
+		await broken.coordinator.run(broken.manifest.id);
+		expect(broken.review.mock.calls[0][1].map((i: { rule: string }) => i.rule)).toEqual([
+			'cadnano-strand-class',
+		]);
 	});
 });

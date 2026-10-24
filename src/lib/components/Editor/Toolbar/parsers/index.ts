@@ -1,4 +1,5 @@
 import type { Part } from '$lib/model/Part';
+import type { CadnanoLattice } from '$lib/model/io/cadnanoLattice';
 import type FoldnanoDocument from '../../../../model/document.svelte';
 import type { PluginManifest } from '$lib/plugin/types';
 import { cadnanoParser } from './cadnanojsonParser';
@@ -28,11 +29,20 @@ export interface FileMeta {
 	type: string;
 }
 
+/** Answers a format can't carry itself (e.g. the lattice of a cadnano file). */
+export interface ParseOptions {
+	lattice?: CadnanoLattice;
+}
+
 export interface DesignFileParser {
 	id: string;
 	priority?: number; // higher runs earlier
 	canParse(raw: Record<string, unknown>, meta: FileMeta): boolean;
-	parse(raw: Record<string, unknown>, meta: FileMeta): Part | FoldnanoDocument;
+	parse(
+		raw: Record<string, unknown>,
+		meta: FileMeta,
+		options?: ParseOptions
+	): Part | FoldnanoDocument;
 }
 
 // Registry (order + priority controls selection)
@@ -46,7 +56,8 @@ const parsers: DesignFileParser[] = [
 // Dispatch pre-parsed JSON through the registered parsers
 export function parseDesignRaw(
 	raw: Record<string, unknown>,
-	meta: FileMeta
+	meta: FileMeta,
+	options?: ParseOptions
 ): Part | FoldnanoDocument {
 	const candidates = parsers
 		.filter((p) => {
@@ -69,12 +80,13 @@ export function parseDesignRaw(
 		);
 	}
 
-	return candidates[0].parse(raw, meta);
+	return candidates[0].parse(raw, meta, options);
 }
 
 // Core dispatcher for File objects
 export async function parseDesignFile(
-	file: File
+	file: File,
+	options?: ParseOptions
 ): Promise<Part | FoldnanoDocument | LocalPluginZipFile> {
 	if (!(file instanceof File)) {
 		throw new TypeError('parseDesignFile: expected a File');
@@ -124,7 +136,7 @@ export async function parseDesignFile(
 		throw new SyntaxError(`Unable to parse JSON in "${file.name}": ${(jsonErr as Error).message}`);
 	}
 
-	return parseDesignRaw(raw, meta);
+	return parseDesignRaw(raw, meta, options);
 }
 
 // Utility to register at runtime if needed

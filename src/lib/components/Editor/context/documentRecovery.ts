@@ -3,6 +3,12 @@ import { exportBaseName } from '$lib/model/io/designFileName';
 import { DocumentFormatError } from '$lib/model/documentFormat';
 import type { BackupReason, LocalBackup } from '$lib/services/storage';
 import { toast } from 'svelte-sonner';
+import type { DesignIssue } from '$lib/model/checks/designIssue';
+
+const MAX_LISTED_ISSUES = 5;
+// Opening a file as a new document adopts it twice (import, then the /editor/[docId] remount).
+const REPEAT_NOTICE_WINDOW_MS = 10_000;
+let lastIssueNotice: { key: string; at: number } | null = null;
 
 export type DocumentLoadFailureReason = 'too-new' | 'malformed' | 'error';
 
@@ -20,6 +26,23 @@ export function notifyDocumentRepairs(repairs: string[]): void {
 	console.warn('[documentRepair] Repaired the document on load:', repairs);
 	toast.warning('This design had inconsistencies from an earlier bug and was repaired.', {
 		description: repairs.join('\n'),
+	});
+}
+
+/** Tells the user what the integrity check found in a design just opened; `info` stays quiet. */
+export function notifyDesignIssues(docId: string, issues: readonly DesignIssue[]): void {
+	const shown = issues.filter((issue) => issue.severity !== 'info');
+	if (shown.length === 0) return;
+	const key = `${docId}\n${shown.map((issue) => issue.message).join('\n')}`;
+	const now = Date.now();
+	if (lastIssueNotice?.key === key && now - lastIssueNotice.at < REPEAT_NOTICE_WINDOW_MS) return;
+	lastIssueNotice = { key, at: now };
+	console.warn('[designIssues] Found on load:', shown);
+	const lines = shown.slice(0, MAX_LISTED_ISSUES).map((issue) => issue.message);
+	if (shown.length > MAX_LISTED_ISSUES)
+		lines.push(`…and ${shown.length - MAX_LISTED_ISSUES} more.`);
+	toast.warning("This design contains things the editor wouldn't create itself.", {
+		description: lines.join('\n'),
 	});
 }
 

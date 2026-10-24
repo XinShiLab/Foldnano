@@ -69,6 +69,7 @@ hidden drafts from recent commits for a human to rewrite. See `docs/whats-new.md
 | External structure overlay (mrDNA `.txt` / PDB `.pdb` into 3D)    | `docs/editor-3d-external-overlay.md`                            |
 | Repeat units (duplicate selection, linked mirror oligos)          | `docs/repeat-units.md`                                          |
 | Rigid-body simulation (transient, render-only)                    | `docs/rigid-body-simulation.md`                                 |
+| Design guards (shared shape / integrity / export checks)          | `docs/design-guards.md`                                         |
 | Commands, undo/redo, history mementos                             | `docs/commands-and-history.md`                                  |
 | Workspace help (`?` overlay, `help()` attachment, first visit)    | `docs/workspace-help.md`                                        |
 | Routes, page wiring, multi-tab init                               | `docs/routes-guide.md`                                          |
@@ -115,6 +116,7 @@ Each `docs/*.md` declares the code it describes in front matter (`covers:` globs
 - **All GitHub API calls go through `/api/github/*`.** The OAuth token sits in an httpOnly cookie; client code never reads it.
 - **No `localStorage` in the runtime path.** Working copy and GitHub metadata live in IndexedDB via `StorageManager` / `GitHubMetadataStore` / `GitHubExplorerStateStore`.
 - **RBS results are transient.** `BlockTransformOverride` is a render-time override only — never persisted.
+- **Design checks follow the editor and the exporters.** When an edit newly allows or forbids a state, or an exporter/importer changes what it can hold, update the rule in `src/lib/model/checks/` (see `docs/design-guards.md` § Changing the checks).
 - **Saves are tab-owner-gated.** `EditorDocumentSession` checks `isTabOwner` before writing; preserve that gate when adding new write paths.
 
 ## Editor Session Split
@@ -132,7 +134,7 @@ These are wired together but distinct — keep responsibilities on the right sid
 
 **Capability flags live on `DesignRegion`, not `Part`** (use instead of `instanceof`): `supportsLatticeGrid`, `supportsConstrainedXoverSites`, `supportsLatticeAutoStaple`. Gate UI/IO on the _active_ region (`editorViewContext.activeRegion`), not on the Part — a Part with a mixed lattice + freeform region set has no honest part-level answer.
 
-**Lattice detection (cadnano import):** by base count — `numBases % 32 === 0` → SQUARE, `% 21 === 0` → HONEYCOMB.
+**Lattice detection (cadnano import):** by base count (`% 21` honeycomb, `% 32` square); a length fitting both (multiples of 672) is settled by crossover sites, else the user is asked (`cadnanoLattice.ts`, `withLatticeChoice`).
 
 **`isScafToStrandSetIdx(vhIdx, isScaf)`** in `cadnanoJSON.ts` is a **file-format directional adapter only**, not a scaffold-identity check. The `isScaf` argument means "this is the cadnano file's `scaf` slot" (a rendering convention of cadnano2), not "this strand is the design's scaffold". Cadnano IO never reads or writes Foldnano's `Oligo.isScaffold` flag. The parity flip (`even VH: scaf↔strandSet[0]`; `odd VH: scaf↔strandSet[1]`) exists because the model pins `strandSets[0]` to ascending bp and cadnano's `scaf` direction flips with VH parity. See `docs/cadnano-import.md` § Strand/StrandSet index convention.
 

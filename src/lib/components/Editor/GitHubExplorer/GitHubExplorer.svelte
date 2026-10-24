@@ -21,6 +21,7 @@
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
 	import { cadnanoParser } from '../Toolbar/parsers/cadnanojsonParser';
+	import { withLatticeChoice } from '../Toolbar/latticeChoice.svelte';
 	import type { Part } from '$lib/model/Part';
 	import { GitHubExplorerState } from './GitHubExplorerState.svelte';
 	import { addLocalOnlyEntry } from './localPersistence';
@@ -120,7 +121,10 @@
 				toast.error(`"${node.name}" is not a valid cadnano JSON file.`);
 				return;
 			}
-			const part = cadnanoParser.parse(raw, meta) as Part;
+			const part = await withLatticeChoice(
+				node.name,
+				(lattice) => cadnanoParser.parse(raw, meta, { lattice }) as Part
+			);
 			for (const w of cadnanoParser.getLastWarnings()) {
 				toast.warning('Cadnano import warning', { description: w });
 			}

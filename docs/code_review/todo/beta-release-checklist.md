@@ -46,6 +46,14 @@ gate titles, a use-with-caution note); drop the "beta" badge at 1.0.
   core on production (`pyodide.asm.mjs` with the CORS header). (2) Check a bundled compiled
   wheel's tags at install, so a wheel built for another Pyodide fails with a clear message
   instead of at import.
+- Design checks follow-ups (checks landed 2026-10-24, `docs/design-guards.md`). (1) Done
+  2026-10-24: `replaceRegionKeepAnnotationsWhereMatched` dropped the scaffold label (confirmed by a
+  test); it is now regrafted, and the scaffold indicator turns grey when no scaffold is set. (2) A design with
+  cross-region links shows the cadnano warning on every `replaceRegion*` plugin run; consider "don't
+  ask again for this design". (3) `cadnano-cross-region` is one region-wide issue, so the overlay
+  can't frame the cut links; give each link its own anchor. (4) Review and publish the two What's
+  New drafts of 2026-10-24. (5) Refresh `06-design-checks-menu.webp` (shows the old lowercase
+  "cadnano export" label).
 - Multi-file commits as one atomic commit via the Git Data API. Assessed
   2026-10-03: ~1–2 days (blob/tree/commit/ref proxy routes, batch conflict check against the
   branch head, per-file SHA updates, keeping the current doc's tab-owner and snapshot path).

@@ -535,3 +535,19 @@ describe('history limits', () => {
 		expect(history.droppedEntryCount).toBe(2);
 	});
 });
+
+describe('history revision', () => {
+	it('bumps on every commit, undo and redo, so views can recompute once per edit', () => {
+		const { doc, part, vh } = createDocWithPartAndVh();
+		const history = createHistory(doc);
+		const oligo = part.createOligo(vh, 0, 10, '#111111');
+		const start = history.revision;
+
+		paintOligoCmd({ oligo, color: '#abcdef' }, history);
+		expect(history.revision).toBe(start + 1);
+		history.undoOnce();
+		expect(history.revision).toBe(start + 2);
+		history.redoOnce();
+		expect(history.revision).toBe(start + 3);
+	});
+});

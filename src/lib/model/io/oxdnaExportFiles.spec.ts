@@ -97,7 +97,9 @@ describe.skipIf(jsonFiles.length === 0)(
 					result = exportPartToOxDna(part);
 				} catch (error) {
 					const message = error instanceof Error ? error.message : String(error);
-					expect(message).toMatch(/asymmetric insert\/skip|constrained crossover site/);
+					expect(message).toMatch(
+						/different skip\/insert on each strand|on one strand only|constrained crossover site/
+					);
 					console.warn(`  ${file}: skipped invalid legacy insert/skip data — ${message}`);
 					return;
 				}

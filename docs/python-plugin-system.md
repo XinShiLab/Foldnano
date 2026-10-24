@@ -96,8 +96,9 @@ src/lib/plugin/
   result-replacement-operations.ts  ← shared performReplacePart* / performReplaceRegion* ops used by ResultApplicator and design-verification
   design-verification.ts            ← dry-run reconstruction of a plugin result on a detached scratch Part, before Apply is ever offered
   plugin-result-errors.ts           ← PluginValidationError / PluginApplyError, InvariantCategory, phase display names
-  result-format-validation-cadnano-json.ts   ← Result validation: shape-checks + repairs a cadnano_json plugin result
-  result-format-validation-foldnano-json.ts  ← Result validation: shape-checks a foldnano_json plugin result
+  result-format-validation.ts               ← checkResultArtifact(): parse + run a model shape check as Result validation
+  result-format-validation-cadnano-json.ts   ← Result validation adapter for cadnano_json (checks in model/checks/shape, see docs/design-guards.md)
+  result-format-validation-foldnano-json.ts  ← Result validation adapter for foldnano_json
   worker/
     protocol.ts                     ← shared WorkerRequest / WorkerResponse discriminated unions
     bridge.ts                       ← PyodideWorkerBridge
@@ -405,15 +406,15 @@ This is the model used by the built-in Script Lab plugin. See [script-lab.md](sc
 
 ### Apply strategies
 
-| `applyStrategy`                            | Description                                                                                                                                                         |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `replacePartKeepAnnotationsWhereMatched`   | Whole-part replacement for `foldnano_json` plugins. Re-grafts sequences / mods / names onto segments at exactly matched coordinates. Unmatched segments are warned. |
-| `replacePart`                              | Whole-part replacement for `foldnano_json` plugins. No annotation re-grafting. Shows a data-loss warning before apply.                                              |
-| `replaceRegionKeepAnnotationsWhereMatched` | Region replacement for `cadnano_json` plugins. Re-grafts matched annotations inside the active latticed region and restores cross-region links.                     |
-| `replaceRegion`                            | Region replacement for `cadnano_json` plugins without annotation re-grafting. Cross-region links are restored where possible.                                       |
-| `replayMutationLog`                        | Replay a `foldnano_mini` mutation log against the current part under one undo step.                                                                                 |
-| `replayMutationLogInRegion`                | As above, but every target VH must stay inside the recorded active region or the replay aborts cleanly.                                                             |
-| `previewOnly`                              | Output shown as a diff only; never written to the model. Suitable for analysis plugins.                                                                             |
+| `applyStrategy`                            | Description                                                                                                                                                                              |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `replacePartKeepAnnotationsWhereMatched`   | Whole-part replacement for `foldnano_json` plugins. Re-grafts sequences / mods / names onto segments at exactly matched coordinates. Unmatched segments are warned.                      |
+| `replacePart`                              | Whole-part replacement for `foldnano_json` plugins. No annotation re-grafting. Shows a data-loss warning before apply.                                                                   |
+| `replaceRegionKeepAnnotationsWhereMatched` | Region replacement for `cadnano_json` plugins. Re-grafts matched annotations (sequences, mods, names, scaffold label) inside the active latticed region and restores cross-region links. |
+| `replaceRegion`                            | Region replacement for `cadnano_json` plugins without annotation re-grafting. Cross-region links are restored where possible.                                                            |
+| `replayMutationLog`                        | Replay a `foldnano_mini` mutation log against the current part under one undo step.                                                                                                      |
+| `replayMutationLogInRegion`                | As above, but every target VH must stay inside the recorded active region or the replay aborts cleanly.                                                                                  |
+| `previewOnly`                              | Output shown as a diff only; never written to the model. Suitable for analysis plugins.                                                                                                  |
 
 Install-time validation rejects unsupported format/strategy pairs:
 
@@ -827,8 +828,9 @@ async run(pluginId: string): Promise<void>
 5. Uses `pluginId` as `requestId` and calls `bridge.runPlugin(...)`. Using `pluginId` (not a fresh UUID) ensures the `onLog` callback can route streamed log lines back to the correct plugin via `registry.get(requestId)`.
 6. On success: populates `plugin.logs`, `plugin.artifacts`, `plugin.pluginResult`; sets status back to `'active'`.
 7. For non-`previewOnly`, non-replay strategies, the raw `result.primaryArtifact` is checked **before** `pendingApply` is ever created:
-   - **Result validation** (`result-format-validation-cadnano-json.ts` / `-foldnano-json.ts`) shape-checks the JSON against the declared format. Some issues are silently repaired (e.g. a one-sided connection pointer is cleared when the other end is free, so `pyOrigamiBreak`-style plugins don't need to emit fully reciprocal pointers); everything else is rejected.
-   - **Design verification** (`design-verification.ts`) then reconstructs the result with the same `perform*` ops `ResultApplicator` uses, but against a **detached scratch `Part`** — never `doc.parts`, never inside a `tx` — and checks the rebuilt part for dangling plane/region/segment references, out-of-bounds segments, broken reciprocal connections, and (for region strategies) an unchanged active-region VH index set.
+   - **Result validation** (`result-format-validation-cadnano-json.ts` / `-foldnano-json.ts`, thin adapters over the shared shape checks in `src/lib/model/checks/shape/`, see `docs/design-guards.md`) shape-checks the JSON against the declared format. Some issues are silently repaired (e.g. a one-sided connection pointer is cleared when the other end is free, so `pyOrigamiBreak`-style plugins don't need to emit fully reciprocal pointers, and a crossover exit pointing at its own base is rewritten to its neighbour); everything else is rejected. File import runs the same check (`CadnanoJSON.fromRaw`).
+   - **Before the run** (cadnano_json only), `runWithOptions` checks the active region with `checkCadnanoProfile` and asks the reviewer set by `setCadnanoInputReviewer`: errors always, warnings only for `replaceRegion*` strategies. Declining returns before the plugin's status changes. See `docs/design-guards.md`.
+   - **Design verification** (`design-verification.ts`) then reconstructs the result with the same `perform*` ops `ResultApplicator` uses, but against a **detached scratch `Part`** — never `doc.parts`, never inside a `tx` — and checks the rebuilt part for dangling plane/region/segment references, out-of-bounds segments, broken reciprocal connections, and (for region strategies) an unchanged active-region VH index set. It then runs the integrity check (`checkPartIntegrity`, `docs/design-guards.md`) over the replaced scope and rejects any `error` (e.g. `asymmetric-skip-insert`, `shared-cell`, `negative-cell`) with the rule name as `invariantCategory`.
    - If either check throws (`PluginValidationError`), `plugin.status = 'error'` is set with that message and **no** `pendingApply` is created for that run.
      `replayMutationLog[InRegion]` results skip both checks and go straight to step 8 once the log is non-empty — op-level validation happens at replay time via `dispatchOp` instead.
 8. If checks pass, the (possibly repaired) result is stored in `coordinator.pendingApply` along with a fresh `resultToken`. The UI shows a diff summary; the user must call `confirmApply()` (or `cancelApply()`) before the model is mutated.
@@ -1234,7 +1236,7 @@ Demonstrates:
 
 - **Plugin parameter system** — five parameters covering all four input types (`select`, `number`, `boolean`); opening Run shows a dialog pre-filled with defaults
 - Modifying `stap_colors` in cadnano JSON (purely cosmetic topology change)
-- `replaceRegionKeepAnnotationsWhereMatched` — the active region is replaced; sequences, modifications, and oligo names are re-grafted onto coordinate-matched segments inside that region
+- `replaceRegionKeepAnnotationsWhereMatched` — the active region is replaced; sequences, modifications, oligo names and the scaffold label are re-grafted onto coordinate-matched segments inside that region (the label is only ever set: an oligo with any matched scaffold segment becomes a scaffold, since cadnano JSON can't carry the flag)
 - Reads `palette`, `hue`, `saturation`, `lightness`, and `colorize_scaffold` from `ctx.get_param()`; logs received values at the start so you can verify they came through
 - The plugin is **deterministic**: re-running it with the same parameters assigns the same palette again (idempotent). Use Ctrl+Z to revert.
 

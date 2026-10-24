@@ -270,12 +270,20 @@ returns the fixed snapshot plus one line per kind of fix:
 - crossover links that aren't reciprocal within one oligo are cleared, then any oligo that is no
   longer one connected piece is split (the first piece keeps the id; split-off pieces lose
   repeat-group membership)
+- a lattice region with a helix at a negative row/col is shifted up/right by an even number of
+  rows/cols (cell parity kept) and its plane moved back by the same lattice distance, so the
+  design stays put in 3D; a plane another region shares is copied first
 
 A consistent document passes through as the same object. When something was fixed,
 `notifyDocumentRepairs()` shows a warning toast, and `EditorDocumentSession.#persistRepair()` writes
 the repaired copy back (owner tab only). A local load saves with a `before_repair` backup so the
 unrepaired copy stays restorable. Open and pull write the GitHub version first, as usual, then the
 repair as a newer local save, so the repair shows up as a local change to commit.
+
+After repair, `EditorDocumentSession.#adoptDocument()` (every way a document becomes current:
+load, import, open, pull, URL, new) runs the integrity check (`checkDocumentIntegrity`, see
+`design-guards.md`) and `notifyDesignIssues()` lists what it found. That check only reports; it
+never changes or refuses a design the user already has.
 
 Snapshots handed back to IndexedDB must be plain objects: a Svelte `$state` proxy fails the write
 with `DataCloneError`. The recovery screen and Backups dialog keep their lists in `$state.raw`,

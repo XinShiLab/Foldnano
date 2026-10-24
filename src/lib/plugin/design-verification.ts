@@ -5,6 +5,7 @@ import { LatticedDesignRegion } from '$lib/model/Part/DesignRegion';
 import type { VStrandJSON } from '$lib/model/io/cadnanoJSON';
 import type { PluginManifest } from './types';
 import { PluginValidationError, type InvariantCategory } from './plugin-result-errors';
+import { checkPartIntegrity } from '$lib/model/checks/integrity';
 import {
 	performReplacePart,
 	performReplacePartKeepAnnotations,
@@ -104,6 +105,7 @@ function verifyReplacePart(
 		scratchPart = reconstruct(() => performReplacePart(result.data));
 	}
 	checkReconstructedPart(scratchPart, reject);
+	checkIntegrity(scratchPart, pluginId, reject);
 }
 
 function verifyReplaceRegion(
@@ -154,6 +156,23 @@ function verifyReplaceRegion(
 	// length (measured, not assumed — see the plan). Whether that should be rejected here is an
 	// open, deferred policy decision, not yet made — no check for it exists on purpose.
 	checkReconstructedPart(scratchPart, reject);
+	checkIntegrity(scratchPart, pluginId, reject, new Set([activeRegionId]));
+}
+
+// Only the replaced scope: a region the plugin didn't touch isn't the plugin's fault.
+function checkIntegrity(
+	part: Part,
+	pluginId: string,
+	reject: Reject,
+	regionIds?: ReadonlySet<string>
+): void {
+	const issues = checkPartIntegrity(part, regionIds);
+	const error = issues.find((issue) => issue.severity === 'error');
+	if (error) reject(error.message, error.rule);
+	for (const issue of issues) {
+		if (issue.severity === 'warning')
+			console.warn(`[design-verification] ${pluginId}: ${issue.message}`);
+	}
 }
 
 // Reads from the frozen preRunSnapshot, never a live re-read of the document.

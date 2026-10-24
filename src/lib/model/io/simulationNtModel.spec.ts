@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { checkSimulationProfile } from '../checks/simulation';
 import type OligoSegment from '$lib/model/Oligo/OligoSegment.svelte';
 import type VirtualHelix from '$lib/model/VirtualHelix';
 import { addLatticeVh, makeHoneycombPart } from '$lib/model/test/testHelpers';
@@ -144,7 +145,21 @@ describe('simulation NT model', () => {
 		part.createOligo(vh, 4, 0);
 		seg.skipsAndInserts = [[2, 1]];
 
-		expect(() => buildSimulationNtModel(part)).toThrow(/asymmetric insert\/skip/);
+		expect(() => buildSimulationNtModel(part)).toThrow(/different skip\/insert on each strand/);
+	});
+
+	it('rejects a skip left on one strand after its partner strand was deleted', () => {
+		const part = makeHoneycombPart('lone skip');
+		const vh = addLatticeVh(part, 0, 0);
+		const seg = segmentOf(part.createOligo(vh, 0, 4).segments);
+		const partner = part.createOligo(vh, 4, 0);
+		seg.addSkipOrInsertion(2, -1);
+		part.removeOligo(partner);
+
+		expect(checkSimulationProfile(part).map((issue) => issue.rule)).toEqual([
+			'unpaired-skip-insert',
+		]);
+		expect(() => buildSimulationNtModel(part)).toThrow(/a skip on one strand only/);
 	});
 
 	it('rejects insert/skip data at constrained anchors', () => {

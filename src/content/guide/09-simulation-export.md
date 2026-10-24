@@ -4,6 +4,9 @@ description: Rigid-body simulation, NT model, inserts/skips, oxDNA, mrDNA, and f
 category: guide
 order: 9
 slug: simulation-export
+covers:
+  - src/lib/model/checks/simulation.ts
+  - src/lib/model/checks/cadnano.ts
 ---
 
 <script>
@@ -50,6 +53,16 @@ Every simulation export is built from a **format-agnostic nucleotide (NT) model*
 - a **skip** removes that base position from the emitted nucleotide path,
 - an **insertion** adds extra nucleotide positions between neighboring slots,
 - sequence assignment follows each oligo's current 5′ → 3′ order.
+
+The NT model, and so every simulation export and the 3D view's NT mode, can't be built when a skip or insert:
+
+- differs between the two strands of one base,
+- sits on a base where only one strand exists (for example after you deleted the opposite staple), or
+- sits on a constrained crossover site.
+
+The export stops with a message naming the helix and base (the 3D view shows **Cannot show NT model** and falls back to strand rendering). Remove the skip or insert there, or restore the missing strand, and export again.
+
+Single-stranded DNA itself is fine: oxDNA and mrDNA simulate it. Don't add single-stranded bases as an insert on one strand, though. Make them explicit in the design instead: draw them as ordinary strand bases (or shorten the strand rather than skipping a base on it), or remove the skip or insert before simulating.
 
 <Callout type="warning">
 
@@ -100,6 +113,16 @@ mrDNA export uses the **same NT model** but emits mrDNA-targeted files. Use it w
 Prefer `.fn.json` whenever the goal is to preserve the design. It's the only format that round-trips everything. See [Saving And GitHub](/docs/guide/saving-github) for backup strategy.
 
 </Callout>
+
+### Exporting cadnano JSON
+
+Before **Export as cadnano JSON** downloads anything, Foldnano checks what cadnano can't hold and lists it in a dialog:
+
+- **Must be fixed first** (no download): a freeform region, a connection that joins a cadnano scaffold path to a staple path (cadnano keeps them in separate arrays, so the file couldn't be read back), or helix lengths cadnano can't open.
+- **Will be lost or changed** (**Export anyway** downloads): connections to other regions are cut, repeat-group copies are left out, and a design whose helix length fits both lattices (such as 672 bases) makes cadnano ask whether it is square when you open the file. The message tells you what to answer.
+- **Not included**: sequences, modifications, oligo names and the scaffold label.
+
+If there is nothing to fix or lose, the file downloads right away. The [Design Checks Reference](/docs/guide/design-checks#cadnano-export) lists every case. Plugins that work on cadnano JSON run the same check before they start.
 
 ![Save/export dropdown in the top toolbar, showing the Export as cadnano JSON, Export as Foldnano JSON, and Export Oligos of this Part as CSV items](/screenshots/guide/simulation-and-export/03-save-dropdown.webp)
 
