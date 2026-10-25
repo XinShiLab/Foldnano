@@ -8,7 +8,6 @@ export function createGridHandler(): HandlerInstance {
 		down(evt, ctx, _hit) {
 			const downWorld = ctx.camera.toWorld(evt.clientX, evt.clientY);
 			const hitRsp = ctx.hit.hitRsp(downWorld);
-			// console.log("hitRsp at", downWorld, "is", hitRsp);
 			if (hitRsp) {
 				ctx.strandCtx.activeAround.rowIdx = hitRsp.rowIdx;
 				ctx.strandCtx.activeAround.bpIdx = hitRsp.bpIdx;
@@ -21,9 +20,5 @@ export function createGridHandler(): HandlerInstance {
 			// hover footnote now handled by HoverInfoBehavior
 			return false;
 		},
-		// cancel(evt, ctx, _hit) {
-
-		//   return false;
-		// }
 	};
 }

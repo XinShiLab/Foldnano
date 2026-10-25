@@ -5,10 +5,6 @@ export function clearAllTempParts(ctx: ViewContext) {
 	ctx.strandCtx.tempParts.splice(0, ctx.strandCtx.tempParts.length);
 }
 
-export function replaceTempParts(ctx: ViewContext, tempParts: TemporalPartInfo[]) {
-	ctx.strandCtx.tempParts.splice(0, ctx.strandCtx.tempParts.length, ...tempParts);
-}
-
 export function addTempParts(ctx: ViewContext, tempPartsToAdd: TemporalPartInfo[]) {
 	ctx.strandCtx.tempParts.push(...tempPartsToAdd);
 }

@@ -1,6 +1,7 @@
 ---
 covers:
   - src/lib/components/help/**
+  - src/lib/components/Editor/StrandView/strandCanvasHelp*.ts
   - src/lib/server/workspaceHelp.ts
   - src/lib/remote/workspaceHelp.remote.ts
 ---
@@ -38,8 +39,11 @@ skipped.
   (the sidebar's "Side panels" caption used to cover the Script Lab toolbar). The hover card is placed last so hovering never moves captions. A note that
   ends up away from its target gets a dashed leader line (`leaderLine()`) back to it.
 - **Shortcut card** (`ShortcutCard.svelte`) is collapsed by default to leave room for notes; its
-  expanded state is remembered for the session. Its Strand View (arrow-key pan) and Selection
-  Filters sections show only while the strand pane is active, matching where those keys work.
+  expanded state is remembered for the session. Its Strand View (arrow-key pan), Strand View
+  Mouse and Selection Filters sections show only while the strand pane is active, matching where
+  those keys work. The Mouse rows also follow the editor mode (Shift+click and header
+  double-click in Select, double-click to remove in Skip/Insert), because canvas gestures have no
+  control to hang a hover card on.
 - **Visibility.** Non-area controls are shown only if `elementFromPoint` at their centre lands
   inside them, which hides controls clipped by scrolling toolbars or covered by floating panels.
   A disabled control is `pointer-events: none`, so for it a hit on its direct parent also counts;
@@ -60,6 +64,29 @@ skipped.
   panel is open and docked. A popped-out editor window gets no overlay.
 - **Mode descriptions** reuse `MODE_TUTORIAL_INFO` from the docs tutorial data, so the mode buttons
   and the docs describe modes with the same text.
+
+## Canvas anchors
+
+Konva and Three.js objects are not DOM, so `help()` cannot attach to them. A canvas registers
+`CanvasHelpAnchor`s instead (`registerCanvasHelp()` in `help.ts`): a host element plus a
+`getRect()` that returns the object's viewport box. `WorkspaceHelp` measures them in the same
+frame loop and always shows them as pinned captions (`below` by default, never `inside`, since the
+object is an obstacle other captions keep off). An anchor is shown only when its box is inside the
+host and the hit test at its centre lands in the host, so a floating panel over the canvas hides it.
+
+The strand viewer (`registerStrandCanvasHelp()`) registers exactly three: the first region header
+in view, its plane icon and the first helix tag. It does so from an `$effect` only while help is
+open and the mode is Select (the only mode those gestures work in).
+
+Help is optional, so canvas anchors are built never to cost the editor anything on large designs:
+
+- Nothing registers while help is closed.
+- A canvas registers a fixed number of anchors (one per kind of object), never one per helix or
+  region; the overlay also caps canvas notes at `MAX_CANVAS_HELP_NOTES`.
+- `getRect()` runs every frame, so it must be constant-time: the strand viewer finds the row at
+  the viewport top by arithmetic (`getRowIdxByY`) and scans at most `MAX_SCANNED_ROWS` rows
+  from there. `strandCanvasHelp.spec.ts` checks this on a 10,000-helix layout.
+- An anchor whose `getRect()` throws is logged and dropped, not rethrown into the frame loop.
 
 ## Exit pill
 
@@ -83,7 +110,9 @@ enough that returning users should see it open once more.
   anything longer.
 - Set `newVsCadnano` where Foldnano behaves differently from cadnano (regions, movable planes,
   linked mirror copies); it renders a badge.
-- Canvas contents (Konva strand view, Three.js scene) are not DOM, so they only get an area caption.
+- Canvas contents (Konva strand view, Three.js scene) are not DOM: give the pane an area caption,
+  list gestures that work anywhere in the shortcut card, and use a canvas anchor only for a
+  visible landmark whose gesture can't be guessed (see Canvas anchors).
 
 ## Boundaries / Don'ts
 
@@ -94,5 +123,7 @@ enough that returning users should see it open once more.
   (`z-[999]`) so both can show at once.
 - **Don't add a second first-visit flag** (IndexedDB, `localStorage`). The cookie is server-read so
   the decision is known before the editor mounts, and it is listed on `/privacy`.
+- **Don't register a canvas anchor per object** (every helix, every region) or one whose
+  `getRect()` walks the design. One anchor per kind of object, constant-time measurement.
 - **Don't wrap controls in a help component.** Wrappers break toggle groups, button groups and
   pane layouts; the attachment adds no DOM.

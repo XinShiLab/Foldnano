@@ -6,7 +6,14 @@
 	import { resolve } from '$app/paths';
 	import * as Kbd from '$lib/components/ui/kbd/index.js';
 
-	import { helpRegistry, resolveHelpTitle, type HelpSpec } from './help';
+	import {
+		canvasHelpRegistry,
+		helpRegistry,
+		MAX_CANVAS_HELP_NOTES,
+		resolveHelpTitle,
+		type CanvasHelpAnchor,
+		type HelpSpec,
+	} from './help';
 	import { leaderLine, placeNotes, type NoteRequest, type Rect } from './helpLayout';
 	import ShortcutCard from './ShortcutCard.svelte';
 
@@ -20,22 +27,29 @@
 
 	let { root, firstVisit = false, onClose }: Props = $props();
 
+	type HelpTarget = HTMLElement | CanvasHelpAnchor;
+
 	interface PlacedHelp {
-		element: HTMLElement;
+		target: HelpTarget;
 		spec: HelpSpec;
 		title: string | undefined;
 		box: Rect;
+		/** Pinned caption (areas and canvas anchors) rather than a hover card. */
+		pinned: boolean;
+		canvas: boolean;
 	}
 
-	type NoteKey = HTMLElement | 'hover';
+	type NoteKey = HelpTarget | 'hover';
 
 	const CAPTION_MAX_WIDTH = 256;
 	const CARD_WIDTH = 288;
 	const FIXED_INSET = 24;
 	const PILL_TOP = 12;
 
-	let placed = $state<PlacedHelp[]>([]);
-	let hovered = $state<PlacedHelp | null>(null);
+	// Raw: a deep proxy would wrap canvas anchors and specs, so identity checks (sameLayout, keyed
+	// each) would fail every frame and rebuild the notes under the pointer.
+	let placed = $state.raw<PlacedHelp[]>([]);
+	let hovered = $state.raw<PlacedHelp | null>(null);
 	let layer: HTMLDivElement | undefined;
 	let hoverCard = $state<HTMLElement | null>(null);
 	let viewportWidth = $state(0);
@@ -65,21 +79,51 @@
 		return wrapper?.querySelector(':scope > [data-slot="tooltip-content"]') != null;
 	}
 
-	function isShown(element: HTMLElement, spec: HelpSpec, box: Rect): boolean {
+	function isOnScreen(box: Rect): boolean {
 		if (box.width <= 0 || box.height <= 0) return false;
 		if (box.left + box.width <= 0 || box.top + box.height <= 0) return false;
-		if (box.left >= window.innerWidth || box.top >= window.innerHeight) return false;
-		if (spec.area) return true;
-		// Controls clipped by a scrolling toolbar or covered by a floating panel fail this hit test.
-		// Skip the overlay's own notes: a caption or hover card over a control must not hide it, or
-		// placement and hover feed back into visibility and the notes flicker.
-		const hit = document
+		return box.left < window.innerWidth && box.top < window.innerHeight;
+	}
+
+	// Controls clipped by a scrolling toolbar or covered by a floating panel fail this hit test.
+	// Skip the overlay's own notes: a caption or hover card over a control must not hide it, or
+	// placement and hover feed back into visibility and the notes flicker.
+	function hitAtCentre(box: Rect): Element | undefined {
+		return document
 			.elementsFromPoint(box.left + box.width / 2, box.top + box.height / 2)
 			.find((el) => !layer?.contains(el) && !isTooltip(el));
+	}
+
+	function isShown(element: HTMLElement, spec: HelpSpec, box: Rect): boolean {
+		if (!isOnScreen(box)) return false;
+		if (spec.area) return true;
+		const hit = hitAtCentre(box);
 		if (hit === undefined) return false;
 		if (element.contains(hit)) return true;
 		// Disabled buttons are pointer-events: none, so the hit lands on their parent instead.
 		return element.matches(':disabled') && hit === element.parentElement;
+	}
+
+	function canvasBox(anchor: CanvasHelpAnchor): Rect | null {
+		// Help is optional: an anchor that throws is dropped instead of breaking the frame loop.
+		let box: Rect | null;
+		try {
+			box = anchor.getRect();
+		} catch (error) {
+			console.warn('Workspace help: dropping a canvas anchor that failed to measure', error);
+			canvasHelpRegistry.delete(anchor);
+			return null;
+		}
+		if (!box || !isOnScreen(box)) return null;
+		const host = anchor.host.getBoundingClientRect();
+		const inHost =
+			box.left >= host.left &&
+			box.top >= host.top &&
+			box.left + box.width <= host.right &&
+			box.top + box.height <= host.bottom;
+		if (!inHost) return null;
+		const hit = hitAtCentre(box);
+		return hit !== undefined && anchor.host.contains(hit) ? box : null;
 	}
 
 	function measure(): PlacedHelp[] {
@@ -90,7 +134,23 @@
 			const r = element.getBoundingClientRect();
 			const box = { left: r.left, top: r.top, width: r.width, height: r.height };
 			if (!isShown(element, spec, box)) continue;
-			next.push({ element, spec, title: resolveHelpTitle(element, spec), box });
+			next.push({
+				target: element,
+				spec,
+				title: resolveHelpTitle(element, spec),
+				box,
+				pinned: !!spec.area,
+				canvas: false,
+			});
+		}
+		let canvasNotes = 0;
+		for (const [anchor, spec] of canvasHelpRegistry) {
+			if (canvasNotes >= MAX_CANVAS_HELP_NOTES) break;
+			if (!root.contains(anchor.host)) continue;
+			const box = canvasBox(anchor);
+			if (!box) continue;
+			next.push({ target: anchor, spec, title: spec.title, box, pinned: true, canvas: true });
+			canvasNotes++;
 		}
 		return next;
 	}
@@ -100,7 +160,7 @@
 		return a.every((p, i) => {
 			const q = b[i];
 			return (
-				p.element === q.element &&
+				p.target === q.target &&
 				p.spec === q.spec &&
 				p.title === q.title &&
 				Math.abs(p.box.left - q.box.left) < 0.5 &&
@@ -138,7 +198,7 @@
 		if (hoverCard?.contains(e.target as Node)) return;
 		let best: PlacedHelp | null = null;
 		for (const p of placed) {
-			if (p.spec.area || !contains(p.box, e.clientX, e.clientY)) continue;
+			if (p.pinned || !contains(p.box, e.clientX, e.clientY)) continue;
 			if (!best || p.box.width * p.box.height < best.box.width * best.box.height) best = p;
 		}
 		hovered = best && (best.title || best.spec.text) ? best : null;
@@ -146,7 +206,7 @@
 
 	const captions = $derived(
 		placed
-			.filter((p) => p.spec.area && (p.title || p.spec.text))
+			.filter((p) => p.pinned && (p.title || p.spec.text))
 			.sort((a, b) => a.box.top - b.box.top || a.box.left - b.box.left)
 	);
 
@@ -171,16 +231,18 @@
 
 	const viewport = $derived({ width: viewportWidth, height: viewportHeight });
 
-	// Captions also keep off hoverable controls, or a caption could hide the buttons it sits on.
-	const controlObstacles = $derived(placed.filter((p) => !p.spec.area).map((p) => p.box));
+	// Captions also keep off hoverable controls and canvas anchors, or a caption could hide the
+	// thing another note points at.
+	const controlObstacles = $derived(placed.filter((p) => !p.pinned || p.canvas).map((p) => p.box));
 
 	const captionLayout = $derived(
 		placeNotes<NoteKey>(
 			captions.map((p): NoteRequest<NoteKey> => ({
-				key: p.element,
+				key: p.target,
 				target: p.box,
-				...(sizes.get(p.element) ?? { width: 0, height: 0 }),
-				placement: p.spec.placement ?? 'inside',
+				...(sizes.get(p.target) ?? { width: 0, height: 0 }),
+				// Inside would cover the canvas object, which is also an obstacle.
+				placement: p.spec.placement ?? (p.canvas ? 'below' : 'inside'),
 			})),
 			[...fixedObstacles, ...controlObstacles],
 			viewport
@@ -235,8 +297,8 @@
 	></div>
 
 	<svg class="absolute inset-0 h-full w-full overflow-visible" aria-hidden="true">
-		{#each captions as p (p.element)}
-			{@const rect = captionLayout.get(p.element)}
+		{#each captions as p (p.target)}
+			{@const rect = captionLayout.get(p.target)}
 			<rect
 				x={p.box.left + 1}
 				y={p.box.top + 1}
@@ -247,7 +309,7 @@
 				stroke-width="1.5"
 				stroke-dasharray="6 4"
 			/>
-			{#if rect && sizes.has(p.element)}
+			{#if rect && sizes.has(p.target)}
 				{@const line = leaderLine(rect, p.box)}
 				{#if line}
 					<line {...line} class="stroke-primary/70" stroke-width="1.5" stroke-dasharray="4 3" />
@@ -275,13 +337,13 @@
 		{/if}
 	</svg>
 
-	{#each captions as p (p.element)}
+	{#each captions as p (p.target)}
 		<div
 			class="pointer-events-auto absolute w-max rounded-md border border-primary/40 bg-background/95 px-2.5 py-1.5 text-xs shadow-md"
 			style="{position(
-				sizes.has(p.element) ? captionLayout.get(p.element) : null
+				sizes.has(p.target) ? captionLayout.get(p.target) : null
 			)};max-width:{CAPTION_MAX_WIDTH}px"
-			{@attach trackSize(p.element)}
+			{@attach trackSize(p.target)}
 		>
 			<div class="flex items-center gap-1.5">
 				{#if p.title}<span class="font-semibold">{p.title}</span>{/if}
@@ -303,7 +365,7 @@
 		</div>
 	{/each}
 
-	{#each placed as p (p.element)}
+	{#each placed as p (p.target)}
 		{#if p.spec.key}
 			<div class="absolute" style="left:{p.box.left + 5}px;top:{p.box.top - 16}px">
 				<Kbd.Root class="shadow-sm">{p.spec.key}</Kbd.Root>

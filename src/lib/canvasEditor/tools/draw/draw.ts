@@ -1,7 +1,5 @@
 import type { Tool, PointerEvt } from '../index';
 import type { ViewContext } from '$lib/canvasEditor/core/views';
-// import { Segment } from '../../model/domain';
-// import type { Command } from '../services/tx';
 import type { RspCoord } from '$lib/model/Part/Part.svelte';
 import { drawStrandEnd, drawStrandStart, drawStrandUpdate } from './drawUtils';
 import { connectingEnd, connectingStart, connectingUpdate } from './connectUtils';
@@ -15,13 +13,11 @@ export function DrawTool(): Tool {
 		name: 'DRAW',
 		onPointer(evt: PointerEvt, ctx: ViewContext) {
 			if (evt.type === 'down' && evt.button === 0) {
-				// console.log('DrawTool: pointer down at', evt.clientX, evt.clientY);
 				const downWorld = ctx.camera.toWorld(evt.clientX, evt.clientY);
 				const filterKind = ['END', 'SEGMENT', 'VH_GRID'];
 				const hit = ctx.hit
 					.hitAt(downWorld, evt.directTargetId)
 					.filter((h) => filterKind.includes(h.kind));
-				// console.log('DrawTool: hit test result', hit);
 
 				// if it is an empty grid, start drawing
 				if (hit.length === 1 && hit[0].kind === 'VH_GRID') {
@@ -45,7 +41,6 @@ export function DrawTool(): Tool {
 			}
 
 			if (evt.type === 'move' && evt.button === 0) {
-				// console.log('DrawTool: pointer move at', evt.clientX, evt.clientY);
 				if (drawingStatus.isDrawing) {
 					const moveWorld = ctx.camera.toWorld(evt.clientX, evt.clientY);
 					const hitBp = ctx.hit.hitXAsBpPos(moveWorld);

@@ -1,12 +1,5 @@
 <script lang="ts">
-	import {
-		Circle,
-		Group,
-		Line,
-		Text,
-		type KonvaMouseEvent,
-		type KonvaPointerEvent,
-	} from 'svelte-konva';
+	import { Circle, Group, Line, Text, type KonvaPointerEvent } from 'svelte-konva';
 	import type { Part } from '../../../model/Part';
 	import { fillEmptyVhCmd } from '../../../commands/strands';
 	import { getEditorViewContext } from '../context/EditorViewContext.svelte';
@@ -19,7 +12,7 @@
 		strokeWidth: number;
 		active?: boolean;
 		vhIdx?: number;
-		clickHandler?: (e: KonvaMouseEvent) => void;
+		clickHandler?: (e: KonvaPointerEvent) => void;
 		pointerDownHandler?: (e: KonvaPointerEvent) => void;
 		text?: string | null;
 		scafStartAngle?: number;
@@ -113,10 +106,10 @@
 		hovered = false;
 	};
 
-	// Native Konva dblclick — more reliable than home-grown click-then-click detection.
+	// Native Konva pointerdblclick — more reliable than home-grown click-then-click detection.
 	// Used for the existing-VH double-click-to-fill-default-strand UX. The grid-cell
 	// path doesn't pass vhIdx/part, so it short-circuits and bubbles down to nothing.
-	const doubleClickHandler = (e: KonvaMouseEvent) => {
+	const doubleClickHandler = (e: KonvaPointerEvent) => {
 		if (vhIdx === undefined || !part) return;
 		e.cancelBubble = true;
 		e.evt.stopPropagation();
@@ -133,8 +126,8 @@
 	onpointerover={hoverInHandler}
 	onpointerout={hoverOutHandler}
 	onpointerdown={pointerDownHandler}
-	onclick={clickHandler ? (e) => clickHandler(e) : undefined}
-	ondblclick={doubleClickHandler}
+	onpointerclick={clickHandler ? (e) => clickHandler(e) : undefined}
+	onpointerdblclick={doubleClickHandler}
 >
 	<Circle
 		{x}

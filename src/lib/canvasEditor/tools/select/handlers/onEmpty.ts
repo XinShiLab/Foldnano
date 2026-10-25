@@ -32,7 +32,6 @@ function showMarquee(ctx: ViewContext, r: WorldRect) {
 	m.props.visible = true;
 }
 export function hideMarquee(ctx: ViewContext) {
-	// ensureMarquee(ctx).props.visible = false;
 	removeTempPartsByType(ctx, 'Marquee');
 }
 
@@ -125,14 +124,12 @@ export function createEmptyHandler(): HandlerInstance {
 
 		up(evt, ctx) {
 			const upWorld = ctx.camera.toWorld(evt.clientX, evt.clientY);
-			// const selection = ctx.strandCtx.selected;
 			if (isMarquee && downWorld) {
 				// commit marquee selection
 				const rect = rectFrom(downWorld, upWorld);
 				const cands = ctx.hit.queryRect(rect);
 				const ends = cands.filter((h) => h.kind === 'END');
 				const endIds = ends.map((h) => h.id).filter(isDefined);
-				// ctx.selection.set(endIds);
 				const parsedEndsInfo = endIds.map((id) => parseEndSelectId(id)).filter(isDefined);
 				const selectedEnds = fromHitsCandsToSelectedEnds(parsedEndsInfo, ctx);
 				if (!evt.shiftKey) {
@@ -154,8 +151,6 @@ export function createEmptyHandler(): HandlerInstance {
 			hideMarquee(ctx);
 			return true;
 		},
-
-		// contextmenu handler removed - now handled by ContextMenuBehavior
 
 		reset() {
 			isMarquee = false;

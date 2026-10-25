@@ -11,8 +11,6 @@ export type EditorMode =
 	| 'SPLIT_REGION'
 	| 'DUPLICATE';
 
-export type CanSelectToggle = 'SCAF' | 'STAP' | 'END' | 'XOVER' | 'SEGMENT' | 'OLIGO' | 'VH_TAG';
-
 export type Category = 'SCAF' | 'STAP' | 'VH' | 'UNKNOWN' | 'CONTROL';
 /** Things can bit hit by mouse. you can't hit Oligo because it is made of
  * a collection of ends, segments, and crossovers */

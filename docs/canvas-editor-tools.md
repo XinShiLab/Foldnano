@@ -23,12 +23,11 @@ Important scope note:
 ```
 src/lib/canvasEditor/
 ├── core/
-│   ├── modes.ts          # EditorMode type, CanSelectToggle
+│   ├── modes.ts          # EditorMode, LeafTarget, Category, HitResult types
 │   ├── capabilities.ts   # which modes are valid in which view
 │   └── views.ts          # ViewContext interface
 ├── services/
 │   ├── hitEventToModel.ts   # canvas hit ID → LeafTarget
-│   ├── selection.ts         # selection helpers
 │   └── cameraKonva.ts       # KonvaCamera (pan/zoom)
 └── tools/
     ├── index.ts             # ToolController, Tool, ToolBehavior interfaces
@@ -55,7 +54,6 @@ src/lib/canvasEditor/
     ├── modification.ts      # MODIFICATION tool
     ├── duplicate.ts          # transient DUPLICATE tool
     ├── splitRegion.ts        # transient SPLIT_REGION tool
-    ├── pan.ts
     ├── doubleClick.ts
     └── behaviors/            # cross-cutting ToolBehaviors (hover info, context menu)
 ```
@@ -73,8 +71,6 @@ interface Tool {
 	onExit?(ctx: ViewContext): void; // called when another tool takes over
 	onPointer?(evt: PointerEvt, ctx: ViewContext): void;
 	onKey?(e: KeyboardEvent, ctx: ViewContext): void;
-	mountOverlay?(layer: Konva.Layer, ctx: ViewContext): void;
-	unmountOverlay?(layer: Konva.Layer, ctx: ViewContext): void;
 }
 ```
 
@@ -424,7 +420,7 @@ More structured transient elements (selection boxes, move previews) go through `
 - **Don't mutate the model from a tool directly.** Call a command from `src/lib/commands/*` so the change goes through `historyStack.tx(...)` and lands on the undo stack.
 - **Don't read `editorMode` synchronously from `setMode`.** The controller polls `getMode()` on each event; `onExit` / `onEnter` fire on the next pointer event. If a mode change must run setup before the user clicks, do it in the component that flipped the mode.
 - **Don't call hit-testing inside a `move`/`up` phase that is already captured.** Once a sub-handler returns `true` from `down`, it owns the gesture — re-running priority dispatch will desync state.
-- **Don't add stage-level Konva listeners from a tool.** Use `mountOverlay` / `unmountOverlay` and clean up in `onExit` / `cancel`. Stage-level listeners survive mode changes and leak.
+- **Don't add stage-level Konva listeners from a tool.** Draw transient shapes on `ctx.overlay` and clean up in `onExit` / `cancel`. Stage-level listeners survive mode changes and leak.
 - **Don't store DOM references on the controller.** Every tool's transient state lives in its own closure or in `ctx.overlay` / `strandCtx.tempParts`.
 - **Plane viewers do not use this tool stack.** `FreeformViewer.svelte` and `HelixViewer.svelte` handle Konva pointer events directly. They still observe `editorMode`, but adding to `canvasEditor/tools/*` will not affect them.
 - **`PAN` is a stage-level mode, not a tool.** Don't try to register a Tool with `name: 'PAN'`.

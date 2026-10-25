@@ -199,15 +199,15 @@ for vh in part.virtual_helices():
 				? 'border-b border-[var(--landing-border)] bg-[var(--landing-bg)]/80 backdrop-blur'
 				: 'border-b border-transparent'}"
 		>
-			<div class="mx-auto flex h-14 max-w-6xl items-center gap-4 px-6">
+			<div class="mx-auto flex h-14 max-w-6xl items-center gap-2 px-4 sm:gap-4 sm:px-6">
 				<a
 					href={resolve('/')}
-					class="flex items-center gap-2 text-xl font-extrabold text-[var(--landing-ink)]"
+					class="flex shrink-0 items-center gap-2 text-xl font-extrabold text-[var(--landing-ink)]"
 				>
 					<img src={fn} alt="" class="size-8" />
 					Foldnano
 				</a>
-				<nav class="ml-auto flex items-center gap-1 text-sm">
+				<nav class="ml-auto flex items-center gap-0.5 text-sm sm:gap-1">
 					<a
 						href={resolve('/docs')}
 						class="rounded-[10px] px-3 py-1.5 text-[var(--landing-muted)] transition-colors hover:text-[var(--landing-ink)]"
@@ -218,7 +218,7 @@ for vh in part.virtual_helices():
 						href={GITHUB_URL}
 						target="_blank"
 						rel="noopener"
-						class="flex items-center gap-1.5 rounded-[10px] px-3 py-1.5 text-[var(--landing-muted)] transition-colors hover:text-[var(--landing-ink)]"
+						class="hidden items-center gap-1.5 rounded-[10px] px-3 py-1.5 text-[var(--landing-muted)] transition-colors hover:text-[var(--landing-ink)] sm:flex"
 					>
 						<GitFork size={15} />GitHub
 					</a>
@@ -257,7 +257,7 @@ for vh in part.virtual_helices():
 						class="relative mx-auto flex max-w-7xl flex-col justify-center px-4 md:h-[calc(100vh-3.5rem)] md:px-6"
 					>
 						<div
-							class="glass-panel pointer-events-auto mt-6 w-full rounded-3xl p-7 text-left md:mt-0 md:max-w-xl md:p-10"
+							class="glass-panel pointer-events-auto mt-6 w-full rounded-3xl p-6 text-left sm:p-7 md:mt-0 md:max-w-xl md:p-10"
 						>
 							<p
 								class="font-heading text-[10px] tracking-[0.12em] text-[var(--landing-muted)] uppercase md:text-xs md:tracking-[0.18em]"
@@ -265,7 +265,7 @@ for vh in part.virtual_helices():
 								Open-source · Local-first · In your browser
 							</p>
 							<h1
-								class="mt-4 text-4xl leading-[1.05] font-extrabold text-[var(--landing-ink)] md:text-5xl"
+								class="mt-4 text-3xl leading-[1.05] font-extrabold text-[var(--landing-ink)] sm:text-4xl md:text-5xl"
 							>
 								Everything you need<br />
 								to <span class="text-[var(--landing-green)]">design</span><br />
@@ -273,7 +273,7 @@ for vh in part.virtual_helices():
 									>DNA Nanostructures</span
 								>
 							</h1>
-							<p class="mt-4 max-w-md text-lg text-[var(--landing-muted)]">
+							<p class="mt-4 max-w-md text-base text-[var(--landing-muted)] sm:text-lg">
 								Design, simulate, and export DNA origami entirely in your browser. No installation,
 								no account, your data stays on your machine.
 							</p>
@@ -305,7 +305,7 @@ for vh in part.virtual_helices():
 					<section
 						id="features"
 						bind:this={featuresEl}
-						class="mx-auto max-w-6xl scroll-mt-20 px-6 py-8 md:pt-14 md:pb-16"
+						class="mx-auto max-w-6xl scroll-mt-20 px-4 py-8 md:px-6 md:pt-14 md:pb-16"
 					>
 						<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-6 lg:gap-5">
 							{#each features as f (f.hi)}
@@ -359,7 +359,7 @@ for vh in part.virtual_helices():
 
 			<!-- Build-on band -->
 			<section class="relative z-10 mt-8 bg-[var(--landing-card)]">
-				<div class="mx-auto max-w-6xl px-6 py-14 text-center">
+				<div class="mx-auto max-w-6xl px-4 py-12 text-center sm:px-6 sm:py-14">
 					<h2 class="text-2xl font-bold text-[var(--landing-ink)]">Build on Foldnano</h2>
 					<p class="mx-auto mt-3 max-w-xl text-[var(--landing-muted)]">
 						An open platform: write Python plugins that run in the browser and share them with the
@@ -390,7 +390,7 @@ for vh in part.virtual_helices():
 		<!-- Footer -->
 		<footer class="border-t border-[var(--landing-border)]">
 			<div
-				class="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-6 py-10 text-sm text-[var(--landing-muted)] sm:flex-row"
+				class="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-4 py-10 text-center text-sm text-[var(--landing-muted)] sm:flex-row sm:px-6"
 			>
 				<span class="flex items-center gap-2">
 					<img src={fn} alt="" class="size-4 opacity-70" />

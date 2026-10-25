@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Circle, Line, type KonvaMouseEvent } from 'svelte-konva';
+	import { Circle, Line, type KonvaPointerEvent } from 'svelte-konva';
 	// import { getBpCoordsByRowAndBpIdx, dimensions } from '../utils';
 	import { bulgePoint, getAttachmentPoints } from './utils';
 	import { getDimensionContext } from '../drawingContext';
@@ -50,7 +50,7 @@
 	const [bpx, bpy] = $derived(bulgePoint(x1, y1, x2, y2, direction(start, end)));
 
 	let isHovered = $state();
-	const onmouseoverLine = (_e: KonvaMouseEvent) => {
+	const onPointerOverLine = (_e: KonvaPointerEvent) => {
 		isHovered = true;
 		// if (!isConstrained) {
 		//   const container = _e.target.getStage()?.container();
@@ -60,7 +60,7 @@
 		//   }
 		// }
 	};
-	const onmouseleaveLine = (_e: KonvaMouseEvent) => {
+	const onPointerLeaveLine = (_e: KonvaPointerEvent) => {
 		isHovered = false;
 		// const container = _e.target.getStage()?.container();
 		// if (container) {
@@ -89,8 +89,8 @@
 	lineCap="round"
 	lineJoin="round"
 	tension={0.4}
-	onmouseover={onmouseoverLine}
-	onmouseleave={onmouseleaveLine}
+	onpointerover={onPointerOverLine}
+	onpointerleave={onPointerLeaveLine}
 />
 {#if isConstrained}
 	<Circle

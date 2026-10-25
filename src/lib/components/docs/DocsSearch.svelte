@@ -86,10 +86,11 @@
 	type="button"
 	onclick={openSearch}
 	onpointerenter={() => void loadIndex()}
-	class="flex h-8 w-full max-w-64 items-center gap-2 rounded border border-border bg-muted/40 px-2.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+	aria-label="Search docs"
+	class="flex h-8 w-full max-w-64 min-w-8 items-center gap-2 rounded border border-border bg-muted/40 px-2.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
 >
-	<Search size={14} />
-	<span class="flex-1 text-left">Search docs…</span>
+	<Search size={14} class="shrink-0" />
+	<span class="flex-1 truncate text-left">Search docs…</span>
 	<Kbd class="hidden sm:inline-flex">{isMac ? '⌘' : 'Ctrl'} K</Kbd>
 </button>
 

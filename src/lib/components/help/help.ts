@@ -1,6 +1,8 @@
 import type { Attachment } from 'svelte/attachments';
 import { SvelteMap } from 'svelte/reactivity';
 
+import type { Rect } from './helpLayout';
+
 // Slugs of `src/content/guide/*.md` (their `slug:` front matter).
 export type GuideSlug =
 	| 'getting-started'
@@ -50,6 +52,35 @@ export function help(spec: HelpSpec): Attachment<HTMLElement> {
 		return () => {
 			if (helpRegistry.get(element) === spec) helpRegistry.delete(element);
 		};
+	};
+}
+
+/** A spot on a canvas (Konva, Three.js) that has no DOM element to attach `help()` to. */
+export interface CanvasHelpAnchor {
+	/** The canvas host element; decides the help root and clips the anchor. */
+	readonly host: HTMLElement;
+	/**
+	 * Viewport box of the canvas object, or null when it is not drawn. Called every frame while
+	 * help is open, so it must not walk the design.
+	 */
+	getRect(): Rect | null;
+}
+
+/** Canvas notes are pinned captions, so the title is required (there is no element to name it). */
+export type CanvasHelpSpec = Omit<HelpSpec, 'key' | 'area'> & { title: string };
+
+// The overlay shows at most this many canvas notes, however many anchors register.
+export const MAX_CANVAS_HELP_NOTES = 4;
+
+export const canvasHelpRegistry = new SvelteMap<CanvasHelpAnchor, CanvasHelpSpec>();
+
+/** Registers canvas anchors; returns the unregister function. Register only while help is open. */
+export function registerCanvasHelp(
+	entries: readonly [CanvasHelpAnchor, CanvasHelpSpec][]
+): () => void {
+	for (const [anchor, spec] of entries) canvasHelpRegistry.set(anchor, spec);
+	return () => {
+		for (const [anchor] of entries) canvasHelpRegistry.delete(anchor);
 	};
 }
 

@@ -36,6 +36,8 @@ Below it, **or load an existing design** is a drop zone (click to browse). It ac
 
 ## Top Toolbar
 
+On narrower screens (such as an iPad), the toolbar buttons show only their icons. Hover over one, or press `?`, to see its name.
+
 | Control | What it does |
 | --- | --- |
 | **Foldnano** (with *beta* badge) | Opens the **About** dialog: the version and build, **What's New** (the last 3 months of changes, with **Show earlier updates** for older ones), the author, the MIT license, and third-party licenses |

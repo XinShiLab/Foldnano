@@ -1,3 +1,4 @@
+import { v4 as uuidv4 } from 'uuid';
 import { createContext } from 'svelte';
 
 import FoldnanoDocument, { type DocSnapshot } from '$lib/model/document.svelte';
@@ -603,7 +604,7 @@ export class EditorDocumentSession {
 					`This file shares a document ID with "${existingMeta.path}" already saved locally.\n\nOpen as a new independent copy? (Cancel to abort)`
 				);
 				if (!openAsCopy) return false;
-				snapshot = { ...snapshot, id: crypto.randomUUID() };
+				snapshot = { ...snapshot, id: uuidv4() };
 			}
 
 			const { snapshot: repairedSnapshot, repairs } = repairDocumentJson(snapshot);

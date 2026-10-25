@@ -59,10 +59,6 @@ export function makeETMHitTester(drawingDimensions: DrawingDimensions, part: Par
 			}
 
 			const targets = part.getEntitiesAtVh(vh.id, rsp.strandIdx, rsp.bpIdx);
-			// console.log('part.oligos in hitTester: ', part.oligos);
-			// if (targets.vh) {
-			//   // result.add({ kind: 'VH_GRID', id: targets.vh.id, category: 'VH' });
-			// }
 			if (targets.oligo) {
 				result.add({
 					kind: 'OLIGO',
@@ -86,7 +82,6 @@ export function makeETMHitTester(drawingDimensions: DrawingDimensions, part: Par
 					category: targets.oligo?.isScaffold ? 'SCAF' : 'STAP',
 				});
 			}
-			// console.log('hitAt', p, '->', Array.from(result));
 			return Array.from(result);
 		},
 

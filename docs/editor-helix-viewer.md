@@ -230,6 +230,7 @@ lattice coordinates.
 - **Don't render every VH in the part.** Each region renderer must filter to its own `regionId` — that is what makes mixed-region parts render correctly.
 - **Don't bypass `region.addVhAtCoords` to add a VH.** The region owns parity rules and `vhOrder`; talking directly to `Part` skips this.
 - **Don't move VHs through `vh.latticeCoords =`.** Use `moveLatticeVirtualHelicesCmd` so undo/redo and parity validation run.
+- **Don't use Konva mouse events (`onclick`, `ondblclick`, `onmouse*`) on canvas shapes.** Konva fires them only for real mice, and it cancels `touchstart` on listening shapes, so iPad Safari never synthesizes the compat mouse events: Apple Pencil and finger taps are silently dropped. Use `onpointerclick` / `onpointerdblclick` / `onpointer*`, which fire for mouse, pen and touch alike.
 - **Don't share selection with the strand view or the freeform viewer.** This pane has its own `selectedLatticeVhIndices`.
 - **Don't apply plane transforms in this pane.** It's region-local 2D — apply transforms in `View3D`.
 - **Don't add lattice VHs to a freeform region.** `region.kind` must match — mismatches break geometry queries.

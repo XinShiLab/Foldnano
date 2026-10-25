@@ -1,3 +1,4 @@
+import { v4 as uuidv4 } from 'uuid';
 import Dexie, { type Table } from 'dexie';
 import type { BackupReason, DocumentMetadata, LocalBackup, SaveDocumentOptions } from '../types';
 import type {
@@ -232,7 +233,7 @@ export class FoldnanoIndexedDb extends Dexie implements IndexedDbPersistenceBack
 		const previous = await this.documentSnapshots.get(docId);
 		if (!previous) return;
 		await this.localBackups.put({
-			id: crypto.randomUUID(),
+			id: uuidv4(),
 			docId,
 			// Strictly increasing, so two backups within one millisecond keep their order.
 			createdAt: newest ? Math.max(now, newest.createdAt + 1) : now,
