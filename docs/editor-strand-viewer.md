@@ -224,8 +224,11 @@ keeps hiding rows that scrolled into view.
 
 `RegionHeader.svelte` renders one header row per region in the overlay layer.
 
-Clicking it in `SELECT` mode toggles membership in
-`strandViewContext.collapsedRegionIds`.
+In `SELECT` mode a click activates the region and a double-click toggles its
+membership in `strandViewContext.collapsedRegionIds`; the plane icon at its right
+end frames the region's plane in 3D. Its boxes come from `regionHeaderGeometry()`,
+which the `?` help anchors (`strandCanvasHelp.ts`, see `docs/workspace-help.md`
+§ Canvas anchors) reuse to point at the first header in view.
 
 When a region is collapsed, helper state such as hover, active-around, and
 context-menu visibility is cleaned up if it now points at hidden rows.
@@ -348,6 +351,7 @@ document or `historyStack.revision` change. The model is read inside `untrack`, 
 - **Don't pass `vh.listRow` into `getEntitiesAtVh`.** Topology is keyed by `vh.id`. Use `getVisibleVhByDisplayRow(...)` to translate from a clicked row to a VH.
 - **Don't treat `displayRow` as model identity** — collapse/expand and region reorder change it.
 - **Don't add interactive shapes to the world layer.** `listening=false` is intentional; pickable controls go on the overlay layer.
+- **Don't use Konva mouse events (`onclick`, `ondblclick`, `onmouse*`) on canvas shapes.** Konva fires them only for real mice, and it cancels `touchstart` on listening shapes, so iPad Safari never synthesizes the compat mouse events: Apple Pencil and finger taps are silently dropped. Use `onpointerclick` / `onpointerdblclick` / `onpointer*`, which fire for mouse, pen and touch alike.
 - **Don't bypass `drawingDimensions` for coordinate math.** It is the only consistent source of (bpIdx ↔ x) and (displayRow ↔ y) under collapse/region rules.
 - **Don't mount one component per segment for selection.** Use the batched `SelectionOverlay`. The "many mounted route components" path was deliberately retired.
 - **Don't reorder `VhGrid` / `MismatchMarkers` / `StrandRoutes` in the world layer without checking z-order.** Mount order there is bottom-to-top paint order, and it's intentional (grid under warnings under sequence text) — see Layer Architecture above.

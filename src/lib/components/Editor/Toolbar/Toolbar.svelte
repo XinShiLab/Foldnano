@@ -337,27 +337,31 @@
 				Foldnano 
 			</p>
 		</div> -->
-		<div class="flex flex-grow flex-col items-start gap-2 xl:flex-row">
+		<div class="flex min-w-0 flex-grow flex-row flex-wrap items-start gap-2">
 			<div class="my-auto flex flex-none flex-row gap-2">
 				<ButtonGroup.Root>
 					<Button
 						variant="outline"
 						size="sm"
 						onclick={createNewDocument}
+						title="New Document"
+						aria-label="New Document"
 						{@attach help({
 							title: 'New Document',
 							text: 'Start an empty design. Your current one stays saved in this browser.',
-						})}><FilePlusCorner />New Document</Button
+						})}><FilePlusCorner /><span class="hidden xl:inline">New Document</span></Button
 					>
 
 					<Dialog.Root bind:open={isDialogOpen}>
 						<Dialog.Trigger
 							class={buttonVariants({ variant: 'outline', size: 'sm' })}
+							title="Open"
+							aria-label="Open"
 							{@attach help({
 								title: 'Open',
 								text: 'Open a Foldnano .fn.json or cadnano .json design, or a design saved in this browser.',
 								doc: 'creating-a-design',
-							})}><FolderOpen />Open</Dialog.Trigger
+							})}><FolderOpen /><span class="hidden xl:inline">Open</span></Dialog.Trigger
 						>
 						<Dialog.Content class="sm:max-w-2xl">
 							<Dialog.Header>
@@ -380,13 +384,15 @@
 						variant="outline"
 						size="sm"
 						onclick={async () => await session.saveDocumentToLocalStorage()}
+						title="Save"
+						aria-label="Save"
 						{@attach help({
 							title: 'Save',
 							text: 'Save to this browser now (it also autosaves). The arrow menu has GitHub and file downloads.',
 							doc: 'saving-github',
 						})}
 					>
-						<Save />Save
+						<Save /><span class="hidden xl:inline">Save</span>
 					</Button>
 					<DropdownMenu.Root>
 						<DropdownMenu.Trigger>
@@ -458,12 +464,14 @@
 						variant="outline"
 						size="sm"
 						onclick={() => startAddRegion('HONEYCOMB')}
+						title="Add Region"
+						aria-label="Add Region"
 						{@attach help({
 							title: 'Add Region',
 							text: 'Add another region, on its own plane, to this part. The arrow menu picks the lattice or imports a cadnano design as a region.',
 							doc: 'creating-a-design',
 							newVsCadnano: true,
-						})}><Bolt />Add Region</Button
+						})}><Bolt /><span class="hidden xl:inline">Add Region</span></Button
 					>
 					<DropdownMenu.Root bind:open={addPartMenuOpen}>
 						<DropdownMenu.Trigger>
@@ -516,19 +524,24 @@
 							variant="outline"
 							size="sm"
 							onclick={() => onAutoStaple()}
+							title="Auto Staple — {activeLatticeRegion.name}"
+							aria-label="Auto Staple — {activeLatticeRegion.name}"
 							{@attach help({
 								title: 'Auto Staple',
 								text: 'Generate staples for the active lattice region from its scaffold routing. Review them before assigning sequences.',
 								doc: 'creating-a-design',
-							})}><Workflow />Auto Staple — {activeLatticeRegion.name}</Button
+							})}
+							><Workflow /><span class="hidden xl:inline">Auto Staple</span><span
+								class="hidden 2xl:inline">— {activeLatticeRegion.name}</span
+							></Button
 						>
 					</ButtonGroup.Root>
 				{/if}
 			</div>
 
-			<div class="flex w-full flex-grow flex-row gap-2">
+			<div class="flex min-w-0 flex-grow basis-64 flex-row gap-2">
 				<div
-					class="my-auto flex flex-grow"
+					class="my-auto flex min-w-0 flex-grow"
 					{@attach help({
 						title: 'Document name',
 						text: 'Click to rename. The icon next to it shows whether the latest changes are saved.',

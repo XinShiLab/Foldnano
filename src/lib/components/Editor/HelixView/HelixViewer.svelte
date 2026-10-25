@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { v4 as uuidv4 } from 'uuid';
 	import { onMount, untrack } from 'svelte';
 	import type { Stage } from 'svelte-konva';
 	import type { Part } from '../../../model/Part';
@@ -192,7 +193,7 @@
 					setOverlayPlacementCmd(
 						editorViewContext.historyStack,
 						part,
-						crypto.randomUUID(),
+						uuidv4(),
 						sourceKey,
 						identityOverlayTransform(),
 						'Add overlay'
@@ -201,7 +202,7 @@
 			} else {
 				// mrDNA: session-only, no persistence.
 				addOverlayInstance({
-					id: crypto.randomUUID(),
+					id: uuidv4(),
 					sourceKey: '',
 					data,
 					transform: identityOverlayTransform(),
@@ -230,7 +231,7 @@
 	function onDuplicateOverlay(id: string): void {
 		const src = findOverlay(id);
 		if (!src) return;
-		const newId = crypto.randomUUID();
+		const newId = uuidv4();
 		const transform = cloneOverlayTransform(src.transform);
 		transform.position.x += DUPLICATE_OFFSET_NM; // nudge so the copy is visible
 		if (src.sourceKey) {

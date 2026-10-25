@@ -1,3 +1,4 @@
+import { v4 as uuidv4 } from 'uuid';
 /**
  * Plugin dev mode: link a plugin folder on disk and run it as-is on every Run. Owns the dev mode
  * setting, folder handles and permission state; reading the folder is `linkedPluginFolder.ts`,
@@ -207,7 +208,7 @@ export class PluginDevMode {
 	}
 
 	async #register(dir: FileSystemDirectoryHandle, read: LinkedFolderRead): Promise<PythonPlugin> {
-		const handleId = crypto.randomUUID();
+		const handleId = uuidv4();
 		const now = Date.now();
 		await this.#db.saveFileHandle({
 			id: handleId,
@@ -244,7 +245,7 @@ export class PluginDevMode {
 			);
 		}
 		const oldHandleId = plugin.linked!.handleId;
-		const handleId = crypto.randomUUID();
+		const handleId = uuidv4();
 		const now = Date.now();
 		await this.#db.saveFileHandle({
 			id: handleId,

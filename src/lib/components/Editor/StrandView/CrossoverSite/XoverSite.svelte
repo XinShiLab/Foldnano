@@ -1,12 +1,5 @@
 <script lang="ts">
-	import {
-		Group,
-		Line,
-		Rect,
-		Text,
-		type KonvaMouseEvent,
-		type KonvaPointerEvent,
-	} from 'svelte-konva';
+	import { Group, Line, Rect, Text, type KonvaPointerEvent } from 'svelte-konva';
 	// import { dimensions } from '../utils';
 	import type { CrossoverSite } from '$lib/model/Part/Part.svelte';
 	import { getDimensionContext } from '../drawingContext';
@@ -30,7 +23,7 @@
 			fromStrandSet: 0 | 1,
 			xoverInfo: CrossoverSite
 		) => boolean;
-		clickHandler?: (e: KonvaMouseEvent) => void;
+		clickHandler?: (e: KonvaPointerEvent) => void;
 		isHighlighted?: boolean;
 		strokeWidth: number;
 		fgColor: string;
@@ -124,7 +117,7 @@
 	{@const [x_num, y_num] = numberPos.get(variant) || [0, 0]}
 	<Text x={x_num} y={y_num} text={`${to}`} fontSize={5} fill={fgColor} perfectDrawEnabled={false} />
 {:else}
-	<Group onpointerover={onHoverIn} onpointerout={onHoverOut} onclick={clickHandler}>
+	<Group onpointerover={onHoverIn} onpointerout={onHoverOut} onpointerclick={clickHandler}>
 		<Rect {x} y={getClickBoxY(variant)} width={sideLength} height={sideLength} fill="transparent" />
 		<Line
 			{id}

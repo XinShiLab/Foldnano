@@ -6,6 +6,7 @@
 	import { getEditorViewContext } from '../../context/EditorViewContext.svelte';
 	import { getPlaneColor, planeColorAsCss } from '$lib/model/Part/planeColors';
 	import type { Part } from '$lib/model/Part';
+	import { regionHeaderGeometry } from './regionHeaderGeometry';
 
 	interface Props {
 		row: VisibleRegionHeaderRow;
@@ -16,8 +17,7 @@
 	const { row, maxBpIdx, part }: Props = $props();
 	const d = getDimensionContext();
 	const editorViewContext = getEditorViewContext();
-	const { dimensions, getRowYByRowIdx, getXByBpIdx } = d;
-	const { radius, sideLength, strokeWidth } = dimensions;
+	const { radius, strokeWidth } = d.dimensions;
 
 	// Header spans this region's own maxBase (clamped to the global max passed in
 	// for layout consistency), so a shorter region's header doesn't stretch across
@@ -25,9 +25,10 @@
 	const region = $derived(part.regions.find((r) => r.id === row.regionId));
 	const headerMaxBpIdx = $derived(Math.min(maxBpIdx, region ? region.maxBase : maxBpIdx));
 	const x = 2 * radius;
-	const y = $derived(getRowYByRowIdx(row.displayRow) - sideLength - 4);
-	const width = $derived(getXByBpIdx(headerMaxBpIdx) - x + sideLength * 2);
-	const height = sideLength * 2 + 8;
+	const geometry = $derived(regionHeaderGeometry(d, row.displayRow, headerMaxBpIdx));
+	const y = $derived(geometry.top);
+	const width = $derived(geometry.width);
+	const height = $derived(geometry.height);
 	const label = $derived(`${row.regionName} (${row.vhCount})`);
 	const isActive = $derived(editorViewContext.activeRegionId === row.regionId);
 	const activeAccentColor = '#7f1d1d';
@@ -42,11 +43,11 @@
 	const planeFill = $derived(planeColor ? `${planeColor}22` : canvasTheme.colors.vhFill);
 	const headerStroke = $derived(planeColor ?? canvasTheme.colors.vhStroke);
 
-	const iconSize = sideLength + 4;
-	const planeX = $derived(x - radius + width - iconSize - 10);
-	const iconY = $derived(y + (height - iconSize) / 2);
+	const iconSize = $derived(geometry.iconSize);
+	const planeX = $derived(geometry.iconLeft);
+	const iconY = $derived(geometry.iconTop);
 	const planeGlyphInset = 1;
-	const planeGlyphSize = iconSize - planeGlyphInset * 2;
+	const planeGlyphSize = $derived(iconSize - planeGlyphInset * 2);
 	const planeGlyphDotRadius = 1.5;
 	const chevronX = x + 2;
 	const chevronY = $derived(y + height / 2);

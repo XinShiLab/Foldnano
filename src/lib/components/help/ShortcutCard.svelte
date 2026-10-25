@@ -13,6 +13,7 @@
 
 	const ctx = getEditorViewContext();
 	const activeViewer = $derived(ctx.activeViewer);
+	const editorMode = $derived(ctx.editorMode);
 	// A popped-out editor lives in its own window, which the overlay does not cover.
 	const codeEditorOpen = $derived.by(() => {
 		if (!ctx.showSidePanel || !ctx.sidePanelTab.startsWith('plugin:')) return false;
@@ -82,6 +83,25 @@
 		{ keys: ['←↑↓→'], label: 'Pan view' },
 		{ keys: ['⇧', '←↑↓→'], label: 'Pan view faster' },
 	];
+
+	// Canvas gestures have no DOM control to hang a hover card on, so they are listed here.
+	const strandMouseRows = $derived([
+		...(editorMode === 'SELECT'
+			? [
+					{ keys: ['⇧', 'Click'], label: 'Add to selection' },
+					{ keys: ['Double-click'], label: 'Collapse region (header)' },
+				]
+			: []),
+		...(editorMode === 'SKIP' || editorMode === 'INSERT'
+			? [
+					{
+						keys: ['Double-click'],
+						label: `Remove ${editorMode === 'SKIP' ? 'skip' : 'insertion'}`,
+					},
+				]
+			: []),
+		{ keys: ['Right-click'], label: 'More actions' },
+	]);
 </script>
 
 {#snippet chordSection(title: string, rows: { keys: string[]; label: string }[])}
@@ -151,6 +171,7 @@
 		{@render section('Editor Modes', modeShortcuts)}
 		{#if activeViewer === 'STRAND'}
 			{@render chordSection('Strand View', strandNavShortcuts)}
+			{@render chordSection('Strand View Mouse', strandMouseRows)}
 			{@render section('Selection Filters', filterShortcuts)}
 		{/if}
 		{#if activeViewer === 'VIEW3D'}

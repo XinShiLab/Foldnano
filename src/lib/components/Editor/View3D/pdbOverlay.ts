@@ -1,3 +1,4 @@
+import { v4 as uuidv4 } from 'uuid';
 import type { Vec3 } from '$lib/model/geometry3d/types';
 import { computeBounds, type PdbChain, type PdbOverlay } from './externalStructureOverlay';
 
@@ -132,7 +133,7 @@ export function parsePdbOverlay(txt: string, name = 'PDB overlay'): PdbOverlay {
 	}
 
 	return {
-		id: crypto.randomUUID(),
+		id: uuidv4(),
 		name,
 		format: 'pdb',
 		pdbId,

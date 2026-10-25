@@ -653,7 +653,8 @@ const RANDOM_EDITS: Record<string, RandomEdit> = {
 
 describe('undo round-trip: random edits on real designs', () => {
 	for (const file of DESIGNS) {
-		it(file, () => {
+		// minitest3 takes ~2s locally and ran past the 5s default on a loaded CI runner.
+		it(file, { timeout: 30_000 }, () => {
 			// Rejected random edits log why (e.g. an occupied position); that's expected here.
 			vi.spyOn(console, 'error').mockImplementation(() => {});
 			const doc = FoldnanoDocument.fromJSON(JSON.parse(readFileSync(file, 'utf8')));

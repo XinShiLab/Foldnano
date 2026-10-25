@@ -63,7 +63,7 @@ strand viewer is the active viewer.
 
 *In-app shortcut overlay, opened with the ? key, listing Global and Editor Modes shortcuts.*
 
-The overlay is also the workspace help. Each visible pane and panel gets a short caption, and hovering over any control explains what it does, with a link to the matching guide page where there is one. You can keep working while it is open; press `?` or `Esc`, or click **Close** in the pill at the bottom of the screen, to close it. It opens by itself once, on your first visit, and you can also open it from **Workspace help** in the toolbar's Help menu (the **?** icon at the top right).
+The overlay is also the workspace help. Each visible pane and panel gets a short caption, and hovering over any control explains what it does, with a link to the matching guide page where there is one. In the strand view it also lists the mouse gestures for the current tool, and in Select mode it points at the first region header, its plane icon and a helix tag to explain what clicking or dragging them does. You can keep working while it is open; press `?` or `Esc`, or click **Close** in the pill at the bottom of the screen, to close it. It opens by itself once, on your first visit, and you can also open it from **Workspace help** in the toolbar's Help menu (the **?** icon at the top right).
 
 The overlay also shows shortcuts for the currently open side panel, here the Selection Tool's `c`/`t`/`e`/`x`/`d`/`o` filter and action keys:
 

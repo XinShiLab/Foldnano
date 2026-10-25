@@ -24,6 +24,13 @@ The same markdown also feeds three machine-facing outputs: the search index, the
 files and per-page `.md` files. All of them read pages through `listDocPages` / `findDocPage`
 in `src/lib/server/docsContent.ts`, the one place that globs `src/content`.
 
+## Layout
+
+`src/routes/docs/+layout.svelte` holds the header and the sidebar. The page list is one
+`pageLinks` snippet rendered in two places: the sticky sidebar (md+) and the menu-button panel
+under the header (below lg it carries the category tabs; below md also the page list). The panel
+closes on `afterNavigate`. Wide prose tables scroll horizontally below md (`src/app.css`).
+
 ## Search
 
 `DocsSearch` (header button, `⌘K` / `Ctrl K` / `/`) lazily fetches `/docs/search-index.json`

@@ -9,11 +9,6 @@ import {
 	fillSequenceToSegmentCmd,
 } from '../../commands/strands';
 
-// import { Segment } from '../../model/domain';
-// import type { Command } from '../services/tx';
-// import { parseRspString } from './utils';
-// import { breakOligoCmd } from '$lib/commands/strands';
-
 export function SequenceTool(): Tool {
 	return {
 		name: 'SEQUENCE',
@@ -24,12 +19,9 @@ export function SequenceTool(): Tool {
 				const hit = ctx.hit
 					.hitAt(downWorld, evt.directTargetId)
 					.filter((h) => filterKind.includes(h.kind));
-				// console.log('DrawTool: hit test result', hit);
-				// const hitGrid = hit.find((h) => h.kind === 'VH_GRID');
 				const hitSegment = hit.find((h) => h.kind === 'SEGMENT');
 				// if a segment is hit, break it
 				if (hitSegment && evt.button === 0 && hitSegment.id) {
-					// console.log('SequenceTool: segment hit - do nothing for now');
 					const segment = ctx.part.getSegmentById(hitSegment.id);
 					const oligo = segment?.oligo;
 					if (!segment || !oligo) return;
@@ -103,7 +95,6 @@ export function SequenceTool(): Tool {
 						);
 					}
 
-					// const filledSequence = segment?.fillRandomSequence();
 					return;
 				}
 			}

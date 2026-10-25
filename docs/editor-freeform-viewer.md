@@ -250,6 +250,7 @@ Those are current product boundaries, not just documentation gaps.
 - **Don't use parity helpers** (`isEvenParity`, `scaffoldStrandIndex`) on freeform VHs — they require lattice coords and will throw.
 - **Don't write `vh.localFrame` directly outside live drag.** The transient mutation during pointer-move is intentional but must end with one of the freeform commands so undo/redo captures it.
 - **Don't reuse the strand-view priority dispatch here.** This viewer handles Konva pointer events directly with a small handler set; cross-pollination duplicates state.
+- **Don't use Konva mouse events (`onclick`, `ondblclick`, `onmouse*`) on canvas shapes.** Konva fires them only for real mice, and it cancels `touchstart` on listening shapes, so iPad Safari never synthesizes the compat mouse events: Apple Pencil and finger taps are silently dropped. Use `onpointerclick` / `onpointerdblclick` / `onpointer*`, which fire for mouse, pen and touch alike.
 - **Don't connect a 3' to a 3'.** Connections are 3'→5' only — the directional convention is enforced by `createCrossoverCmd`.
 - **Don't render VHs from other regions.** Filter by `vh.regionId === region.id` so mixed-region parts work.
 - **Don't apply lab-frame plane transforms in this 2D pane.** Use `View3D` for that.

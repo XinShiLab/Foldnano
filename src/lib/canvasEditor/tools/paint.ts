@@ -7,7 +7,6 @@ export function PaintTool(): Tool {
 		name: 'PAINT',
 		onPointer(evt: PointerEvt, ctx: ViewContext) {
 			if (evt.type === 'down' && evt.button === 0) {
-				// console.log('DrawTool: pointer down at', evt.clientX, evt.clientY);
 				const downWorld = ctx.camera.toWorld(evt.clientX, evt.clientY);
 				const paintParams: PaintOligoParams[] = [];
 				// check if selection is empty
@@ -33,9 +32,6 @@ export function PaintTool(): Tool {
 					const hit = ctx.hit
 						.hitAt(downWorld, evt.directTargetId)
 						.filter((h) => filterKind.includes(h.kind));
-					// console.log('DrawTool: hit test result', hit);
-					// const hitGrid = hit.find((h) => h.kind === 'VH_GRID');
-					// const hitSegment = hit.find((h) => h.kind === 'SEGMENT');
 					const hitOligo = hit.find((h) => h.kind === 'OLIGO');
 					// if a segment is hit, break it
 					if (hitOligo && hitOligo.id && evt.button === 0) {

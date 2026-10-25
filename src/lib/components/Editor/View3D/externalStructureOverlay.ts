@@ -1,3 +1,4 @@
+import { v4 as uuidv4 } from 'uuid';
 import type { Vec3 } from '$lib/model/geometry3d/types';
 
 export type ExternalStructureFormat = 'mrdna' | 'pdb';
@@ -254,7 +255,7 @@ export function parseMrdnaOverlay(txt: string, name = 'mrDNA overlay'): MrdnaOve
 	const threePrimeTerminalIds = rows.flatMap((row, id) => (row.threePrimeIdx === -1 ? [id] : []));
 
 	return {
-		id: crypto.randomUUID(),
+		id: uuidv4(),
 		name,
 		format: 'mrdna',
 		nodes,

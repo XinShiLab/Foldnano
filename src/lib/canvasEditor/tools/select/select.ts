@@ -1,4 +1,4 @@
-import type { PointerEventType, PointerEvt, Tool } from '..';
+import type { PointerEventType, Tool } from '..';
 import type { Category, HitResult, LeafTarget } from '../../core/modes';
 import type { ViewContext } from '../../core/views';
 import { createEndHandler } from './handlers/onEnd';
@@ -98,7 +98,6 @@ export function SelectTool(): Tool {
 					active.reset?.();
 					active = null;
 					activeHit = null;
-					// console.log('SelectTool: cleared active handler on ', type);
 				}
 				return;
 			}
@@ -112,9 +111,6 @@ export function SelectTool(): Tool {
 			// Walk hits by priority and try handlers
 			for (const hit of hits) {
 				const key = hit.kind as string;
-				// if(type === 'down') {
-				//   console.log(`SelectTool: trying handler for kind ${key} on event ${type}`, evt, hit);
-				// }
 				const handler = instances.get(key) ?? wildcard;
 				if (!handler) continue;
 
@@ -159,14 +155,5 @@ export function SelectTool(): Tool {
 			hideMarquee(ctx);
 			removeMoveEndBox(ctx);
 		},
-	};
-}
-
-/* ===================== Utilities (stubs or real ones) ===================== */
-
-export function modifiers(evt: PointerEvt) {
-	return {
-		multi: !!(evt.shiftKey || evt.ctrlKey || evt.metaKey),
-		precise: !!evt.altKey,
 	};
 }

@@ -1,4 +1,3 @@
-import type Konva from 'konva';
 import type { EditorMode } from '../core/modes';
 import type { ViewContext } from '../core/views';
 import { reportError } from '$lib/errorReporting';
@@ -27,8 +26,6 @@ export interface Tool {
 	onExit?(ctx: ViewContext): void;
 	onPointer?(evt: PointerEvt, ctx: ViewContext): void;
 	onKey?(e: KeyboardEvent, ctx: ViewContext): void;
-	mountOverlay?(layer: Konva.Layer, ctx: ViewContext): void;
-	unmountOverlay?(layer: Konva.Layer, ctx: ViewContext): void;
 }
 
 // New: behavior plugin interface
@@ -72,9 +69,7 @@ export class ToolController {
 	setMode(m: EditorMode) {
 		if (m === this.active.name) return;
 		this.active.onExit?.(this.ctx);
-		// this.active?.unmountOverlay?.(this.ctx.overlay, this.ctx);
 		this.active = this.require(m);
-		// this.active?.mountOverlay?.(this.ctx.overlay, this.ctx);
 		this.active.onEnter?.(this.ctx);
 	}
 

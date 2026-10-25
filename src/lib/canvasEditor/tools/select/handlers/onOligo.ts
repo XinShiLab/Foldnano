@@ -58,13 +58,6 @@ export function createOligoHandler(): HandlerInstance {
 
 			return true; // handled; tool will delegate to WITH_SELECTION
 		},
-		// move() {
-		//   console.log('OLIGO move');
-		//   return false;
-		// },
-		// up() { return false; },
-
-		// contextmenu handler removed - now handled by ContextMenuBehavior
 
 		reset() {
 			/* no local moving state */

@@ -1,11 +1,6 @@
 import type { HandlerInstance } from '../../types';
-// import { clearAllTempParts } from './drawTempPartsOps';
-// remove movingEndsOps imports (delegated now)
-// import { commitMovingEnds, resetMoveState, startMovingEnds, updateMovingEnds } from './movingEndsOps';
 
 export function createSegmentHandler(): HandlerInstance {
-	// remove per-handler moving state
-	// const movingEnds = { ... };
 	return {
 		kind: 'SEGMENT',
 
@@ -39,8 +34,6 @@ export function createSegmentHandler(): HandlerInstance {
 		// movement handled by WITH_SELECTION
 
 		// up(evt, ctx) { clearAllTempParts(ctx); return true; },
-
-		// contextmenu handler removed - now handled by ContextMenuBehavior
 
 		reset() {
 			/* no moving state now */

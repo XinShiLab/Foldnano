@@ -193,6 +193,15 @@
 	content: none;
 }
 
+/* Wide tables scroll inside the column instead of widening the page on phones.
+   Desktop keeps display: table so tables still stretch to the column width. */
+@media (width < 48rem) {
+	.prose table {
+		display: block;
+		overflow-x: auto;
+	}
+}
+
 @media print {
 	html {
 		font-size: 12pt;

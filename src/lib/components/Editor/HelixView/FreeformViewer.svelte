@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
 	import { Stage, Layer, Group, Rect, Arrow, Text, Line, Circle } from 'svelte-konva';
-	import type { Stage as StageType, KonvaMouseEvent, KonvaPointerEvent } from 'svelte-konva';
+	import type { Stage as StageType, KonvaPointerEvent } from 'svelte-konva';
 	import type { Part } from '$lib/model/Part/Part.svelte';
 	import { FreeformRegion, type DesignRegion } from '$lib/model/Part/DesignRegion';
 	import { handleWheel } from '../mouseHandler';
@@ -408,7 +408,7 @@
 		}
 	}
 
-	function onBackgroundDblClick(e: KonvaMouseEvent) {
+	function onBackgroundDblClick(e: KonvaPointerEvent) {
 		if (editorMode !== 'DRAW') return;
 		if (e.target !== e.currentTarget) return;
 		const stage = e.target.getStage();
@@ -786,7 +786,7 @@
 				height={CANVAS_H}
 				fill="transparent"
 				onpointerdown={onBackgroundPointerDown}
-				ondblclick={onBackgroundDblClick}
+				onpointerdblclick={onBackgroundDblClick}
 			/>
 
 			<!-- In-plane axes at local (0,0) — labelled U/V to match the plane's local frame -->

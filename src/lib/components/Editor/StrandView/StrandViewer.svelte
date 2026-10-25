@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Stage, Layer, type KonvaMouseEvent, Group, Rect } from 'svelte-konva';
+	import { Stage, Layer, type KonvaPointerEvent, Group, Rect } from 'svelte-konva';
 	import { handleWheel } from '../mouseHandler';
 	import { KonvaCamera } from '$lib/canvasEditor/services/cameraKonva';
 	import { onMount } from 'svelte';
@@ -39,6 +39,7 @@
 	import { createContextMenuBehavior } from '../../../canvasEditor/tools/behaviors/contextMenu';
 	import BlockLayer from './BlockLayer.svelte';
 	import { help } from '$lib/components/help/help';
+	import { registerStrandCanvasHelp } from './strandCanvasHelp';
 
 	interface Props {
 		part: Part;
@@ -46,6 +47,7 @@
 	let { part }: Props = $props();
 
 	const editorViewContext = getEditorViewContext();
+	let viewerEl = $state<HTMLDivElement>();
 	let viewerWidth = $state(1000);
 	let viewerHeight = $state(800);
 	const strandToolbarController = $state({
@@ -202,10 +204,10 @@
 		}
 	});
 
-	function forward(type: PointerEventType, e: KonvaMouseEvent) {
+	function forward(type: PointerEventType, e: KonvaPointerEvent) {
 		if (editorViewContext.editorMode === 'PAN') return;
 
-		const dom = e.evt as MouseEvent;
+		const dom = e.evt;
 		if (type === 'down' && dom.button !== 0) {
 			return;
 		}
@@ -224,7 +226,8 @@
 		controller.handlePointer({
 			directTargetId: (e.target as Konva.Node).getAttr('id'),
 			type,
-			button: dom.button,
+			// pointermove reports -1 ("no button change") where mousemove reported 0; tools expect 0.
+			button: dom.button === -1 ? 0 : dom.button,
 			altKey: dom.altKey,
 			shiftKey: dom.shiftKey,
 			ctrlKey: dom.ctrlKey,
@@ -292,6 +295,14 @@
 			: dimensions.sideLength * 2
 	);
 
+	// Canvas help notes exist only while help is open; header and tag gestures are Select-only.
+	$effect(() => {
+		const node = stage?.node;
+		if (!editorViewContext.showShortcuts || editorViewContext.editorMode !== 'SELECT') return;
+		if (!viewerEl || !node) return;
+		return registerStrandCanvasHelp(viewerEl, node, d, part);
+	});
+
 	// Forwards keyboard events into the active tool (e.g. SplitRegionTool's
 	// Escape-to-cancel). Editor.svelte's global handler covers mode switches and
 	// selection clearing; this only reaches per-tool `onKey` behavior.
@@ -308,6 +319,7 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <div
+	bind:this={viewerEl}
 	class="relative m-2 h-full w-full overflow-hidden"
 	{@attach help({
 		area: true,
@@ -363,10 +375,11 @@
 		<Layer
 			bind:this={overlay}
 			listening={true}
-			onmousedown={(e) => forward('down', e)}
-			onmousemove={(e) => forward('move', e)}
-			onmouseup={(e) => forward('up', e)}
-			onmouseleave={(e) => forward('cancel', e)}
+			onpointerdown={(e) => forward('down', e)}
+			onpointermove={(e) => forward('move', e)}
+			onpointerup={(e) => forward('up', e)}
+			onpointerleave={(e) => forward('cancel', e)}
+			onpointercancel={(e) => forward('cancel', e)}
 			oncontextmenu={(e) => {
 				e.evt.preventDefault();
 				forward('contextmenu', e);
