@@ -273,6 +273,20 @@ Concrete types:
 - `potentialXoverSites(vhIdx)`
 - `addVhAtCoords(part, col, row)`
 - region-local lattice frame generation via `getHelixXY(...)`
+- `autoStaple()`
+
+#### Auto-staple vs cadnano2
+
+`autoStaple()` follows cadnano2's `Part.autoStaple` outline (lay staple strands over contiguous
+scaffold, then crossover at potential staple crossover sites) but is not a port; the same scaffold
+can yield different staples. The user guide (`src/content/guide/04-creating-a-design.md` §
+Auto-Staple) states only this general claim — keep it in sync if the rules change.
+
+|                  | cadnano2                                                                                                     | Foldnano                                                                              |
+| ---------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
+| Existing staples | Removes every staple oligo first                                                                             | Kept; only VHs whose staple strand set is empty get filled                            |
+| Site filter      | Staple must span `[idx-1, idx+2]`; no scaffold xover at `idx-4` / `idx+5`; edge-xover checks at `idx±1`/`±2` | Both sides occupied, and ≥ 6 bp from every scaffold segment end and VH end            |
+| Building staples | Deletes temp strands, recreates them split at chosen sites, then joins with `createXover`                    | `breakOligoAt` on existing oligos, then `createCrossover`; skips already-joined sites |
 
 ### FreeformRegion
 
