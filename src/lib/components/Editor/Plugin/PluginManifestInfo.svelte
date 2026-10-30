@@ -4,6 +4,7 @@
 	import { ANY_HOST } from '$lib/plugin/networkPolicy';
 	import { PYODIDE_VERSION } from '$lib/plugin/worker/pyodideConfig';
 	import { Info, ShieldCheck } from '@lucide/svelte';
+	import PluginCitations from './PluginCitations.svelte';
 
 	let { manifest }: { manifest: PluginManifest } = $props();
 
@@ -159,4 +160,10 @@
 			<strong>Apply</strong>.
 		</span>
 	</div>
+
+	{#if manifest.citations?.length}
+		<div class="ml-5">
+			<PluginCitations citations={manifest.citations} />
+		</div>
+	{/if}
 </div>

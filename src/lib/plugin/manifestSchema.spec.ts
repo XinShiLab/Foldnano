@@ -3,6 +3,7 @@ import path from 'node:path';
 import Ajv2020 from 'ajv/dist/2020';
 import { describe, expect, it } from 'vitest';
 import {
+	MANIFEST_CITATION_FIELDS,
 	MANIFEST_SCHEMA_VERSION,
 	MANIFEST_V1_NESTED_FIELDS,
 	manifestFieldsFor,
@@ -137,6 +138,42 @@ describe('fplugin JSON Schema', () => {
 			expect(() => validateManifest(manifest, { allowNoEntrypoint: true })).toThrow(/"icon"/);
 		}
 	);
+
+	it('accepts "citations" only at schemaVersion 2, like the app', () => {
+		const v2 = {
+			...PACKAGED_V2,
+			citations: [
+				{ text: 'A paper', doi: '10.1073/pnas.2406769121' },
+				{ text: 'Some software', url: 'https://example.org/tool' },
+				{ text: 'No link' },
+			],
+		};
+		expect(schemaErrors(v2)).toEqual([]);
+		expect(() => validateManifest(v2, { allowNoEntrypoint: true })).not.toThrow();
+		const v1 = { ...v2, schemaVersion: 1 };
+		expect(schemaErrors(v1)).not.toEqual([]);
+		expect(() => validateManifest(v1, { allowNoEntrypoint: true })).toThrow(/schemaVersion/);
+	});
+
+	it('lists exactly the citation fields validateManifest allows', () => {
+		const citations = schema.properties.citations as { items: JsonSchemaObject };
+		expect(keys(citations.items)).toEqual([...MANIFEST_CITATION_FIELDS].sort());
+	});
+
+	it.each([
+		['too many entries', Array(11).fill({ text: 'A' })],
+		['missing text', [{ doi: '10.1000/x' }]],
+		['blank text', [{ text: '  ' }]],
+		['overlong text', [{ text: 'x'.repeat(501) }]],
+		['an unknown field', [{ text: 'A', year: 2024 }]],
+		['both doi and url', [{ text: 'A', doi: '10.1000/x', url: 'https://a.org' }]],
+		['a doi link', [{ text: 'A', doi: 'https://doi.org/10.1000/x' }]],
+		['a non-https url', [{ text: 'A', url: 'http://a.org' }]],
+	])('agrees with the app on citations with %s', (_label, citations) => {
+		const manifest = { ...PACKAGED_V2, citations };
+		expect(schemaErrors(manifest)).not.toEqual([]);
+		expect(() => validateManifest(manifest, { allowNoEntrypoint: true })).toThrow();
+	});
 
 	it('rejects a format/applyStrategy mismatch', () => {
 		expect(schemaErrors({ ...scriptLabManifest, applyStrategy: 'replacePart' })).not.toEqual([]);

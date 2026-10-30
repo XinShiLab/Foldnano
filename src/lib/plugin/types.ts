@@ -93,6 +93,16 @@ export interface PluginSidePanelInput {
 	filename?: string;
 }
 
+/** A reference the plugin's author asks users to cite. Links to either a DOI or a URL, not both. */
+export interface PluginCitation {
+	/** Formatted reference, shown as plain text */
+	text: string;
+	/** Bare DOI, e.g. "10.1073/pnas.2406769121" */
+	doi?: string;
+	/** HTTPS link, for work without a DOI */
+	url?: string;
+}
+
 /**
  * The manifest schema for a .fplugin.json file.
  */
@@ -128,6 +138,8 @@ export interface PluginManifest {
 	description?: string;
 	/** Path of an SVG icon inside the plugin zip (schemaVersion 2). Overrides `sidePanel.icon`. */
 	icon?: string;
+	/** References the author asks users to cite (schemaVersion 2) */
+	citations?: PluginCitation[];
 	/** User-configurable parameters shown in the run dialog */
 	parameters?: PluginParamDef[];
 	/** Host-rendered side panel requested by the plugin */

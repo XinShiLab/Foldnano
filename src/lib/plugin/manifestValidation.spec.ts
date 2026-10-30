@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
 	MANIFEST_SCHEMA_VERSION,
 	SUPPORTED_REQUIREMENTS_ALLOWLIST,
+	citationLink,
 	classifyManifest,
 	validateManifest,
 } from './manifestValidation';
@@ -98,6 +99,52 @@ describe('validateManifest', () => {
 			expect(() => validateManifest({ ...base(), icon: 'icon.svg' })).toThrow(
 				/"icon" needs "schemaVersion": 2/
 			);
+		});
+
+		it('accepts "citations" at v2 and refuses it at v1', () => {
+			const citations = [{ text: 'A paper', doi: '10.1073/pnas.2406769121' }];
+			expect(validateManifest({ ...base(), schemaVersion: 2, citations }).citations).toEqual(
+				citations
+			);
+			expect(() => validateManifest({ ...base(), citations })).toThrow(
+				/"citations" needs "schemaVersion": 2/
+			);
+		});
+
+		it.each([
+			['not an array', 'A paper', /must be an array/],
+			['too many entries', Array(11).fill({ text: 'A paper' }), /at most 10/],
+			['a string entry', ['A paper'], /must be an object/],
+			['missing text', [{ doi: '10.1000/x' }], /non-empty string "text"/],
+			['blank text', [{ text: '  ' }], /non-empty string "text"/],
+			['overlong text', [{ text: 'x'.repeat(501) }], /at most 500/],
+			['an unknown field', [{ text: 'A paper', year: 2024 }], /Unknown field "year"/],
+			['both doi and url', [{ text: 'A', doi: '10.1000/x', url: 'https://a.org' }], /not both/],
+			['a doi link', [{ text: 'A', doi: 'https://doi.org/10.1000/x' }], /bare DOI/],
+			['a non-https url', [{ text: 'A', url: 'javascript:alert(1)' }], /must start with https/],
+		])('rejects citations with %s', (_label, citations, message) => {
+			expect(() => validateManifest({ ...base(), schemaVersion: 2, citations })).toThrow(message);
+		});
+	});
+
+	describe('citationLink', () => {
+		it('always links a DOI through doi.org', () => {
+			expect(citationLink({ text: 'A', doi: '10.1073/pnas.2406769121' })).toEqual({
+				href: 'https://doi.org/10.1073/pnas.2406769121',
+				label: 'doi.org/10.1073/pnas.2406769121',
+			});
+			expect(citationLink({ text: 'A', doi: '10.1000/a#b?c' })?.href).toBe(
+				'https://doi.org/10.1000/a%23b%3Fc'
+			);
+		});
+
+		it('links only https URLs', () => {
+			expect(citationLink({ text: 'A', url: 'https://example.org/p' })).toEqual({
+				href: 'https://example.org/p',
+				label: 'example.org/p',
+			});
+			expect(citationLink({ text: 'A', url: 'javascript:alert(1)' })).toBeNull();
+			expect(citationLink({ text: 'A' })).toBeNull();
 		});
 	});
 

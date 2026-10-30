@@ -26,13 +26,14 @@ covers:
 	"entrypointUrl": "/plugins/my_plugin/my_plugin.zip",
 	"requirements": ["numpy"],
 	"description": "Optional description shown in the plugin panel.",
-	"icon": "icon.svg"
+	"icon": "icon.svg",
+	"citations": [{ "text": "Author, A. and Author, B., Journal, 2026, 1(2), p.3.", "doi": "10.1234/example" }]
 }
 ```
 
 | Field | Required | Notes |
 | --- | --- | --- |
-| `schemaVersion` | Recommended | Manifest schema version, currently `2`. Read as `1` when missing, but include it; `icon` needs `2`. Not your plugin's version; see [Versioning](#versioning-and-unknown-fields). |
+| `schemaVersion` | Recommended | Manifest schema version, currently `2`. Read as `1` when missing, but include it; `icon` and `citations` need `2`. Not your plugin's version; see [Versioning](#versioning-and-unknown-fields). |
 | `$schema` | No | Link to the [published JSON Schema](#machine-readable-schema) for editor support. Ignored by Foldnano. |
 | `id` | Yes | Unique key used by the registry. Starts with a letter, then letters, digits, `.`, `_` or `-`, up to 64 characters; kebab-case such as `my-plugin` is recommended. Checked when the plugin is installed. |
 | `name` | Yes | Display name in the panel. |
@@ -45,6 +46,7 @@ covers:
 | `network` | No | Hosts your plugin may contact, or `["*"]` for any HTTPS host. Omit it for no network access; see [Network access](#network-access). |
 | `description` | No | Human-readable description. |
 | `icon` | No | Path of an SVG icon inside your zip, such as `"icon.svg"`. Needs `"schemaVersion": 2`; see [Plugin icon](#plugin-icon). |
+| `citations` | No | Papers you ask users to cite. Needs `"schemaVersion": 2`; see [Citations](#citations). |
 | `parameters` | No | Array of `PluginParamDef`: user-configurable inputs shown in a run dialog. |
 | `sidePanel` | No | Optional host-rendered side panel request. Supports `form` and `codeEditor` UIs. |
 | `x-…` | No | Your own metadata (for example `"x-homepage"`). Allowed at the top level only; ignored by Foldnano. |
@@ -64,11 +66,11 @@ The only case where inline `entrypoint` is allowed is a `sidePanel.codeEditor` p
 
 `schemaVersion` tells Foldnano which version of this manifest format you wrote against. It is separate from `version`, which is your plugin's own release number.
 
-- A manifest without `schemaVersion` is read as version 1, so plugins written before the Foldnano beta keep working. Include `"schemaVersion"` anyway: fields added later (such as `icon` in version 2) only work once you declare the version that introduced them.
+- A manifest without `schemaVersion` is read as version 1, so plugins written before the Foldnano beta keep working. Include `"schemaVersion"` anyway: fields added later (such as `icon` and `citations` in version 2) only work once you declare the version that introduced them.
 - A manifest with a higher `schemaVersion` than the running app supports is refused with a request to update Foldnano, rather than having its newer fields silently ignored.
 - Unknown fields are rejected, at every level, so a typo such as `"netwrok"` fails loudly instead of quietly doing nothing. Put your own metadata in top-level fields starting with `x-`.
 
-When a field is added, `schemaVersion` goes up and the new schema is published next to the old one. Existing fields never change meaning between versions, so a manifest that works today keeps meaning the same thing.
+When a field is added, `schemaVersion` normally goes up and the new schema is published next to the old one. During the beta, an optional field that only affects what is displayed can join the current version instead, as `citations` did. Existing fields never change meaning between versions, so a manifest that works today keeps meaning the same thing.
 
 ### Machine-readable schema
 
@@ -77,7 +79,7 @@ Each manifest schema version has a JSON Schema (draft 2020-12), published with t
 | Schema version | Schema |
 | --- | --- |
 | 1 | [`/schemas/fplugin-v1.schema.json`](/schemas/fplugin-v1.schema.json) |
-| 2 | [`/schemas/fplugin-v2.schema.json`](/schemas/fplugin-v2.schema.json) (adds `icon`) |
+| 2 | [`/schemas/fplugin-v2.schema.json`](/schemas/fplugin-v2.schema.json) (adds `icon` and `citations`) |
 
 Point `$schema` in your manifest at the one matching your `schemaVersion` (for example `"$schema": "https://<foldnano-host>/schemas/fplugin-v2.schema.json"`) and editors such as VS Code will autocomplete fields and flag mistakes as you type. The schema checks structure, types and the `format`/`applyStrategy` pairing. Foldnano checks a little more when installing (allowed URLs, field defaults and ranges, parameters versus side panel forms), so a manifest can pass the schema and still be refused; the install error says why.
 
@@ -142,6 +144,28 @@ The icon appears on your plugin's sidebar tab and on its row in the Plugins list
 - The path is relative to the zip root (`"icon.svg"` or `"assets/icon.svg"`) and ends in `.svg`.
 
 Foldnano draws the icon in a single colour that follows the app theme, so design it as a monochrome glyph. A 24×24 stroke icon in the style of [Lucide](https://lucide.dev) fits in well. Code-editor plugins with `execution: "entrypoint"` have no zip, so they can't use `icon`.
+
+### Citations
+
+List the papers you would like people to cite when they use your plugin in their work:
+
+```json
+"schemaVersion": 2,
+"citations": [
+	{
+		"text": "Aksel, T., J. Navarro, E., Fong, N. and Douglas, S.M., Proceedings of the National Academy of Sciences, 2024, 121(48), p.e2406769121.",
+		"doi": "10.1073/pnas.2406769121"
+	},
+	{ "text": "My Plugin source code, version 1.0.", "url": "https://example.org/my-plugin" }
+]
+```
+
+Users see citations when they review your plugin before installing it, and when they click its name in **My Plugins**.
+
+- `text` is required and shown as plain text, at most 500 characters. Format the reference however you like.
+- `doi` is a bare DOI such as `10.1073/pnas.2406769121`, without `https://doi.org/`. Foldnano builds the link.
+- `url` is an `https://` link for work without a DOI. Set `doi` or `url`, not both; both are optional.
+- List at most 10 references.
 
 ### Code-editor execution modes
 

@@ -1,9 +1,15 @@
 {
-	"schemaVersion": 1,
+	"schemaVersion": 2,
 	"id": "pyOrigamiBreak",
 	"name": "pyOrigamiBreak — Staple Auto-Break",
-	"version": "1.0.2",
-	"description": "Optimises staple break positions using thermodynamic (dG) scoring. Based on Mauthe et al. PNAS 2023.",
+	"version": "1.0.3",
+	"description": "Optimises staple break positions using thermodynamic (dG) scoring.",
+	"citations": [
+		{
+			"text": "Aksel, T., J. Navarro, E., Fong, N. and Douglas, S.M., Proceedings of the National Academy of Sciences, 2024, 121(48), p.e2406769121.",
+			"doi": "10.1073/pnas.2406769121"
+		}
+	],
 	"format": "cadnano_json",
 	"applyStrategy": "replaceRegion",
 	"entrypointUrl": "/plugins/pyOrigamiBreak/pyOrigamiBreak.zip",
