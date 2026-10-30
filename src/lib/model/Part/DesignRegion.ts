@@ -3,7 +3,7 @@ import VirtualHelix from '../VirtualHelix';
 import {
 	getHelixXY,
 	normalizeVec,
-	radial0ForAxis,
+	referenceRadial0,
 	type VirtualHelixFrame,
 } from '../geometry3d/dnaGeometry';
 import type { CrossoverSite, Part } from './Part.svelte';
@@ -661,7 +661,7 @@ export class FreeformRegion extends DesignRegion {
 		vh.localFrame = {
 			origin: { x: start[0], y: start[1], z: start[2] },
 			axis,
-			radial0: radial0ForAxis(axis),
+			radial0: referenceRadial0(axis),
 		};
 		if (!this.vhOrder.includes(vh.id)) this.vhOrder.push(vh.id);
 		part.syncListRows();

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Stage } from 'svelte-konva';
-	import { Shrink, ImageDown, Trash2 } from '@lucide/svelte/icons';
+	import { Shrink, ImageDown, Trash2, CircleDashed, CircleDotDashed } from '@lucide/svelte/icons';
 	import * as ButtonGroup from '$lib/components/ui/button-group/index.js';
 	import * as Separator from '$lib/components/ui/separator/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -13,7 +13,10 @@
 	import {
 		deleteLatticeVirtualHelicesCmd,
 		deleteFreeformVirtualHelicesCmd,
+		moveFreeformVirtualHelicesCmd,
 	} from '$lib/commands/virtualHelix';
+	import { planRadialDistribute } from './radialDistribute';
+	import type VirtualHelix from '$lib/model/VirtualHelix/VirtualHelix.svelte';
 
 	interface Props {
 		stage: Stage | undefined;
@@ -27,6 +30,23 @@
 	const hasVhSelection = $derived(
 		ctx.selectedLatticeVhIndices.size > 0 || ctx.selectedFreeformVhIndices.size > 0
 	);
+
+	const selectedFreeformVhsInActiveRegion = $derived.by(() => {
+		const part = session.currentDoc.parts[0];
+		const activeRegion = ctx.activeRegion;
+		if (!part || activeRegion?.kind !== 'FREEFORM') return [];
+		return Array.from(ctx.selectedFreeformVhIndices)
+			.map((vhIndex) => part.getVhByIndex(vhIndex))
+			.filter((vh): vh is VirtualHelix => vh?.regionId === activeRegion.id);
+	});
+	const canDistributeRadially = $derived(
+		ctx.isTabOwner && planRadialDistribute(selectedFreeformVhsInActiveRegion) !== null
+	);
+
+	function distributeRadially(faceCenter: boolean) {
+		const moves = planRadialDistribute(selectedFreeformVhsInActiveRegion, { faceCenter });
+		if (moves) moveFreeformVirtualHelicesCmd({ moves }, session.historyStack);
+	}
 
 	function resetScale(viewer: Stage | undefined) {
 		if (!viewer) return;
@@ -104,6 +124,30 @@
 				})}
 			>
 				<Trash2 />
+			</Button>
+			<Button
+				variant="outline"
+				size="icon-sm"
+				title="Distribute in a circle"
+				disabled={!canDistributeRadially}
+				onclick={() => distributeRadially(false)}
+				{@attach help({
+					text: 'Space three or more selected perpendicular helices evenly on a circle around their centre, keeping their order and roll.',
+				})}
+			>
+				<CircleDashed />
+			</Button>
+			<Button
+				variant="outline"
+				size="icon-sm"
+				title="Distribute in a circle, facing the centre"
+				disabled={!canDistributeRadially}
+				onclick={() => distributeRadially(true)}
+				{@attach help({
+					text: 'Like Distribute in a circle, and also rolls each helix so roll 0 points at the centre.',
+				})}
+			>
+				<CircleDotDashed />
 			</Button>
 		</ButtonGroup.Root>
 	</div>

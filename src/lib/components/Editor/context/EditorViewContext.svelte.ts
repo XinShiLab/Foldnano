@@ -795,6 +795,8 @@ export class EditorViewContext {
 type PlaneVec3 = { x: number; y: number; z: number };
 type PlaneTransformDef = { origin: PlaneVec3; u: PlaneVec3; v: PlaneVec3; normal: PlaneVec3 };
 
+// Every basis must be right-handed (u × v = normal; `isRightHandedBasis`): a mirrored plane
+// reverses the helix twist in 3D and export relative to the 2D layout.
 export const BASIS_PLANE_TRANSFORMS: Record<'XY' | 'XZ' | 'YZ', PlaneTransformDef> = {
 	XY: {
 		origin: { x: 0, y: 0, z: 0 },
@@ -811,7 +813,7 @@ export const BASIS_PLANE_TRANSFORMS: Record<'XY' | 'XZ' | 'YZ', PlaneTransformDe
 	YZ: {
 		origin: { x: 0, y: 0, z: 0 },
 		u: { x: 0, y: 1, z: 0 },
-		v: { x: 0, y: 0, z: -1 },
+		v: { x: 0, y: 0, z: 1 },
 		normal: { x: 1, y: 0, z: 0 },
 	},
 };

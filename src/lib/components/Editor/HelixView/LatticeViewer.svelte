@@ -25,9 +25,10 @@
 		region: LatticedDesignRegion;
 		canvasWidth: number;
 		canvasHeight: number;
+		onIdleClick?: () => void;
 	}
 
-	const { part, region, canvasWidth, canvasHeight }: Props = $props();
+	const { part, region, canvasWidth, canvasHeight, onIdleClick }: Props = $props();
 
 	const numOfCols = 32;
 	const numOfRows = 30;
@@ -199,7 +200,10 @@
 					)
 				: 0;
 			if (distancePx < dragThresholdPx) {
-				if (!activeMarquee.additive) editorViewContext.clearSelectedLatticeVhs();
+				if (!activeMarquee.additive) {
+					if (selectedVhIndices.size === 0) onIdleClick?.();
+					editorViewContext.clearSelectedLatticeVhs();
+				}
 			} else {
 				const rect = normalizedRect(activeMarquee.startLayer, activeMarquee.currentLayer);
 				const marqueeBounds = {

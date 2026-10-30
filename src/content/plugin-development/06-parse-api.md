@@ -96,6 +96,7 @@ All of these import from `foldnano` (and the two functions from `foldnano.io`).
 | `vh.is_freeform` | read‑only | True when it has no lattice position. |
 | `vh.parity_is_even` | read‑only | True when `row % 2 == col % 2`. Raises `ValueError` on a freeform helix. |
 | `vh.local_frame` | read‑only | A freeform helix's placement (`origin`, `axis`, `radial0`), or `None`. |
+| `vh.roll_deg` | read‑only | A freeform helix's rotation about its own axis, in degrees (-180 to 180], or `None`. 0 points `radial0` along the region plane's normal; positive turns right-handed about the axis. |
 | `vh.list_row` | read‑only | Its row in the strand view, or `None`. |
 | `vh.strand_set_segment_ids` | read‑only | `[strand 0 ids, strand 1 ids]`: the segments on each strand. |
 

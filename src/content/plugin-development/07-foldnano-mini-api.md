@@ -80,9 +80,9 @@ Arguments named `vh` take a helix object or its index. `strand_index` is 0 (base
 | `part.remove_oligo(oligo)` | **edit** | Remove the oligo and all its segments. **Records** `remove_oligo`. |
 | `part.remove_vhs([vh, ...])` | **edit** | Remove helices and everything on them; oligos passing through are split where they lose segments. **Records** `remove_vhs`. |
 | `part.reorder_vh(vh, target_region_row)` | **edit** | Move a helix to another row (0-based) within its region's list. **Records** `reorder_vh`. |
-| `part.add_region(kind, name, max_base, *, min_base=0, plane_origin=..., plane_u=..., plane_v=..., plane_normal=..., plane_name=None, step=None, turns_per_step=None, sub_step_size=None, twist_offset=None)` | **edit** | A new region (`'HONEYCOMB'`, `'SQUARE'` or `'FREEFORM'`) on its own new plane; lattice settings default per kind. Returns the region. **Records** `add_region_and_plane`. |
+| `part.add_region(kind, name, max_base, *, min_base=0, plane_origin=..., plane_u=..., plane_v=..., plane_normal=..., plane_name=None, step=None, turns_per_step=None, sub_step_size=None, twist_offset=None)` | **edit** | A new region (`'HONEYCOMB'`, `'SQUARE'` or `'FREEFORM'`) on its own new plane; lattice settings default per kind. The plane basis must be right-handed (`plane_u` × `plane_v` along `plane_normal`), or it raises `ValueError`. Returns the region. **Records** `add_region_and_plane`. |
 | `part.split_region(region, split_after_vh)` | **edit** | Split a region after the given helix; the helices after it move to a new region with a copy of the plane. Returns the new region. **Records** `split_region`. |
-| `part.set_plane_transform(plane_id, origin, u, v, normal)` | **edit** | Move a plane: each vector is `(x, y, z)` or `{x, y, z}`. **Records** `transform_plane`. |
+| `part.set_plane_transform(plane_id, origin, u, v, normal)` | **edit** | Move a plane: each vector is `(x, y, z)` or `{x, y, z}`. The basis must be right-handed (`u` × `v` along `normal`); a mirrored one raises `ValueError`, since its helices would twist the wrong way in 3D and export. **Records** `transform_plane`. |
 | `part.create_repeat_group(oligos, bp_offset)` | **edit** | Make `oligos` the originals of a new repeat group with one copy `bp_offset` bases along the same helices, like the editor's **Duplicate as linked mirror copies**. The copy's mirror oligos appear at once; a region the copy runs past grows. Returns the group. **Records** `create_repeat_group`. Check: `can_create_repeat_group`. |
 
 ## `MutablePart`: checks
@@ -178,7 +178,8 @@ Each edit check above also refuses an edit to a mirror oligo, and an edit to a r
 | `vh.row`, `vh.col` | read‑only | Lattice position, or `None` for a freeform helix. |
 | `vh.is_freeform` | read‑only | True when it has no lattice position. |
 | `vh.parity_is_even`, `vh.is_even_parity` | read‑only | Lattice parity (`row % 2 == col % 2`). |
-| `vh.local_frame` | **settable** | A freeform helix's frame (`origin`, `axis`, `radial0`). **Records** `set_vh_local_frame`. |
+| `vh.local_frame` | **settable** | A freeform helix's frame (`origin`, `axis`, `radial0`). The axis is normalized and `radial0` made perpendicular to it; a `radial0` parallel to the axis is refused. **Records** `set_vh_local_frame`. |
+| `vh.roll_deg` | **settable** | A freeform helix's rotation about its own axis, in degrees (-180 to 180], or `None` for a lattice helix. 0 points `radial0` along the region plane's normal (the plane's U axis for a helix standing along the normal); positive turns right-handed about the axis. Setting it keeps the origin and axis. **Records** `set_vh_local_frame`. |
 | `vh.move_to(col, row)` | **edit** | Move a lattice helix; refused if it would change parity. **Records** `move_lattice_vh`. |
 | `vh.strand_sets` | read‑only | `[strand 0, strand 1]` as `MutableStrandSet`s. |
 | `vh.segments_at(bp, strand_index=None)` | query | Segments covering a base, on one strand or both. |
@@ -210,7 +211,7 @@ Each edit check above also refuses an edit to a mirror oligo, and an edit to a r
 | `region.reduce_unused_length()` | **edit** | Shorten to the strands it holds, rounded up to `step` and at least two steps, like the strand view's reduce button. |
 | `region.remove_all_skips()`, `region.remove_all_insertions()` | **edit** | Turn every skip / insertion in the region back into a plain base; returns how many. |
 | `lattice_region.add_vh_at(row, col, length=None)` | **edit** | A new helix at a lattice position (`LatticedRegion`). **Records** `add_vh_at_coords`. |
-| `freeform_region.add_vh_at(origin, direction=(0, 0, 1), length=None)` | **edit** | A new helix at a 3D position in nm (`FreeformRegion`). **Records** `add_freeform_vh`. |
+| `freeform_region.add_vh_at(origin, direction=(0, 0, 1), length=None)` | **edit** | A new helix at a 3D position in nm (`FreeformRegion`), with roll 0. **Records** `add_freeform_vh`. |
 | `plane.id`, `plane.name`, `plane.origin`, `plane.u`, `plane.v`, `plane.normal` | read‑only | A plane's placement (read-only; move it with `part.set_plane_transform`). |
 
 ## Repeat groups

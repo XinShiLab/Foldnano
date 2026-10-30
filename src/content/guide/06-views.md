@@ -72,6 +72,7 @@ Used when helix positions should **not** snap to a lattice. The 2D editor draws 
 - **Drag selected VHs** moves them.
 - **Drag a rotate handle** rotates one in-plane VH.
 - **Drag a free endpoint** (Select mode) resizes that segment.
+- **Distribute in a circle** (plane view toolbar) spaces three or more selected perpendicular VHs evenly on a circle around their centre, keeping their order. Its sibling, **Distribute in a circle, facing the centre**, also rolls each VH so roll 0 points at the centre.
 
 Freeform edits update each helix's explicit local frame, which is preserved in `.fn.json` but **not** in cadnano JSON.
 

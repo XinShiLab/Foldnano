@@ -14,6 +14,7 @@
 	import type Oligo from '$lib/model/Oligo';
 	import { getModificationColor } from '$lib/model/modifications';
 	import RepeatGroupPanel from './RepeatGroupPanel.svelte';
+	import FreeformVhPanel from './FreeformVhPanel.svelte';
 	import OligoNameField from './OligoNameField.svelte';
 
 	type ModificationEntry = { label: string; name: string; color: string };
@@ -255,4 +256,5 @@
   <p>Sequence: AATTCCAATTGGGAATT... </p>
   <p>Color: {@render color("#FF2233")}</p> -->
 </div>
+<FreeformVhPanel />
 <RepeatGroupPanel />

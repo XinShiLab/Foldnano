@@ -41,7 +41,12 @@ import {
 	syncRepeatGroups,
 } from '$lib/model/Part/repeatGroups';
 import { InvalidOperationError } from '$lib/errors';
-import type { VirtualHelixFrame } from '$lib/model/geometry3d/dnaGeometry';
+import {
+	isRightHandedBasis,
+	normalizeFrame,
+	type Vec3,
+	type VirtualHelixFrame,
+} from '$lib/model/geometry3d/dnaGeometry';
 
 // ---------------------------------------------------------------------------
 // Op shapes (mirror the Python foldnano_mini.mutations module)
@@ -338,6 +343,14 @@ function findVh(part: Part, vhId: string): VirtualHelix {
 	return vh;
 }
 
+function assertRightHandedPlane(opName: string, u: Vec3, v: Vec3, normal: Vec3): void {
+	if (!isRightHandedBasis(u, v, normal)) {
+		throw new Error(
+			`${opName}: the plane basis is mirrored (u × v must point along normal); its helices would twist the wrong way in 3D and export`
+		);
+	}
+}
+
 function assertVhIdAvailable(part: Part, vhId: string): void {
 	if (part.getVhById(vhId)) {
 		throw new Error(`VirtualHelix id ${vhId} already exists`);
@@ -519,7 +532,9 @@ export function dispatchOp(op: MutationOp, part: Part, options: DispatchOptions 
 		case 'set_vh_local_frame': {
 			const vh = findVh(part, op.vhId);
 			guardVhInRegion(part, vh.regionId, activeRegionId);
-			vh.localFrame = (op.localFrame ?? undefined) as VirtualHelixFrame | undefined;
+			vh.localFrame = op.localFrame
+				? normalizeFrame(op.localFrame as unknown as VirtualHelixFrame)
+				: undefined;
 			return;
 		}
 		case 'remove_vhs': {
@@ -610,14 +625,15 @@ export function dispatchOp(op: MutationOp, part: Part, options: DispatchOptions 
 				);
 			}
 			assertVhIdAvailable(part, op.newVhId);
-			const vh = part.addVirtualHelix({ id: op.newVhId });
-			vh.length = op.length ?? region.maxBase;
-			vh.regionId = op.regionId;
-			vh.localFrame = {
+			const localFrame = normalizeFrame({
 				origin: { x: op.origin[0], y: op.origin[1], z: op.origin[2] },
 				axis: { x: op.axis[0], y: op.axis[1], z: op.axis[2] },
 				radial0: { x: op.radial0[0], y: op.radial0[1], z: op.radial0[2] },
-			};
+			});
+			const vh = part.addVirtualHelix({ id: op.newVhId });
+			vh.length = op.length ?? region.maxBase;
+			vh.regionId = op.regionId;
+			vh.localFrame = localFrame;
 			if (!region.vhOrder.includes(op.newVhId)) region.vhOrder.push(op.newVhId);
 			part.syncListRows();
 			return;
@@ -630,6 +646,7 @@ export function dispatchOp(op: MutationOp, part: Part, options: DispatchOptions 
 		}
 		case 'transform_plane': {
 			if (!part.getPlaneById(op.planeId)) throw new Error(`Plane ${op.planeId} not found`);
+			assertRightHandedPlane('transform_plane', op.u, op.v, op.normal);
 			part.setPlaneTransform(op.planeId, {
 				origin: op.origin,
 				u: op.u,
@@ -639,6 +656,7 @@ export function dispatchOp(op: MutationOp, part: Part, options: DispatchOptions 
 			return;
 		}
 		case 'add_region_and_plane': {
+			assertRightHandedPlane('add_region_and_plane', op.planeU, op.planeV, op.planeNormal);
 			const plane = Plane.fromJSON({
 				id: op.planeId,
 				name: op.planeName,

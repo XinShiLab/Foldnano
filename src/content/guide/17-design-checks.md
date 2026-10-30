@@ -43,6 +43,7 @@ Each problem has a level:
 | What Foldnano finds | What happens |
 | --- | --- |
 | Helices at negative lattice positions | Repaired: the region is moved onto the grid without changing where it sits in 3D. For a design saved in this browser, the unrepaired copy is kept in **Backups**. |
+| A mirrored plane, from regions created on the **Side (YZ)** base plane before this was fixed (and never rotated since) | Repaired: the plane's V axis is flipped. The 2D view is unchanged; in 3D the regions on it flip along V, and their helices now twist the right way, so crossovers line up in the 3D view and in oxDNA/mrDNA export. For a design saved in this browser, the unrepaired copy is kept in **Backups**. |
 | Inconsistencies from an earlier bug (strands listed on the wrong helix, one-way connections) | Repaired, with a message listing what was fixed (and a **Backups** copy for a design saved in this browser). |
 | Anything in the **Editor rules** check | Reported, not changed. |
 
@@ -57,6 +58,7 @@ States the editor doesn't create itself. They come from imported files or plugin
 | Two helices on the same lattice position | Error | Move one of them. |
 | A helix at a negative lattice position | Error | Foldnano moves a saved design onto the grid when it opens it, so this mostly shows up as a refused plugin result: fix the plugin. |
 | A helix whose number is even on an odd lattice position (or the reverse) | Warning | cadnano export and crossover positions assume they match. Recreate the helix in place if you need either. |
+| A freeform helix whose saved direction or roll is not a proper frame (not unit length, or roll not at a right angle to the helix) | Warning | The 3D view and exports would distort the helix. Select it and set its **Roll** in the Select panel, which rebuilds the frame. |
 
 ## Simulation Export
 

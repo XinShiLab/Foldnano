@@ -1049,6 +1049,17 @@ Python-allocated `groupId` / `instanceId` / `name`, adopted by `createRepeatGrou
 `addRepeatInstance`. Mirror ids are not shared: the host gives its mirrors fresh ids
 and Python derives them as `<source id>@<instance id>`; no op refers to a mirror.
 
+`set_vh_local_frame` and `add_freeform_vh` normalize the frame on both sides
+(`normalizeFrame` here, `normalize_frame` in `foldnano/_frame.py` for the Python mirror)
+and refuse a zero axis or a `radial0` parallel to it, so host and mirror hold the same
+numbers. `vh.roll_deg` (both packages) is derived from `radial0` with the same
+convention as `rollDegOf` (`docs/dna-model.md` § FreeformRegion); `_frame.py` is private
+so it stays out of the generated stubs and API pages.
+
+`transform_plane` and `add_region_and_plane` refuse a mirrored basis on both sides
+(`assertRightHandedPlane` / `assert_right_handed_plane`) before touching anything; a
+`foldnano_json` result with one fails the `mirrored-plane` shape rule (`docs/design-guards.md`).
+
 ### Coordinate key for annotation matching
 
 ```

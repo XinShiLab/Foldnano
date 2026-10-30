@@ -247,6 +247,7 @@ guard and persistence details: `docs/autosave.md`.
 | `addInPlaneFreeformVirtualHelixCmd({ part, start, end })`                   | Draw an in-plane freeform VH, extend capacity if needed, and fill both strand sets |
 | `moveFreeformVirtualHelixCmd({ vh, from, to })`                             | Move or rotate one freeform VH by recording `vh.localFrame`                        |
 | `moveFreeformVirtualHelicesCmd({ moves })`                                  | Batch move several freeform VHs                                                    |
+| `setFreeformVhRollCmd({ vhs, rollDeg })`                                    | Set the roll of freeform VHs (rewrites `localFrame.radial0` via `withRoll`)        |
 | `moveLatticeVirtualHelicesCmd({ part, region, vhIndices, fromTo, bounds })` | Move one constrained lattice selection by recording updated `vh.latticeCoords`     |
 | `deleteFreeformVirtualHelicesCmd({ part, vhIndices })`                      | Remove selected freeform VHs while preserving unaffected DNA                       |
 

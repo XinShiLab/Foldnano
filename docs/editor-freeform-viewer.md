@@ -1,6 +1,11 @@
 ---
 covers:
   - src/lib/components/Editor/HelixView/FreeformViewer.svelte
+  - src/lib/components/Editor/HelixView/rollDial.ts
+  - src/lib/components/Editor/HelixView/planeAxes.ts
+  - src/lib/components/Editor/HelixView/radialDistribute.ts
+  - src/lib/components/Editor/ToolPanel/FreeformVhPanel.svelte
+  - src/lib/components/Editor/ToolPanel/RollDial.svelte
 ---
 
 # Editor - Freeform Viewer
@@ -130,6 +135,11 @@ fillFreeformVirtualHelixCmd({ part, vh }, history);
 
 ---
 
+`PlaneViewer` explains these gestures on the canvas; see
+`docs/editor-helix-viewer.md` § Gesture hint.
+
+---
+
 ## Endpoint Interactions
 
 Freeform endpoint interaction is intentionally lightweight and local to this
@@ -172,7 +182,10 @@ During pointer movement, the viewer mutates the live model for immediate visual
 feedback:
 
 - group translation uses `FreeformRegion.moveVh(part, vh, x, y)` per selected VH
-- single-VH rotation updates `vh.localFrame.axis` and `radial0` directly
+- single-VH rotation updates `vh.localFrame.axis` and carries the roll over with
+  `withRoll(..., rollDegOf(dragStartFrame))`
+- a roll drag updates `radial0` via `withRoll`, then on pointer-up restores the
+  start frame and commits `setFreeformVhRollCmd`
 
 On pointer-up it compares the original and current frames:
 
@@ -188,7 +201,9 @@ This gives smooth drag feedback while still producing clean undo entries.
 
 The viewer renders:
 
-- coordinate axis at the plane origin
+- plane axes at the plane origin: U (red), V (green), and W = U × V as ⊗ (into
+  the screen); colours come from `planeAxes.ts` and match the panel's U/V/W labels
+  and the 3D view's triad for the active freeform region (`createPlaneAxes`)
 - dashed drag guides while moving
 - dashed line preview while drawing an in-plane VH
 - dashed connection preview while creating a crossover
@@ -197,8 +212,56 @@ The viewer renders:
 - in-plane strand lines, 5' squares, and 3' triangles
 - shallow crossover arcs between connected endpoints
 - per-VH rotate handles on hover
+- roll markers (see below)
+
+---
+
+## Roll
+
+Roll is the helix's rotation about its own axis, stored in `localFrame.radial0`
+(convention in `docs/dna-model.md` § FreeformRegion). Every roll widget shows the
+**cross-section seen from the bp-0 end looking along the axis**, so positive roll
+turns clockwise on screen. `rollDial.ts` holds the shared screen math
+(`rollDialPoint`, `rollFromDialPoint`, `rollReferenceAngle`, 15° snap, Alt for free).
+
+A projection onto the canvas can't show roll for an in-plane helix: `radial0`
+turns out of the drawing plane and a projected tick only shows sin(roll). So:
+
+- **Perpendicular VH:** the circle already is the cross-section. When selected it
+  shows an arrow along the projected `radial0` whose tip drags the roll; a helix
+  pointing at -W is seen from behind, so the drag flips sign. `HelixCircle`'s
+  phase indicator also adds the `radial0` screen angle.
+- **In-plane VH:** a small cross-section glyph (circle, 0° tick up = plane normal,
+  dot at the roll) sits on the axis line just before bp 0, on hover or selection;
+  its dot drags when the helix is selected.
+
+`FreeformVhPanel` (shown in the Select tool panel when freeform VHs are selected,
+from this viewer or by clicking a freeform VH's tag in the strand view)
+has a `RollDial` plus a Roll field, origin U/V/W fields (absolute for one helix,
+Δ for several, so a group doesn't collapse onto one point) and, when every
+selected helix is in-plane, a direction angle. Mixed values show blank; typing
+one applies it to all. Edits go through `setFreeformVhRollCmd` and
+`moveFreeformVirtualHelicesCmd`. The dial commits on release only (no live
+preview), so the 3D view updates then.
 
 Only VHs in the active freeform region are rendered.
+
+---
+
+## Radial Distribute
+
+Two `HelixViewerTools` buttons (plain, and facing the centre) apply
+`planRadialDistribute` (`radialDistribute.ts`) to the selected VHs of the active
+freeform region and commit one `moveFreeformVirtualHelicesCmd`. The planner is a
+pure frames-in, frames-out function, like the strand view's `endAlignmentOps`;
+returning `null` disables the buttons (fewer than 3 VHs, or any in-plane / frameless VH).
+
+- centre = centroid; radius = mean distance from it, floored so neighbours are at
+  least `SQ_INTERHELIX_NM` apart (no clash rule exists for freeform, so the floor is the guard)
+- slots keep the VHs' angular order and the ring is turned by the circular mean of
+  their offsets, so helices move, and crossovers stretch, as little as possible
+- `origin.z` and `axis` are kept; roll is kept unless `faceCenter` sets `radial0`
+  toward the centre
 
 ---
 
@@ -211,6 +274,7 @@ Freeform editing currently uses these undoable commands:
 - `fillFreeformVirtualHelixCmd`
 - `moveFreeformVirtualHelixCmd`
 - `moveFreeformVirtualHelicesCmd`
+- `setFreeformVhRollCmd`
 - `deleteFreeformVirtualHelicesCmd`
 - `createCrossoverCmd`
 - `moveOligoEndCmd`
@@ -222,6 +286,8 @@ That covers:
 - fill
 - translation
 - rotation
+- roll
+- radial distribute (via `moveFreeformVirtualHelicesCmd`)
 - deletion
 - endpoint-to-endpoint connection
 - endpoint resizing
@@ -252,5 +318,6 @@ Those are current product boundaries, not just documentation gaps.
 - **Don't reuse the strand-view priority dispatch here.** This viewer handles Konva pointer events directly with a small handler set; cross-pollination duplicates state.
 - **Don't use Konva mouse events (`onclick`, `ondblclick`, `onmouse*`) on canvas shapes.** Konva fires them only for real mice, and it cancels `touchstart` on listening shapes, so iPad Safari never synthesizes the compat mouse events: Apple Pencil and finger taps are silently dropped. Use `onpointerclick` / `onpointerdblclick` / `onpointer*`, which fire for mouse, pen and touch alike.
 - **Don't connect a 3' to a 3'.** Connections are 3'→5' only — the directional convention is enforced by `createCrossoverCmd`.
+- **Don't reset `radial0` when changing a VH's axis.** That silently drops the user's roll; use `withRoll(newFrame, rollDegOf(oldFrame))`.
 - **Don't render VHs from other regions.** Filter by `vh.regionId === region.id` so mixed-region parts work.
 - **Don't apply lab-frame plane transforms in this 2D pane.** Use `View3D` for that.

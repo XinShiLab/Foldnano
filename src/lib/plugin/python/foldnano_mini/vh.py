@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from foldnano._frame import roll_deg_of, with_roll
+
 from . import invariants, mutations as M
 from .lattice import CrossoverSite
 
@@ -163,6 +165,23 @@ class MutableVirtualHelix:
                 "localFrame": value,
             }
         )
+
+    @property
+    def roll_deg(self) -> float | None:
+        """Rotation of a freeform helix about its own axis, in degrees (-180, 180].
+
+        0 means ``radial0`` points along the region plane's normal (or +X for a helix
+        standing along ±Z); positive is right-handed about the axis. ``None`` for lattice VHs.
+        """
+        frame = self.local_frame
+        return None if frame is None else roll_deg_of(frame)
+
+    @roll_deg.setter
+    def roll_deg(self, value: float) -> None:
+        frame = self.local_frame
+        if frame is None:
+            raise ValueError(f"VH index={self._index} is a lattice VH; roll_deg needs a freeform VH")
+        self.local_frame = with_roll(frame, float(value))
 
     def move_to(self, col: int, row: int) -> None:
         """Move this lattice VH to (col, row), preserving parity.

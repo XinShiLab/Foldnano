@@ -217,7 +217,9 @@
 		// Region-header clicks already activate via onRegionHeader; this covers
 		// the more common "I edited a strand" case.
 		if (type === 'down') {
-			const displayRow = d.getRowIdxByY(p.y);
+			// p is in screen space; rows are laid out in world space (pan/zoom).
+			const worldY = camera ? camera.toWorld().y : p.y;
+			const displayRow = d.getRowIdxByY(worldY);
 			const row = d.getRowAtDisplayRow(displayRow);
 			if (row && row.regionId && row.regionId !== editorViewContext.activeRegionId) {
 				editorViewContext.setActiveRegion(row.regionId);

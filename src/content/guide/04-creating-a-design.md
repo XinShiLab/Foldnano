@@ -115,6 +115,7 @@ Foldnano is more flexible than classic cadnano, and a few defaults differ.
 
 | Topic | Classic cadnano expectation | Foldnano behavior |
 | --- | --- | --- |
+| Adding helices | Click lattice cells in Select mode | Switch to Draw mode (`N`) first; Select mode only selects and moves helices |
 | Scaffold identity | Often implied by file slot and helix parity | Explicit oligo flag you set yourself |
 | Strand-set pairing | Scaffold/staple distinction tied to lattice convention | Ends can connect whenever topology allows |
 | Default scaffold fill | Often creates a circular scaffold by default | Double-clicking a helix circle fills the default strand set **without** creating a circular scaffold by default |

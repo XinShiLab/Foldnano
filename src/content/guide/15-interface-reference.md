@@ -169,6 +169,8 @@ On the right, *press ? for help* is a reminder of the workspace help (shortcuts 
 | **Reset view** | Fits the plane view back to its default zoom |
 | **Mode** | **Pan**, **Select**, **Draw** (see [Views And Regions](/docs/guide/views)) |
 | **Delete selected helices** | Deletes the selected helices; in lattice regions only empty ones are removed |
+| **Distribute in a circle** | Freeform only: spaces three or more selected perpendicular helices evenly on a circle around their centre, keeping their order and roll |
+| **Distribute in a circle, facing the centre** | Same, and rolls each helix so roll 0 points at the centre |
 | **Export as image** | Downloads the plane view as a PNG image |
 
 ### 3D view toolbar

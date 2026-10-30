@@ -197,6 +197,10 @@ select mode.
 - drag reorders a VH inside its region-local row order
 - preview is shown with `VhDragPreview`
 - commit calls `reorderVirtualHelixCmd(...)`
+- on a freeform VH (has `localFrame`), pointer-down also selects it in
+  `selectedFreeformVhIndices` (Shift/Cmd/Ctrl toggles), so the Select panel's
+  roll/position fields work without the freeform plane view; `VhTag.svelte`
+  rings selected freeform tags
 
 ### Cross-section cursor
 

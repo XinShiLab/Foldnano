@@ -273,6 +273,10 @@ returns the fixed snapshot plus one line per kind of fix:
 - a lattice region with a helix at a negative row/col is shifted up/right by an even number of
   rows/cols (cell parity kept) and its plane moved back by the same lattice distance, so the
   design stays put in 3D; a plane another region shares is copied first
+- a mirrored (left-handed) plane, `(u × v)·normal < 0`, gets `v` negated so it is right-handed.
+  The Side (YZ) base plane was created mirrored until it was fixed, which reversed helix twist in
+  3D and export relative to the 2D layout (crossovers 1.3-2.5 nm apart). Plane-local data is
+  untouched, so the 2D view is the same; in 3D the plane's regions flip along V
 
 A consistent document passes through as the same object. When something was fixed,
 `notifyDocumentRepairs()` shows a warning toast, and `EditorDocumentSession.#persistRepair()` writes

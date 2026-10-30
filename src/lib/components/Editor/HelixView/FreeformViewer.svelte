@@ -12,17 +12,27 @@
 		fillFreeformVirtualHelixCmd,
 		moveFreeformVirtualHelixCmd,
 		moveFreeformVirtualHelicesCmd,
+		setFreeformVhRollCmd,
 	} from '$lib/commands/virtualHelix';
 	import { createCrossoverCmd, moveOligoEndCmd } from '$lib/commands/strands';
 	import {
 		BACKBONE_RISE_NM,
 		framesEqual,
+		rollDegOf,
+		withRoll,
 		type VirtualHelixFrame,
 	} from '$lib/model/geometry3d/dnaGeometry';
 	import type VirtualHelix from '$lib/model/VirtualHelix';
 	import type OligoSegment from '$lib/model/Oligo/OligoSegment.svelte';
 	import type { SegmentEnd } from '$lib/model/Oligo';
 	import HelixCircle from './HelixCircle.svelte';
+	import {
+		isPerpendicularFrame as isPerpendicular,
+		rollDialPoint,
+		rollFromDialPoint,
+		rollReferenceAngle,
+	} from './rollDial';
+	import { PLANE_AXIS_COLORS } from './planeAxes';
 	import { canvasTheme } from '$lib/canvasEditor/theme.svelte';
 
 	interface Props {
@@ -30,6 +40,7 @@
 		region: DesignRegion;
 		focusedSegments?: Set<OligoSegment> | null;
 		stageRef?: StageType;
+		onIdleClick?: () => void;
 	}
 
 	type FreeformHitTarget =
@@ -40,7 +51,13 @@
 		releasePointerCapture(pointerId: number): void;
 	};
 
-	let { part, region, focusedSegments = null, stageRef = $bindable() }: Props = $props();
+	let {
+		part,
+		region,
+		focusedSegments = null,
+		stageRef = $bindable(),
+		onIdleClick,
+	}: Props = $props();
 
 	const editorViewContext = getEditorViewContext();
 	const editorMode = $derived(editorViewContext.editorMode);
@@ -61,14 +78,15 @@
 	// Axis indicator at nm (0,0) — colors match the 3D coordinate axis
 	const AXIS_LEN_PX = 40; // length of each arm in pixels
 	// In-plane axes — labelled U and V to match the plane's local frame, not world XY
-	const AXIS_U_COLOR = '#ff3333'; // red  — U axis (in-plane)
-	const AXIS_V_COLOR = '#33cc44'; // green — V axis (in-plane)
+	const AXIS_U_COLOR = PLANE_AXIS_COLORS.u;
+	const AXIS_V_COLOR = PLANE_AXIS_COLORS.v;
+	const AXIS_W_COLOR = PLANE_AXIS_COLORS.w;
+	const AXIS_W_RADIUS = 6;
 	const AXIS_LABEL_OFFSET = 8; // px past the arrowhead for the letter
 	const RADIUS = 10; // = HELIX_VISUAL_RADIUS (1.0 nm) × SCALE
 	const STROKE_W = 2;
 	const HELIX_WIDTH_PX = 2 * RADIUS;
 	const DRAG_THRESHOLD_PX = 4;
-	const PERPENDICULAR_AXIS_DOT = 0.9;
 	const VH_CORNER_RADIUS = 2;
 	const VH_OUTLINE_OPACITY = 0.42;
 	const STRAND_STROKE_W = 2;
@@ -78,6 +96,9 @@
 	const THREE_PRIME_TRIANGLE_SIZE_PX = TERMINUS_SIZE_PX * 1.2;
 	const THREE_PRIME_MARKER_OUTSET_PX = TERMINUS_SIZE_PX * 0.4;
 	const END_HIT_RADIUS_PX = 7;
+	const ROLL_HANDLE_RADIUS_PX = 4;
+	const ROLL_GLYPH_RADIUS_PX = 7;
+	const ROLL_GLYPH_GAP_PX = 6;
 	const END_HIT_TARGET_FILL = 'rgba(37, 99, 235, 0.001)';
 	const DIMMED_FATLINE_OPACITY = 0.25;
 	const selectionColor = $derived(themeColors.freeformDragColor);
@@ -128,16 +149,34 @@
 		};
 	}
 
-	function isPerpendicular(frame: VirtualHelixFrame | undefined): boolean {
-		return !frame || Math.abs(frame.axis.z) >= PERPENDICULAR_AXIS_DOT;
-	}
-
 	function hasSelectionModifier(e: KonvaPointerEvent): boolean {
 		return e.evt.shiftKey || e.evt.metaKey || e.evt.ctrlKey;
 	}
 
 	function frameAngleDeg(frame: VirtualHelixFrame): number {
 		return (Math.atan2(frame.axis.y, frame.axis.x) * 180) / Math.PI;
+	}
+
+	function vhCanvasCenter(frame: VirtualHelixFrame): { x: number; y: number } {
+		return nmToCanvas(frame.origin.x, frame.origin.y);
+	}
+
+	// Cross-section glyph for an in-plane helix, just before its bp-0 end on the axis line.
+	function rollGlyphOffset(frame: VirtualHelixFrame): { x: number; y: number } {
+		const angle = Math.atan2(frame.axis.y, frame.axis.x);
+		const d = ROLL_GLYPH_RADIUS_PX + ROLL_GLYPH_GAP_PX;
+		return { x: -d * Math.cos(angle), y: -d * Math.sin(angle) };
+	}
+
+	function rollGlyphCenter(frame: VirtualHelixFrame): { x: number; y: number } {
+		const origin = vhCanvasCenter(frame);
+		const offset = rollGlyphOffset(frame);
+		return { x: origin.x + offset.x, y: origin.y + offset.y };
+	}
+
+	// Screen angle (deg) of radial0 for a perpendicular helix; its true projection on the canvas.
+	function radial0ScreenDeg(frame: VirtualHelixFrame | undefined): number {
+		return frame ? (Math.atan2(frame.radial0.y, frame.radial0.x) * 180) / Math.PI : 0;
 	}
 
 	function fullLengthPx(vh: VirtualHelix): number {
@@ -478,6 +517,14 @@
 		vhIdx: number;
 		dragStartFrame: VirtualHelixFrame;
 	} | null>(null);
+	let activeRoll = $state<{
+		vhIdx: number;
+		dragStartFrame: VirtualHelixFrame;
+		center: { x: number; y: number };
+		referenceAngle: number;
+		// -1 for a perpendicular helix pointing at -W: the canvas then sees it from the far end.
+		sign: 1 | -1;
+	} | null>(null);
 	let activePointerCapture = $state<{ pointerId: number; target: PointerCaptureTarget } | null>(
 		null
 	);
@@ -513,6 +560,10 @@
 			const vh = part.getVhByIndex(activeRotate.vhIdx);
 			if (vh) vh.localFrame = cloneFrame(activeRotate.dragStartFrame);
 		}
+		if (activeRoll) {
+			const vh = part.getVhByIndex(activeRoll.vhIdx);
+			if (vh) vh.localFrame = cloneFrame(activeRoll.dragStartFrame);
+		}
 		if (activeDrag) {
 			for (const frame of activeDrag.frames) {
 				const vh = part.getVhByIndex(frame.vhIdx);
@@ -525,6 +576,7 @@
 		activeEndDrag = null;
 		activeDrag = null;
 		activeRotate = null;
+		activeRoll = null;
 		releaseCapturedPointer();
 	}
 
@@ -582,6 +634,22 @@
 		capturePointer(e);
 	}
 
+	function onRollPointerDown(e: KonvaPointerEvent, vhIdx: number) {
+		if (editorMode !== 'SELECT') return;
+		e.cancelBubble = true;
+		const vh = part.getVhByIndex(vhIdx);
+		if (!vh?.localFrame) return;
+		const perpendicular = isPerpendicular(vh.localFrame);
+		activeRoll = {
+			vhIdx,
+			dragStartFrame: cloneFrame(vh.localFrame),
+			center: perpendicular ? vhCanvasCenter(vh.localFrame) : rollGlyphCenter(vh.localFrame),
+			referenceAngle: rollReferenceAngle(vh.localFrame),
+			sign: perpendicular && vh.localFrame.axis.z < 0 ? -1 : 1,
+		};
+		capturePointer(e);
+	}
+
 	function onStagePointerMove(e: KonvaPointerEvent) {
 		const stage = e.target.getStage();
 		if (!stage) return;
@@ -597,6 +665,14 @@
 			activeMarquee.currentLayer = { x: lx, y: ly };
 			return;
 		}
+		if (activeRoll) {
+			const vh = part.getVhByIndex(activeRoll.vhIdx);
+			if (!vh?.localFrame) return;
+			const { center, referenceAngle, sign, dragStartFrame } = activeRoll;
+			const roll = rollFromDialPoint(center, { x: lx, y: ly }, referenceAngle, e.evt.altKey);
+			vh.localFrame = withRoll(dragStartFrame, sign * roll);
+			return;
+		}
 		if (activeRotate) {
 			const vh = part.getVhByIndex(activeRotate.vhIdx);
 			if (!vh?.localFrame) return;
@@ -605,11 +681,10 @@
 			const dy = y - vh.localFrame.origin.y;
 			const len = Math.hypot(dx, dy);
 			if (len < 1e-9) return;
-			vh.localFrame = {
-				...vh.localFrame,
-				axis: { x: dx / len, y: dy / len, z: 0 },
-				radial0: { x: 0, y: 0, z: 1 },
-			};
+			vh.localFrame = withRoll(
+				{ ...vh.localFrame, axis: { x: dx / len, y: dy / len, z: 0 } },
+				rollDegOf(activeRotate.dragStartFrame)
+			);
 			return;
 		}
 		if (activeConnection) {
@@ -676,6 +751,7 @@
 				activeMarquee.currentLayer.y - activeMarquee.startLayer.y
 			);
 			if (distancePx < DRAG_THRESHOLD_PX) {
+				if (!activeMarquee.additive && selectedVhIndices.size === 0) onIdleClick?.();
 				editorViewContext.clearSelectedFreeformVhs();
 			} else {
 				const rect = normalizedRect(activeMarquee.startLayer, activeMarquee.currentLayer);
@@ -695,6 +771,17 @@
 				}
 			}
 			activeMarquee = null;
+			releaseCapturedPointer();
+			return;
+		}
+		if (activeRoll) {
+			const vh = part.getVhByIndex(activeRoll.vhIdx);
+			if (vh?.localFrame) {
+				const rollDeg = rollDegOf(vh.localFrame);
+				vh.localFrame = cloneFrame(activeRoll.dragStartFrame);
+				setFreeformVhRollCmd({ vhs: [vh], rollDeg }, history);
+			}
+			activeRoll = null;
 			releaseCapturedPointer();
 			return;
 		}
@@ -825,6 +912,18 @@
 					fontStyle="bold"
 					fill={AXIS_V_COLOR}
 				/>
+				<!-- W = U × V points into the screen (V is canvas-down): drawn as ⊗ -->
+				<Circle radius={AXIS_W_RADIUS} stroke={AXIS_W_COLOR} strokeWidth={1.5} />
+				<Line points={[-4, -4, 4, 4]} stroke={AXIS_W_COLOR} strokeWidth={1.5} />
+				<Line points={[-4, 4, 4, -4]} stroke={AXIS_W_COLOR} strokeWidth={1.5} />
+				<Text
+					x={-AXIS_W_RADIUS - 14}
+					y={-AXIS_W_RADIUS - 12}
+					text="W"
+					fontSize={13}
+					fontStyle="bold"
+					fill={AXIS_W_COLOR}
+				/>
 			</Group>
 
 			{#if dragIndicator}
@@ -953,9 +1052,38 @@
 							text={`${vh.index}`}
 							active={true}
 							scafStartAngle={(vh.index % 2 === 0 ? 0 : 180) +
-								part.getRegionForVh(vh).twistOffsetInDeg}
+								part.getRegionForVh(vh).twistOffsetInDeg +
+								radial0ScreenDeg(vh.localFrame)}
 							scafBpAngle={part.getRegionForVh(vh).twistPerBaseInDeg}
 						/>
+						{#if vh.localFrame && (selected || activeRoll?.vhIdx === vh.index)}
+							{@const handle = rollDialPoint(
+								{ x: 0, y: 0 },
+								RADIUS + 9,
+								(radial0ScreenDeg(vh.localFrame) * Math.PI) / 180,
+								0
+							)}
+							{@const base = rollDialPoint(
+								{ x: 0, y: 0 },
+								RADIUS,
+								(radial0ScreenDeg(vh.localFrame) * Math.PI) / 180,
+								0
+							)}
+							<Line
+								points={[base.x, base.y, handle.x, handle.y]}
+								stroke={themeColors.freeformAccent}
+								strokeWidth={1.5}
+								listening={false}
+							/>
+							<Circle
+								x={handle.x}
+								y={handle.y}
+								radius={ROLL_HANDLE_RADIUS_PX}
+								fill={themeColors.freeformAccent}
+								hitStrokeWidth={8}
+								onpointerdown={(e) => onRollPointerDown(e, vh.index)}
+							/>
+						{/if}
 					{:else if vh.localFrame}
 						{@const lengthPx = fullLengthPx(vh)}
 						<Group
@@ -1142,6 +1270,49 @@
 								</Group>
 							{/if}
 						</Group>
+						{#if selected || hoveredVhIdx === vh.index || activeRoll?.vhIdx === vh.index}
+							{@const glyph = rollGlyphOffset(vh.localFrame)}
+							{@const refAngle = rollReferenceAngle(vh.localFrame)}
+							{@const tickIn = rollDialPoint(glyph, ROLL_GLYPH_RADIUS_PX - 2, refAngle, 0)}
+							{@const tickOut = rollDialPoint(glyph, ROLL_GLYPH_RADIUS_PX + 3, refAngle, 0)}
+							{@const dot = rollDialPoint(
+								glyph,
+								ROLL_GLYPH_RADIUS_PX,
+								refAngle,
+								rollDegOf(vh.localFrame)
+							)}
+							<Circle
+								x={glyph.x}
+								y={glyph.y}
+								radius={ROLL_GLYPH_RADIUS_PX}
+								stroke={themeColors.gridLine}
+								strokeWidth={1.5}
+								fill="transparent"
+								listening={false}
+							/>
+							<Line
+								points={[tickIn.x, tickIn.y, tickOut.x, tickOut.y]}
+								stroke={themeColors.gridLine}
+								strokeWidth={1.5}
+								listening={false}
+							/>
+							<Circle
+								x={dot.x}
+								y={dot.y}
+								radius={ROLL_HANDLE_RADIUS_PX - 1}
+								fill={themeColors.freeformAccent}
+								listening={false}
+							/>
+							{#if selected}
+								<Circle
+									x={glyph.x}
+									y={glyph.y}
+									radius={ROLL_GLYPH_RADIUS_PX + 4}
+									fill="transparent"
+									onpointerdown={(e) => onRollPointerDown(e, vh.index)}
+								/>
+							{/if}
+						{/if}
 					{/if}
 				</Group>
 			{/each}

@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from foldnano._frame import reference_radial0
+
 from . import invariants, mutations as M
 from .checks import Check
 from .topology import slot_kind
@@ -222,11 +224,7 @@ class FreeformRegion(MutableRegion):
         if mag < 1e-10:
             raise ValueError("direction vector must be non-zero")
         axis = (dx / mag, dy / mag, dz / mag)
-        # Compute radial0 perpendicular to axis
-        if abs(axis[2]) < 0.9:
-            r0 = _cross_normalize((0.0, 0.0, 1.0), axis)
-        else:
-            r0 = _cross_normalize((1.0, 0.0, 0.0), axis)
+        r0 = reference_radial0(axis)
 
         new_vh_id = self._part.allocate_vh_id()
         new_vh_index = self._part._next_vh_index()
@@ -243,16 +241,3 @@ class FreeformRegion(MutableRegion):
         self._part._apply(op)
         return MutableVirtualHelix(self._part, new_vh_index)
 
-
-def _cross_normalize(
-    a: tuple[float, float, float], b: tuple[float, float, float]
-) -> tuple[float, float, float]:
-    """Return the cross product of a and b, normalised."""
-    cx = a[1] * b[2] - a[2] * b[1]
-    cy = a[2] * b[0] - a[0] * b[2]
-    cz = a[0] * b[1] - a[1] * b[0]
-    mag = (cx**2 + cy**2 + cz**2) ** 0.5
-    if mag < 1e-10:
-        # Fallback: a and b are parallel; pick an arbitrary perpendicular
-        return (1.0, 0.0, 0.0)
-    return (cx / mag, cy / mag, cz / mag)

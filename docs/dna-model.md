@@ -232,6 +232,12 @@ called `Plane 1` may carry any orientation. `BASIS_PLANE_TRANSFORMS` only
 supplies the _initial_ transform for axis-aligned creations and does not affect
 naming.
 
+Every plane basis must be right-handed (`u × v = normal`, `isRightHandedBasis`). Helix twist
+is computed in lab space (`backbonePoint`, the NT model), so a mirrored plane reverses it
+relative to the 2D layout and crossover sites stop facing each other in 3D and export. Rotating
+a plane in 3D rebuilds `normal = u × v`, translating keeps the basis; the Side (YZ) base plane
+is `u = +Y, v = +Z, normal = +X` (its 2D view shows Z downward, as Top shows Y).
+
 ---
 
 ## DesignRegion
@@ -292,6 +298,22 @@ Auto-Staple) states only this general claim — keep it in sync if the rules cha
 
 `FreeformRegion` does not derive position from lattice coordinates. It expects
 its VHs to carry explicit `localFrame` data.
+
+`localFrame` is `{ origin, axis, radial0 }` in plane-local nm. `radial0` is the
+phase-0 direction, so it also stores the helix's **roll** about its own axis;
+there is no separate roll field. Roll is derived, not stored:
+
+- `referenceRadial0(axis)` is roll 0: the plane normal (+Z) projected
+  perpendicular to the axis, or +X for a helix standing within about 25° of ±Z (`PERPENDICULAR_AXIS_DOT`, the same threshold the plane view uses to draw it as a circle; the lattice
+  convention). Every creation path (`FreeformRegion.addVhAt`, the draw command,
+  Python `add_vh_at`) uses it, so the same axis always starts at the same phase.
+- `rollDegOf(frame)` / `withRoll(frame, deg)` read and set it, right-handed about
+  the axis (the same sense as `backbonePoint`). The Python mirror is
+  `foldnano/_frame.py`; keep both in step.
+- `normalizeFrame` makes the axis unit and `radial0` perpendicular; plugin ops go
+  through it, and the `freeform-frame` integrity rule flags files that don't.
+- Changing the axis (rotate drag, direction field) must carry the roll over with
+  `withRoll(newFrame, rollDegOf(oldFrame))`, never reset `radial0`.
 
 ### DesignRegion creation
 

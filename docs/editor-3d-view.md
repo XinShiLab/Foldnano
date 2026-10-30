@@ -66,6 +66,14 @@ All geometry in the 3D view uses physical (oxDNA v2) constants defined in
 These are the same values used by the NT model and oxDNA exporter, so the 3D
 view, the RBS, and the exported `.dat` file all share identical helix positions.
 
+When the active region is freeform, `createPlaneAxes` (`coordinateAxis.ts`) draws
+its plane's U/V/W triad at the plane origin, so the Select panel's plane-local
+position fields have something to point at.
+
+Backbone phase comes from the VH frame's `radial0` (`backbonePoint`), so a
+freeform helix's roll (`docs/dna-model.md` § FreeformRegion) shows up here, in
+the NT model and in export with no extra wiring.
+
 ### NT Model Toggle
 
 The "Show NT Model" toolbar button replaces the strand polylines with a

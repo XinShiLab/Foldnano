@@ -11,7 +11,9 @@ import {
 	fillFreeformVirtualHelixCmd,
 	moveLatticeVirtualHelicesCmd,
 	moveFreeformVirtualHelicesCmd,
+	setFreeformVhRollCmd,
 } from './virtualHelix';
+import { rollDegOf } from '$lib/model/geometry3d/dnaGeometry';
 import { LatticedDesignRegion } from '$lib/model/Part/DesignRegion';
 
 class MockStorageProvider implements StorageProvider {
@@ -174,6 +176,29 @@ describe('freeform virtual helix commands', () => {
 		history.redoOnce();
 		expect(vh0.localFrame!.origin).toEqual(to0.origin);
 		expect(vh1.localFrame!.origin).toEqual(to1.origin);
+	});
+
+	it('sets roll on several freeform VHs in one undoable command, keeping origin and axis', () => {
+		const { part, history } = createFreeformPart();
+		const vh0 = addFreeformVh(part, [0, 0, 0], [1, 0, 0]);
+		const vh1 = addFreeformVh(part, [2, 3, 0]);
+		const from0 = vh0.localFrame!;
+		const from1 = vh1.localFrame!;
+
+		setFreeformVhRollCmd({ vhs: [vh0, vh1], rollDeg: 90 }, history);
+
+		expect(rollDegOf(vh0.localFrame!)).toBeCloseTo(90);
+		expect(rollDegOf(vh1.localFrame!)).toBeCloseTo(90);
+		expect(vh0.localFrame!.origin).toEqual(from0.origin);
+		expect(vh0.localFrame!.axis).toEqual(from0.axis);
+
+		history.undoOnce();
+		expect(vh0.localFrame).toEqual(from0);
+		expect(vh1.localFrame).toEqual(from1);
+
+		history.redoOnce();
+		expect(rollDegOf(vh0.localFrame!)).toBeCloseTo(90);
+		expect(rollDegOf(vh1.localFrame!)).toBeCloseTo(90);
 	});
 
 	it('deletes selected empty freeform VHs and restores them with undo', () => {

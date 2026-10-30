@@ -102,6 +102,30 @@
 			: []),
 		{ keys: ['Right-click'], label: 'More actions' },
 	]);
+
+	const planeMouseRows = $derived.by(() => {
+		if (activeViewer !== 'HELIX' || !ctx.activeRegion) return [];
+		if (editorMode === 'DRAW') {
+			return ctx.activeRegion.kind === 'FREEFORM'
+				? [
+						{ keys: ['Drag'], label: 'Draw in-plane helix' },
+						{ keys: ['Double-click'], label: 'Add perpendicular helix' },
+						{ keys: ['Click'], label: 'Fill perpendicular helix' },
+						{ keys: ["Click 3'", "Click 5'"], label: 'Connect free ends' },
+					]
+				: [
+						{ keys: ['Click'], label: 'Add helix (empty cell)' },
+						{ keys: ['Double-click'], label: 'Fill empty helix' },
+					];
+		}
+		if (editorMode === 'SELECT') {
+			return [
+				{ keys: ['Drag'], label: 'Move helix or box-select' },
+				{ keys: ['⇧', 'Click'], label: 'Toggle selection' },
+			];
+		}
+		return [];
+	});
 </script>
 
 {#snippet chordSection(title: string, rows: { keys: string[]; label: string }[])}
@@ -173,6 +197,9 @@
 			{@render chordSection('Strand View', strandNavShortcuts)}
 			{@render chordSection('Strand View Mouse', strandMouseRows)}
 			{@render section('Selection Filters', filterShortcuts)}
+		{/if}
+		{#if planeMouseRows.length > 0}
+			{@render chordSection('Plane View Mouse', planeMouseRows)}
 		{/if}
 		{#if activeViewer === 'VIEW3D'}
 			{@render section('3D View', view3DShortcuts)}

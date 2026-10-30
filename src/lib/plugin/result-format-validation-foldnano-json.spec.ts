@@ -58,6 +58,16 @@ describe('validateResultShape (foldnano_json) — positive path and boundary', (
 });
 
 describe('validateResultShape (foldnano_json) — top-level and plane/region shape', () => {
+	it('rejects a mirrored (left-handed) plane basis', () => {
+		const fixture = clone(makeValidFixture());
+		Object.assign(fixture.planes[0], {
+			u: { x: 0, y: 1, z: 0 },
+			v: { x: 0, y: 0, z: -1 },
+			normal: { x: 1, y: 0, z: 0 },
+		});
+		expectRejects(serialize(fixture), 'mirrored-plane');
+	});
+
 	it('rejects a missing top-level "name"', () => {
 		const data = clone(makeValidFixture()) as unknown as Record<string, unknown>;
 		delete data.name;

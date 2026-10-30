@@ -36,6 +36,14 @@ export function createVhTagHandler(): HandlerInstance {
 
 			if (!vh) return false;
 			if (!vh.regionId) return false;
+			// Freeform helices get selected so the Select panel's roll/position fields follow them.
+			if (vh.localFrame) {
+				if (evt.shiftKey || evt.metaKey || evt.ctrlKey) {
+					ctx.editorCtx.toggleSelectedFreeformVh(vhIdx);
+				} else {
+					ctx.editorCtx.setSelectedFreeformVhs([vhIdx]);
+				}
+			}
 			const regionRows = ctx.drawingDimensions
 				.getVisibleVhRows()
 				.filter((row) => row.regionId === vh.regionId);

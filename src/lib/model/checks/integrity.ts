@@ -1,6 +1,7 @@
 import type FoldnanoDocument from '../document.svelte';
 import type { Part } from '../Part';
 import type VirtualHelix from '../VirtualHelix';
+import { isFrameOrthonormal } from '../geometry3d/dnaGeometry';
 import type { DesignIssue } from './designIssue';
 
 /** Rules for states the editor never creates itself (load, import and plugin results can). */
@@ -10,6 +11,7 @@ export const INTEGRITY_RULES = [
 	'shared-cell',
 	'asymmetric-skip-insert',
 	'skip-insert-on-crossover',
+	'freeform-frame',
 ] as const;
 export type IntegrityRule = (typeof INTEGRITY_RULES)[number];
 
@@ -63,6 +65,16 @@ function checkLatticeCells(
 			});
 		}
 	}
+}
+
+function checkFreeformFrame(vh: VirtualHelix, issues: DesignIssue<IntegrityRule>[]): void {
+	if (!vh.localFrame || isFrameOrthonormal(vh.localFrame)) return;
+	issues.push({
+		rule: 'freeform-frame',
+		severity: 'warning',
+		message: `Helix ${vh.index} has a frame whose axis or radial0 is not a unit vector, or whose radial0 is not perpendicular to the axis; the 3D view and export distort it. Set its roll in the Select panel to rebuild the frame.`,
+		anchor: { regionId: vh.regionId, vhId: vh.id, vhIndex: vh.index },
+	});
 }
 
 /** Slot length per strand at each base of `vh`; `undefined` where that strand has no segment. */
@@ -125,7 +137,10 @@ export function checkPartIntegrity(
 	);
 	const issues: DesignIssue<IntegrityRule>[] = [];
 	checkLatticeCells(part, vhs, issues);
-	for (const vh of vhs) checkSkipsAndInserts(part, vh, issues);
+	for (const vh of vhs) {
+		checkSkipsAndInserts(part, vh, issues);
+		checkFreeformFrame(vh, issues);
+	}
 	return issues;
 }
 

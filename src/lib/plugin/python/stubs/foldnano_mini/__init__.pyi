@@ -602,6 +602,18 @@ class MutableVirtualHelix:
     @local_frame.setter
     def local_frame(self, value: dict[str, Any] | None) -> None: ...
 
+    @property
+    def roll_deg(self) -> float | None:
+        """
+        Rotation of a freeform helix about its own axis, in degrees (-180, 180].
+
+        0 means ``radial0`` points along the region plane's normal (or +X for a helix
+        standing along ±Z); positive is right-handed about the axis. ``None`` for lattice VHs.
+        """
+
+    @roll_deg.setter
+    def roll_deg(self, value: float) -> None: ...
+
     def move_to(self, col: int, row: int) -> None:
         """
         Move this lattice VH to (col, row), preserving parity.
