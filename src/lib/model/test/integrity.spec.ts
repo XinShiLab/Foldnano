@@ -7,7 +7,7 @@ import { DesignCheckError } from '../checks/designIssue';
 import { repairDocumentJson } from '../documentRepair';
 import FoldnanoDocument from '../document.svelte';
 import type { Part } from '../Part';
-import { makeHoneycombPart, addLatticeVh } from './testHelpers';
+import { makeHoneycombPart, addLatticeVh, addFreeformVh } from './testHelpers';
 
 const PUBLISHED_DIR = path.resolve('test_files/published_cadnano_designs');
 
@@ -110,6 +110,18 @@ describe('checkPartIntegrity', () => {
 		const issues = checkPartIntegrity(part);
 
 		expect(issues.map((i) => i.rule)).toContain('skip-insert-on-crossover');
+	});
+
+	it('warns about a freeform frame that is not orthonormal', () => {
+		const part = new FoldnanoDocument('doc', 'Freeform').addNewPart('FREEFORM');
+		const vh = addFreeformVh(part, [0, 0, 0], [1, 0, 0]);
+		expect(checkPartIntegrity(part)).toEqual([]);
+
+		vh.localFrame = { ...vh.localFrame!, radial0: { x: 1, y: 0, z: 1 } };
+
+		expect(checkPartIntegrity(part)).toMatchObject([
+			{ rule: 'freeform-frame', severity: 'warning', anchor: { vhIndex: vh.index } },
+		]);
 	});
 
 	it('limits the check to the given regions', () => {

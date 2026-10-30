@@ -4,6 +4,7 @@
 
 	import { getDimensionContext } from '../drawingContext';
 	import { canvasTheme } from '$lib/canvasEditor/theme.svelte';
+	import { getEditorViewContext } from '../../context/EditorViewContext.svelte';
 
 	interface Props {
 		vh: VirtualHelix;
@@ -15,7 +16,12 @@
 	const { dimensions, getRowYByRowIdx } = d;
 	const { radius, strokeWidth } = dimensions;
 
+	const editorViewContext = getEditorViewContext();
+
 	let [x, y] = $derived([2 * radius, getRowYByRowIdx(displayRow)]);
+	const selected = $derived(
+		!!vh.localFrame && editorViewContext.selectedFreeformVhIndices.has(vh.index)
+	);
 </script>
 
 <Group id="VH_TAG#{vh.index}" kind="VH_TAG" category="VH" class="pickable" listening={true}>
@@ -25,8 +31,8 @@
 		{y}
 		{radius}
 		fill={canvasTheme.colors.vhFill}
-		stroke={canvasTheme.colors.vhStroke}
-		{strokeWidth}
+		stroke={selected ? canvasTheme.colors.freeformDragColor : canvasTheme.colors.vhStroke}
+		strokeWidth={selected ? 2 * strokeWidth : strokeWidth}
 		perfectDrawEnabled={false}
 	/>
 	<Text

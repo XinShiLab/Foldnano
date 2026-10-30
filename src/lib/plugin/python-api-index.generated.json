@@ -428,6 +428,12 @@
 					"returns": "VirtualHelixProxy"
 				},
 				{
+					"name": "roll_deg",
+					"kind": "property",
+					"type": "Optional[float]",
+					"doc": "Rotation of a freeform helix about its own axis, in degrees (-180, 180]."
+				},
+				{
 					"name": "is_freeform",
 					"kind": "property",
 					"type": "bool",
@@ -1661,6 +1667,13 @@
 					"name": "local_frame",
 					"kind": "property",
 					"type": "dict[str, Any] | None",
+					"settable": true
+				},
+				{
+					"name": "roll_deg",
+					"kind": "property",
+					"type": "float | None",
+					"doc": "Rotation of a freeform helix about its own axis, in degrees (-180, 180].",
 					"settable": true
 				},
 				{

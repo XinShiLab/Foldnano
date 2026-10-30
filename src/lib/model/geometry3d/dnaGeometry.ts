@@ -63,24 +63,98 @@ export function normalizeVec(v: Vec3): Vec3 {
 	return { x: v.x / len, y: v.y / len, z: v.z / len };
 }
 
-/**
- * Returns a unit vector perpendicular to `axis` suitable as `radial0`.
- * For axis ≈ +Z (the default lattice axis), returns [1,0,0] to preserve the
- * existing twist-angle convention (matches `backbonePointNm` behavior).
- */
-export function radial0ForAxis(axis: Vec3): Vec3 {
-	// Project [1,0,0] onto the plane perpendicular to axis (Gram-Schmidt).
-	// Adding 0 to each component avoids -0 floating-point artifacts.
-	const dot = axis.x;
-	const r = { x: 1 - dot * axis.x + 0, y: -dot * axis.y + 0, z: -dot * axis.z + 0 };
-	const len = Math.sqrt(r.x * r.x + r.y * r.y + r.z * r.z);
-	if (len < 1e-6) {
-		// axis ≈ ±X; fall back to projecting [0,1,0]
-		const dot2 = axis.y;
-		const r2 = { x: -dot2 * axis.x + 0, y: 1 - dot2 * axis.y + 0, z: -dot2 * axis.z + 0 };
-		return normalizeVec(r2);
-	}
+function dotVec(a: Vec3, b: Vec3): number {
+	return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+// Gram-Schmidt: component of `v` perpendicular to unit `axis`, normalized; null if ~parallel.
+function perpendicularUnit(v: Vec3, axis: Vec3): Vec3 | null {
+	const d = dotVec(v, axis);
+	// Adding 0 avoids -0 floating-point artifacts.
+	const r = { x: v.x - d * axis.x + 0, y: v.y - d * axis.y + 0, z: v.z - d * axis.z + 0 };
+	const len = Math.sqrt(dotVec(r, r));
+	if (!(len >= 1e-6)) return null;
 	return { x: r.x / len, y: r.y / len, z: r.z / len };
+}
+
+/**
+ * From this |axis.z| on a helix stands perpendicular to its plane: roll 0 is +X (U) and the
+ * plane view draws it as a circle. One threshold, so the UI's 0° label always matches.
+ */
+export const PERPENDICULAR_AXIS_DOT = 0.9;
+
+/**
+ * The roll-0 `radial0` for a unit `axis` in plane-local coordinates: the plane normal (+Z)
+ * projected perpendicular to the axis, or +X for helices standing within about 25° of ±Z (the lattice
+ * convention, matching `backbonePointNm`). Every freeform creation path must use this.
+ */
+export function referenceRadial0(axis: Vec3): Vec3 {
+	if (Math.abs(axis.z) < PERPENDICULAR_AXIS_DOT) {
+		const r = perpendicularUnit({ x: 0, y: 0, z: 1 }, axis);
+		if (r) return r;
+	}
+	return (
+		perpendicularUnit({ x: 1, y: 0, z: 0 }, axis) ??
+		perpendicularUnit({ x: 0, y: 1, z: 0 }, axis) ?? { x: 0, y: 1, z: 0 }
+	);
+}
+
+/** Signed roll (degrees, (-180, 180]) of `radial0` from `referenceRadial0`, right-handed about the axis. */
+export function rollDegOf(frame: VirtualHelixFrame): number {
+	const axis = normalizeVec(frame.axis);
+	const ref = referenceRadial0(axis);
+	const r = perpendicularUnit(frame.radial0, axis) ?? ref;
+	const deg = (Math.atan2(dotVec(crossVec(ref, r), axis), dotVec(ref, r)) * 180) / Math.PI;
+	return deg <= -180 ? deg + 360 : deg;
+}
+
+/** Copy of `frame` whose `radial0` sits `rollDeg` from the reference (same sense as `backbonePoint`). */
+export function withRoll(frame: VirtualHelixFrame, rollDeg: number): VirtualHelixFrame {
+	const axis = normalizeVec(frame.axis);
+	const ref = referenceRadial0(axis);
+	const ortho = crossVec(axis, ref);
+	const rad = (rollDeg * Math.PI) / 180;
+	const c = Math.cos(rad);
+	const s = Math.sin(rad);
+	return {
+		origin: { ...frame.origin },
+		axis,
+		radial0: normalizeVec({
+			x: c * ref.x + s * ortho.x + 0,
+			y: c * ref.y + s * ortho.y + 0,
+			z: c * ref.z + s * ortho.z + 0,
+		}),
+	};
+}
+
+/**
+ * Unit axis plus a unit `radial0` made perpendicular to it. Throws on a zero axis or a
+ * `radial0` parallel to the axis, since no roll can be recovered from those.
+ */
+export function normalizeFrame(frame: VirtualHelixFrame): VirtualHelixFrame {
+	const axisLen = Math.sqrt(dotVec(frame.axis, frame.axis));
+	if (!(axisLen > 1e-9)) throw new Error('localFrame.axis must be a non-zero vector');
+	const axis = normalizeVec(frame.axis);
+	const radial0 = perpendicularUnit(frame.radial0, axis);
+	if (!radial0) throw new Error('localFrame.radial0 must not be parallel to the axis');
+	return { origin: { ...frame.origin }, axis, radial0 };
+}
+
+/**
+ * Whether a plane basis is right-handed (u × v points along `normal`). A mirrored plane makes the
+ * 3D/export helix twist run opposite to the 2D layout, so crossovers stop lining up.
+ */
+export function isRightHandedBasis(u: Vec3, v: Vec3, normal: Vec3): boolean {
+	return dotVec(crossVec(u, v), normal) > 0;
+}
+
+/** Whether `axis` and `radial0` are unit length and perpendicular within `tol`. */
+export function isFrameOrthonormal(frame: VirtualHelixFrame, tol = 1e-3): boolean {
+	return (
+		Math.abs(Math.sqrt(dotVec(frame.axis, frame.axis)) - 1) <= tol &&
+		Math.abs(Math.sqrt(dotVec(frame.radial0, frame.radial0)) - 1) <= tol &&
+		Math.abs(dotVec(frame.axis, frame.radial0)) <= tol
+	);
 }
 
 export function framesEqual(a: VirtualHelixFrame, b: VirtualHelixFrame): boolean {

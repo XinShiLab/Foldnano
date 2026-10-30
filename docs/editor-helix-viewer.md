@@ -24,6 +24,7 @@ src/lib/components/Editor/HelixView/
 ├── HelixViewer.svelte      # pane host; switches between Plane and 3D views
 ├── HelixView.svelte        # thin wrapper around PlaneViewer
 ├── PlaneViewer.svelte      # dispatches each region to the right 2D viewer
+├── PlaneGestureHint.svelte # DOM hint over the canvas for adding helices
 ├── LatticeViewer.svelte    # lattice-region renderer
 ├── HelixGrid.svelte        # empty lattice click targets
 ├── HelixCircle.svelte      # one VH circle + scaffold indicator
@@ -35,6 +36,30 @@ switch the left pane between:
 
 - `Plane`
 - `3D`
+
+---
+
+## Gesture hint
+
+Helices are added only in Draw mode, the editor starts in Select, and classic
+cadnano users expect to add them from Select. Canvas gestures have no control to
+hang a hover card on, and the first-visit `?` overlay opens before most regions
+exist, so `PlaneGestureHint` (a `pointer-events-none` DOM overlay; only its Draw
+mode button takes clicks) explains them for both region kinds:
+
+- empty region, not in Draw -> a button that switches to Draw mode
+- empty region, in Draw -> the kind's creation gestures
+- freeform, in Draw, only in-plane or only perpendicular VHs -> the gesture not yet
+  used, because a user who finds drag may never try double-click
+- non-empty region, in Select, after a plain click on empty space with nothing
+  selected -> the Draw mode button for a few seconds. That click has no other
+  effect, so it signals someone trying to add a helix; a click that clears a
+  selection does not nudge, or this would fire constantly for experts
+
+Everything except the nudge timer is derived from the region's VHs and the mode, so
+undo brings the hint back and there is no "seen" flag to store. Don't add helices
+in Select to solve this: a background click there means deselect, so stray clicks
+would create helices.
 
 ---
 
@@ -164,6 +189,8 @@ deleteLatticeVirtualHelicesCmd({ part, vhIndices: selectedInActiveRegion }, hist
 Only **empty** VHs are deleted — those whose both strand sets carry zero segments. VHs that contain oligos are silently skipped, preventing accidental data loss. The selection is cleared after the command regardless of how many VHs were actually removed.
 
 The toolbar button is enabled whenever at least one lattice VH is selected; the command itself applies the empty-only filter.
+
+The same toolbar's two **Distribute in a circle** buttons are freeform-only; see `docs/editor-freeform-viewer.md` § Radial Distribute.
 
 ---
 

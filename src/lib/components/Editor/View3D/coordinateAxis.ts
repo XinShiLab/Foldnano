@@ -55,7 +55,12 @@ function setMeshState(mesh: THREE.Mesh, opacity: number, edgesOpacity: number): 
 	}
 }
 
-function makeAxisLabel(letter: string, color: number, axisLength: number): THREE.Sprite {
+function makeAxisLabel(
+	letter: string,
+	color: number,
+	axisLength: number,
+	axisIndex = letter === 'X' ? 0 : letter === 'Y' ? 1 : 2
+): THREE.Sprite {
 	const size = 128;
 	const canvas = document.createElement('canvas');
 	canvas.width = size;
@@ -75,10 +80,71 @@ function makeAxisLabel(letter: string, color: number, axisLength: number): THREE
 	sprite.renderOrder = 999;
 	// Position just past the arrowhead tip
 	const offset = axisLength + 4;
-	if (letter === 'X') sprite.position.set(offset, 0, 0);
-	else if (letter === 'Y') sprite.position.set(0, offset, 0);
-	else sprite.position.set(0, 0, offset);
+	sprite.position.setComponent(axisIndex, offset);
 	return sprite;
+}
+
+function disposeAxisObjects(group: THREE.Group): void {
+	group.traverse((obj) => {
+		if (obj instanceof THREE.Sprite) {
+			(obj.material as THREE.SpriteMaterial).map?.dispose();
+			(obj.material as THREE.SpriteMaterial).dispose();
+		} else if (obj instanceof THREE.Mesh || (obj as { isLine?: boolean }).isLine) {
+			(obj as THREE.Mesh).geometry?.dispose();
+			const mat = (obj as THREE.Mesh).material;
+			if (Array.isArray(mat)) mat.forEach((m) => (m as THREE.Material).dispose());
+			else (mat as THREE.Material)?.dispose();
+		} else if (obj instanceof THREE.ArrowHelper) {
+			(obj.line as THREE.Line).geometry.dispose();
+			(obj.line.material as THREE.Material).dispose();
+			(obj.cone as THREE.Mesh).geometry.dispose();
+			const coneMat = (obj.cone as THREE.Mesh).material;
+			if (Array.isArray(coneMat)) coneMat.forEach((m) => (m as THREE.Material).dispose());
+			else (coneMat as THREE.Material)?.dispose();
+		}
+	});
+}
+
+export interface PlaneAxesResult {
+	group: THREE.Group;
+	/** Place the U/V/W triad at a plane's origin with its basis; null hides it. */
+	setPlane(plane: { origin: Vec3Like; u: Vec3Like; v: Vec3Like; normal: Vec3Like } | null): void;
+	dispose(): void;
+}
+
+type Vec3Like = { x: number; y: number; z: number };
+
+/** U/V/W triad of a region plane, in the lab X/Y/Z colours, for the plane-local fields. */
+export function createPlaneAxes(axisLength = 10): PlaneAxesResult {
+	const group = new THREE.Group();
+	group.name = 'planeAxes';
+	group.visible = false;
+	const origin = new THREE.Vector3(0, 0, 0);
+	const axes: [THREE.Vector3, number, string][] = [
+		[new THREE.Vector3(1, 0, 0), 0xff3333, 'U'],
+		[new THREE.Vector3(0, 1, 0), 0x33cc44, 'V'],
+		[new THREE.Vector3(0, 0, 1), 0x3388ff, 'W'],
+	];
+	axes.forEach(([dir, color, letter], i) => {
+		group.add(new THREE.ArrowHelper(dir, origin, axisLength, color, 2, 1));
+		group.add(makeAxisLabel(letter, color, axisLength, i));
+	});
+
+	function setPlane(
+		plane: { origin: Vec3Like; u: Vec3Like; v: Vec3Like; normal: Vec3Like } | null
+	) {
+		group.visible = plane !== null;
+		if (!plane) return;
+		group.position.set(plane.origin.x, plane.origin.y, plane.origin.z);
+		const basis = new THREE.Matrix4().makeBasis(
+			new THREE.Vector3(plane.u.x, plane.u.y, plane.u.z),
+			new THREE.Vector3(plane.v.x, plane.v.y, plane.v.z),
+			new THREE.Vector3(plane.normal.x, plane.normal.y, plane.normal.z)
+		);
+		group.setRotationFromMatrix(basis);
+	}
+
+	return { group, setPlane, dispose: () => disposeAxisObjects(group) };
 }
 
 export function createCoordinateAxis(axisLength = 5): CoordinateAxisResult {
@@ -173,24 +239,7 @@ export function createCoordinateAxis(axisLength = 5): CoordinateAxisResult {
 	}
 
 	function dispose() {
-		group.traverse((obj) => {
-			if (obj instanceof THREE.Sprite) {
-				(obj.material as THREE.SpriteMaterial).map?.dispose();
-				(obj.material as THREE.SpriteMaterial).dispose();
-			} else if (obj instanceof THREE.Mesh || (obj as { isLine?: boolean }).isLine) {
-				(obj as THREE.Mesh).geometry?.dispose();
-				const mat = (obj as THREE.Mesh).material;
-				if (Array.isArray(mat)) mat.forEach((m) => (m as THREE.Material).dispose());
-				else (mat as THREE.Material)?.dispose();
-			} else if (obj instanceof THREE.ArrowHelper) {
-				(obj.line as THREE.Line).geometry.dispose();
-				(obj.line.material as THREE.Material).dispose();
-				(obj.cone as THREE.Mesh).geometry.dispose();
-				const coneMat = (obj.cone as THREE.Mesh).material;
-				if (Array.isArray(coneMat)) coneMat.forEach((m) => (m as THREE.Material).dispose());
-				else (coneMat as THREE.Material)?.dispose();
-			}
-		});
+		disposeAxisObjects(group);
 	}
 
 	return { group, planeMeshes, setHover, setSelected, dispose };

@@ -11,9 +11,9 @@ covers:
 Pressing `?` in the editor toggles the workspace help (**Workspace help** in the top toolbar's Help
 menu, which also links to the docs site, opens it): key badges on controls, pinned captions on
 panes and panels, a hover card with a short explanation for any registered control, and the
-keyboard-shortcut reference card. It is the app's only onboarding surface; there is no step-by-step
-tour, because most users are repeat professionals and a layer they open themselves never has to be
-skipped.
+keyboard-shortcut reference card. It is the app's main onboarding surface (the plane view's gesture
+hint is the other); there is no step-by-step tour, because most users are repeat professionals and
+a layer they open themselves never has to be skipped.
 
 ## How it works
 
@@ -43,7 +43,10 @@ skipped.
   Mouse and Selection Filters sections show only while the strand pane is active, matching where
   those keys work. The Mouse rows also follow the editor mode (Shift+click and header
   double-click in Select, double-click to remove in Skip/Insert), because canvas gestures have no
-  control to hang a hover card on.
+  control to hang a hover card on. A Plane View Mouse section does the same in Draw and Select
+  while the plane pane is active, and the Plane view caption names the region kind's creation
+  gesture. Outside this overlay, `PlaneViewer` shows its own hint for those gestures
+  (`editor-helix-viewer.md` § Gesture hint).
 - **Visibility.** Non-area controls are shown only if `elementFromPoint` at their centre lands
   inside them, which hides controls clipped by scrolling toolbars or covered by floating panels.
   A disabled control is `pointer-events: none`, so for it a hit on its direct parent also counts;

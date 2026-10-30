@@ -408,7 +408,11 @@
 			: {
 					area: true,
 					title: 'Plane view',
-					text: 'Where the helices of the active region sit. Add helices here in Draw mode; each one gets a row in the strand viewer.',
+					text:
+						editorViewContext.activeRegion?.kind === 'FREEFORM'
+							? 'In Draw mode (N), drag to draw an in-plane helix or double-click to add a perpendicular one. Each helix gets a row in the strand viewer.'
+							: 'In Draw mode (N), click an empty lattice cell to add a helix; Select mode only selects and moves. Each helix gets a row in the strand viewer.',
+					newVsCadnano: true,
 					doc: 'views',
 				}
 	)}

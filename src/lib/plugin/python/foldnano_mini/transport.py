@@ -21,6 +21,8 @@ import copy
 import uuid
 from typing import Any, Callable, Protocol
 
+from foldnano._frame import assert_right_handed_plane, normalize_frame
+
 from . import mutations as M
 from . import repeat
 from .checks import InvalidOperationError
@@ -411,7 +413,8 @@ def _h_add_vh_at_coords(raw: dict, op: dict) -> None:
 
 def _h_set_vh_local_frame(raw: dict, op: dict) -> None:
     vh = _find_vh_by_id(raw, op["vhId"])
-    vh["localFrame"] = op["localFrame"]
+    frame = op["localFrame"]
+    vh["localFrame"] = None if frame is None else normalize_frame(frame)
     # If the VH had latticeCoords, drop them — a freeform frame supersedes them.
     vh.pop("latticeCoords", None)
 
@@ -726,11 +729,13 @@ def _h_add_freeform_vh(raw: dict, op: dict) -> None:
         "index": new_vh_index,
         "regionId": region["id"],
         "listRow": len(raw.get("virtualHelices", [])),
-        "localFrame": {
-            "origin": {"x": float(origin[0]), "y": float(origin[1]), "z": float(origin[2])},
-            "axis": {"x": float(axis[0]), "y": float(axis[1]), "z": float(axis[2])},
-            "radial0": {"x": float(radial0[0]), "y": float(radial0[1]), "z": float(radial0[2])},
-        },
+        "localFrame": normalize_frame(
+            {
+                "origin": {"x": origin[0], "y": origin[1], "z": origin[2]},
+                "axis": {"x": axis[0], "y": axis[1], "z": axis[2]},
+                "radial0": {"x": radial0[0], "y": radial0[1], "z": radial0[2]},
+            }
+        ),
         "length": length,
         "strandSets": [{"segmentIds": []}, {"segmentIds": []}],
     }
@@ -755,6 +760,7 @@ def _h_reorder_vh(raw: dict, op: dict) -> None:
 
 
 def _h_transform_plane(raw: dict, op: dict) -> None:
+    assert_right_handed_plane("transform_plane", op["u"], op["v"], op["normal"])
     for p in raw.get("planes", []):
         if p["id"] == op["planeId"]:
             p["origin"] = dict(op["origin"])
@@ -766,6 +772,7 @@ def _h_transform_plane(raw: dict, op: dict) -> None:
 
 
 def _h_add_region_and_plane(raw: dict, op: dict) -> None:
+    assert_right_handed_plane("add_region_and_plane", op["planeU"], op["planeV"], op["planeNormal"])
     new_plane: dict = {
         "id": op["planeId"],
         "name": op["planeName"],

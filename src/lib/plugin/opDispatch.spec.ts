@@ -238,13 +238,33 @@ describe('opDispatch', () => {
 		});
 	});
 
+	describe('plane ops', () => {
+		it('transform_plane refuses a mirrored basis and leaves the plane as it was', () => {
+			const plane = part.planes[0];
+			const before = plane.toJSON();
+			expect(() =>
+				runLog(part, [
+					{
+						op: 'transform_plane',
+						planeId: plane.id,
+						origin: { x: 0, y: 0, z: 0 },
+						u: { x: 0, y: 1, z: 0 },
+						v: { x: 0, y: 0, z: -1 },
+						normal: { x: 1, y: 0, z: 0 },
+					},
+				])
+			).toThrow(/mirrored/);
+			expect(plane.toJSON()).toEqual(before);
+		});
+	});
+
 	describe('VH ops', () => {
 		it('set_vh_local_frame stores the frame on the VH', () => {
 			const vh = part.virtualHelices[0];
 			const frame = {
-				origin: [0, 0, 0] as [number, number, number],
-				axis: [0, 0, 1] as [number, number, number],
-				radial0: [1, 0, 0] as [number, number, number],
+				origin: { x: 0, y: 0, z: 0 },
+				axis: { x: 0, y: 0, z: 1 },
+				radial0: { x: 1, y: 0, z: 0 },
 			};
 			runLog(part, [
 				{
@@ -256,12 +276,51 @@ describe('opDispatch', () => {
 			expect(vh.localFrame).toEqual(frame);
 		});
 
+		it('set_vh_local_frame normalizes the axis and orthogonalizes radial0', () => {
+			const vh = part.virtualHelices[0];
+			const frame = {
+				origin: { x: 1, y: 2, z: 3 },
+				axis: { x: 0, y: 0, z: 2 },
+				radial0: { x: 1, y: 0, z: 5 },
+			};
+			runLog(part, [
+				{
+					op: 'set_vh_local_frame',
+					vhId: vh.id,
+					localFrame: frame as unknown as Record<string, unknown>,
+				},
+			]);
+			expect(vh.localFrame).toEqual({
+				origin: { x: 1, y: 2, z: 3 },
+				axis: { x: 0, y: 0, z: 1 },
+				radial0: { x: 1, y: 0, z: 0 },
+			});
+		});
+
+		it('set_vh_local_frame rejects a radial0 parallel to the axis', () => {
+			const vh = part.virtualHelices[0];
+			const frame = {
+				origin: { x: 0, y: 0, z: 0 },
+				axis: { x: 0, y: 0, z: 1 },
+				radial0: { x: 0, y: 0, z: -1 },
+			};
+			expect(() =>
+				runLog(part, [
+					{
+						op: 'set_vh_local_frame',
+						vhId: vh.id,
+						localFrame: frame as unknown as Record<string, unknown>,
+					},
+				])
+			).toThrow(/parallel/);
+		});
+
 		it('set_vh_local_frame with null clears the frame', () => {
 			const vh = part.virtualHelices[0];
 			const frame = {
-				origin: [0, 0, 0] as [number, number, number],
-				axis: [0, 0, 1] as [number, number, number],
-				radial0: [1, 0, 0] as [number, number, number],
+				origin: { x: 0, y: 0, z: 0 },
+				axis: { x: 0, y: 0, z: 1 },
+				radial0: { x: 1, y: 0, z: 0 },
 			};
 			runLog(part, [
 				{

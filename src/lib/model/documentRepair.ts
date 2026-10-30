@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { DocSnapshot } from './document.svelte';
-import { HEX_INTERHELIX_NM, SQ_INTERHELIX_NM } from './geometry3d/dnaGeometry';
+import { HEX_INTERHELIX_NM, SQ_INTERHELIX_NM, isRightHandedBasis } from './geometry3d/dnaGeometry';
 
 type PartJson = DocSnapshot['parts'][number];
 type OligoJson = PartJson['oligos'][number];
@@ -134,7 +134,30 @@ function repairPart(input: PartJson, repairs: string[]): PartJson {
 	// 5. Lattice cells: no negative row/col (the grid and parity math assume >= 0).
 	shiftNegativeLatticeCells(part, repairs, label);
 
+	// 6. Planes: right-handed bases only (the Side (YZ) base plane used to be mirrored).
+	flipMirroredPlanes(part, repairs, label);
+
 	return part;
+}
+
+/**
+ * Negates `v` of every left-handed plane. Plane-local coordinates (the 2D layout) are untouched,
+ * so in 3D its regions flip along V, and their helices twist the right way.
+ */
+function flipMirroredPlanes(
+	part: PartJson,
+	repairs: string[],
+	label: (what: string) => string
+): void {
+	for (const plane of part.planes) {
+		if (isRightHandedBasis(plane.u, plane.v, plane.normal)) continue;
+		plane.v = { x: -plane.v.x + 0, y: -plane.v.y + 0, z: -plane.v.z + 0 };
+		repairs.push(
+			label(
+				`Flipped the V axis of plane "${plane.name}": it was mirrored, which twisted its helices the wrong way in 3D and in oxDNA/mrDNA export. The 2D layout is unchanged; in 3D the regions on it are flipped along the plane's V axis`
+			)
+		);
+	}
 }
 
 /** One lattice period in plane units: shifting by it moves helices onto equivalent cells. */

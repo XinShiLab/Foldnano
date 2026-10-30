@@ -54,6 +54,28 @@ function repairAndLoad(snapshot: DocSnapshot) {
 }
 
 describe('repairDocumentJson', () => {
+	it('flips V of a mirrored plane so its basis is right-handed, keeping the 2D layout', () => {
+		const snapshot = scene();
+		const plane = partOf(snapshot).planes[0];
+		// The old Side (YZ) base plane: u × v = -X, opposite its stored normal.
+		Object.assign(plane, {
+			u: { x: 0, y: 1, z: 0 },
+			v: { x: 0, y: 0, z: -1 },
+			normal: { x: 1, y: 0, z: 0 },
+		});
+		const cellsBefore = partOf(snapshot).virtualHelices.map((vh) => vh.latticeCoords);
+
+		const { repaired, repairs } = repairAndLoad(snapshot);
+
+		expect(repairs).toEqual([expect.stringContaining('Flipped the V axis of plane')]);
+		expect(partOf(repaired).planes[0]).toMatchObject({
+			u: { x: 0, y: 1, z: 0 },
+			v: { x: 0, y: 0, z: 1 },
+			normal: { x: 1, y: 0, z: 0 },
+		});
+		expect(partOf(repaired).virtualHelices.map((vh) => vh.latticeCoords)).toEqual(cellsBefore);
+	});
+
 	it('returns a consistent document untouched', () => {
 		for (const snapshot of [scene(), crossoverScene()]) {
 			const result = repairDocumentJson(snapshot);

@@ -14,6 +14,7 @@ export const SHAPE_RULES = [
 	'color-bounds',
 	'bounds',
 	'reference',
+	'mirrored-plane',
 ] as const;
 export type ShapeRule = (typeof SHAPE_RULES)[number];
 

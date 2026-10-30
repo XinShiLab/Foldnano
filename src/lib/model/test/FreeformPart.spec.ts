@@ -8,9 +8,67 @@ import {
 	BACKBONE_RADIUS_NM,
 	helixCenterPoint,
 	backbonePoint,
+	isFrameOrthonormal,
+	normalizeFrame,
+	normalizeVec,
+	PERPENDICULAR_AXIS_DOT,
+	referenceRadial0,
+	rollDegOf,
+	withRoll,
 	type VirtualHelixFrame,
 } from '$lib/model/geometry3d/dnaGeometry';
 import { collectOxDnaNucleotides } from '$lib/model/io/oxdnaExport';
+
+describe('VirtualHelixFrame roll helpers', () => {
+	const inPlane: VirtualHelixFrame = {
+		origin: { x: 1, y: 2, z: 0 },
+		axis: { x: 0.6, y: 0.8, z: 0 },
+		radial0: { x: 0, y: 0, z: 1 },
+	};
+
+	it('referenceRadial0: plane normal for in-plane axes, +X for axes along Z', () => {
+		expect(referenceRadial0({ x: 1, y: 0, z: 0 })).toEqual({ x: 0, y: 0, z: 1 });
+		expect(referenceRadial0({ x: 0, y: 0, z: 1 })).toEqual({ x: 1, y: 0, z: 0 });
+		expect(referenceRadial0({ x: 0, y: 0, z: -1 })).toEqual({ x: 1, y: 0, z: 0 });
+	});
+
+	it('a tilted helix the plane view draws as standing also takes +X as its roll 0', () => {
+		const tilted = normalizeVec({ x: 0.3, y: 0, z: 0.954 });
+		expect(Math.abs(tilted.z)).toBeGreaterThanOrEqual(PERPENDICULAR_AXIS_DOT);
+		expect(referenceRadial0(tilted).x).toBeGreaterThan(0.9);
+		const lying = normalizeVec({ x: 0.5, y: 0, z: 0.85 });
+		expect(Math.abs(lying.z)).toBeLessThan(PERPENDICULAR_AXIS_DOT);
+		expect(referenceRadial0(lying).z).toBeGreaterThan(0.5);
+	});
+
+	it('rollDegOf is 0 for the reference and round-trips through withRoll', () => {
+		expect(rollDegOf(inPlane)).toBeCloseTo(0);
+		for (const deg of [-135, -30, 45, 90, 180]) {
+			const rolled = withRoll(inPlane, deg);
+			expect(rollDegOf(rolled)).toBeCloseTo(deg);
+			expect(rolled.origin).toEqual(inPlane.origin);
+			expect(isFrameOrthonormal(rolled, 1e-9)).toBe(true);
+		}
+	});
+
+	it('positive roll turns radial0 toward axis × radial0, the backbonePoint phase sense', () => {
+		const rolled = withRoll({ ...inPlane, axis: { x: 0, y: 0, z: 1 } }, 90);
+		expect(rolled.radial0.x).toBeCloseTo(0);
+		expect(rolled.radial0.y).toBeCloseTo(1);
+	});
+
+	it('normalizeFrame orthogonalizes radial0 and rejects degenerate frames', () => {
+		const fixed = normalizeFrame({
+			origin: { x: 0, y: 0, z: 0 },
+			axis: { x: 0, y: 0, z: 2 },
+			radial0: { x: 1, y: 0, z: 1 },
+		});
+		expect(fixed.axis).toEqual({ x: 0, y: 0, z: 1 });
+		expect(fixed.radial0).toEqual({ x: 1, y: 0, z: 0 });
+		expect(() => normalizeFrame({ ...fixed, axis: { x: 0, y: 0, z: 0 } })).toThrow();
+		expect(() => normalizeFrame({ ...fixed, radial0: { x: 0, y: 0, z: 3 } })).toThrow();
+	});
+});
 
 describe('VirtualHelixFrame geometry helpers', () => {
 	it('helixCenterPoint: +Z axis shifts z with bp index', () => {

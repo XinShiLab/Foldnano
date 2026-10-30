@@ -327,6 +327,12 @@ const CASES: Record<string, Case> = {
 			virtualHelix.moveFreeformVirtualHelicesCmd({ moves }, history)
 		);
 	},
+	setFreeformVhRollCmd: () => {
+		const { doc, vh0, vh1, history } = freeformScene();
+		expectUndoRoundTrip(doc, history, () =>
+			virtualHelix.setFreeformVhRollCmd({ vhs: [vh0, vh1], rollDeg: 60 }, history)
+		);
+	},
 	moveLatticeVirtualHelicesCmd: () => {
 		const { doc, part, region, vh0, history } = emptyLatticeScene();
 		expectUndoRoundTrip(doc, history, () =>

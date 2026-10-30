@@ -38,13 +38,14 @@ rewritten to its neighbour as an `info` issue).
 for states the editor never creates itself but a loaded file or plugin result can. They collect
 every issue and never throw:
 
-| Rule                       | Severity | Why                                                                                                                                                                 |
-| -------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `helix-cell-parity`        | warning  | helix number parity ≠ cell parity (`row % 2 === col % 2` is even); the editor assigns them together (`addVhAtCoords`), cadnano export and crossover sites assume it |
-| `negative-cell`            | error    | the grid, move bounds and parity math assume row/col ≥ 0                                                                                                            |
-| `shared-cell`              | error    | two helices of one region on one lattice cell                                                                                                                       |
-| `asymmetric-skip-insert`   | error    | both strands present at a base with different slot lengths; `addSkipOrInsertion` always edits both                                                                  |
-| `skip-insert-on-crossover` | error    | skip/insert on a constrained crossover site; the editor refuses it (`_assertCanModifySkipOrInsertionAt`)                                                            |
+| Rule                       | Severity | Why                                                                                                                                                                   |
+| -------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `helix-cell-parity`        | warning  | helix number parity ≠ cell parity (`row % 2 === col % 2` is even); the editor assigns them together (`addVhAtCoords`), cadnano export and crossover sites assume it   |
+| `negative-cell`            | error    | the grid, move bounds and parity math assume row/col ≥ 0                                                                                                              |
+| `shared-cell`              | error    | two helices of one region on one lattice cell                                                                                                                         |
+| `asymmetric-skip-insert`   | error    | both strands present at a base with different slot lengths; `addSkipOrInsertion` always edits both                                                                    |
+| `skip-insert-on-crossover` | error    | skip/insert on a constrained crossover site; the editor refuses it (`_assertCanModifySkipOrInsertionAt`)                                                              |
+| `freeform-frame`           | warning  | a freeform `localFrame` whose axis/`radial0` aren't unit length or perpendicular (`isFrameOrthonormal`); editor and plugin ops always `normalizeFrame`, files may not |
 
 A skip/insert on a base whose other strand is **absent** is not an integrity issue: deleting the
 partner strand leaves it there in normal editing. Simulation export refuses it through the
@@ -100,7 +101,10 @@ Every place a cadnano file is changed or refused on the way in, so nothing is dr
 ## Repairs on foldnano JSON load
 
 `repairDocumentJson` (see `storage-architecture.md` § Repair on load) also moves a lattice region off
-negative cells without moving it in 3D. Integrity issues found after that are reported, never fixed:
+negative cells without moving it in 3D, and makes a mirrored plane right-handed by negating its `v`
+(`isRightHandedBasis`). Plugin results can't carry a mirrored plane: the `mirrored-plane` shape rule
+rejects a `foldnano_json` result, and `opDispatch` / the Python mirror refuse `transform_plane` and
+`add_region_and_plane` with one. Integrity issues found after that are reported, never fixed:
 which strand's skip is right, or which helix owns a shared cell, isn't knowable.
 
 ## Callers

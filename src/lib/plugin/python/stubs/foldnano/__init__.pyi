@@ -347,6 +347,16 @@ class VirtualHelixProxy:
     def from_json(cls, vh_json: dict[str, Any]) -> 'VirtualHelixProxy': ...
 
     @property
+    def roll_deg(self) -> Optional[float]:
+        """
+        Rotation of a freeform helix about its own axis, in degrees (-180, 180].
+
+        0 means ``radial0`` points along the region plane's normal (or +X for a
+        helix standing along ±Z); positive is right-handed about the axis.
+        ``None`` when the VH has no ``local_frame``.
+        """
+
+    @property
     def is_freeform(self) -> bool:
         """True when this VH has no lattice coordinates (freeform region VH)."""
 

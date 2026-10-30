@@ -1,10 +1,13 @@
 import type { Part } from '$lib/model/Part/Part.svelte';
 import { failShape as reject } from '../designIssue';
+import { isRightHandedBasis } from '$lib/model/geometry3d/dnaGeometry';
 
 type PartJSON = ReturnType<Part['toJSON']>;
 
 type SegmentJSON = PartJSON['oligos'][number]['segments'][number];
 type SegmentEndJSON = SegmentJSON['fivePrime'];
+
+type PlaneVec = { x: number; y: number; z: number };
 
 const isInt = Number.isInteger;
 const isFiniteNum = (x: unknown): x is number => typeof x === 'number' && Number.isFinite(x);
@@ -47,6 +50,12 @@ export function checkFoldnanoPartJsonShape(parsed: unknown): PartJSON {
 		planeIds.add(p.id as string);
 		for (const field of ['origin', 'u', 'v', 'normal'] as const) {
 			if (!isVec3(p[field])) reject(`Plane "${p.id}" has a malformed "${field}".`);
+		}
+		if (!isRightHandedBasis(p.u as PlaneVec, p.v as PlaneVec, p.normal as PlaneVec)) {
+			reject(
+				`Plane "${p.name || p.id}" is mirrored: u × v must point along its normal, or its helices twist the wrong way in 3D and export.`,
+				'mirrored-plane'
+			);
 		}
 	}
 

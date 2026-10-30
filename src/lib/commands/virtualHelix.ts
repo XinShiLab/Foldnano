@@ -4,6 +4,7 @@ import type VirtualHelix from '$lib/model/VirtualHelix/VirtualHelix.svelte';
 import {
 	BACKBONE_RISE_NM,
 	framesEqual,
+	withRoll,
 	type VirtualHelixFrame,
 } from '$lib/model/geometry3d/dnaGeometry';
 import type { HistoryStack } from './history.svelte';
@@ -12,8 +13,6 @@ import {
 	previewLatticeMove,
 	type LatticeCell,
 } from '$lib/components/Editor/HelixView/latticeSelection';
-
-const WORKPLANE_NORMAL = { x: 0, y: 0, z: 1 };
 
 function nextStepMultiple(value: number, step: number): number {
 	return Math.ceil(value / step) * step;
@@ -134,11 +133,6 @@ export const addInPlaneFreeformVirtualHelixCmd = (
 			region.increaseVhsLengthBy(targetLength - region.maxBase);
 		}
 		const vh = region.addVhAt(part, [start.x, start.y, 0], [axis.x, axis.y, axis.z]);
-		vh.localFrame = {
-			origin: { x: start.x, y: start.y, z: 0 },
-			axis,
-			radial0: { ...WORKPLANE_NORMAL },
-		};
 		fillBothStrandSets(part, vh, fillLengthBp);
 		created = vh;
 	});
@@ -165,6 +159,24 @@ export const moveFreeformVirtualHelicesCmd = (
 
 	history.tx('Move virtual helices', (rec) => {
 		for (const { vh, from, to } of moves) {
+			rec.field(vhRef(vh), 'localFrame', from, to);
+			vh.localFrame = to;
+		}
+	});
+};
+
+export const setFreeformVhRollCmd = (
+	para: { vhs: VirtualHelix[]; rollDeg: number },
+	history: HistoryStack
+) => {
+	const changes = para.vhs
+		.filter((vh): vh is VirtualHelix & { localFrame: VirtualHelixFrame } => !!vh.localFrame)
+		.map((vh) => ({ vh, from: vh.localFrame, to: withRoll(vh.localFrame, para.rollDeg) }))
+		.filter(({ from, to }) => !framesEqual(from, to));
+	if (changes.length === 0) return;
+
+	history.tx(changes.length === 1 ? 'Set helix roll' : 'Set helices roll', (rec) => {
+		for (const { vh, from, to } of changes) {
 			rec.field(vhRef(vh), 'localFrame', from, to);
 			vh.localFrame = to;
 		}

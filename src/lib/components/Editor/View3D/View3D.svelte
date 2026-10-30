@@ -27,7 +27,12 @@
 	import { exportPartToMrdna, type MrdnaFallbackBase } from '$lib/model/io/mrdnaExport';
 	import OxDnaExportDialog from './OxDnaExportDialog.svelte';
 	import { canvasTheme } from '$lib/canvasEditor/theme.svelte';
-	import { createCoordinateAxis, type CoordinateAxisResult } from './coordinateAxis';
+	import {
+		createCoordinateAxis,
+		createPlaneAxes,
+		type CoordinateAxisResult,
+		type PlaneAxesResult,
+	} from './coordinateAxis';
 	import {
 		createTransformGizmo,
 		type GizmoMode,
@@ -158,6 +163,7 @@
 
 	// ── Three.js object references ────────────────────────────────────────────
 	let axisObjects: CoordinateAxisResult | undefined;
+	let planeAxes: PlaneAxesResult | undefined;
 	let _activeCamera: THREE.PerspectiveCamera | undefined;
 	let _controls: TrackballControls | undefined;
 	let currentGroup: THREE.Group | null = null;
@@ -527,6 +533,17 @@
 	$effect(() => {
 		if (!threeRenderer) return;
 		threeRenderer.setClearColor(canvasTheme.isDark ? 0x111113 : 0xfafafa);
+		_markDirty?.();
+	});
+
+	// U/V/W triad of the active freeform region's plane, matching the Select panel's fields
+	$effect(() => {
+		if (!threeRenderer || !planeAxes) return;
+		const region = editorViewContext.activeRegion;
+		const plane = region?.kind === 'FREEFORM' ? editorViewContext.activePlane : null;
+		planeAxes.setPlane(
+			plane ? { origin: plane.origin, u: plane.u, v: plane.v, normal: plane.normal } : null
+		);
 		_markDirty?.();
 	});
 
@@ -911,6 +928,8 @@
 		axisObjects = createCoordinateAxis(20);
 		axisObjects.group.visible = false;
 		scene.add(axisObjects.group);
+		planeAxes = createPlaneAxes(10);
+		scene.add(planeAxes.group);
 
 		// ── Plane overlay ──────────────────────────────────────────────────────
 		planeOverlay = createPlaneOverlay();
@@ -1035,6 +1054,11 @@
 				cursor = undefined;
 			}
 
+			if (planeAxes) {
+				scene!.remove(planeAxes.group);
+				planeAxes.dispose();
+				planeAxes = undefined;
+			}
 			if (axisObjects) {
 				scene!.remove(axisObjects.group);
 				axisObjects.dispose();

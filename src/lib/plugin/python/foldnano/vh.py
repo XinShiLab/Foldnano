@@ -10,6 +10,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
+from ._frame import roll_deg_of
+
 
 @dataclass
 class VirtualHelixProxy:
@@ -65,6 +67,17 @@ class VirtualHelixProxy:
             local_frame=vh_json.get("localFrame"),
             list_row=vh_json.get("listRow"),
         )
+
+    @property
+    def roll_deg(self) -> Optional[float]:
+        """
+        Rotation of a freeform helix about its own axis, in degrees (-180, 180].
+
+        0 means ``radial0`` points along the region plane's normal (or +X for a
+        helix standing along ±Z); positive is right-handed about the axis.
+        ``None`` when the VH has no ``local_frame``.
+        """
+        return None if self.local_frame is None else roll_deg_of(self.local_frame)
 
     @property
     def is_freeform(self) -> bool:

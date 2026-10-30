@@ -6,6 +6,8 @@ order: 7
 slug: selection
 covers:
   - src/lib/components/Editor/ToolPanel/SelectPanel.svelte
+  - src/lib/components/Editor/ToolPanel/FreeformVhPanel.svelte
+  - src/lib/components/Editor/ToolPanel/RollDial.svelte
   - src/lib/components/Editor/ToolPanel/OligoNameField.svelte
   - src/lib/components/Editor/ToolPanel/filterToggleClasses.ts
   - src/lib/components/Editor/ToolPanel/CircularScaffoldMapPanel.svelte
@@ -164,6 +166,14 @@ Freeform plane view selects whole helices, the same way the lattice plane view d
 - **Click or marquee-select** VHs.
 - **Drag** to move selected VHs.
 - `Delete` / `Backspace` removes selected freeform VHs.
+
+Clicking a freeform helix's number tag at the left of the strand viewer selects it too (`Shift`-click adds or removes it), so you can turn a helix from the strand viewer while the 3D view is open in the other pane. With freeform helices selected, the Selection Tool panel shows their **Roll**, **position** and **direction**:
+
+- **Roll** is how far the helix is turned about its own axis, which sets where its backbones and crossovers face. The dial shows the helix end-on, seen from its first base (bp 0); drag the dot (it snaps to 15°, hold `Alt` to turn freely) or type an angle. Clockwise is positive. 0° points along the plane normal (W) for a helix lying in the plane, or along U for a helix standing up.
+- **U, V, W** give the start of one helix in nm, measured along the region plane's own axes: U (red) and V (green) lie in the plane, W (blue) is its normal. The freeform plane view draws them at the plane origin (W points into the screen, shown as ⊗), and the 3D view draws them for the active freeform region. With several helices selected they become **ΔU, ΔV, ΔW** and move them all by that amount.
+- **Direction** turns a helix that lies in the plane, keeping its roll.
+
+When several helices disagree, the field is blank; typing a value applies it to all of them. On the canvas, a selected standing helix shows its roll as a small handle on its circle, and a helix lying in the plane shows a little end-on dial just before its start. Drag either to change the roll.
 
 Both plane views are helix-based; strand-level routing and selection for a freeform region happen in the strand viewer, exactly like any other region.
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onDestroy } from 'svelte';
 	import { Stage, Layer } from 'svelte-konva';
 	import type { Stage as StageType } from 'svelte-konva';
 	import type { Part } from '$lib/model/Part/Part.svelte';
@@ -6,6 +7,7 @@
 	import { LatticedDesignRegion } from '$lib/model/Part/DesignRegion';
 	import LatticeViewer from './LatticeViewer.svelte';
 	import FreeformViewer from './FreeformViewer.svelte';
+	import PlaneGestureHint from './PlaneGestureHint.svelte';
 	import { handleWheel } from '../mouseHandler';
 	import { getEditorViewContext } from '../context/EditorViewContext.svelte';
 
@@ -21,7 +23,18 @@
 	let editorMode = $derived(editorViewContext.editorMode);
 	const latticeCanvasWidth = 1200;
 	const latticeCanvasHeight = 1200;
+	const DRAW_NUDGE_MS = 4000;
 	let tabsScroller = $state<HTMLDivElement | null>(null);
+	let drawNudge = $state(false);
+	let drawNudgeTimer: ReturnType<typeof setTimeout> | undefined;
+
+	function showDrawNudge(): void {
+		drawNudge = true;
+		clearTimeout(drawNudgeTimer);
+		drawNudgeTimer = setTimeout(() => (drawNudge = false), DRAW_NUDGE_MS);
+	}
+
+	onDestroy(() => clearTimeout(drawNudgeTimer));
 
 	let activeRegion = $derived.by(() => {
 		const id = editorViewContext.activeRegionId;
@@ -70,7 +83,7 @@
 		</div>
 	{/if}
 
-	<div class="min-h-0 flex-1 overflow-hidden">
+	<div class="relative min-h-0 flex-1 overflow-hidden">
 		{#if activeRegion instanceof LatticedDesignRegion}
 			<Stage
 				draggable={editorMode === 'PAN'}
@@ -85,11 +98,21 @@
 						region={activeRegion}
 						canvasWidth={latticeCanvasWidth}
 						canvasHeight={latticeCanvasHeight}
+						onIdleClick={showDrawNudge}
 					/>
 				</Layer>
 			</Stage>
 		{:else if activeRegion?.kind === 'FREEFORM'}
-			<FreeformViewer {part} region={activeRegion} {focusedSegments} bind:stageRef />
+			<FreeformViewer
+				{part}
+				region={activeRegion}
+				{focusedSegments}
+				onIdleClick={showDrawNudge}
+				bind:stageRef
+			/>
+		{/if}
+		{#if activeRegion}
+			<PlaneGestureHint {part} region={activeRegion} nudge={drawNudge} />
 		{/if}
 	</div>
 </div>
