@@ -46,7 +46,7 @@ The **Hub** tab lists the curated **Core Plugins**, each with its description an
 | **GC Colorizer** | Colors each staple by GC content (blue GC-rich, red AT-rich); needs sequences | Yes |
 | **Staple Colorizer** / **Staple Colorizer (mini)** | Recolors all staples with a configurable HSL palette | Yes |
 | **Nick Remover** | Joins adjacent staple nicks (consecutive 3′/5′ ends on the same helix) | Yes |
-| **pyOrigamiBreak: Staple Auto-Break** | Optimizes staple break positions with thermodynamic scoring (Mauthe et al., PNAS 2023) | Yes |
+| **pyOrigamiBreak: Staple Auto-Break** | Optimizes staple break positions with thermodynamic scoring (Aksel et al., PNAS 2024) | Yes |
 | **Hello World**, **Mutation Test**, **Side Panel Form Demo** | Examples for plugin authors | Some |
 
 ### My Plugins
@@ -55,6 +55,8 @@ Each installed plugin is a card showing its name, version, and badges:
 
 - **format** (`cadnano_json`, `foldnano_json`, `foldnano_mini`) and **apply strategy**,
 - **standard env** (shares the Python runtime with other plugins) or **custom env** (needs its own runtime; only one custom-environment plugin can be active at a time).
+
+Click a plugin's name to show its description and any papers its author asks you to cite, with a link and a copy button. A small quote mark next to the name means the plugin has a citation. If you use the plugin in published work, please cite them. Citations also appear when you review a plugin before installing it.
 
 | Button | What it does |
 | --- | --- |

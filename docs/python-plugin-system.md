@@ -241,6 +241,7 @@ All fields are typed in `src/lib/plugin/types.ts`:
 | `network`       | `string[]?`                                            | Hosts the plugin may contact, or `["*"]`. Omitted/empty = none. Enforced by the sandbox CSP (§ Sandbox).  |
 | `description`   | `string?`                                              | Optional human-readable description.                                                                      |
 | `icon`          | `string?`                                              | v2 only. Path of an SVG inside the plugin zip; see § Plugin icons.                                        |
+| `citations`     | `PluginCitation[]?`                                    | v2 only. References the author asks users to cite; see § Plugin citations.                                |
 | `parameters`    | `PluginParamDef[]?`                                    | User-configurable parameters shown in a dialog before each run (see below).                               |
 | `sidePanel`     | `PluginSidePanelManifest?`                             | Optional host-rendered side panel request using built-in `form` or `codeEditor` surfaces.                 |
 
@@ -250,15 +251,15 @@ All fields are typed in `src/lib/plugin/types.ts`:
 
 - **Missing:** read as `1` (see below).
 - **Newer than `MANIFEST_SCHEMA_VERSION`:** refused with "needs a newer version of Foldnano", before any field is looked at, so an old app never half-understands a new manifest.
-- **Unknown fields:** rejected at every level (`MANIFEST_V1_FIELDS`, `MANIFEST_V1_NESTED_FIELDS`). This is what gives the version teeth: a new field can't ship without a version bump, because older apps would reject it rather than ignore it. Top-level `x-` fields are the author escape hatch.
+- **Unknown fields:** rejected at every level (`MANIFEST_V1_FIELDS`, `MANIFEST_V1_NESTED_FIELDS`). This is what gives the version teeth: a new field normally can't ship without a version bump, because older apps would reject it rather than ignore it. Top-level `x-` fields are the author escape hatch.
 
 **Missing means 1, forever** (`DEFAULT_MANIFEST_SCHEMA_VERSION`, not the current version), like `.fn.json` files without a header. `withSchemaVersion` fills it in, so `validateManifest` returns, and `PluginRegistry` loads from IndexedDB, manifests with an explicit version. This is safe only because of two rules: unknown fields are rejected (a newer field used without declaring its version fails loudly), and **an existing field never changes meaning** in a later version; add a new field instead. A stored manifest newer than the app is flagged `needs-reinstall`.
 
 **Published schemas:** `static/schemas/fplugin-v<N>.schema.json` (JSON Schema 2020-12), one per version and all kept online, documented for authors in `src/content/plugin-development/04-plugin-manifest.md`. `manifestSchema.spec.ts` keeps them in lockstep: every shipped manifest must pass the schema of its own `schemaVersion` and `validateManifest`, each schema's field lists must equal `manifestFieldsFor(N)`, and network-entry rules must agree.
 
-**Versions:** v1 is the original field set (`MANIFEST_V1_FIELDS`). v2 (`MANIFEST_V2_FIELDS`) adds top-level `icon`; nested objects are unchanged. A v1 manifest that uses `icon` is refused with a message naming `schemaVersion`. Owned plugins (Script Lab) always write the current version.
+**Versions:** v1 is the original field set (`MANIFEST_V1_FIELDS`). v2 (`MANIFEST_V2_FIELDS`) adds top-level `icon` and `citations`; objects shared with v1 are unchanged. A v1 manifest that uses either is refused with a message naming `schemaVersion`. Owned plugins (Script Lab) always write the current version.
 
-**Bumping the version:** add the field to the validator and its field lists, raise `MANIFEST_SCHEMA_VERSION` (and the `schemaVersion` literal type), publish `fplugin-v<N>.schema.json` next to the old one, and update the author docs.
+**Bumping the version:** add the field to the validator and its field lists, raise `MANIFEST_SCHEMA_VERSION` (and the `schemaVersion` literal type), publish `fplugin-v<N>.schema.json` next to the old one, and update the author docs. **Beta exception:** users load the latest app, so an optional, display-only field may join the current version and its published schema instead, as `citations` joined v2. The cost is that a tab still open on an older build refuses such a manifest as an unknown field until it reloads. Don't use this exception for a field that affects behavior or safety, or after the beta.
 
 **Install-time identity rules.** `validateManifest` requires `id` to match `PLUGIN_ID_PATTERN` and `version` to be semver (`PLUGIN_VERSION_PATTERN`); the published schema carries the same patterns (`manifestSchema.spec.ts` checks they match). `validateManifest` runs only on install paths, so plugins installed before these rules (checked 2026-09-30) keep loading; tightening a v1 field this way is the exception the versioning policy allows only because it never touches stored manifests.
 
@@ -365,6 +366,14 @@ A v2 manifest may name an SVG inside its zip: `"icon": "icon.svg"` (`PLUGIN_ICON
 - **Precedence:** `manifest.icon` → `sidePanel.icon` → the panel type's default glyph (`toPluginSidePanelDescriptors` in `Editor/sidePanels.ts`).
 - **Owned plugins** bundle theirs as `icon.svg`, chosen in Save as Plugin or the editor's Icon button; see `docs/script-lab.md` § Owned plugins.
 - **Not yet:** the Plugin Centre lists pointer manifests before install, so it shows no icons.
+
+### Plugin citations
+
+`citations` lists `{ text, doi? | url? }` entries (`validateCitations`), and the schema keeps the same limits.
+
+- **Untrusted text:** `text` renders as plain text. `citationLink` is the only way to get a link: a DOI always becomes a `https://doi.org/…` address and `url` must be `https://`, so a manifest can't produce another scheme.
+- **Where it shows:** `PluginCitations.svelte`, used by `PluginManifestInfo` (every pre-install review) and by the row expansion in `PluginPanel`. Clicking the name toggles the expansion, which also holds `description`. It is a real button rather than a row click because the row holds a switch, actions and selectable run output. Expansion state is per panel instance and not persisted.
+- **One source for core plugins:** the Hub lists `core_plugins/*.fplugin.json`, and `scripts/build-plugins.mjs` injects the same manifest into the zip. Installed copies keep their stored manifest until they are reinstalled.
 
 ### Code-editor execution modes
 

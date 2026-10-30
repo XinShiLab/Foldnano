@@ -6,6 +6,7 @@
  */
 
 import type {
+	PluginCitation,
 	PluginFieldDef,
 	PluginManifest,
 	PluginParamDef,
@@ -42,8 +43,11 @@ export const MANIFEST_V1_FIELDS: readonly string[] = [
 	'sidePanel',
 ];
 
-/** v2 adds `icon`. Nested objects are unchanged. */
-export const MANIFEST_V2_FIELDS: readonly string[] = [...MANIFEST_V1_FIELDS, 'icon'];
+/** v2 adds `icon` and `citations`. The objects shared with v1 are unchanged. */
+export const MANIFEST_V2_FIELDS: readonly string[] = [...MANIFEST_V1_FIELDS, 'icon', 'citations'];
+
+/** Fields allowed in an entry of `citations`. */
+export const MANIFEST_CITATION_FIELDS: readonly string[] = ['text', 'doi', 'url'];
 
 /** Top-level fields a manifest of `schemaVersion` may contain. */
 export function manifestFieldsFor(schemaVersion: number): readonly string[] {
@@ -245,6 +249,54 @@ export const PLUGIN_VERSION_PATTERN =
 export const PLUGIN_ICON_PATH_PATTERN =
 	/^(?:[A-Za-z0-9_-][A-Za-z0-9._-]*\/)*[A-Za-z0-9_-][A-Za-z0-9._-]*\.svg$/;
 
+export const MAX_PLUGIN_CITATIONS = 10;
+export const MAX_PLUGIN_CITATION_TEXT_LENGTH = 500;
+export const PLUGIN_CITATION_DOI_PATTERN = /^10\.\d{4,9}\/\S+$/;
+export const PLUGIN_CITATION_URL_PATTERN = /^https:\/\/[^\s/]\S*$/;
+
+/** Where a citation links to, or null when it has no valid link. Only ever an https:// address. */
+export function citationLink(citation: PluginCitation): { href: string; label: string } | null {
+	if (citation.doi) {
+		const path = citation.doi.split('/').map(encodeURIComponent).join('/');
+		return { href: `https://doi.org/${path}`, label: `doi.org/${citation.doi}` };
+	}
+	if (citation.url && PLUGIN_CITATION_URL_PATTERN.test(citation.url))
+		return { href: citation.url, label: citation.url.slice('https://'.length) };
+	return null;
+}
+
+function validateCitations(raw: unknown): void {
+	if (!Array.isArray(raw)) throw new Error('"citations" must be an array');
+	if (raw.length > MAX_PLUGIN_CITATIONS)
+		throw new Error(`"citations" can list at most ${MAX_PLUGIN_CITATIONS} references`);
+	for (const entry of raw as unknown[]) {
+		if (!entry || typeof entry !== 'object' || Array.isArray(entry))
+			throw new Error('Each entry of "citations" must be an object with a "text" field');
+		const c = entry as Record<string, unknown>;
+		rejectUnknownFields(c, MANIFEST_CITATION_FIELDS, 'an entry of "citations"');
+		if (typeof c.text !== 'string' || !c.text.trim())
+			throw new Error('Each entry of "citations" must have a non-empty string "text" field');
+		if (c.text.length > MAX_PLUGIN_CITATION_TEXT_LENGTH)
+			throw new Error(
+				`A citation's "text" can be at most ${MAX_PLUGIN_CITATION_TEXT_LENGTH} characters`
+			);
+		if (c.doi !== undefined && c.url !== undefined)
+			throw new Error('A citation can set "doi" or "url", not both');
+		if (
+			c.doi !== undefined &&
+			(typeof c.doi !== 'string' || !PLUGIN_CITATION_DOI_PATTERN.test(c.doi))
+		)
+			throw new Error(
+				`Citation "doi" must be a bare DOI such as "10.1073/pnas.2406769121", without "https://doi.org/" (got ${JSON.stringify(c.doi)})`
+			);
+		if (
+			c.url !== undefined &&
+			(typeof c.url !== 'string' || !PLUGIN_CITATION_URL_PATTERN.test(c.url))
+		)
+			throw new Error(`Citation "url" must start with https:// (got ${JSON.stringify(c.url)})`);
+	}
+}
+
 export function validateManifest(raw: unknown, { allowNoEntrypoint = false } = {}): PluginManifest {
 	if (!raw || typeof raw !== 'object' || Array.isArray(raw))
 		throw new Error('Manifest must be a JSON object');
@@ -254,6 +306,8 @@ export function validateManifest(raw: unknown, { allowNoEntrypoint = false } = {
 	const schemaVersion = (m.schemaVersion as number | undefined) ?? DEFAULT_MANIFEST_SCHEMA_VERSION;
 	if (m.icon !== undefined && schemaVersion < 2)
 		throw new Error('"icon" needs "schemaVersion": 2 (or later) in the manifest');
+	if (m.citations !== undefined && schemaVersion < 2)
+		throw new Error('"citations" needs "schemaVersion": 2 (or later) in the manifest');
 	rejectUnknownFields(m, manifestFieldsFor(schemaVersion), 'the manifest', true);
 	if (m.$schema !== undefined && typeof m.$schema !== 'string')
 		throw new Error('"$schema" must be a string');
@@ -397,6 +451,8 @@ export function validateManifest(raw: unknown, { allowNoEntrypoint = false } = {
 		if (isRuntimeCodeManifest(m as { sidePanel?: { codeEditor?: { execution?: string } } }))
 			throw new Error('"icon" needs a packaged plugin zip; code-editor plugins can\'t bundle one');
 	}
+
+	if (m.citations !== undefined) validateCitations(m.citations);
 
 	if (m.parameters !== undefined) {
 		if (!Array.isArray(m.parameters)) throw new Error('"parameters" must be an array');

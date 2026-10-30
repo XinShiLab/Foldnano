@@ -3,8 +3,11 @@
 	import { getEditorViewContext } from '../context/EditorViewContext.svelte';
 	import { getEditorDocumentSession } from '../context/EditorDocumentSession.svelte';
 	import type { PythonPlugin } from '$lib/plugin/types';
+	import { SvelteSet } from 'svelte/reactivity';
 	import { toPluginSidePanelId } from '../sidePanels';
 	import {
+		ChevronRight,
+		Quote,
 		Play,
 		Square,
 		Trash2,
@@ -31,6 +34,7 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Switch } from '$lib/components/ui/switch/index.js';
 	import PluginIcon from './PluginIcon.svelte';
+	import PluginCitations from './PluginCitations.svelte';
 
 	const editorCtx = getEditorViewContext();
 	const registry = $derived(editorCtx.pluginRegistry);
@@ -42,6 +46,11 @@
 
 	let pendingRunPlugin: PythonPlugin | null = $state(null);
 	let activeTab: string = $state('mine');
+	const expandedPluginIds = new SvelteSet<string>();
+
+	function toggleExpanded(id: string) {
+		if (!expandedPluginIds.delete(id)) expandedPluginIds.add(id);
+	}
 
 	// ---------------------------------------------------------------------------
 	// Plugin actions
@@ -195,6 +204,9 @@
 {#snippet pluginRow(plugin: PythonPlugin)}
 	{@const Icon = statusIcon(plugin)}
 	{@const isDisabledBuiltin = plugin.origin === 'builtin' && !plugin.enabled}
+	{@const citations = plugin.manifest.citations ?? []}
+	{@const hasDetails = !!plugin.manifest.description || citations.length > 0}
+	{@const isExpanded = expandedPluginIds.has(plugin.manifest.id)}
 	<div class="border-b border-border px-3 py-2 hover:bg-muted" class:opacity-50={isDisabledBuiltin}>
 		<div class="flex items-center gap-2">
 			<!-- Status icon -->
@@ -215,7 +227,34 @@
 				<PluginIcon svg={plugin.iconSvg} size={14} class="text-muted-foreground" />
 			{/if}
 			<!-- Name + version -->
-			<span class="flex-1 truncate font-medium text-foreground">{plugin.manifest.name}</span>
+			{#if hasDetails}
+				<button
+					type="button"
+					class="flex min-w-0 flex-1 items-center gap-1 text-left"
+					aria-expanded={isExpanded}
+					onclick={() => toggleExpanded(plugin.manifest.id)}
+					{@attach help({
+						title: 'Plugin details',
+						text: 'Show what this plugin does and any papers its author asks you to cite.',
+						doc: 'plugins-for-users',
+					})}
+				>
+					<ChevronRight
+						size={12}
+						class="shrink-0 text-muted-foreground transition-transform {isExpanded
+							? 'rotate-90'
+							: ''}"
+					/>
+					<span class="truncate font-medium text-foreground">{plugin.manifest.name}</span>
+					{#if citations.length > 0}
+						<span class="shrink-0 text-muted-foreground" title="Has a citation">
+							<Quote size={10} />
+						</span>
+					{/if}
+				</button>
+			{:else}
+				<span class="flex-1 truncate font-medium text-foreground">{plugin.manifest.name}</span>
+			{/if}
 			{#if plugin.authoring}
 				<span
 					class="shrink-0 rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
@@ -252,6 +291,19 @@
 				<span class="shrink-0 text-xs text-gray-400">{plugin.manifest.version}</span>
 			{/if}
 		</div>
+
+		{#if isExpanded}
+			<div class="mt-1.5 ml-5 flex flex-col gap-2">
+				{#if plugin.manifest.description}
+					<p class="text-[11px] leading-snug text-muted-foreground">
+						{plugin.manifest.description}
+					</p>
+				{/if}
+				{#if citations.length > 0}
+					<PluginCitations {citations} />
+				{/if}
+			</div>
+		{/if}
 
 		{#if plugin.enabled}
 			<!-- Format + strategy + env badges -->
