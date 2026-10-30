@@ -93,6 +93,8 @@ Run **Auto Staple** (top toolbar; labeled `Auto Staple — [region name]`) once 
 
 Auto-staple is available only on lattice regions (it's gated on the region's `supportsLatticeAutoStaple` capability).
 
+Auto Staple follows the same general approach as cadnano2's auto-staple: it lays staple strands along the scaffold, then adds staple crossovers at the lattice's crossover sites. Foldnano uses its own rules for which sites to skip and keeps any staples you have already drawn, so results can differ from cadnano's.
+
 <Callout type="warning">
 
 **Always review the generated topology** before assigning sequence, paying special attention to region boundaries (staples that approach where one region meets another), skips and inserts (these change effective length), and very short or very long resulting staples.
