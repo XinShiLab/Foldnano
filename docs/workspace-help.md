@@ -105,7 +105,9 @@ clear of the top toolbar. Don't remove it or make it conditional.
 loaded, in a first-visit variant with a
 lighter dim and the exit pill at the top as a "Welcome" message. Closing it by any means calls the
 `markWorkspaceHelpSeen` remote command. Bump `WORKSPACE_HELP_VERSION` only when the content changes
-enough that returning users should see it open once more.
+enough that returning users should see it open once more. Closing the first-visit help also marks
+every announcement and What's New entry as seen (`whats-new.md` § Announcements), since a new
+user never knew the old behaviour.
 
 ## Writing help text
 

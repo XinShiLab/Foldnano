@@ -26,6 +26,10 @@
 	import WorkspaceHelp from '$lib/components/help/WorkspaceHelp.svelte';
 	import { markWorkspaceHelpSeen } from '$lib/remote/workspaceHelp.remote';
 	import { dismissBrowserNotice } from '$lib/remote/browserNotice.remote';
+	import { markAnnouncementSeen, markWhatsNewSeen } from '$lib/remote/announcements.remote';
+	import AnnouncementCard from '$lib/components/AnnouncementCard.svelte';
+	import { noticeStack } from '$lib/notices/noticeStack.svelte';
+	import { latestAnnouncementId, pendingAnnouncement } from '$lib/whats-new/entries';
 	import { isChromiumBrowser } from '$lib/browserSupport';
 	import { page } from '$app/state';
 	import SidePanel from './SidePanel/SidePanel.svelte';
@@ -399,7 +403,39 @@
 		if (helpFirstVisit && !editorViewContext.showShortcuts) {
 			helpFirstVisit = false;
 			void markWorkspaceHelpSeen();
+			// New users never knew the old behaviour: count every announcement and entry as seen.
+			const latestId = latestAnnouncementId();
+			if (latestId !== null) void markAnnouncementSeen(latestId);
+			void markWhatsNewSeen();
 		}
+	});
+
+	// Newest unseen major change, shown once in the bottom-right notice stack after load. Never on a
+	// first visit (see above) and never over the workspace help.
+	const pendingNotice = pendingAnnouncement(
+		page.data.announcementSeen,
+		new Date().toISOString().slice(0, 10)
+	);
+	let announcementDismissed = $state(false);
+	const showAnnouncement = $derived(
+		pendingNotice !== null &&
+			!announcementDismissed &&
+			page.data.workspaceHelpSeen &&
+			!session.isLoading &&
+			!urlLoading &&
+			!editorViewContext.showShortcuts
+	);
+	function dismissAnnouncement() {
+		if (!pendingNotice) return;
+		announcementDismissed = true;
+		void markAnnouncementSeen(pendingNotice.announcement.id);
+	}
+	$effect(() => {
+		if (!showAnnouncement) return;
+		noticeStack.announcement = announcementNotice;
+		return () => {
+			noticeStack.announcement = null;
+		};
 	});
 
 	const handleCtrlKeyDown = (e: KeyboardEvent) => {
@@ -793,3 +829,13 @@
 <LinkedPluginReviewDialog gate={editorViewContext.linkedPluginReviewGate} />
 <LatticeChoiceDialog />
 <DesignCheckDialog />
+
+{#snippet announcementNotice()}
+	{#if pendingNotice}
+		<AnnouncementCard
+			pending={pendingNotice}
+			onDismiss={dismissAnnouncement}
+			onOpenWhatsNew={() => (editorViewContext.aboutDialogOpen = true)}
+		/>
+	{/if}
+{/snippet}

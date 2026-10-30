@@ -2,7 +2,7 @@
 	import { resolve } from '$app/paths';
 
 	const CONTROLLER = 'Prof. Xin Shi, Department of Chemistry, KU Leuven';
-	const LAST_UPDATED = '2026-10-13';
+	const LAST_UPDATED = '2026-10-25';
 
 	const STORAGE_ITEMS = [
 		{
@@ -30,6 +30,20 @@
 			kind: 'Cookie',
 			purpose:
 				'Remembers that you dismissed the notice recommending a Chromium-based browser (shown only in other browsers).',
+			lifetime: '1 year',
+		},
+		{
+			name: 'foldnano_announcement',
+			kind: 'Cookie',
+			purpose:
+				'Remembers the newest announcement you dismissed, so each one is shown to you only once.',
+			lifetime: '1 year',
+		},
+		{
+			name: 'foldnano_whats_new',
+			kind: 'Cookie',
+			purpose:
+				"Remembers the newest What's New entry you have seen, so the dot on the Foldnano button disappears once you have read it.",
 			lifetime: '1 year',
 		},
 		{

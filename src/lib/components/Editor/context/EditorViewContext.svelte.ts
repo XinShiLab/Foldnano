@@ -302,6 +302,7 @@ export class EditorViewContext {
 	activeViewer: ActiveViewer = $state('STRAND');
 	show3D: boolean = $state(false);
 	showShortcuts: boolean = $state(false);
+	aboutDialogOpen: boolean = $state(false);
 	showBackups: boolean = $state(false);
 	showScaffoldMap: boolean = $state(false);
 	showSidePanel: boolean = $state(false);

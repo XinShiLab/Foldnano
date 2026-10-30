@@ -1,3 +1,4 @@
+import { resolve } from '$app/paths';
 import type { Attachment } from 'svelte/attachments';
 import { SvelteMap } from 'svelte/reactivity';
 
@@ -20,6 +21,16 @@ export type GuideSlug =
 	| 'script-lab'
 	| 'interface-reference'
 	| 'keyboard-shortcuts';
+
+/** A guide page, optionally with a heading anchor (rehype-slug id, e.g. `'views#3d-view'`). */
+export type GuideLink = GuideSlug | `${GuideSlug}#${string}`;
+
+/** URL of a guide page; `resolve()` has no hash option, so the anchor is appended. */
+export function guideHref(link: GuideLink): string {
+	const [page, anchor] = link.split('#', 2);
+	const href = resolve('/docs/[...slug]', { slug: `guide/${page}` });
+	return anchor ? `${href}#${anchor}` : href;
+}
 
 export interface HelpSpec {
 	/** Keyboard shortcut, shown as a badge on the element while help is open. */

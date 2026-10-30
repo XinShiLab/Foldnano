@@ -13,6 +13,9 @@
 	import Open from './Open.svelte';
 	import LoadCadnanoAsRegionDialog from './LoadCadnanoAsRegionDialog.svelte';
 	import AboutDialog from './AboutDialog.svelte';
+	import { page } from '$app/state';
+	import { markWhatsNewSeen } from '$lib/remote/announcements.remote';
+	import { latestEntryKey } from '$lib/whats-new/entries';
 	import {
 		// BadgeCheckIcon,
 		Bolt,
@@ -79,7 +82,6 @@
 	// let { history }: ToolbarProps = $props();
 	let isDialogOpen = $state(false);
 	let loadCadnanoRegionDialogOpen = $state(false);
-	let aboutDialogOpen = $state(false);
 
 	// Opened in a new tab so the design stays open beside the docs.
 	const helpLinks = [
@@ -99,6 +101,24 @@
 
 	// const foldnanoDoc = getDocContext();
 	const editorViewContext = getEditorViewContext();
+
+	// Dot on the Foldnano button while What's New has entries this browser hasn't opened. A first
+	// visit counts as seen: the editor marks it when the welcome help closes.
+	const latestWhatsNewKey = latestEntryKey();
+	let whatsNewSeenLocally = $state(false);
+	const hasUnreadWhatsNew = $derived(
+		!whatsNewSeenLocally &&
+			page.data.workspaceHelpSeen &&
+			latestWhatsNewKey !== null &&
+			page.data.whatsNewSeen !== latestWhatsNewKey
+	);
+	$effect(() => {
+		if (editorViewContext.aboutDialogOpen && hasUnreadWhatsNew) {
+			whatsNewSeenLocally = true;
+			void markWhatsNewSeen();
+		}
+	});
+
 	const session = getEditorDocumentSession();
 
 	// Whether the current doc was loaded from GitHub (has reactive file metadata)
@@ -319,12 +339,16 @@
 			> -->
 		<div class="relative">
 			<Button
-				onclick={() => (aboutDialogOpen = true)}
+				onclick={() => (editorViewContext.aboutDialogOpen = true)}
+				aria-label={hasUnreadWhatsNew ? "Foldnano (What's New has updates)" : undefined}
 				{@attach help({
 					title: 'About Foldnano',
 					text: "Version, What's New, and licenses.",
 				})}
 			>
+				{#if hasUnreadWhatsNew}
+					<span class="size-1.5 shrink-0 rounded-full bg-sky-400" aria-hidden="true"></span>
+				{/if}
 				<p class="flex-none cursor-pointer text-sm font-semibold text-white">Foldnano</p>
 			</Button>
 			<span
@@ -733,7 +757,7 @@
 	<ActiveViewerToolbar />
 </div>
 
-<AboutDialog bind:open={aboutDialogOpen} />
+<AboutDialog bind:open={editorViewContext.aboutDialogOpen} />
 
 <!-- Rename & commit confirmation dialog (GitHub committed files only) -->
 <Dialog.Root

@@ -41,7 +41,8 @@ model file still pulls in the slow golden suites (`sequence-comparison.spec.ts`,
 Note: a dirty `package.json` or vite/vitest config forces `--changed` to run everything (force-rerun trigger).
 
 **What's New** (About dialog) is data in `src/lib/whats-new/entries.ts`; `pnpm whats-new:draft` adds
-hidden drafts from recent commits for a human to rewrite. See `docs/whats-new.md`.
+hidden drafts from recent commits for a human to rewrite. An entry with `announce` is also shown
+once to returning users as a bottom-right card (rarely; major changes only). See `docs/whats-new.md`.
 
 ## Tech Stack
 

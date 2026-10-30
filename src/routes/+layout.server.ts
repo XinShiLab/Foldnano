@@ -1,3 +1,4 @@
+import { seenAnnouncementId, seenWhatsNewKey } from '$lib/server/announcements';
 import { hasDismissedBrowserNotice } from '$lib/server/browserNotice';
 import { hasDismissedPrivacyNotice } from '$lib/server/privacyNotice';
 import { hasSeenWorkspaceHelp } from '$lib/server/workspaceHelp';
@@ -9,5 +10,7 @@ export const load: LayoutServerLoad = ({ cookies }) => {
 		privacyNoticeDismissed: hasDismissedPrivacyNotice(cookies),
 		workspaceHelpSeen: hasSeenWorkspaceHelp(cookies),
 		browserNoticeDismissed: hasDismissedBrowserNotice(cookies),
+		announcementSeen: seenAnnouncementId(cookies),
+		whatsNewSeen: seenWhatsNewKey(cookies),
 	};
 };
