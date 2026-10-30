@@ -294,6 +294,13 @@ export class PluginDevMode {
 		});
 	}
 
+	/** The linked folder's handle, without asking for access; null when the link was lost. */
+	async folderHandle(plugin: PythonPlugin): Promise<FileSystemDirectoryHandle | null> {
+		if (!plugin.linked) return null;
+		const record = await this.#db.loadFileHandle(plugin.linked.handleId);
+		return record ? (record.handle as FileSystemDirectoryHandle) : null;
+	}
+
 	/** Check plugin: every problem and note for the linked folder, without running it. */
 	checkFolder(plugin: PythonPlugin): Promise<PluginCheckIssue[]> {
 		return this.#withFolder(plugin, (dir) => checkLinkedPluginFolder(dir));

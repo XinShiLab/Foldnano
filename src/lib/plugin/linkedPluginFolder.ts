@@ -9,14 +9,22 @@ import { readFileBytes, walkDirectory } from '$lib/services/fileAccess/fileAcces
 import { processPluginZip } from './PluginInstaller';
 import { classifyEnv, requirementSources } from './envClassification';
 import { MAX_PLUGIN_ZIP_BYTES, formatMb } from './sizeLimits';
+import { AGENT_SCRIPTS_DIR } from './agentRuns';
 import type { PluginManifest } from './types';
 import type { IndexedDbPluginFilesRecord } from '$lib/services/storage/indexedDbTypes';
 
 /** Folders that never belong in a plugin (environments, caches, build output of other tools). */
-const IGNORED_DIRS = new Set(['__pycache__', 'node_modules', 'venv', 'env', 'site-packages']);
+const IGNORED_DIRS = new Set([
+	'__pycache__',
+	'node_modules',
+	'venv',
+	'env',
+	'site-packages',
+	AGENT_SCRIPTS_DIR,
+]);
 const IGNORED_FILE = /\.(pyc|pyo|zip)$/;
-/** Editor config a starter plugin writes next to its stubs; never part of the plugin. */
-const IGNORED_FILE_NAMES = new Set(['pyrightconfig.json']);
+/** Editor and agent config written next to a plugin; never part of it. */
+const IGNORED_FILE_NAMES = new Set(['pyrightconfig.json', 'AGENTS.md', 'CLAUDE.md']);
 
 /** Dot-files and dot-folders (.git, .venv, .foldnano-stubs, .vscode …) and the names above. */
 export function isIgnoredLinkedPath(path: string, kind: 'file' | 'directory'): boolean {

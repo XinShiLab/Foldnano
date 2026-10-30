@@ -30,10 +30,15 @@ export interface WhatsNewEntry {
  * Author date of the newest commit already considered for this list. `pnpm whats-new:draft`
  * only drafts commits authored after it (author dates survive rebases; hashes don't).
  */
-export const WHATS_NEW_REVIEWED_THROUGH = '2026-10-25T21:36:03+01:00';
+export const WHATS_NEW_REVIEWED_THROUGH = '2026-10-28T23:45:00+01:00';
 
 // Newest first. Edit freely; the draft script only inserts new entries at the top.
 export const WHATS_NEW: readonly WhatsNewEntry[] = [
+	{
+		date: '2026-10-28',
+		area: 'Plugins',
+		text: 'Experimental agent runs: a coding agent such as Claude Code or Codex can change your open design by running Python scripts from a linked plugin folder. Each applied run is one Undo step, and you can ask to review a change before it is applied. Turn it on under the Plugin dev mode switch, and read the Agent Runs page first: the agent sends your design to its AI provider.',
+	},
 	{
 		date: '2026-10-25',
 		area: 'Editing',

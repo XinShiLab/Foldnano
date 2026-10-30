@@ -28,6 +28,8 @@ export interface RunPluginRequest {
 	pluginCode?: string;
 	/** Zip bundle to extract and execute (mutually exclusive with pluginCode) */
 	pluginZipData?: ArrayBuffer;
+	/** Zip-relative file to load instead of plugin.py (an agent script run); default plugin.py. */
+	entrypointPath?: string;
 	/** Human-readable label for logs and error messages */
 	pluginLabel: string;
 	format: PluginFormat;

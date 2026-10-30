@@ -50,6 +50,7 @@ On narrower screens (such as an iPad), the toolbar buttons show only their icons
 | `Auto Staple — [region]` | Generates staples for the active lattice region. Shown only when the active region is a lattice region. See [Creating A Design](/docs/guide/creating-a-design#auto-staple). |
 | Document name | Click to rename; `Enter` confirms, `Escape` cancels. For a file already committed to GitHub, a **Rename and Commit** dialog asks for confirmation and also commits any uncommitted local changes. |
 | Save status | See [Save status](#save-status) |
+| Agent runs badge | Shown while a coding agent may run Python from a linked plugin folder: which folder is connected to which design, the running script, or why runs are paused. **×** stops agent runs. See [Agent Runs](/docs/plugin-development/agent-runs). |
 | **Undo** / **Redo** arrows | Same as `Ctrl/Cmd + Z` / `Ctrl/Cmd + Shift + Z` |
 | **Commit** | Shown for GitHub files. Opens the Source Control **Changes** tab; an amber dot means uncommitted changes. |
 | **GitHub** / your avatar | Not connected: **Connect to GitHub**. Connected: toggles the Source Control panel. See [Saving And GitHub](/docs/guide/saving-github). |

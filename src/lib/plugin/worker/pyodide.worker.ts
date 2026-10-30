@@ -234,7 +234,11 @@ try:
                 raise RuntimeError(f'Zip path traversal blocked: {_member.filename}')
             _zf_obj.extract(_member, _plugin_run)
         _zsys.path.insert(0, _plugin_run)
-        _spec = _ilu.spec_from_file_location('_plugin', _plugin_run + '/plugin.py')
+        # An agent script run swaps the entrypoint; the plugin's own modules stay importable.
+        _entry = _os.path.realpath(_os.path.join(_plugin_run, _entrypoint))
+        if not _entry.startswith(_plugin_run_real + '/'):
+            raise RuntimeError(f'Entrypoint outside the plugin: {_entrypoint}')
+        _spec = _ilu.spec_from_file_location('_plugin', _entry)
         _ns = _ilu.module_from_spec(_spec)
         _spec.loader.exec_module(_ns)
     else:
@@ -404,6 +408,7 @@ for _pkg in _micropip_pkgs:
 const RUN_GLOBALS = [
 	'_plugin_code',
 	'_plugin_zip',
+	'_entrypoint',
 	'_format',
 	'_cadnano_json_in',
 	'_foldnano_json_in',
@@ -422,6 +427,7 @@ async function runPlugin(
 	requestId: string,
 	pluginCode: string,
 	isZip: boolean,
+	entrypoint: string,
 	format: string,
 	cadnanoJsonIn: string | null,
 	foldnanoJsonIn: string | null,
@@ -458,6 +464,7 @@ async function runPlugin(
 	try {
 		pyodide.globals.set('_plugin_code', pluginCode);
 		pyodide.globals.set('_plugin_zip', isZip);
+		pyodide.globals.set('_entrypoint', entrypoint);
 		pyodide.globals.set('_format', format);
 		// Since Pyodide 0.28 JS null arrives as jsnull; undefined still becomes None.
 		pyodide.globals.set('_cadnano_json_in', cadnanoJsonIn ?? undefined);
@@ -621,6 +628,7 @@ function handleRequest(msg: WorkerRequest): void {
 					msg.requestId,
 					msg.pluginCode ?? '',
 					msg.pluginZipData != null,
+					msg.entrypointPath ?? 'plugin.py',
 					msg.format,
 					msg.cadnanoJsonIn ?? null,
 					msg.foldnanoJsonIn ?? null,

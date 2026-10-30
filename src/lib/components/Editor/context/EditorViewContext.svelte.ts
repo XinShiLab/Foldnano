@@ -14,6 +14,8 @@ import { PluginCoordinator } from '$lib/plugin/PluginCoordinator.svelte';
 import { PluginRegistry } from '$lib/plugin/PluginRegistry.svelte';
 import { PluginInstallGate } from '../Plugin/PluginInstallGate.svelte';
 import { PluginDevMode } from '$lib/plugin/PluginDevMode.svelte';
+import { AgentRunListener } from '$lib/plugin/AgentRunListener.svelte';
+import { buildDesignOverview } from '$lib/model/io/designOverview';
 import { LinkedPluginReviewGate } from '../Plugin/LinkedPluginReviewGate.svelte';
 import type { SegmentEnd, OligoSegment } from '$lib/model/Oligo';
 import type Oligo from '$lib/model/Oligo';
@@ -331,6 +333,7 @@ export class EditorViewContext {
 	pluginCoordinator: PluginCoordinator;
 	pluginInstallGate: PluginInstallGate;
 	pluginDevMode: PluginDevMode;
+	agentRuns: AgentRunListener;
 	linkedPluginReviewGate = new LinkedPluginReviewGate();
 
 	constructor() {
@@ -362,6 +365,25 @@ export class EditorViewContext {
 		this.pluginDevMode = new PluginDevMode(this.pluginRegistry, () => this.pluginCoordinator);
 		this.pluginCoordinator.setLinkedFolderReader((plugin) => this.pluginDevMode.readFolder(plugin));
 		this.pluginDevMode.setReviewer((review) => this.linkedPluginReviewGate.request(review));
+		this.agentRuns = new AgentRunListener({
+			registry: this.pluginRegistry,
+			devMode: this.pluginDevMode,
+			getCoordinator: () => this.pluginCoordinator,
+			getDocId: () => this.session.currentDoc.id,
+			getDocName: () => this.session.currentDoc.name,
+			isAwaitingUser: () => this.linkedPluginReviewGate.pending !== null,
+			getPartJson: () => {
+				const part = this.currentDoc.parts[0];
+				return part ? JSON.stringify(part.toJSON()) : null;
+			},
+			getOverview: (part = this.currentDoc.parts[0]) =>
+				part ? buildDesignOverview(part, this.activeRegionId) : null,
+			canEdit: () => this.session.isTabOwner,
+			origin: typeof window === 'undefined' ? '' : window.location.origin,
+		});
+		this.pluginCoordinator.setPendingResolvedListener((token, resolution) =>
+			this.agentRuns.onPendingResolved(token, resolution)
+		);
 		// An unsaved draft brings its editor's icon back after a reload.
 		void this.pluginRegistry.ready.then(() => {
 			for (const plugin of this.pluginRegistry.all) {
@@ -787,6 +809,7 @@ export class EditorViewContext {
 	}
 
 	destroy(): void {
+		this.agentRuns.dispose();
 		this.session.destroy();
 		this.pluginCoordinator.pendingApply = null;
 		this.pluginCoordinator.terminate();

@@ -1,8 +1,8 @@
 /**
  * In-memory stand-in for `navigator.locks` (jsdom has none), modelling the parts of the Web Locks
- * spec that TabSync relies on: exclusive grant, FIFO queue, `steal` (the previous holder's
- * request rejects with AbortError and the stealer is granted at once), and `signal` aborting a
- * queued request. Instances in one test behave like separate tabs sharing the manager.
+ * spec that TabSync and agent runs rely on: exclusive grant, FIFO queue, `ifAvailable`, `steal`
+ * (the previous holder's request rejects with AbortError and the stealer is granted at once), and
+ * `signal` aborting a queued request. Instances in one test behave like separate tabs sharing the manager.
  */
 
 interface LockRequest {
@@ -28,6 +28,12 @@ export class FakeLockManager {
 		return new Promise((resolve, reject) => {
 			const request: LockRequest = { name, callback, resolve, reject };
 			if (options.signal?.aborted) return reject(abortError());
+			if (options.ifAvailable && (this.#held.has(name) || this.#queues.get(name)?.length)) {
+				Promise.resolve()
+					.then(() => (callback as unknown as (lock: null) => unknown)(null))
+					.then(resolve, reject);
+				return;
+			}
 			if (options.steal) {
 				const holder = this.#held.get(name);
 				this.#held.delete(name);

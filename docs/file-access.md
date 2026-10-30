@@ -7,7 +7,8 @@ covers:
 
 A thin, feature-agnostic layer over the browser's File System Access API in
 `src/lib/services/fileAccess/fileAccess.ts`. Plugin dev mode uses it to read a linked plugin
-folder (`docs/python-plugin-system.md` § Plugin dev mode); editing local design files is meant to
+folder (`docs/python-plugin-system.md` § Plugin dev mode) and agent runs to exchange request and
+result files in it; editing local design files is meant to
 reuse it later.
 
 ## What it provides
@@ -20,6 +21,7 @@ reuse it later.
   be in the `prompt` state.
 - `walkDirectory()`: lists files (path, handle, size) without reading them, with an `ignore`
   callback and `maxFiles` / `maxBytes` limits checked as it goes.
+- `listFileNames()` (one folder, no recursion), `removeFile()` (a missing file is fine).
 - `readFileBytes()`, `writeFile()` (via `createWritable`), `isEffectivelyEmpty()` (only OS/git
   noise), `isMissingHandleError()` (a moved or deleted folder).
 - `memoryFileSystem.ts`: in-memory handles for tests; jsdom has no File System Access API.

@@ -54,6 +54,32 @@ gate titles, a use-with-caution note); drop the "beta" badge at 1.0.
   can't frame the cut links; give each link its own anchor. (4) Review and publish the two What's
   New drafts of 2026-10-24. (5) Refresh `06-design-checks-menu.webp` (shows the old lowercase
   "cadnano export" label).
+- Agent runs follow-ups (prototype landed 2026-10-28 behind an experimental switch,
+  `docs/python-plugin-system.md` § Agent runs). An agent asked for a 6-helix bundle built a valid
+  but unconventional one (helices numbered in placement order, scaffold crossovers between helices
+  not next to each other along the path): the checks only answer "is it valid?". Next steps, in
+  order: (1) A design-conventions guide (helix numbering along the scaffold path, scaffold routing
+  and seams, staple crossovers and lengths), in our own words with citations, plus worked example
+  scripts (a conventional 6HB), linked from `AGENTS.md`, and a plan-first step where the agent
+  proposes layout, numbering and scaffold path before building. (2) A design-quality report: soft
+  warnings with reasons, built on the overview's data, kept apart from the hard checks in
+  `src/lib/model/checks/`. (3) foldnano_mini helpers that make the conventional design the easy
+  one: choosing helix numbers in `add_vh_at` (today the host assigns them by cell and order),
+  autostaple / autobreak (the editor has `autoStapleRegion`), a raster scaffold route. (4) A small
+  set of test prompts scored with the report, to tell whether 1–3 help. Left out on purpose so far:
+  seam detection (a guess about intent), a diff against the previous run, a foldnano_mini
+  `describe()` (a second builder would drift).
+- Agent runs: known gaps before it stops being a prototype. (1) A result held for
+  `--ask-user-approval` lives in the tab's memory: after a reload it is gone, but if the editor
+  comes back within the heartbeat window `run.py` keeps waiting until its timeout; a new listener
+  could mark such results as lost. (2) Detection is polling (~0.5 s) on the main thread and hidden
+  tabs are throttled; use `FileSystemObserver` where available and poll from a dedicated worker
+  otherwise. (3) `awaiting-user` covers the requirements review dialog only; a folder permission
+  prompt or the cadnano input review still shows as `running`. (4) No rate limit, no cleanup of old
+  `runs/` files; artifacts are listed by name, not exported. (5) The undo label is the plugin's, not
+  "Agent: <script>". (6) No copy of each run's code and input design (records hold hashes only); no
+  selection or view state in the context. (7) No "Connect a coding agent" entry outside dev mode.
+  (8) Protocol mismatch handling is a version check only, with no migration.
 - Multi-file commits as one atomic commit via the Git Data API. Assessed
   2026-10-03: ~1–2 days (blob/tree/commit/ref proxy routes, batch conflict check against the
   branch head, per-file SHA updates, keeping the current doc's tab-owner and snapshot path).

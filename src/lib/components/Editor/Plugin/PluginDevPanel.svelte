@@ -1,7 +1,9 @@
 <script lang="ts">
 	import type { ComponentProps, Snippet } from 'svelte';
 	import { toast } from 'svelte-sonner';
+	import { resolve } from '$app/paths';
 	import {
+		Bot,
 		CircleAlert,
 		CircleCheck,
 		Download,
@@ -28,6 +30,7 @@
 	const editorCtx = getEditorViewContext();
 	const devMode = $derived(editorCtx.pluginDevMode);
 	const coordinator = $derived(editorCtx.pluginCoordinator);
+	const agentRuns = $derived(editorCtx.agentRuns);
 	const linkedPlugins = $derived(devMode.linkedPlugins);
 	let linking = $state(false);
 
@@ -120,6 +123,56 @@
 		class:pointer-events-none={!devMode.enabled}
 		inert={!devMode.enabled}
 	>
+		<div class="space-y-1.5 border-b border-border px-3 py-2.5">
+			<div class="flex items-center justify-between gap-2">
+				<Label for="plugin-agent-runs" class="flex items-center gap-1.5 text-xs font-medium">
+					Agent runs
+					<span
+						class="rounded border border-amber-300 bg-amber-50 px-1 text-[10px] font-semibold tracking-wide text-amber-700 uppercase dark:border-amber-700 dark:bg-amber-950 dark:text-amber-300"
+					>
+						Experimental
+					</span>
+				</Label>
+				<Switch
+					id="plugin-agent-runs"
+					checked={agentRuns.allowed}
+					onCheckedChange={(v) =>
+						void act("Couldn't change agent runs", () => agentRuns.setAllowed(v))}
+					class="h-4 w-7"
+					{@attach help({
+						title: 'Agent runs (experimental)',
+						text: 'Turn on to let a coding agent run Python from one linked folder. Turning it off stops agent runs in every folder.',
+					})}
+				/>
+			</div>
+			<p class="text-xs text-muted-foreground">
+				Let a coding agent on your computer (Claude Code, Codex, a script) run Python against the
+				open design through one linked folder, without clicking Run.
+				<a
+					href={resolve('/docs/[...slug]', { slug: 'plugin-development/agent-runs' })}
+					target="_blank"
+					rel="noopener"
+					class="underline underline-offset-2 hover:text-foreground">How it works and the risks</a
+				>
+			</p>
+			<p
+				class="flex gap-1.5 rounded border border-amber-200 bg-amber-50 p-1.5 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300"
+			>
+				<TriangleAlert size={13} class="mt-0.5 shrink-0" />
+				<span>
+					Highly experimental: how it works, and the files it writes, may change or be removed.
+					Results are applied as soon as a run finishes (Undo reverts each one). Only use it with
+					folders and agents you trust.
+					<strong class="mt-1 block font-medium">
+						The agent can read your whole design, sequences included, and after every run it is
+						shown a text overview of the design's structure (helices, routes, staple lengths; no
+						sequences). Unless it uses a model on your own computer, what it reads is sent to its AI
+						provider, which may keep it in chat history or use it under its own terms.
+					</strong>
+				</span>
+			</p>
+		</div>
+
 		<div class="flex items-center justify-between border-b border-border px-3 py-2">
 			<span class="text-xs font-medium text-muted-foreground">Linked folders</span>
 			<Button
@@ -148,6 +201,7 @@
 			{#each linkedPlugins as plugin (plugin.manifest.id)}
 				{@const linked = plugin.linked}
 				{@const note = linked ? ACCESS_NOTES[linked.access] : undefined}
+				{@const agentOn = agentRuns.pluginId === plugin.manifest.id}
 				<div class="border-b border-border">
 					<div
 						class="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 bg-muted/40 px-3 py-1 text-xs text-muted-foreground"
@@ -169,6 +223,26 @@
 							>
 								<RefreshCw size={11} />
 								Restart env
+							</Button>
+						{/if}
+						{#if agentRuns.allowed}
+							<Button
+								variant="ghost"
+								size="sm"
+								class="h-5 gap-1 px-1.5 text-[11px] {agentOn
+									? 'border border-primary bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary'
+									: ''}"
+								aria-pressed={agentOn}
+								onclick={() =>
+									void act("Couldn't change agent runs", () =>
+										agentOn ? agentRuns.disable() : agentRuns.enable(plugin.manifest.id)
+									)}
+								title={agentOn
+									? 'Stop accepting runs from a coding agent in this folder'
+									: 'Let a coding agent in this folder run Python here (python .foldnano/run.py). Writes .foldnano/run.py and AGENTS.md.'}
+							>
+								<Bot size={11} />
+								{agentOn ? 'Agent runs on' : 'Agent runs'}
 							</Button>
 						{/if}
 						<Button
@@ -218,6 +292,21 @@
 					</div>
 					{#if note}
 						<p class="px-3 pt-1.5 text-xs text-amber-600">{note}</p>
+					{/if}
+					{#if agentOn}
+						<p class="px-3 pt-1.5 text-xs text-muted-foreground">
+							Connected to the design <strong>{agentRuns.connection?.docName}</strong>. A coding
+							agent working in this folder can run <code>python .foldnano/run.py [script.py]</code>,
+							and results are applied straight away (each run is one undo step). Instructions for
+							the agent are in <code>AGENTS.md</code>.
+						</p>
+						{#if plugin.manifest.format !== 'foldnano_mini'}
+							<p class="px-3 pt-1 text-xs text-amber-600">
+								Agent scripts run as <code>{plugin.manifest.format}</code> and replace the whole
+								{plugin.manifest.format === 'cadnano_json' ? 'region' : 'part'} on each run. For step-by-step
+								design edits, a <code>foldnano_mini</code> plugin records each change instead.
+							</p>
+						{/if}
 					{/if}
 					{@render pluginRow(plugin)}
 				</div>

@@ -144,6 +144,52 @@ export async function writeFile(
 	}
 }
 
+/** Resolves a relative POSIX folder path; null when any part of it doesn't exist. */
+async function findDirectory(
+	dir: FileSystemDirectoryHandle,
+	path: string
+): Promise<FileSystemDirectoryHandle | null> {
+	let folder = dir;
+	for (const part of path.split('/').filter(Boolean)) {
+		try {
+			folder = await folder.getDirectoryHandle(part);
+		} catch (e) {
+			if (
+				e instanceof DOMException &&
+				(e.name === 'NotFoundError' || e.name === 'TypeMismatchError')
+			)
+				return null;
+			throw e;
+		}
+	}
+	return folder;
+}
+
+/** Names of the files directly inside `path`; empty when the folder doesn't exist. */
+export async function listFileNames(
+	dir: FileSystemDirectoryHandle,
+	path: string
+): Promise<string[]> {
+	const folder = await findDirectory(dir, path);
+	if (!folder) return [];
+	const names: string[] = [];
+	for await (const entry of folder.values()) if (entry.kind === 'file') names.push(entry.name);
+	return names.sort();
+}
+
+/** Deletes a file; a file that is already gone is not an error. */
+export async function removeFile(dir: FileSystemDirectoryHandle, path: string): Promise<void> {
+	const slash = path.lastIndexOf('/');
+	const folder = await findDirectory(dir, slash < 0 ? '' : path.slice(0, slash));
+	if (!folder) return;
+	try {
+		await folder.removeEntry(path.slice(slash + 1));
+	} catch (e) {
+		if (e instanceof DOMException && e.name === 'NotFoundError') return;
+		throw e;
+	}
+}
+
 /** Names the OS or tools drop into folders on their own; they don't make a folder "used". */
 const NOISE_ENTRIES = new Set(['.DS_Store', 'Thumbs.db', 'desktop.ini', '.git']);
 
