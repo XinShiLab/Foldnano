@@ -6,6 +6,8 @@ covers:
   - src/lib/server/**
   - src/lib/remote/**
   - src/lib/components/PrivacyNotice.svelte
+  - src/lib/components/NoticeStack.svelte
+  - src/lib/notices/**
   - src/lib/browserSupport.ts
 ---
 
@@ -139,13 +141,16 @@ the event leaves the browser, so no document ID reaches analytics.
 
 ## Preference Cookies
 
-The root `+layout.server.ts` reads two dismissal cookies for every route: the privacy notice
+The root `+layout.server.ts` reads the dismissal cookies for every route: the privacy notice
 (`src/lib/server/privacyNotice.ts`, set by the `dismissPrivacyNotice` remote form) and the
 editor's first-visit workspace help (`src/lib/server/workspaceHelp.ts`, set by the
 `markWorkspaceHelpSeen` remote command; see `workspace-help.md`), and the editor's
 Chromium-browser notice (`src/lib/server/browserNotice.ts`, set by the `dismissBrowserNotice`
 remote command; shown only when `isChromiumBrowser()` in `src/lib/browserSupport.ts` is false,
-which is every browser without `navigator.userAgentData`). All are httpOnly and versioned. Every new cookie must be added to the storage table in `src/routes/privacy/+page.svelte`.
+which is every browser without `navigator.userAgentData`). All are httpOnly and versioned. It also
+reads the two What's New watermarks, `foldnano_announcement` and `foldnano_whats_new`
+(`src/lib/server/announcements.ts`, set by the `markAnnouncementSeen` / `markWhatsNewSeen`
+commands); these hold the newest id seen rather than a version (see `whats-new.md`). Every new cookie must be added to the storage table in `src/routes/privacy/+page.svelte`.
 
 A remote `form` whose `submit()` is awaited without `.updates(...)` calls `invalidateAll()` on
 success, re-running every load function. `PrivacyNotice` therefore calls `submit().updates()`
@@ -153,6 +158,16 @@ success, re-running every load function. `PrivacyNotice` therefore calls `submit
 `command`, which never invalidates. The editor pages also derive the `browser && alphaAccessGranted`
 boolean before the dynamic `import()` of `Editor.svelte`, so a load-data refresh can't remount the
 editor and drop the in-memory design.
+
+## Notice stack
+
+Messages for the user (privacy notice, announcements) all appear bottom right, in `NoticeStack`
+mounted by the root `+layout.svelte`. The stack owns the fixed position; its cards don't position
+themselves. `flex-col-reverse` puts the first card (the privacy notice) in the corner and later
+ones above it. A page hands a card to the stack by setting a snippet on `noticeStack`
+(`src/lib/notices/noticeStack.svelte.ts`) and clearing it in its effect teardown, so the layout
+never imports page state. Tab status (non-owner tab, browser notice) stays in the editor's
+top-center banner stack instead.
 
 ## Access gate
 

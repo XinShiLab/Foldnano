@@ -13,7 +13,7 @@
 {#if !dismissed && !hiddenLocally}
 	<aside
 		aria-label="Privacy notice"
-		class="fixed right-4 bottom-4 left-4 z-[999] border border-border bg-card p-4 text-sm text-card-foreground shadow-lg sm:left-auto sm:max-w-sm"
+		class="border border-border bg-card p-4 text-sm text-card-foreground shadow-lg"
 	>
 		<div class="flex items-start gap-3">
 			<ShieldCheck class="mt-0.5 size-4 shrink-0 text-muted-foreground" />

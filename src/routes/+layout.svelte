@@ -4,6 +4,7 @@
 	import { ModeWatcher } from 'mode-watcher';
 	import { Toaster } from '$lib/components/ui/sonner';
 	import ErrorLogDialog from '$lib/components/Editor/ErrorLogDialog.svelte';
+	import NoticeStack from '$lib/components/NoticeStack.svelte';
 	import PrivacyNotice from '$lib/components/PrivacyNotice.svelte';
 	let { children, data } = $props();
 </script>
@@ -16,4 +17,6 @@
 {@render children?.()}
 <Toaster richColors position="bottom-right" />
 <ErrorLogDialog />
-<PrivacyNotice dismissed={data.privacyNoticeDismissed} />
+<NoticeStack>
+	<PrivacyNotice dismissed={data.privacyNoticeDismissed} />
+</NoticeStack>

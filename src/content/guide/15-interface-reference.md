@@ -40,7 +40,7 @@ On narrower screens (such as an iPad), the toolbar buttons show only their icons
 
 | Control | What it does |
 | --- | --- |
-| **Foldnano** (with *beta* badge) | Opens the **About** dialog: the version and build, **What's New** (the last 3 months of changes, with **Show earlier updates** for older ones), the author, the MIT license, and third-party licenses |
+| **Foldnano** (with *beta* badge) | Opens the **About** dialog: the version and build, **What's New** (the last 3 months of changes, some with a **Learn more** link to the guide, and **Show earlier updates** for older ones), the author, the MIT license, and third-party licenses. A small blue dot before the name means What's New has entries you haven't opened yet, and inside What's New those entries carry the same dot and darker text until you next reload; some major changes are also announced once in a card at the bottom right |
 | **New Document** | Creates a new, empty document |
 | **Open** | Opens the **Load design files here** dialog (see [Open dialog](#open-dialog)) |
 | **Save** | Saves the working copy to browser storage now |

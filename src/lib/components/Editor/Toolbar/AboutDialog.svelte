@@ -1,14 +1,17 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
 	import { APP_COMMIT, APP_VERSION } from '$lib/appInfo';
+	import { guideHref } from '$lib/components/help/help';
 	import { PYODIDE_PYTHON_VERSION, PYODIDE_VERSION } from '$lib/plugin/worker/pyodideConfig';
 	import {
 		RECENT_WINDOW_MONTHS,
 		publishedWhatsNew,
 		splitByRecency,
+		unreadEntryCount,
 		type WhatsNewEntry,
 	} from '$lib/whats-new/entries';
 
@@ -26,6 +29,9 @@
 	});
 
 	const entries = publishedWhatsNew();
+	// Fixed for this page load: opening the dialog marks entries seen, but they stay highlighted
+	// until the next load so the user can still see what was new.
+	const unread = new Set(entries.slice(0, unreadEntryCount(page.data.whatsNewSeen ?? null)));
 	const latestDate = entries[0]?.date;
 	const { recent, earlier } = splitByRecency(entries);
 	const recentByMonth = groupByMonth(recent);
@@ -50,11 +56,27 @@
 			<h4 class="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
 				{group.month}
 			</h4>
-			<ul class="space-y-2 text-muted-foreground">
+			<ul class="space-y-2">
 				{#each group.entries as entry (entry.date + entry.area + entry.text)}
-					<li>
+					<li class={unread.has(entry) ? 'text-foreground' : 'text-muted-foreground'}>
+						{#if unread.has(entry)}
+							<span
+								class="mr-1.5 inline-block size-1.5 rounded-full bg-sky-400 align-middle"
+								aria-hidden="true"
+							></span><span class="sr-only">New: </span>
+						{/if}
 						<span class="font-medium text-foreground">{entry.area}:</span>
 						{entry.text}
+						{#if entry.link}
+							<!-- eslint-disable svelte/no-navigation-without-resolve -- guideHref() uses resolve() -->
+							<a
+								href={guideHref(entry.link)}
+								target="_blank"
+								rel="noopener"
+								class="text-primary underline-offset-2 hover:underline">Learn more →</a
+							>
+							<!-- eslint-enable svelte/no-navigation-without-resolve -->
+						{/if}
 					</li>
 				{/each}
 			</ul>
