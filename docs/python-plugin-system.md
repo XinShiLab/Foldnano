@@ -927,6 +927,83 @@ Run. Chromium only (File System Access API, `docs/file-access.md`).
   and traceback to the folder name (`linkedFolderPaths`), so `File "my-plugin/helpers.py", line 3`
   points at the author's file.
 
+### Agent runs (prototype)
+
+A coding agent outside the browser (Claude Code, Codex, a shell script) runs Python against the
+open design through files in one linked folder; no server or port. Next steps and known gaps:
+`docs/code_review/todo/beta-release-checklist.md` § After the beta.
+
+- **Protocol** (`agentRuns.ts`, `AGENT_PROTOCOL`): under `.foldnano/agent/`, the agent drops
+  `requests/<id>.json` (temp file + rename), Foldnano answers in `runs/<id>.json` (`running`, then
+  `done` / `error` / `rejected` / `cancelled` / `interrupted`, with `applyOutcome`) and keeps
+  `listener.json` (design, session, activity, heartbeat). A request carries the session from
+  `listener.json` and names the plugin or a folder `.py` with `run(ctx)` (`isSafeScriptPath`),
+  params, and a `mode` (`AgentRunMode`): `apply`, `ask-user` (a real change held for Apply /
+  Discard; `run.py --ask-user-approval` waits for the user's decision through the record's
+  `review`) or `dry-run` (`previewPendingResult` applies the result to a scratch copy of the doc
+  for the overview, then the pending result is cancelled). A request without `mode` (an older
+  run.py) is read from `apply`. Never operations: everything the agent does is a Python file. The one
+  other request `kind` is `describe`, which runs nothing and only gets the overview below.
+- **Connection = one folder + one design** (`AgentConnection`, setting `pluginAgentRunsConnection`,
+  behind the opt-in `allowed`, setting `pluginAgentRunsAllowed`, off by default). It survives a
+  reload, but only the tab that shows that design, owns it (`canEdit`), has `readwrite`
+  permission and holds the Web Lock `foldnano-agent-folder:<pluginId>` listens; other tabs pause
+  without writing. Every poll re-reads both settings, so turning the switch off, turning dev mode
+  off, unlinking, or connecting elsewhere in any tab disconnects everywhere.
+- **`AgentRunListener`** (`AgentRunListener.svelte.ts`, on `EditorViewContext.agentRuns`) polls the
+  folder and runs one request at a time through `coordinator.activate()` / `runWithOptions()` like
+  a Run click. The heartbeat has its own timer, so it keeps going during a run.
+- **Each listening stretch** (connect, resume after a pause, permission granted again) first marks
+  records a closed editor left `running` as `interrupted`, rejects every request already waiting
+  unread, then starts a new session; only requests carrying it run. A request is acknowledged
+  (`running` record) before it is deleted, so a crash never runs one twice.
+- **Outcomes, not inference:** `runWithOptions()` returns a `RunOutcome` (completed with the result
+  token _this_ run left pending, invalid result, or cancelled: stopped / input review declined /
+  dev mode off) and `confirmApply(pluginId, token)` an `ApplyOutcome` (`applied`, `stale`,
+  `not-owner`, `failed`). The listener copies them into the record; it never guesses from design
+  hashes. Logs are only copied when this run replaced them.
+- **Review:** while any result awaits Apply / Discard, requests queue (`listener.json` activity
+  `awaiting-review`). The coordinator reports what became of each pending result
+  (`setPendingResolvedListener`: applied / discarded / superseded / stale / failed) and the
+  listener writes it into that run's record (`review`).
+- **Script runs:** `runWithOptions({ entrypoint })` (linked plugins only) adds the script to that
+  run's zip at its own path (`zipWithFile`) and sends `entrypointPath`; the harness loads it instead
+  of `plugin.py`, so plugin modules stay importable and tracebacks name the script. Requests are
+  capped at `MAX_AGENT_REQUEST_BYTES`, scripts at `MAX_AGENT_SCRIPT_BYTES` (checked before reading)
+  and the run's zip at `MAX_PLUGIN_ZIP_BYTES`. `agent-scripts/`, `AGENTS.md` and `CLAUDE.md` are
+  ignored for plugin zips (`isIgnoredLinkedPath`).
+- **Records are a log, not a snapshot:** they hold the hash of the exact zip that ran
+  (`bundleSha256`), the script hash, manifest version, runtime, active region, params and design
+  hashes, but not the code or design themselves.
+- **Agent files:** turning agent runs on writes `.foldnano/run.py` (from `python/agent/run.py`;
+  replaced only while it still carries the generated marker), the API stubs under
+  `.foldnano-stubs/` (always refreshed), and `AGENTS.md`, `CLAUDE.md`, `pyrightconfig.json` and
+  `agent-scripts/` when missing. `AGENTS.md` is written with a hash marker (`agentsMdFile`) and
+  replaced on each connect while it still matches it (`isUneditedAgentsMd`); an edited copy is
+  the user's and stays. `agentsMdText` opens with first steps (`--describe`, the local stubs, a
+  script tried with `--dry-run`) and a folder map, so agents don't explore or fetch docs first,
+  and lists the doc pages (`apiPages`) only as a fallback. `CLAUDE.md` is an `@AGENTS.md` import
+  (a symlink can't be made through the File System Access API, and breaks on Windows). `run.py` is stdlib-only and tested by
+  `tests/test_agent_cli.py`; its `PROTOCOL` must equal `AGENT_PROTOCOL` (`agentRuns.spec.ts`).
+- **Design overview** (`buildDesignOverview` in `src/lib/model/io/designOverview.ts`, through the
+  listener's `getOverview` dep): every `done` record carries a structure-only overview of the active
+  region (for a dry run, of the scratch copy with the change) (helices, scaffold routes, staple lengths vs `STAPLE_LENGTH_RANGE` 15–60 nt), and
+  `run.py` prints it (`format_overview`; `--describe`, `--no-overview`). It is built from the
+  model after the apply, so it shows what the editor holds, for any plugin format. It states facts,
+  not judgements; a design-quality report would build its warnings on the same data. The shape is
+  pinned by `tests/fixtures/design_overview.golden.json`, which `designOverview.spec.ts` generates
+  and `test_agent_cli.py` renders. A failure to build it is logged and leaves `overview: null`; it
+  never fails a run.
+- **Stopping and teardown:** `#generation` is bumped on connect, disconnect and `dispose()`, and
+  `dispose()` is final; work that sees it change after an await stops before activating, running
+  or applying.
+- **UI:** the **Agent runs (Experimental)** switch under the dev mode switch (with a link to the
+  public page `src/content/plugin-development/11-agent-runs.md` and a warning that the agent can
+  send the design to its AI provider), the folder bar's
+  **Agent runs** button shown only while it is on and naming the connected design
+  (`PluginDevPanel.svelte`), and the toolbar's `AgentRunIndicator.svelte` (folder → design, running
+  script, stop, a toast per finished run).
+
 ---
 
 ## The `foldnano` And `foldnano_mini` Python Packages
@@ -1398,6 +1475,10 @@ Coverage: `initRuntime` idempotency, RUNTIME_ERROR retry, concurrent installs an
 
 - **Never pass a folder handle to the worker.** Linked plugins cross into the sandbox as zip bytes, exactly like installed ones.
 - **Check `_devEpoch` (and `_stoppedPluginIds`) after every await in an activation or linked run** before creating or using a worker; dev mode can turn off, or a stop or eviction terminate the bridge, during a folder read, review dialog or wheel download. A terminated bridge respawns a worker on its next call, and nothing would own or terminate that one.
+- **Don't run a request that predates the current listening session, and don't infer outcomes.** Keep the session reset on every pause, permission lapse, connect and disconnect; take run and apply outcomes from `RunOutcome` / `ApplyOutcome`, never from plugin state or design hashes; and keep at most one listener per folder (the Web Lock) and per connection (the design id).
+- **Agent runs never carry operations.** A request names Python in the folder; don't add request kinds that mutate the design directly, or runs stop being reproducible from scripts (`describe` only reads).
+- **A dry run never touches the design or leaves a result to apply.** `previewPendingResult` works on a scratch document and history only, and the listener cancels its own pending result straight after. Don't let `dry-run` fall through to `confirmApply`.
+- **Keep the design overview free of sequences, oligo names, colours and notes.** It goes into the agent's conversation, and so to its AI provider, after every run; the Dev panel warning and the Agent Runs page promise only structure. `designOverview.spec.ts` checks it. Bump `AGENT_PROTOCOL` (and `PROTOCOL` in `python/agent/run.py`) on any incompatible change to the files under `.foldnano/agent/`.
 - **Don't cache a linked plugin's files.** `activate()` skips `pluginFiles` writes for `origin: 'linked'`; the folder is the only source.
 - Don't hand-edit `python/stubs/**` or `python-api-index.generated.json`; change the Python source (signature, annotation, docstring, `__all__`) and regenerate.
 

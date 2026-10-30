@@ -112,6 +112,12 @@ class MemoryDirectoryHandle {
 		return new MemoryFileHandle(name, this.tree, this.permissions);
 	}
 
+	async removeEntry(name: string) {
+		if (this.missing) throw notFound(this.name);
+		if (this.tree[name] === undefined) throw notFound(name);
+		delete this.tree[name];
+	}
+
 	async queryPermission({ mode = 'read' }: { mode?: 'read' | 'readwrite' } = {}) {
 		return this.permissions[mode];
 	}

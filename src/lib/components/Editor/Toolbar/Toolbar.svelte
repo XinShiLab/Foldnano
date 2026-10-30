@@ -69,6 +69,7 @@
 	import { modKeySymbol } from '$lib/utils/platform';
 	import { goto } from '$app/navigation';
 	import SaveStatusIndicator from '../SaveStatusIndicator.svelte';
+	import AgentRunIndicator from '../Plugin/AgentRunIndicator.svelte';
 	import { githubAuth, getAuthStatus, loginWithGitHub } from '$lib/services/github/auth.svelte';
 	import { toast } from 'svelte-sonner';
 	import { githubExplorerStateStore } from '$lib/services/storage';
@@ -597,6 +598,7 @@
 						<LoaderCircle size={14} class="my-auto shrink-0 animate-spin text-muted-foreground" />
 					{/if}
 					<SaveStatusIndicator />
+					<AgentRunIndicator />
 					<!-- <Badge class="h-6 min-w-5 rounded-full px-1 font-mono tabular-nums my-auto bg-green-700 font-bold "><CloudCheck /></Badge> -->
 					<!-- <CloudCheck class="stroke-2 stroke-green-700 my-auto" size={18}/> -->
 					<!-- <CloudAlert class="stroke-3 stroke-amber-500 my-auto" size={18}/> -->

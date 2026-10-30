@@ -177,12 +177,12 @@ for vh in part.virtual_helices():
 	<title>Foldnano: DNA nanostructure design in your browser</title>
 	<meta
 		name="description"
-		content="Free, open-source, local-first DNA origami design tool. Mix lattices, simulate, and export to oxDNA/mrDNA. No installation, no account."
+		content="Free, open-source, local-first DNA origami design tool. Mix lattices, run python plugins, and export to oxDNA/mrDNA. No installation, no account."
 	/>
 	<meta property="og:title" content="Foldnano: DNA nanostructure design in your browser" />
 	<meta
 		property="og:description"
-		content="Free, open-source, local-first DNA origami design tool. Mix lattices, simulate, and export to oxDNA/mrDNA. No installation, no account."
+		content="Free, open-source, local-first DNA origami design tool. Mix lattices, run python plugins, and export to oxDNA/mrDNA. No installation, no account."
 	/>
 	<meta property="og:type" content="website" />
 </svelte:head>
@@ -262,20 +262,20 @@ for vh in part.virtual_helices():
 							<p
 								class="font-heading text-[10px] tracking-[0.12em] text-[var(--landing-muted)] uppercase md:text-xs md:tracking-[0.18em]"
 							>
-								Open-source · Local-first · In your browser
+								Integrated Design Environment · Open-source
 							</p>
 							<h1
 								class="mt-4 text-3xl leading-[1.05] font-extrabold text-[var(--landing-ink)] sm:text-4xl md:text-5xl"
 							>
-								Everything you need<br />
-								to <span class="text-[var(--landing-green)]">design</span><br />
+								The <span class="text-[var(--landing-green)]">IDE</span> for<br />
 								<span class="text-[var(--landing-blue)] sm:whitespace-nowrap"
 									>DNA Nanostructures</span
 								>
 							</h1>
 							<p class="mt-4 max-w-md text-base text-[var(--landing-muted)] sm:text-lg">
-								Design, simulate, and export DNA origami entirely in your browser. No installation,
-								no account, your data stays on your machine.
+								Design, inspect, and export DNA origami entirely in your browser. Run python plugins
+								and scripts directly to analyze and modify your designs. No installation, no
+								account, your data stays on your machine.
 							</p>
 							<div class="mt-6 flex flex-wrap items-center gap-3">
 								<a

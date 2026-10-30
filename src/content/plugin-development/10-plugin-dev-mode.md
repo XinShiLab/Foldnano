@@ -71,6 +71,10 @@ The run log's first line names the environment an installed copy would get, for 
 - **Check** lists what would stop the plugin installing or running (no `plugin.py`, no `run(ctx)` function, an `fplugin.json` that isn't valid) together, then manifest problems as an install reports them, then notes: packages that come from PyPI, why the plugin would run in the custom environment, wheels in the folder that `requirements` doesn't list, and which files are ignored.
 - **Zip** downloads the folder as the plugin zip that **Import zip** expects, without the ignored files.
 
+## Let a coding agent run it (experimental)
+
+A coding agent working in a linked folder (Claude Code, Codex, Cursor or a plain script) can run Python on the open design without anyone clicking **Run**. This is off until you turn on **Agent runs** (marked *Experimental*) under the **Plugin dev mode** switch. See [Agent Runs](/docs/plugin-development/agent-runs) for how to set it up, how it works, and the risks, including that the agent can send your design to its AI provider.
+
 ## Permission, moved folders and unlinking
 
 - After a reload, Chromium may ask again for permission to read the folder when you click **Activate** or **Run**. Each browser tab asks separately.

@@ -1,0 +1,114 @@
+{
+	"overview": 1,
+	"region": {
+		"id": "region-1",
+		"name": "HONEYCOMB Region 1",
+		"kind": "HONEYCOMB",
+		"bpRange": {
+			"min": 0,
+			"max": 41
+		},
+		"helixCount": 2,
+		"helices": [
+			{
+				"number": 0,
+				"cell": {
+					"row": 0,
+					"col": 0
+				},
+				"length": 42
+			},
+			{
+				"number": 1,
+				"cell": {
+					"row": 0,
+					"col": 1
+				},
+				"length": 42
+			}
+		]
+	},
+	"scaffolds": [
+		{
+			"lengthNt": 84,
+			"circular": false,
+			"helixOrder": [
+				0,
+				1
+			],
+			"segmentCount": 2,
+			"crossoverCount": 1,
+			"route": [
+				{
+					"helix": 0,
+					"from": 0,
+					"to": 41
+				},
+				{
+					"helix": 1,
+					"from": 41,
+					"to": 0
+				}
+			],
+			"unpairedNt": 4,
+			"unpaired": [
+				{
+					"helix": 0,
+					"from": 26,
+					"to": 29
+				}
+			]
+		}
+	],
+	"scaffoldCount": 1,
+	"staples": {
+		"count": 3,
+		"circular": 0,
+		"lengthNt": {
+			"min": 12,
+			"median": 26,
+			"max": 42
+		},
+		"histogram": [
+			{
+				"from": 10,
+				"to": 19,
+				"count": 1
+			},
+			{
+				"from": 20,
+				"to": 29,
+				"count": 1
+			},
+			{
+				"from": 30,
+				"to": 39,
+				"count": 0
+			},
+			{
+				"from": 40,
+				"to": 49,
+				"count": 1
+			}
+		],
+		"range": {
+			"min": 15,
+			"max": 60
+		},
+		"outsideRangeCount": 1,
+		"outsideRange": [
+			{
+				"helix": 0,
+				"bp": 41,
+				"lengthNt": 12
+			}
+		]
+	},
+	"otherRegions": [
+		{
+			"name": "Side arm",
+			"kind": "FREEFORM",
+			"helixCount": 0
+		}
+	]
+}

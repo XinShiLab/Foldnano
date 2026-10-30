@@ -1,5 +1,5 @@
 import { checkCadnanoProfile, type CadnanoProfileIssue } from '$lib/model/checks/cadnano';
-import { MAX_WHEEL_BYTES, readResponseCapped } from './sizeLimits';
+import { MAX_PLUGIN_ZIP_BYTES, MAX_WHEEL_BYTES, formatMb, readResponseCapped } from './sizeLimits';
 import type { PluginRegistry } from './PluginRegistry.svelte';
 import { classifyManifest, isSameOriginUrl } from './manifestValidation';
 import { classifyEnv, STANDARD_ENV_EXTRAS } from './envClassification';
@@ -9,8 +9,10 @@ import { PyodideWorkerBridge, RunTimeoutError } from './worker/bridge';
 import { buildSandboxCsp, SandboxedWorker } from './worker/sandboxHost';
 import { connectSourcesFor } from './networkPolicy';
 import { CadnanoJSON } from '$lib/model/io/cadnanoJSON';
-import type FoldnanoDocument from '$lib/model/document.svelte';
-import type { HistoryStack } from '$lib/commands/history.svelte';
+import FoldnanoDocument from '$lib/model/document.svelte';
+import type { Part } from '$lib/model/Part';
+import { HistoryStack } from '$lib/commands/history.svelte';
+import { StorageManager } from '$lib/services/storage/StorageManager';
 import { applyResult } from './ResultApplicator';
 import type { MutationOp } from './opDispatch';
 import { LatticedDesignRegion, type DesignRegion } from '$lib/model/Part/DesignRegion';
@@ -24,6 +26,7 @@ import { verifyDesign, type DesignVerificationInput } from './design-verificatio
 import { buildPluginZip } from './ownedPlugins';
 import type { PartJSON } from './result-replacement-operations';
 import type { LinkedFolderRead } from './linkedPluginFolder';
+import { zipWithFile } from './agentRuns';
 
 /** Shown the cadnano export issues of a cadnano_json plugin's input; resolves whether to run. */
 export type CadnanoInputReviewer = (
@@ -54,6 +57,26 @@ export type PendingApply = {
 	activeRegionId: string | null;
 	resultToken: string;
 };
+
+/** How a run ended, for callers that must know (agent runs); a failed run still throws. */
+export type RunOutcome =
+	| {
+			kind: 'completed';
+			/** The result this run left waiting for Apply; null when it left none. */
+			resultToken: string | null;
+			/** Linked plugins: the exact zip that ran. */
+			zip: Uint8Array | null;
+			activeRegionId: string | null;
+	  }
+	/** The result failed validation; the plugin shows the error. */
+	| { kind: 'invalid-result'; message: string }
+	| { kind: 'cancelled'; reason: 'stopped' | 'input-review-declined' | 'dev-mode-off' };
+
+/** What `confirmApply` did. `none`: no pending result (with that token) for the plugin. */
+export type ApplyOutcome = 'applied' | 'none' | 'not-owner' | 'stale' | 'failed';
+
+/** What finally became of a pending result; reported once per result token. */
+export type PendingResolution = 'applied' | 'discarded' | 'superseded' | 'stale' | 'failed';
 
 /**
  * What activating a plugin would do to the currently resident custom-slot
@@ -103,8 +126,40 @@ export class PluginCoordinator {
 	/** Asks whether to run a cadnano_json plugin on input the export can't write faithfully. */
 	private reviewCadnanoInput: CadnanoInputReviewer | undefined;
 
+	#pendingApply: PendingApply | null = $state(null);
+	/** Why the next clear of `pendingApply` happens; any other clear is a discard. */
+	#nextResolution: PendingResolution | null = null;
+	#onPendingResolved: ((resultToken: string, resolution: PendingResolution) => void) | undefined;
+
 	/** Result awaiting user confirmation before being applied to the model. */
-	pendingApply: PendingApply | null = $state(null);
+	get pendingApply(): PendingApply | null {
+		return this.#pendingApply;
+	}
+
+	set pendingApply(next: PendingApply | null) {
+		const previous = this.#pendingApply;
+		const resolution = this.#nextResolution;
+		this.#nextResolution = null;
+		this.#pendingApply = next;
+		if (previous && previous.resultToken !== next?.resultToken) {
+			this.#onPendingResolved?.(
+				previous.resultToken,
+				resolution ?? (next ? 'superseded' : 'discarded')
+			);
+		}
+	}
+
+	/** Told once whenever a pending result is applied, discarded or replaced (agent run records). */
+	setPendingResolvedListener(
+		listener: (resultToken: string, resolution: PendingResolution) => void
+	): void {
+		this.#onPendingResolved = listener;
+	}
+
+	#clearPending(resolution: PendingResolution): void {
+		this.#nextResolution = resolution;
+		this.pendingApply = null;
+	}
 
 	/** Plugins whose worker was deliberately terminated (user stop or custom-slot
 	 *  eviction) — lets catch blocks distinguish that from a genuine error.
@@ -629,7 +684,7 @@ export class PluginCoordinator {
 	 * @param pluginId  ID of the plugin to run.
 	 */
 	async run(pluginId: string): Promise<void> {
-		return this.runWithOptions(pluginId);
+		await this.runWithOptions(pluginId);
 	}
 
 	async runWithOptions(
@@ -639,8 +694,10 @@ export class PluginCoordinator {
 			sidePanelInput?: PluginSidePanelInput | null;
 			/** Owned plugins only: run this plugin.py instead of the saved one, as the plugin. */
 			draftCode?: string;
+			/** Linked plugins only (agent runs): load this folder file instead of plugin.py. */
+			entrypoint?: { path: string; code: Uint8Array };
 		}
-	): Promise<void> {
+	): Promise<RunOutcome> {
 		if (this.registry.hasReservation(pluginId)) {
 			throw new Error(
 				`Cannot run plugin "${pluginId}": plugin installation or replacement is currently in progress.`
@@ -668,6 +725,9 @@ export class PluginCoordinator {
 			);
 		if (draftCode !== null && draftCode.trim() === '')
 			throw new Error('The plugin editor is empty. Write a run(ctx) function before running.');
+		const entrypoint = options?.entrypoint ?? null;
+		if (entrypoint !== null && plugin.origin !== 'linked')
+			throw new Error(`"${plugin.manifest.name}" is not linked, so it can't run a folder script.`);
 		if (this.pendingApply && this.pendingApply.pluginId !== pluginId) {
 			throw new Error(
 				`"${plugin.manifest.name}" cannot run while "${this.pendingApply.pluginId}" has an unapplied result. Apply or discard it first.`
@@ -683,15 +743,21 @@ export class PluginCoordinator {
 			try {
 				const read = await this.readLinked(plugin);
 				// Dev mode was turned off while the folder was read: nothing runs.
-				if (this._devEpoch !== devEpoch) return;
+				if (this._devEpoch !== devEpoch) return { kind: 'cancelled', reason: 'dev-mode-off' };
 				this.registry.refreshLinked(read.manifest, read.files);
 				// A changed environment, or a dev worker that died (stop, timeout), is rebuilt here,
 				// from this same read so the zip that runs matches the manifest it was built for.
 				if (!this.ownsDevSlot(plugin, read.envFingerprint)) {
 					await this.activateWith(pluginId, read);
-					if (this._devEpoch !== devEpoch) return;
+					if (this._devEpoch !== devEpoch) return { kind: 'cancelled', reason: 'dev-mode-off' };
 				}
-				linkedZip = read.zip;
+				// The script may sit in a folder plugin zips leave out (agent-scripts/).
+				linkedZip = entrypoint ? zipWithFile(read.zip, entrypoint.path, entrypoint.code) : read.zip;
+				if (linkedZip.byteLength > MAX_PLUGIN_ZIP_BYTES) {
+					throw new Error(
+						`The plugin with "${entrypoint?.path}" adds up to more than ${formatMb(MAX_PLUGIN_ZIP_BYTES)}.`
+					);
+				}
 			} finally {
 				this._linkedRunReads.delete(pluginId);
 			}
@@ -721,7 +787,7 @@ export class PluginCoordinator {
 					(issue) => issue.severity === 'error' || (writesBack && issue.severity === 'warning')
 				);
 				if (issues.length > 0 && !(await this.reviewCadnanoInput(plugin.manifest.name, issues))) {
-					return;
+					return { kind: 'cancelled', reason: 'input-review-declined' };
 				}
 			}
 		}
@@ -755,6 +821,8 @@ export class PluginCoordinator {
 				NonNullable<typeof part>['toJSON']
 			>;
 		}
+
+		let resultToken: string | null = null;
 
 		// Use pluginId as requestId so the onLog callback can route streamed log
 		// lines to the correct plugin via registry.get(requestId). This is safe
@@ -798,6 +866,7 @@ export class PluginCoordinator {
 							? (linkedZip.slice().buffer as ArrayBuffer)
 							: plugin.resolvedZipData,
 				pluginLabel: plugin.manifest.name,
+				entrypointPath: entrypoint?.path,
 				format: plugin.manifest.format,
 				cadnanoJsonIn,
 				foldnanoJsonIn,
@@ -846,7 +915,7 @@ export class PluginCoordinator {
 							preRunFoldnanoSnapshot: snapshot,
 							summary: buildApplySummary(plugin.manifest, null, mutationLog, snapshot),
 							activeRegionId,
-							resultToken: this._mintResultToken(),
+							resultToken: (resultToken = this._mintResultToken()),
 						};
 					}
 				} else {
@@ -883,7 +952,7 @@ export class PluginCoordinator {
 							plugin.errorMessage = err.message;
 							plugin.errorTraceback = null;
 							reportError(err.toSafeReportable(), err.errorLogContext, { notify: false });
-							return;
+							return { kind: 'invalid-result', message: err.message };
 						}
 						throw err;
 					}
@@ -899,10 +968,11 @@ export class PluginCoordinator {
 						preRunFoldnanoSnapshot: snapshot,
 						summary: buildApplySummary(plugin.manifest, validatedArtifact, null, snapshot),
 						activeRegionId,
-						resultToken: this._mintResultToken(),
+						resultToken: (resultToken = this._mintResultToken()),
 					};
 				}
 			}
+			return { kind: 'completed', resultToken, zip: linkedZip, activeRegionId };
 		} catch (e) {
 			if (this._stoppedPluginIds.delete(pluginId)) {
 				// Deliberate worker termination (user stop or custom-slot eviction).
@@ -919,7 +989,7 @@ export class PluginCoordinator {
 				if (!devModeOff && (plugin.manifest.requirements?.length ?? 0) === 0) {
 					this.activate(pluginId).catch(() => {});
 				}
-				return;
+				return { kind: 'cancelled', reason: 'stopped' };
 			}
 
 			if (e instanceof RunTimeoutError) {
@@ -955,65 +1025,104 @@ export class PluginCoordinator {
 	}
 
 	/**
-	 * Confirm applying the pending result for a plugin.
-	 * Calls applyResult() and clears pendingApply.
+	 * Confirm applying the pending result for a plugin (only the one with `resultToken`, when
+	 * given). Calls applyResult() and clears pendingApply; says what happened.
 	 */
-	confirmApply(pluginId: string): void {
-		if (this.pendingApply?.pluginId !== pluginId) return;
+	confirmApply(pluginId: string, resultToken?: string): ApplyOutcome {
+		const pending = this.pendingApply;
+		if (pending?.pluginId !== pluginId) return 'none';
+		if (resultToken !== undefined && pending.resultToken !== resultToken) return 'none';
 		// Another tab owns the document: keep the result so it can be applied after taking back
 		// control (the stale check below discards it if the reloaded design differs).
-		if (!this.canEditDoc()) return;
+		if (!this.canEditDoc()) return 'not-owner';
 		const doc = this.getDoc?.();
 		if (!doc) {
-			this.pendingApply = null;
-			return;
+			this.#clearPending('stale');
+			return 'stale';
 		}
-		const currentFingerprint = doc.parts.length > 0 ? JSON.stringify(doc.parts[0].toJSON()) : null;
-		if (
-			doc.id !== this.pendingApply.docId ||
-			currentFingerprint !== this.pendingApply.partFingerprint
-		) {
+		if (this.#isStale(pending, doc)) {
 			// Document or active part changed since the plugin ran — discard rather than
 			// replay a stale result onto newer local edits.
-			this.pendingApply = null;
-			return;
+			this.#clearPending('stale');
+			return 'stale';
 		}
 		const { manifest, primaryArtifact, mutationLog, preRunFoldnanoSnapshot, activeRegionId } =
-			this.pendingApply;
+			pending;
 
 		const historyStack = this.getHistory?.();
-		if (doc && historyStack) {
-			try {
-				applyResult({
-					manifest,
-					primaryArtifact,
-					mutationLog,
-					preRunFoldnanoSnapshot: preRunFoldnanoSnapshot as Parameters<
-						typeof applyResult
-					>[0]['preRunFoldnanoSnapshot'],
-					doc,
-					partIndex: 0,
-					historyStack,
-					activeRegionId,
-				});
-			} catch (err) {
-				this.pendingApply = null;
-				const applyError = new PluginApplyError(
-					err instanceof Error ? err.message : String(err),
-					pluginId,
-					'apply-failed'
-				);
-				const plugin = this.registry.get(pluginId);
-				if (plugin) {
-					plugin.status = 'error';
-					plugin.errorMessage = applyError.message;
-					plugin.errorTraceback = null;
-				}
-				reportError(applyError.toSafeReportable(), applyError.errorLogContext, { notify: false });
-				return;
-			}
+		if (!historyStack) {
+			this.#clearPending('failed');
+			return 'failed';
 		}
-		this.pendingApply = null;
+		try {
+			applyResult({
+				manifest,
+				primaryArtifact,
+				mutationLog,
+				preRunFoldnanoSnapshot: preRunFoldnanoSnapshot as Parameters<
+					typeof applyResult
+				>[0]['preRunFoldnanoSnapshot'],
+				doc,
+				partIndex: 0,
+				historyStack,
+				activeRegionId,
+			});
+		} catch (err) {
+			this.#clearPending('failed');
+			const applyError = new PluginApplyError(
+				err instanceof Error ? err.message : String(err),
+				pluginId,
+				'apply-failed'
+			);
+			const plugin = this.registry.get(pluginId);
+			if (plugin) {
+				plugin.status = 'error';
+				plugin.errorMessage = applyError.message;
+				plugin.errorTraceback = null;
+			}
+			reportError(applyError.toSafeReportable(), applyError.errorLogContext, { notify: false });
+			return 'failed';
+		}
+		this.#clearPending('applied');
+		return 'applied';
+	}
+
+	#isStale(pending: PendingApply, doc: FoldnanoDocument): boolean {
+		const currentFingerprint = doc.parts.length > 0 ? JSON.stringify(doc.parts[0].toJSON()) : null;
+		return doc.id !== pending.docId || currentFingerprint !== pending.partFingerprint;
+	}
+
+	/**
+	 * Applies the pending result (only the one with `resultToken`) to a scratch copy of the design,
+	 * the way Apply would, and returns the copy's part. The design, its history and the pending
+	 * result are untouched. 'stale' when the design changed since the run; throws when applying
+	 * fails.
+	 */
+	previewPendingResult(pluginId: string, resultToken: string): Part | 'none' | 'stale' {
+		const pending = this.pendingApply;
+		if (pending?.pluginId !== pluginId || pending.resultToken !== resultToken) return 'none';
+		const doc = this.getDoc?.();
+		if (!doc || this.#isStale(pending, doc)) return 'stale';
+		const scratch = FoldnanoDocument.fromJSON(doc.snapshot());
+		const history = new HistoryStack(scratch, new StorageManager('memory'));
+		history.setAutoSaveConfig({ enabled: false });
+		try {
+			applyResult({
+				manifest: pending.manifest,
+				primaryArtifact: pending.primaryArtifact,
+				mutationLog: pending.mutationLog,
+				preRunFoldnanoSnapshot: pending.preRunFoldnanoSnapshot as Parameters<
+					typeof applyResult
+				>[0]['preRunFoldnanoSnapshot'],
+				doc: scratch,
+				partIndex: 0,
+				historyStack: history,
+				activeRegionId: pending.activeRegionId,
+			});
+		} finally {
+			history.destroy();
+		}
+		return scratch.parts[0];
 	}
 
 	/**
