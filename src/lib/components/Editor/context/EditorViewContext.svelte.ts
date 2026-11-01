@@ -31,7 +31,7 @@ import {
 	type ReferenceGeometry,
 	type ReferenceMesh,
 } from '$lib/model/Part/DesignRegion';
-import { scaleReferenceMesh } from '$lib/model/geometry3d/referenceMesh';
+import { hasFiniteVertices, scaleReferenceMesh } from '$lib/model/geometry3d/referenceMesh';
 import { readPlyMeshFile } from '$lib/model/io/plyMesh';
 import { Plane } from '$lib/model/Part/Plane.svelte';
 import type { SolverParams } from '$lib/model/rbs/rbsTypes';
@@ -638,9 +638,15 @@ export class EditorViewContext {
 	}
 
 	setMeshDraftScale(scale: number): void {
-		if (this.meshDraft && Number.isFinite(scale) && scale > 0) {
-			this.meshDraft = { ...this.meshDraft, scale };
+		if (!this.meshDraft || !Number.isFinite(scale) || scale <= 0) return;
+		// JSON saves a non-finite coordinate as null, which would silently damage the mesh.
+		if (!hasFiniteVertices(scaleReferenceMesh(this.meshDraft.mesh, scale))) {
+			toast.error('This scale is too large', {
+				description: 'It makes some mesh coordinates too large to store.',
+			});
+			return;
 		}
+		this.meshDraft = { ...this.meshDraft, scale };
 	}
 
 	clearMeshDraft(): void {

@@ -18,6 +18,10 @@ export function scaleReferenceMesh(mesh: ReferenceMesh, factor: number): Referen
 	};
 }
 
+export function hasFiniteVertices(mesh: ReferenceMesh): boolean {
+	return mesh.vertices.every((vertex) => vertex.every(Number.isFinite));
+}
+
 /** Every distinct edge: the mesh's own edges plus the sides of its faces. */
 export function referenceMeshEdges(mesh: ReferenceMesh): [number, number][] {
 	const seen = new Set<number>();
@@ -36,9 +40,15 @@ export function referenceMeshEdges(mesh: ReferenceMesh): [number, number][] {
 }
 
 export function summarizeReferenceMesh(mesh: ReferenceMesh): ReferenceMeshSummary {
+	// A loop, not Math.max(...values): spreading a plugin's large mesh overflows the call stack.
 	const size = [0, 1, 2].map((axis) => {
-		const values = mesh.vertices.map((v) => v[axis]);
-		return values.length > 0 ? Math.max(...values) - Math.min(...values) : 0;
+		let min = Infinity;
+		let max = -Infinity;
+		for (const vertex of mesh.vertices) {
+			min = Math.min(min, vertex[axis]);
+			max = Math.max(max, vertex[axis]);
+		}
+		return mesh.vertices.length > 0 ? max - min : 0;
 	}) as [number, number, number];
 
 	const edges = referenceMeshEdges(mesh);
