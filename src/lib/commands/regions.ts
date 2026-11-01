@@ -1,6 +1,10 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { Part } from '$lib/model/Part';
-import { DesignRegion } from '$lib/model/Part/DesignRegion';
+import {
+	DesignRegion,
+	WireframeRegion,
+	type ReferenceGeometry,
+} from '$lib/model/Part/DesignRegion';
 import { Plane } from '$lib/model/Part/Plane.svelte';
 import type { HistoryStack } from './history.svelte';
 
@@ -78,6 +82,24 @@ export function splitRegionCmd(
 		}
 
 		part.syncListRows();
+	});
+}
+
+export function setRegionReferenceGeometryCmd(
+	historyStack: HistoryStack,
+	part: Part,
+	regionId: string,
+	geometry: ReferenceGeometry | undefined,
+	label = 'Set reference geometry'
+): void {
+	const region = part.getRegionById(regionId);
+	if (!(region instanceof WireframeRegion)) {
+		throw new Error(`Region ${regionId} is not a wireframe region`);
+	}
+	const before = region.referenceGeometry;
+	historyStack.tx(label, (rec) => {
+		rec.regionReferenceGeometry(part, regionId, before, geometry);
+		part.setRegionReferenceGeometry(regionId, geometry);
 	});
 }
 

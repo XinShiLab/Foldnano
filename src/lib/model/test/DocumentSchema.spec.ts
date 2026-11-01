@@ -4,6 +4,7 @@ import Ajv2020 from 'ajv/dist/2020';
 import { describe, it, expect } from 'vitest';
 import FoldnanoDocument from '$lib/model/document.svelte';
 import { CURRENT_FORMAT_VERSION } from '$lib/model/documentFormat';
+import type { WireframeRegion } from '$lib/model/Part/DesignRegion';
 import { addFreeformVh, addLatticeVh } from '$lib/model/test/testHelpers';
 
 // The published schema is the public .fn.json contract (src/content/contributors/09-file-format.md).
@@ -64,6 +65,20 @@ function buildFullDocument(): FoldnanoDocument {
 	const fvh = addFreeformVh(freeform, [0, 0, 0], [0, 0, 1]);
 	freeform.createOligo(fvh, 0, 10, '#888888');
 
+	const wireframe = doc.addNewPart('WIREFRAME');
+	(wireframe.getDefaultRegion() as WireframeRegion).referenceGeometry = {
+		unit: 'nm',
+		mesh: {
+			vertices: [
+				[0, 0, 0],
+				[1, 0, 0],
+				[0, 1, 0],
+			],
+			faces: [[0, 1, 2]],
+			edges: [[0, 1]],
+		},
+	};
+
 	return doc;
 }
 
@@ -91,6 +106,7 @@ describe('published .fn.json schema', () => {
 
 		expect(json.parts[0].repeatGroups).toHaveLength(1);
 		expect(json.parts[1].virtualHelices[0].localFrame).toBeDefined();
+		expect(json.parts[2].regions[0].referenceGeometry.mesh.faces).toHaveLength(1);
 		expectValid(CURRENT_FORMAT_VERSION, json);
 	});
 

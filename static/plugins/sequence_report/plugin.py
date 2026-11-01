@@ -27,8 +27,7 @@ import csv
 import io
 import re
 
-from foldnano.io import parse_foldnano_json
-from foldnano.plugin import PluginContext
+from foldnano import PluginContext, parse_foldnano_json
 
 
 def run(ctx: PluginContext) -> None:

@@ -1,0 +1,409 @@
+{
+	"format": "foldnano",
+	"formatVersion": 2,
+	"savedWith": {
+		"app": "0.10.0-beta.1",
+		"commit": "6706f96"
+	},
+	"id": "a3790775-8517-4f2d-aa6a-414fbb69359c",
+	"name": "Format version 2",
+	"parts": [
+		{
+			"name": "Part 1",
+			"id": "42b6c04c-d75e-4a85-8721-53c0f37546d3",
+			"planes": [
+				{
+					"id": "6bb96cb7-ad0f-476d-95ea-6d5f4b862277",
+					"name": "Plane 1",
+					"origin": {
+						"x": 0,
+						"y": 0,
+						"z": 0
+					},
+					"u": {
+						"x": 1,
+						"y": 0,
+						"z": 0
+					},
+					"v": {
+						"x": 0,
+						"y": 1,
+						"z": 0
+					},
+					"normal": {
+						"x": 0,
+						"y": 0,
+						"z": 1
+					}
+				}
+			],
+			"regions": [
+				{
+					"id": "d1b4705c-d2c1-401a-9a82-d57e30d52225",
+					"name": "HONEYCOMB Region 1",
+					"kind": "HONEYCOMB",
+					"planeId": "6bb96cb7-ad0f-476d-95ea-6d5f4b862277",
+					"vhOrder": ["e4dd9f68-32ab-4b0c-9b69-f69eefb21149"],
+					"step": 21,
+					"turnsPerStep": 2,
+					"subStepSize": 7,
+					"twistOffset": 340,
+					"minBase": 0,
+					"maxBase": 42
+				}
+			],
+			"oligos": [
+				{
+					"id": "2e543a48-fa77-4328-97fd-0b778c33716c",
+					"segments": [
+						{
+							"id": "4d1bb3f2-d940-46f2-808a-21daaa3a0987",
+							"inVirtualHelixIndex": 0,
+							"fivePrime": {
+								"segmentId": "4d1bb3f2-d940-46f2-808a-21daaa3a0987",
+								"isThreePrime": false,
+								"index": 0,
+								"connectedSegmentId": null,
+								"modification": null,
+								"isConstrained": false
+							},
+							"threePrime": {
+								"segmentId": "4d1bb3f2-d940-46f2-808a-21daaa3a0987",
+								"isThreePrime": true,
+								"index": 20,
+								"connectedSegmentId": null,
+								"modification": null,
+								"isConstrained": false
+							},
+							"sequence": "NNNNNNNNNNNNNNNNNNNNN",
+							"slots": [
+								{
+									"bpIndex": 0,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 1,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 2,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 3,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 4,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 5,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 6,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 7,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 8,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 9,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 10,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 11,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 12,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 13,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 14,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 15,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 16,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 17,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 18,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 19,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 20,
+									"seq": "N"
+								}
+							]
+						}
+					],
+					"color": "#0066cc",
+					"isScaffold": false,
+					"isSequenceLocked": false,
+					"name": ""
+				}
+			],
+			"virtualHelices": [
+				{
+					"id": "e4dd9f68-32ab-4b0c-9b69-f69eefb21149",
+					"index": 0,
+					"listRow": 0,
+					"regionId": "d1b4705c-d2c1-401a-9a82-d57e30d52225",
+					"latticeCoords": {
+						"row": 0,
+						"col": 0
+					},
+					"length": 42,
+					"strandSets": [
+						{
+							"strandIndex": 0,
+							"segmentIds": ["4d1bb3f2-d940-46f2-808a-21daaa3a0987"]
+						},
+						{
+							"strandIndex": 1,
+							"segmentIds": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Part 2",
+			"id": "c64999a6-1de3-4044-8996-7e3be72368cd",
+			"planes": [
+				{
+					"id": "0cdbcc1d-8794-4249-ab76-ac7fd3f527ef",
+					"name": "Plane 1",
+					"origin": {
+						"x": 0,
+						"y": 0,
+						"z": 0
+					},
+					"u": {
+						"x": 1,
+						"y": 0,
+						"z": 0
+					},
+					"v": {
+						"x": 0,
+						"y": 1,
+						"z": 0
+					},
+					"normal": {
+						"x": 0,
+						"y": 0,
+						"z": 1
+					}
+				}
+			],
+			"regions": [
+				{
+					"id": "8f1a217e-9b68-4dc4-b24a-6136efc390da",
+					"name": "WIREFRAME Region 1",
+					"kind": "WIREFRAME",
+					"planeId": "0cdbcc1d-8794-4249-ab76-ac7fd3f527ef",
+					"vhOrder": ["c0911b97-9fef-4dd2-8691-94f3f36cdd8b"],
+					"step": 21,
+					"turnsPerStep": 2,
+					"subStepSize": 7,
+					"twistOffset": 0,
+					"minBase": 0,
+					"maxBase": 42,
+					"referenceGeometry": {
+						"unit": "nm",
+						"mesh": {
+							"vertices": [
+								[0, 0, 0],
+								[12.5, 0, 0],
+								[6.25, 10.8, 0]
+							],
+							"faces": [[0, 1, 2]],
+							"edges": []
+						}
+					}
+				}
+			],
+			"oligos": [
+				{
+					"id": "f4390ead-020e-4263-83a5-c3b3f37a1abe",
+					"segments": [
+						{
+							"id": "cece96ea-0f45-40fd-8253-949c16b13c18",
+							"inVirtualHelixIndex": 0,
+							"fivePrime": {
+								"segmentId": "cece96ea-0f45-40fd-8253-949c16b13c18",
+								"isThreePrime": false,
+								"index": 0,
+								"connectedSegmentId": null,
+								"modification": null,
+								"isConstrained": false
+							},
+							"threePrime": {
+								"segmentId": "cece96ea-0f45-40fd-8253-949c16b13c18",
+								"isThreePrime": true,
+								"index": 20,
+								"connectedSegmentId": null,
+								"modification": null,
+								"isConstrained": false
+							},
+							"sequence": "NNNNNNNNNNNNNNNNNNNNN",
+							"slots": [
+								{
+									"bpIndex": 0,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 1,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 2,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 3,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 4,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 5,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 6,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 7,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 8,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 9,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 10,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 11,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 12,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 13,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 14,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 15,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 16,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 17,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 18,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 19,
+									"seq": "N"
+								},
+								{
+									"bpIndex": 20,
+									"seq": "N"
+								}
+							]
+						}
+					],
+					"color": "#f97316",
+					"isScaffold": false,
+					"isSequenceLocked": false,
+					"name": ""
+				}
+			],
+			"virtualHelices": [
+				{
+					"id": "c0911b97-9fef-4dd2-8691-94f3f36cdd8b",
+					"index": 0,
+					"listRow": 0,
+					"regionId": "8f1a217e-9b68-4dc4-b24a-6136efc390da",
+					"localFrame": {
+						"origin": {
+							"x": 1,
+							"y": 2,
+							"z": 3
+						},
+						"axis": {
+							"x": 1,
+							"y": 0,
+							"z": 0
+						},
+						"radial0": {
+							"x": 0,
+							"y": 0,
+							"z": 1
+						}
+					},
+					"length": 42,
+					"strandSets": [
+						{
+							"strandIndex": 0,
+							"segmentIds": ["cece96ea-0f45-40fd-8253-949c16b13c18"]
+						},
+						{
+							"strandIndex": 1,
+							"segmentIds": []
+						}
+					]
+				}
+			]
+		}
+	]
+}

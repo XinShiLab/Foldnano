@@ -121,7 +121,12 @@ function validateSchemaVersion(m: Record<string, unknown>): void {
 		);
 }
 
-export const INSTALLABLE_FORMATS = ['cadnano_json', 'foldnano_json', 'foldnano_mini'] as const;
+export const INSTALLABLE_FORMATS = ['cadnano_json', 'foldnano_json', 'foldnano_edit'] as const;
+
+/** A manifest with the old format name read as `foldnano_edit`. */
+export function withCurrentFormat<T extends { format?: unknown }>(manifest: T): T {
+	return manifest.format === 'foldnano_mini' ? { ...manifest, format: 'foldnano_edit' } : manifest;
+}
 
 /**
  * When non-null, non-wheel requirements must appear in this list.
@@ -300,7 +305,7 @@ function validateCitations(raw: unknown): void {
 export function validateManifest(raw: unknown, { allowNoEntrypoint = false } = {}): PluginManifest {
 	if (!raw || typeof raw !== 'object' || Array.isArray(raw))
 		throw new Error('Manifest must be a JSON object');
-	const m = raw as Record<string, unknown>;
+	const m = withCurrentFormat(raw as Record<string, unknown>);
 
 	validateSchemaVersion(m);
 	const schemaVersion = (m.schemaVersion as number | undefined) ?? DEFAULT_MANIFEST_SCHEMA_VERSION;
@@ -334,12 +339,12 @@ export function validateManifest(raw: unknown, { allowNoEntrypoint = false } = {
 
 	const fmt = m.format as string;
 	const strategy = m.applyStrategy as string;
-	if (fmt === 'foldnano_mini' && !REPLAY_STRATEGIES.has(strategy) && strategy !== 'previewOnly')
+	if (fmt === 'foldnano_edit' && !REPLAY_STRATEGIES.has(strategy) && strategy !== 'previewOnly')
 		throw new Error(
-			`format "foldnano_mini" requires applyStrategy to be replayMutationLog, replayMutationLogInRegion, or previewOnly (got "${strategy}")`
+			`format "foldnano_edit" requires applyStrategy to be replayMutationLog, replayMutationLogInRegion, or previewOnly (got "${strategy}")`
 		);
-	if (fmt !== 'foldnano_mini' && REPLAY_STRATEGIES.has(strategy))
-		throw new Error(`applyStrategy "${strategy}" requires format "foldnano_mini" (got "${fmt}")`);
+	if (fmt !== 'foldnano_edit' && REPLAY_STRATEGIES.has(strategy))
+		throw new Error(`applyStrategy "${strategy}" requires format "foldnano_edit" (got "${fmt}")`);
 	if (
 		fmt === 'cadnano_json' &&
 		strategy !== 'previewOnly' &&
@@ -632,7 +637,7 @@ export function looksLikePluginManifest(raw: Record<string, unknown>): boolean {
 		typeof raw.id === 'string' &&
 		typeof raw.name === 'string' &&
 		typeof raw.version === 'string' &&
-		(INSTALLABLE_FORMATS as readonly string[]).includes(raw.format as string) &&
+		(INSTALLABLE_FORMATS as readonly string[]).includes(withCurrentFormat(raw).format as string) &&
 		(VALID_STRATEGIES as readonly string[]).includes(raw.applyStrategy as string)
 	);
 }

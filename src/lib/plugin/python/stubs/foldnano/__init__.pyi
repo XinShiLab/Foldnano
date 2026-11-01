@@ -17,7 +17,7 @@ Example (cadnano_json mode)::
 Example (foldnano_json mode)::
 
     def run(ctx):
-        from foldnano.io import parse_foldnano_json
+        from foldnano import parse_foldnano_json
         part = parse_foldnano_json(
             ctx.get_part_as_foldnano_json(),
             active_region_id=ctx.active_region_id,
@@ -32,11 +32,12 @@ Example (foldnano_json mode)::
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Literal, Optional, Union
+from typing import Any, Literal, Optional, Sequence, Union
 
-RegionKind = Literal['HONEYCOMB', 'SQUARE', 'FREEFORM']
+RegionKind = Literal['HONEYCOMB', 'SQUARE', 'FREEFORM', 'WIREFRAME']
 
 __all__ = [
+    "BACKBONE_RISE_NM",
     "PluginContext",
     "PartData",
     "parse_cadnano_json",
@@ -47,8 +48,13 @@ __all__ = [
     "RegionProxy",
     "LatticedRegionProxy",
     "FreeformRegionProxy",
+    "WireframeRegionProxy",
+    "ReferenceGeometry",
+    "ReferenceMesh",
     "PlaneProxy",
 ]
+
+BACKBONE_RISE_NM: float
 
 
 def parse_cadnano_json(json_str: str) -> dict[str, Any]:
@@ -155,7 +161,7 @@ class PluginContext:
         Return the active part as a Foldnano JSON string (Part.toJSON() format).
 
         Valid when the plugin manifest declared ``format = "foldnano_json"``,
-        ``"foldnano_mini"``, or ``"live"``.
+        ``"foldnano_edit"``, or ``"live"``.
         """
 
     def set_result_foldnano_json(self, json_str: str) -> None:
@@ -163,11 +169,11 @@ class PluginContext:
 
     def set_result_mutation_log(self, log: list[dict[str, Any]]) -> None:
         """
-        Store a foldnano_mini mutation log to be replayed against the host's
+        Store a foldnano_edit mutation log to be replayed against the host's
         canonical ``Part`` under one undo step (apply strategy
         ``replayMutationLog`` / ``replayMutationLogInRegion``).
 
-        Only valid when the plugin manifest declared ``format = "foldnano_mini"``.
+        Only valid when the plugin manifest declared ``format = "foldnano_edit"``.
         Each op must be a JSON-serialisable dict with an ``op`` key.
         """
 
@@ -231,9 +237,9 @@ class PartData:
     name, id:
         Part name and UUID.
     lattice_type:
-        ``"HONEYCOMB"`` or ``"SQUARE"`` (legacy field; superseded by region kinds).
+        Deprecated: use ``region.kind``. Kind of the first region only.
     max_base:
-        Total number of base-pair slots per helix.
+        Deprecated: use ``region.max_base``. Length of the first region only.
     virtual_helices:
         Parsed VirtualHelixProxy list (same order as the JSON array).
     oligos:
@@ -251,10 +257,6 @@ class PartData:
 
     id: str
 
-    lattice_type: str
-
-    max_base: int
-
     virtual_helices: list[VirtualHelixProxy]
 
     oligos: list[OligoProxy]
@@ -266,6 +268,14 @@ class PartData:
     active_region_id: Optional[str]
 
     def __init__(self, name: str, id: str, lattice_type: str, max_base: int, virtual_helices: list[VirtualHelixProxy], oligos: list[OligoProxy], raw: dict[str, Any], regions: Optional[list[RegionProxy]]=None, planes: Optional[list[PlaneProxy]]=None, active_region_id: Optional[str]=None) -> None: ...
+
+    @property
+    def lattice_type(self) -> str:
+        """Deprecated: use ``region.kind``. Kind of the first region only."""
+
+    @property
+    def max_base(self) -> int:
+        """Deprecated: use ``region.max_base``. Length of the first region only."""
 
     def get_vh(self, index: int) -> VirtualHelixProxy | None:
         """Return the VirtualHelixProxy with the given VH index, or None."""
@@ -510,7 +520,7 @@ class RegionProxy:
     name:
         Region display name.
     kind:
-        ``"HONEYCOMB"`` | ``"SQUARE"`` | ``"FREEFORM"``.
+        ``"HONEYCOMB"`` | ``"SQUARE"`` | ``"FREEFORM"`` | ``"WIREFRAME"``.
     plane_id:
         UUID of the Plane this region lives on.
     vh_order:
@@ -524,6 +534,8 @@ class RegionProxy:
         Other geometry parameters; see DesignRegion on the JS side.
     min_base, default_max_base:
         Bounds for VHs newly added to this region.
+    max_base:
+        Length of every VH in this region.
     """
     id: str
 
@@ -546,6 +558,8 @@ class RegionProxy:
     min_base: int
 
     default_max_base: int
+
+    max_base: int
 
     @classmethod
     def from_json(cls, region_json: dict[str, Any]) -> 'RegionProxy': ...
@@ -570,6 +584,58 @@ class LatticedRegionProxy(RegionProxy):
 @dataclass
 class FreeformRegionProxy(RegionProxy):
     """Freeform region — VHs are placed by ``localFrame`` rather than lattice coords."""
+
+
+@dataclass
+class WireframeRegionProxy(FreeformRegionProxy):
+    """Wireframe region — a freeform region that can hold the geometry it was built from."""
+    reference_geometry: ReferenceGeometry | None
+
+
+@dataclass(frozen=True)
+class ReferenceGeometry:
+    """
+    What a wireframe region was built from, kept with the design.
+
+    Attributes
+    ----------
+    mesh:
+        The mesh, or ``None``.
+    unit:
+        Always ``"nm"``.
+    """
+    mesh: ReferenceMesh | None
+
+    unit: Literal['nm']
+
+
+@dataclass(frozen=True)
+class ReferenceMesh:
+    """
+    A polygon mesh in nanometres: what a wireframe design was built from.
+
+    Immutable; the values are checked when it is created, against the same rules as the host.
+
+    Attributes
+    ----------
+    vertices:
+        ``(x, y, z)`` positions in nm, in the region's frame.
+    faces:
+        Each face is three or more vertex indices.
+    edges:
+        ``(a, b)`` vertex index pairs. Only edges a file states; those of the faces are implied.
+    """
+    vertices: Sequence[Sequence[float]]
+
+    faces: Sequence[Sequence[int]]
+
+    edges: Sequence[Sequence[int]]
+
+    def all_edges(self) -> tuple[tuple[int, int], ...]:
+        """Every distinct edge as a sorted ``(a, b)`` pair: ``edges`` plus the sides of ``faces``."""
+
+    def to_ply(self) -> str:
+        """The mesh as ASCII PLY text, in nm, for tools that read a mesh file."""
 
 
 @dataclass

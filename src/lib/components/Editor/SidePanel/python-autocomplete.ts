@@ -73,7 +73,7 @@ const pythonApiSource: CompletionSource = (context, editor) => {
 
 let registered = false;
 
-/** Adds `foldnano` / `foldnano_mini` API completions to a `basicEditor` (which supplies `cursorPosition`). */
+/** Adds `foldnano` / `foldnano.edit` API completions to a `basicEditor` (which supplies `cursorPosition`). */
 export function addPythonAutocomplete(editor: PrismEditor, shadowRoot: ShadowRoot | null): void {
 	if (!registered) {
 		registerCompletions(['python'], { sources: [pythonApiSource] });

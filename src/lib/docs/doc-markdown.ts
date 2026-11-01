@@ -7,6 +7,7 @@ const CALLOUT_LABELS: Record<string, string> = {
 	note: 'Note',
 	warning: 'Warning',
 	limit: 'Current limitation',
+	danger: 'Warning',
 };
 
 const FRONT_MATTER = /^---\n[\s\S]*?\n---\n/;

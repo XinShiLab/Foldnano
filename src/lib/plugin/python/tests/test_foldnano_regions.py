@@ -242,5 +242,6 @@ def test_lattice_type_and_max_base_derive_from_regions() -> None:
         "oligos": [],
     }
     part = parse_foldnano_json(json.dumps(doc))
-    assert part.lattice_type == "SQUARE"
-    assert part.max_base == 64
+    with pytest.warns(FutureWarning):
+        assert part.lattice_type == "SQUARE"
+        assert part.max_base == 64

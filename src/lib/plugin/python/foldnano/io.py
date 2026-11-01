@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 from typing import Any, Optional
 
+from ._deprecation import warn_deprecated
 from .vh import VirtualHelixProxy
 from .oligo import OligoProxy
 from .region import RegionProxy
@@ -38,9 +39,9 @@ class PartData:
     name, id:
         Part name and UUID.
     lattice_type:
-        ``"HONEYCOMB"`` or ``"SQUARE"`` (legacy field; superseded by region kinds).
+        Deprecated: use ``region.kind``. Kind of the first region only.
     max_base:
-        Total number of base-pair slots per helix.
+        Deprecated: use ``region.max_base``. Length of the first region only.
     virtual_helices:
         Parsed VirtualHelixProxy list (same order as the JSON array).
     oligos:
@@ -70,14 +71,26 @@ class PartData:
     ) -> None:
         self.name = name
         self.id = id
-        self.lattice_type = lattice_type
-        self.max_base = max_base
+        self._lattice_type = lattice_type
+        self._max_base = max_base
         self.virtual_helices = virtual_helices
         self.oligos = oligos
         self.regions: list[RegionProxy] = regions or []
         self.planes: list[PlaneProxy] = planes or []
         self.active_region_id = active_region_id
         self._raw = raw
+
+    @property
+    def lattice_type(self) -> str:
+        """Deprecated: use ``region.kind``. Kind of the first region only."""
+        warn_deprecated("part.lattice_type describes only the first region. Use region.kind.")
+        return self._lattice_type
+
+    @property
+    def max_base(self) -> int:
+        """Deprecated: use ``region.max_base``. Length of the first region only."""
+        warn_deprecated("part.max_base describes only the first region. Use region.max_base.")
+        return self._max_base
 
     def get_vh(self, index: int) -> VirtualHelixProxy | None:
         """Return the VirtualHelixProxy with the given VH index, or None."""
@@ -145,7 +158,7 @@ class PartData:
 
     def __repr__(self) -> str:
         return (
-            f"PartData(name={self.name!r}, lattice={self.lattice_type}, "
+            f"PartData(name={self.name!r}, lattice={self._lattice_type}, "
             f"vhs={len(self.virtual_helices)}, oligos={len(self.oligos)}, "
             f"regions={len(self.regions)}, planes={len(self.planes)})"
         )
@@ -211,7 +224,7 @@ def parse_foldnano_json(
     # documents predating the regions schema.
     if regions:
         lattice_type = regions[0].kind
-        max_base = regions[0].default_max_base
+        max_base = regions[0].max_base
     else:
         lattice_type = raw.get("latticeType", "")
         max_base = raw.get("maxBase", 0)

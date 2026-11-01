@@ -20,6 +20,39 @@ function isVec3(x: unknown): x is { x: number; y: number; z: number } {
 	return isFiniteNum(v.x) && isFiniteNum(v.y) && isFiniteNum(v.z);
 }
 
+export function checkReferenceGeometryShape(region: Record<string, unknown>): void {
+	const geometry = region.referenceGeometry;
+	if (geometry === undefined) return;
+	const fail = (detail: string) => reject(`Region "${region.id}"'s "referenceGeometry" ${detail}.`);
+	if (region.kind !== 'WIREFRAME') fail('is only allowed on a wireframe region');
+	if (!isObj(geometry) || geometry.unit !== 'nm') fail('must have "unit": "nm"');
+	const mesh = (geometry as Record<string, unknown>).mesh;
+	if (mesh === undefined) return;
+	if (!isObj(mesh)) fail('has an invalid "mesh"');
+	const { vertices, faces, edges } = mesh as Record<string, unknown>;
+	if (!Array.isArray(vertices) || !Array.isArray(faces) || !Array.isArray(edges)) {
+		fail('needs "vertices", "faces" and "edges" arrays');
+	}
+	const vertexList = vertices as unknown[];
+	for (const v of vertexList) {
+		if (!Array.isArray(v) || v.length !== 3 || !v.every(isFiniteNum)) {
+			fail('has a vertex that is not three finite numbers');
+		}
+	}
+	const isVertexIndex = (i: unknown) =>
+		isInt(i) && (i as number) >= 0 && (i as number) < vertexList.length;
+	for (const f of faces as unknown[]) {
+		if (!Array.isArray(f) || f.length < 3 || !f.every(isVertexIndex)) {
+			fail('has a face that is not three or more valid vertex indices');
+		}
+	}
+	for (const e of edges as unknown[]) {
+		if (!Array.isArray(e) || e.length !== 2 || !e.every(isVertexIndex)) {
+			fail('has an edge that is not two valid vertex indices');
+		}
+	}
+}
+
 /**
  * Shape/internal-consistency check for one parsed Part in foldnano JSON, before reconstruction.
  * Throws `DesignCheckError` on the first error.
@@ -76,7 +109,12 @@ export function checkFoldnanoPartJsonShape(parsed: unknown): PartJSON {
 		}
 		// `name` is free text, not an identifier — an empty name is unusual but legitimate.
 		if (typeof r.name !== 'string') reject(`Region "${r.id}" is missing a string "name".`);
-		if (r.kind !== 'SQUARE' && r.kind !== 'HONEYCOMB' && r.kind !== 'FREEFORM') {
+		if (
+			r.kind !== 'SQUARE' &&
+			r.kind !== 'HONEYCOMB' &&
+			r.kind !== 'FREEFORM' &&
+			r.kind !== 'WIREFRAME'
+		) {
 			reject(`Region "${r.id}" has an invalid "kind".`);
 		}
 		for (const field of ['step', 'turnsPerStep', 'subStepSize'] as const) {
@@ -89,6 +127,7 @@ export function checkFoldnanoPartJsonShape(parsed: unknown): PartJSON {
 		if (!isInt(r.minBase) || !isInt(r.maxBase) || (r.minBase as number) > (r.maxBase as number)) {
 			reject(`Region "${r.id}" has an invalid "minBase"/"maxBase".`);
 		}
+		checkReferenceGeometryShape(r);
 		if (regionIds.has(r.id as string)) reject(`Duplicate region id "${r.id}".`);
 		regionIds.add(r.id as string);
 		if (!planeIds.has(r.planeId as string)) {
@@ -164,7 +203,7 @@ export function checkFoldnanoPartJsonShape(parsed: unknown): PartJSON {
 	// latticeCoords required + unique per latticed region.
 	for (const vh of virtualHelices) {
 		const region = regionById.get(vh.regionId as string)!;
-		if (region.kind === 'FREEFORM') continue;
+		if (region.kind === 'FREEFORM' || region.kind === 'WIREFRAME') continue;
 		if (vh.latticeCoords === undefined) {
 			reject(`Virtual helix "${vh.id}" belongs to a latticed region but has no "latticeCoords".`);
 		}

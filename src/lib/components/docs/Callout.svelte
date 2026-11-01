@@ -5,7 +5,7 @@
 	import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
 	import Construction from '@lucide/svelte/icons/construction';
 
-	type CalloutType = 'tip' | 'note' | 'warning' | 'limit';
+	type CalloutType = 'tip' | 'note' | 'warning' | 'limit' | 'danger';
 
 	let {
 		type = 'note',
@@ -37,6 +37,12 @@
 			label: 'Current limitation',
 			classes: 'border-orange-500/30 bg-orange-500/10 text-orange-950 dark:text-orange-100',
 			iconClass: 'text-orange-600 dark:text-orange-400',
+		},
+		danger: {
+			icon: TriangleAlert,
+			label: 'Warning',
+			classes: 'border-red-500/30 bg-red-500/10 text-red-950 dark:text-red-100',
+			iconClass: 'text-red-600 dark:text-red-400',
 		},
 	} as const;
 

@@ -18,7 +18,7 @@ const fields = (overrides: Partial<NewPluginFields> = {}): NewPluginFields => ({
 	name: 'My Tool',
 	version: '0.1.0',
 	description: '',
-	format: 'foldnano_mini',
+	format: 'foldnano_edit',
 	applyStrategy: 'replayMutationLog',
 	requirements: [],
 	network: [],
@@ -65,7 +65,7 @@ describe('buildNewManifest', () => {
 			id: 'my-tool',
 			name: 'My Tool',
 			version: '0.1.0',
-			format: 'foldnano_mini',
+			format: 'foldnano_edit',
 			applyStrategy: 'replayMutationLog',
 		});
 		const full = buildNewManifest(
@@ -102,7 +102,7 @@ describe('starterPluginPy', () => {
 	it('returns the result the strategy expects', () => {
 		const py = (format: ScaffoldFormat, applyStrategy: NewPluginFields['applyStrategy']) =>
 			starterPluginPy(buildNewManifest(fields({ format, applyStrategy })));
-		expect(py('foldnano_mini', 'replayMutationLog')).toContain('set_result_mutation_log');
+		expect(py('foldnano_edit', 'replayMutationLog')).toContain('set_result_mutation_log');
 		expect(py('foldnano_json', 'replacePart')).toContain('set_result_foldnano_json');
 		expect(py('cadnano_json', 'replaceRegion')).toContain('set_result_cadnano_json');
 		for (const format of Object.keys(STRATEGIES_FOR_FORMAT) as ScaffoldFormat[]) {
@@ -131,7 +131,7 @@ describe('starterPluginFiles', () => {
 			stubs: true,
 		});
 		expect(Object.keys(files)).toContain(`${STUBS_DIR}/foldnano/plugin.pyi`);
-		expect(Object.keys(files)).toContain(`${STUBS_DIR}/foldnano_mini/__init__.pyi`);
+		expect(Object.keys(files)).toContain(`${STUBS_DIR}/foldnano/edit/__init__.pyi`);
 		expect(JSON.parse(files['pyrightconfig.json'])).toEqual({
 			stubPath: STUBS_DIR,
 			typeCheckingMode: 'standard',

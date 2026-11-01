@@ -23,7 +23,7 @@ import { loadedPackageLogs, missingModuleHint } from './scriptImports';
 import { connectSourcesFromCsp, isConnectAllowed } from './connectSources';
 
 // ---------------------------------------------------------------------------
-// The foldnano and foldnano_mini packages, every module, inlined at bundle time
+// The foldnano and foldnano.edit packages, every module, inlined at bundle time
 // (scripts/vite-sandbox-worker.ts)
 // ---------------------------------------------------------------------------
 import pythonPackageFiles from 'virtual:foldnano-python-packages';
@@ -325,13 +325,16 @@ async function initRuntime(indexUrl: string, packageBaseUrl: string): Promise<vo
 		// Load micropip so plugins can install packages at activation time
 		await pyodide.loadPackage(['micropip']);
 
-		// Write the foldnano and foldnano_mini packages into the virtual filesystem
+		// Write the foldnano and foldnano.edit packages into the virtual filesystem
 		const packageDirs = new Set<string>();
 		for (const [file, source] of Object.entries(pythonPackageFiles)) {
-			const dir = `/${file.split('/')[0]}`;
-			if (!packageDirs.has(dir)) {
-				pyodide.FS.mkdir(dir);
-				packageDirs.add(dir);
+			const parents = file.split('/').slice(0, -1);
+			for (let depth = 1; depth <= parents.length; depth++) {
+				const dir = `/${parents.slice(0, depth).join('/')}`;
+				if (!packageDirs.has(dir)) {
+					pyodide.FS.mkdir(dir);
+					packageDirs.add(dir);
+				}
 			}
 			pyodide.FS.writeFile(`/${file}`, source);
 		}

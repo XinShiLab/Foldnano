@@ -17,7 +17,7 @@ Every file/URL-delivered plugin is a single zip bundle with `fplugin.json` and `
 **`my_plugin/plugin.py`**
 
 ```python
-from foldnano.plugin import PluginContext
+from foldnano import PluginContext
 
 def run(ctx: PluginContext) -> None:
     ctx.log("Hello from my plugin")
@@ -37,6 +37,8 @@ def run(ctx: PluginContext) -> None:
 	"description": "One-line description shown in the plugin panel."
 }
 ```
+
+`foldnano` gives you `ctx` and read-only access to the design. To edit a design you also import from `foldnano.edit`; see [which package to import](/docs/plugin-development/runtime-model#which-package-to-import).
 
 The manifest inside the zip doesn't need `entrypointUrl`. The installer already knows `plugin.py` is in the zip.
 

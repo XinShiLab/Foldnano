@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from foldnano_mini import load_part
+from foldnano.edit import load_part
 
 # The old Side (YZ) base plane: u x v = -X, opposite its normal.
 MIRRORED = {"u": (0.0, 1.0, 0.0), "v": (0.0, 0.0, -1.0), "normal": (1.0, 0.0, 0.0)}

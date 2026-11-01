@@ -27,7 +27,7 @@ Hover over any icon button in the app to see its name in a tooltip, and press `?
 
 ## Start Screen
 
-A new, empty document shows **Start a new design** with three buttons, **Honeycomb**, **Square**, and **Freeform**. Each opens the **New Region** panel for that type, where you choose its base plane (see [Adding a region](#adding-a-region)).
+A new, empty document shows **Start a new design** with **Honeycomb**, **Square** and **Freeform** buttons. Each opens the **New Region** panel for that type, where you choose its base plane (see [Adding a region](#adding-a-region)). A greyed **Wireframe** card, marked **API preview**, is for plugin developers: it creates a wireframe region, and hovering it links to the [current status](/docs/guide/wireframe) of wireframe support.
 
 Below it, **or load an existing design** is a drop zone (click to browse). It accepts:
 
@@ -91,6 +91,8 @@ The **ⓘ** next to it (*Storage info*) explains that designs are saved in this 
 1. The panel shows the region type.
 2. Choose its **Base Plane**: **Top (XY)** (normal points up, Z), **Front (XZ)** (normal points forward, Y), or **Side (YZ)** (normal points right, X).
 3. Click **Create *type* Region Here**, or **Cancel**.
+
+With [Plugin dev mode](/docs/plugin-development/plugin-dev-mode) on, **Add Region** offers wireframe regions too, for developers of routing plugins. See [Wireframe Plugin APIs](/docs/plugin-development/wireframe-plugins).
 
 **Load Cadnano Design as a Region** opens a dialog where you drop a cadnano `.json` / `.cadnano.json`, choose the same **Base Plane** options, and click **Load**. The file becomes a new region in the current part.
 
@@ -180,6 +182,7 @@ On the right, *press ? for help* is a reminder of the workspace help (shortcuts 
 | --- | --- |
 | **Reset camera to default 3D view** | Resets the 3D camera |
 | **3D Overlay** | Switches the tool panel between **3D View Inspector** and **3D Overlays** (see [3D Overlays](/docs/guide/3d-overlays)) |
+| **Mesh** | Wireframe regions only: switches the tool panel to **Reference Mesh** (see [Wireframe Plugin APIs](/docs/plugin-development/wireframe-plugins#manage-the-mesh)) |
 | **Mode** | **Pan**, **Select**, **Draw** |
 | **View** toggles | **Helix grid** (`g`), **NT model** (`e`), **Cross-section cursor** (`c`, unavailable while the NT model is shown), **Coordinate axis**, **Base planes** (`f`) |
 | **Selection: show only selected strands** | Limits the 3D view to the strands selected in the strand viewer |
@@ -200,7 +203,7 @@ See [Simulation And Export](/docs/guide/simulation-export) for the workflows.
 
 ## Tool Panel
 
-A floating panel on the right shows the options of the current tool or view. Its heading names it: **Selection Tool**, **Paint Tool**, **Modification Tool**, **Sequence Tool**, **Skip Tool**, **Insert Tool**, **New Region**, **Circular Scaffold Map**, **3D View Inspector**, or **3D Overlays**.
+A floating panel on the right shows the options of the current tool or view. Its heading names it: **Selection Tool**, **Paint Tool**, **Modification Tool**, **Sequence Tool**, **Skip Tool**, **Insert Tool**, **New Region**, **Circular Scaffold Map**, **3D View Inspector**, **3D Overlays**, or **Reference Mesh**.
 
 - **Drag** the heading to move the panel between the top and bottom of the window, or **double-click** it to flip position.
 - The **›** button collapses it to a small tab; **‹** expands it again.

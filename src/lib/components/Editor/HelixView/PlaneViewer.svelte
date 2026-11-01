@@ -102,7 +102,7 @@
 					/>
 				</Layer>
 			</Stage>
-		{:else if activeRegion?.kind === 'FREEFORM'}
+		{:else if activeRegion?.supportsFreeformPlacement}
 			<FreeformViewer
 				{part}
 				region={activeRegion}

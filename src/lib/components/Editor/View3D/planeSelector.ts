@@ -16,6 +16,7 @@ const PLANE_KIND_COLORS: Record<string, number> = {
 	HONEYCOMB: 0x3b82f6,
 	SQUARE: 0x22c55e,
 	FREEFORM: 0xa855f7,
+	WIREFRAME: 0xf97316,
 };
 const DEFAULT_COLOR = 0x3b82f6;
 const INACTIVE_COLOR = 0x888888;

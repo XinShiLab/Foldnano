@@ -6,8 +6,8 @@ covers:
   - src/lib/canvasEditor/tools/duplicate.ts
   - src/lib/components/Editor/ToolPanel/RepeatGroupPanel.svelte
   - src/lib/components/Editor/StrandView/temporalLayer/DuplicatePreview.svelte
-  - src/lib/plugin/python/foldnano_mini/repeat.py
-  - src/lib/plugin/python/foldnano_mini/repeat_group.py
+  - src/lib/plugin/python/foldnano/edit/repeat.py
+  - src/lib/plugin/python/foldnano/edit/repeat_group.py
 ---
 
 # Repeat Units (Duplicate + Mirror Oligos)
@@ -214,7 +214,7 @@ groups return immediately.
 
 **Plugin replay:** `replayMutationLog` (`src/lib/plugin/opDispatch.ts`) also runs the
 sync after each replayed op except attribute writes (color, name, scaffold flag,
-modification, slot sequence), because `foldnano_mini` rebuilds mirrors after each op
+modification, slot sequence), because `foldnano.edit` rebuilds mirrors after each op
 in Python: a later op in the log may use bases a mirror just left. Without it, that
 op would hit the stale mirror on the host.
 
@@ -278,8 +278,8 @@ exist.
 - **oxDNA / mrDNA:** `includeMirrors` (default false); the 3D Export menu shows
   "Include mirror copies" when the part has mirrors, exporting the assembled
   multimer.
-- **Plugins:** `foldnano_mini` hands mirrors out as read-only `MirrorOligo` /
-  `SegmentView` proxies, rebuilds them in Python after every op (`foldnano_mini/repeat.py`,
+- **Plugins:** `foldnano.edit` hands mirrors out as read-only `MirrorOligo` /
+  `SegmentView` proxies, rebuilds them in Python after every op (`foldnano/edit/repeat.py`,
   a port of this sync and of `canDuplicateOligosBy` / `duplicateOligos`), and has
   ops for the group commands (`create_repeat_group`, `add_repeat_instance`,
   `remove_repeat_instance`, `detach_repeat_group`, `delete_repeat_group`); see
@@ -323,7 +323,7 @@ deletes the group.
   are the same molecules as their sources. New exporters and oligo lists should
   iterate `part.realOligos`, not `part.oligos`.
 - **Don't allow mirrors of mirrors.**
-- **Keep `foldnano_mini/repeat.py` in step with this sync.** A change to the sync,
+- **Keep `foldnano/edit/repeat.py` in step with this sync.** A change to the sync,
   the fingerprint fields or `canDuplicateOligosBy` must land in the Python port too;
-  `foldnanoMiniRepeatReplay.spec.ts` replays a Python-written log on the real `Part`
+  `foldnanoEditRepeatReplay.spec.ts` replays a Python-written log on the real `Part`
   and catches drift.

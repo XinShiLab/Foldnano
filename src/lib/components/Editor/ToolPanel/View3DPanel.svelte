@@ -52,14 +52,22 @@
 				<p class="mt-1 mb-2 text-muted-foreground">
 					Add a new design region on its own base plane.
 				</p>
-				<div class="flex gap-1">
-					{#each ['HONEYCOMB', 'SQUARE', 'FREEFORM'] as const as kind (kind)}
-						<button
-							class="flex-1 rounded border border-border px-2 py-1 text-[11px] transition-colors hover:bg-accent"
-							onclick={() => startAddRegion(kind)}
-						>
-							{kind === 'HONEYCOMB' ? 'Honeycomb' : kind === 'SQUARE' ? 'Square' : 'Freeform'}
-						</button>
+				<div class="grid grid-cols-2 gap-1">
+					{#each ['HONEYCOMB', 'SQUARE', 'FREEFORM', 'WIREFRAME'] as const as kind (kind)}
+						{#if kind !== 'WIREFRAME' || editorViewContext.pluginDevMode.enabled}
+							<button
+								class="rounded border border-border px-2 py-1 text-[11px] transition-colors hover:bg-accent"
+								onclick={() => startAddRegion(kind)}
+							>
+								{kind === 'HONEYCOMB'
+									? 'Honeycomb'
+									: kind === 'SQUARE'
+										? 'Square'
+										: kind === 'FREEFORM'
+											? 'Freeform'
+											: 'Wireframe'}
+							</button>
+						{/if}
 					{/each}
 				</div>
 			</div>

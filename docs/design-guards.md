@@ -159,6 +159,8 @@ changes, so the model, editor and exporter docs point here instead.
 | `buildSimulationNtModel` (what it can place)                                                                       | Update `simulation.ts`; the NT model must keep calling `assertSimulationReady` first.                                                                                                            |
 | A new import format or plugin result format                                                                        | A shape check in `shape/`, fail-fast, plus a plugin adapter if plugins return it.                                                                                                                |
 
+`WIREFRAME` regions follow the freeform rules: the NT model places their helices by frame, cadnano export stays lattice-only, and `referenceGeometry` is shape-checked but never reaches an exporter.
+
 **Where a rule goes**
 
 | Kind                                        | File            | Rule list          | Who sees it                                                                          |

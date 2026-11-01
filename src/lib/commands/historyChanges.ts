@@ -5,6 +5,7 @@ import type Oligo from '$lib/model/Oligo';
 import OligoClass, { type OligoSegment, type SegmentEnd } from '$lib/model/Oligo';
 import type { Part } from '$lib/model/Part';
 import { DesignRegion } from '$lib/model/Part';
+import type { ReferenceGeometry } from '$lib/model/Part/DesignRegion';
 import { Plane, type PlaneVec3 } from '$lib/model/Part/Plane.svelte';
 import type { OverlayPlacement } from '$lib/model/Part/Part.svelte';
 import VirtualHelix from '$lib/model/VirtualHelix';
@@ -93,6 +94,13 @@ export type RegionRemoveChange = {
 	regionId: string;
 };
 
+export type RegionReferenceGeometryChange = {
+	kind: 'regionReferenceGeometry';
+	partId: string;
+	regionId: string;
+	geometry: ReferenceGeometry | undefined;
+};
+
 export type OverlayPlacementSetChange = {
 	kind: 'overlayPlacementSet';
 	partId: string;
@@ -115,6 +123,7 @@ export type AtomicChange =
 	| PlaneRemoveChange
 	| RegionAddChange
 	| RegionRemoveChange
+	| RegionReferenceGeometryChange
 	| OverlayPlacementSetChange
 	| OverlayPlacementRemoveChange;
 
@@ -170,6 +179,13 @@ type PlaneAddPatchDraft = {
 type RegionAddPatchDraft = {
 	partId: string;
 	regionJson: ReturnType<DesignRegion['toJSON']>;
+};
+
+type RegionReferenceGeometryPatchDraft = {
+	partId: string;
+	regionId: string;
+	before: ReferenceGeometry | undefined;
+	after: ReferenceGeometry | undefined;
 };
 
 type OverlayPlacementPatchDraft = {
@@ -290,6 +306,9 @@ function applyAtomicChange(doc: FoldnanoDocument, change: AtomicChange): void {
 		case 'regionRemove':
 			resolvePart(doc, change.partId).removeRegion(change.regionId);
 			break;
+		case 'regionReferenceGeometry':
+			resolvePart(doc, change.partId).setRegionReferenceGeometry(change.regionId, change.geometry);
+			break;
 		case 'overlayPlacementSet':
 			resolvePart(doc, change.partId).setOverlayPlacement(
 				change.placement.id,
@@ -390,6 +409,7 @@ export class HistoryRecorder {
 	#planeRemoves: PlaneAddPatchDraft[] = [];
 	#regionAdds: RegionAddPatchDraft[] = [];
 	#regionRemoves: RegionAddPatchDraft[] = [];
+	#regionReferenceGeometries: RegionReferenceGeometryPatchDraft[] = [];
 	#overlayPlacements: OverlayPlacementPatchDraft[] = [];
 
 	constructor(readonly doc: FoldnanoDocument) {}
@@ -437,6 +457,15 @@ export class HistoryRecorder {
 
 	regionRemove(part: Part, region: DesignRegion): void {
 		this.#regionRemoves.push({ partId: part.id, regionJson: region.toJSON() });
+	}
+
+	regionReferenceGeometry(
+		part: Part,
+		regionId: string,
+		before: ReferenceGeometry | undefined,
+		after: ReferenceGeometry | undefined
+	): void {
+		this.#regionReferenceGeometries.push({ partId: part.id, regionId, before, after });
 	}
 
 	/** Targeted patch for one overlay-placement entry (set/update/clear). */
@@ -522,6 +551,12 @@ export class HistoryRecorder {
 		for (const patch of this.#regionRemoves) {
 			undo.push({ kind: 'regionAdd', partId: patch.partId, regionJson: patch.regionJson });
 			redo.push({ kind: 'regionRemove', partId: patch.partId, regionId: patch.regionJson.id });
+		}
+
+		for (const { partId, regionId, before, after } of this.#regionReferenceGeometries) {
+			if (sameValue(before, after)) continue;
+			undo.push({ kind: 'regionReferenceGeometry', partId, regionId, geometry: before });
+			redo.push({ kind: 'regionReferenceGeometry', partId, regionId, geometry: after });
 		}
 
 		for (const patch of this.#overlayPlacements) {

@@ -10,7 +10,7 @@ export type ScaffoldFormat = Exclude<PluginFormat, 'live'>;
 
 /** Strategies `validateManifest` accepts for each format, in the order the dialog offers them. */
 export const STRATEGIES_FOR_FORMAT: Record<ScaffoldFormat, readonly ApplyStrategy[]> = {
-	foldnano_mini: ['replayMutationLog', 'replayMutationLogInRegion', 'previewOnly'],
+	foldnano_edit: ['replayMutationLog', 'replayMutationLogInRegion', 'previewOnly'],
 	foldnano_json: ['replacePartKeepAnnotationsWhereMatched', 'replacePart', 'previewOnly'],
 	cadnano_json: ['replaceRegionKeepAnnotationsWhereMatched', 'replaceRegion', 'previewOnly'],
 };
@@ -85,9 +85,9 @@ function docstring(manifest: PluginManifest): string {
 export function starterPluginPy(manifest: PluginManifest): string {
 	const preview = manifest.applyStrategy === 'previewOnly';
 	const header = `${docstring(manifest)}\n\n`;
-	if (manifest.format === 'foldnano_mini') {
-		return `${header}from foldnano.plugin import PluginContext
-from foldnano_mini import load_part
+	if (manifest.format === 'foldnano_edit') {
+		return `${header}from foldnano import PluginContext
+from foldnano.edit import load_part
 
 
 def run(ctx: PluginContext) -> None:
@@ -110,7 +110,7 @@ ${
 	if (manifest.format === 'foldnano_json') {
 		return `${header}import json
 
-from foldnano.plugin import PluginContext
+from foldnano import PluginContext
 
 
 def run(ctx: PluginContext) -> None:
@@ -130,7 +130,7 @@ ${
 	}
 	return `${header}import json
 
-from foldnano.plugin import PluginContext
+from foldnano import PluginContext
 
 
 def run(ctx: PluginContext) -> None:
@@ -173,7 +173,7 @@ const STUB_SOURCES = import.meta.glob('./python/stubs/**/*.pyi', {
 	import: 'default',
 }) as Record<string, () => Promise<string>>;
 
-/** The foldnano / foldnano_mini API stubs, keyed by path under `STUBS_DIR`. */
+/** The foldnano / foldnano.edit API stubs, keyed by path under `STUBS_DIR`. */
 export async function loadApiStubs(): Promise<Record<string, string>> {
 	const entries = await Promise.all(
 		Object.entries(STUB_SOURCES).map(

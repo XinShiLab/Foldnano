@@ -18,6 +18,8 @@ import {
 	HoneycombRegion,
 	LatticedDesignRegion,
 	SquareRegion,
+	WireframeRegion,
+	type ReferenceGeometry,
 	type RegionKind,
 } from './DesignRegion';
 
@@ -354,7 +356,7 @@ export class Part {
 	}
 
 	static forType(
-		type: 'HONEYCOMB' | 'SQUARE' | 'FREEFORM',
+		type: RegionKind,
 		name: string,
 		id?: string,
 		maxBase?: number,
@@ -469,10 +471,12 @@ export class Part {
 		const maxBaseOverride = opts?.maxBase;
 
 		switch (kind) {
-			case 'FREEFORM': {
+			case 'FREEFORM':
+			case 'WIREFRAME': {
 				const step = stepOverride;
 				const subStepSize = stepOverride !== undefined ? Math.floor(stepOverride / 3) : undefined;
-				return new FreeformRegion(
+				const RegionClass = kind === 'WIREFRAME' ? WireframeRegion : FreeformRegion;
+				return new RegionClass(
 					name,
 					planeId,
 					undefined,
@@ -585,6 +589,14 @@ export class Part {
 		const idx = this.regions.findIndex((r) => r.id === afterRegionId);
 		this.regions.splice(idx + 1, 0, region);
 		this.syncListRows();
+	}
+
+	setRegionReferenceGeometry(regionId: string, geometry: ReferenceGeometry | undefined): void {
+		const region = this.getRegionById(regionId);
+		if (!(region instanceof WireframeRegion)) {
+			throw new Error(`Region ${regionId} is not a wireframe region`);
+		}
+		region.referenceGeometry = geometry;
 	}
 
 	removeRegion(regionId: string): void {
@@ -1279,7 +1291,7 @@ export class Part {
 	 * If those ends are already occupied, `SegmentEnd.connectTo` throws —
 	 * surfacing the conflict instead of silently joining the oligo-global ends.
 	 *
-	 * Used by the `foldnano_mini` op replayer for `connect`. For terminal
+	 * Used by the `foldnano.edit` op replayer for `connect`. For terminal
 	 * segments the result is identical to `connectTwoOligos`.
 	 */
 	connectSegmentEnds(fromSeg: OligoSegment, toSeg: OligoSegment): void {

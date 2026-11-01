@@ -19,6 +19,7 @@ Each format version has a JSON Schema (draft 2020-12), published with the app:
 | Format version | Schema                                                               |
 | -------------- | -------------------------------------------------------------------- |
 | 1              | [`/schemas/foldnano-v1.schema.json`](/schemas/foldnano-v1.schema.json) |
+| 2              | [`/schemas/foldnano-v2.schema.json`](/schemas/foldnano-v2.schema.json) |
 
 The schema checks structure and types. It does not check cross-references (for example that a segment's helix exists) or the conventions described below, so a file can pass the schema and still fail to load. The schema is also stricter than the app: it rejects fields it doesn't define, while Foldnano ignores them when loading and drops them on the next save.
 
@@ -31,7 +32,7 @@ Every file starts with a header:
 ```json
 {
 	"format": "foldnano",
-	"formatVersion": 1,
+	"formatVersion": 2,
 	"savedWith": { "app": "0.5.1", "commit": "8e358c7" },
 	"id": "…",
 	"name": "…",
@@ -99,7 +100,7 @@ A region is an area of the design with one layout rule.
 | Field          | Type           | Meaning                                                                                     |
 | -------------- | -------------- | ------------------------------------------------------------------------------------------- |
 | `id`, `name`   | string         |                                                                                             |
-| `kind`         | string         | `"HONEYCOMB"`, `"SQUARE"` or `"FREEFORM"`                                                   |
+| `kind`         | string         | `"HONEYCOMB"`, `"SQUARE"`, `"FREEFORM"` or `"WIREFRAME"`                                    |
 | `planeId`      | string         | The plane this region sits on                                                               |
 | `vhOrder`      | array of ids   | Display order of this region's helices (by helix `id`)                                      |
 | `step`         | int            | Helix length grows in multiples of this many bp (honeycomb 21, square 32)                   |
@@ -108,6 +109,25 @@ A region is an area of the design with one layout rule.
 | `twistOffset`  | number         | Phase offset of the helix twist, in degrees                                                 |
 | `minBase`      | int            | First usable bp index; defaults to 0 if absent                                              |
 | `maxBase`      | int            | Region length in bp. Older files call it `defaultMaxBase`; read that when `maxBase` is absent |
+| `referenceGeometry` | object | Wireframe regions only, optional: the input shape, see below |
+
+### Reference geometry
+
+A wireframe region can store the shape it was designed from. It is reference material only: the helices are the source of truth, and nothing keeps the two in sync. A wireframe region otherwise behaves like a freeform region.
+
+```json
+"referenceGeometry": {
+	"unit": "nm",
+	"mesh": {
+		"vertices": [[0, 0, 0], [12.5, 0, 0], [6.25, 10.8, 0]],
+		"faces": [[0, 1, 2]],
+		"edges": []
+	}
+}
+```
+
+- `unit` is always `"nm"`, and coordinates are in the region's plane coordinates, so the shape moves with the plane.
+- `vertices` are `[x, y, z]` positions. `faces` are polygons and `edges` are pairs, both as indices into `vertices`. All three arrays are present in a `mesh`, and may be empty.
 
 ## Virtual helices
 

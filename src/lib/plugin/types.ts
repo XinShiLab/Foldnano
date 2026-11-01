@@ -2,11 +2,11 @@
  * Plugin format: what JSON the plugin receives and returns.
  * - cadnano_json: classic cadnano format (lossy — topology + colors; scaffold by parity)
  * - foldnano_json: Part-level JSON via Part.toJSON() (lossless)
- * - foldnano_mini: mutable Python API; the plugin emits a structured mutation log
+ * - foldnano_edit: mutable Python API; the plugin emits a structured mutation log
  *   that is replayed against the real Part on the JS side under one undo step.
  * - live: Python proxy objects (deferred — Phase 6)
  */
-export type PluginFormat = 'cadnano_json' | 'foldnano_json' | 'foldnano_mini' | 'live';
+export type PluginFormat = 'cadnano_json' | 'foldnano_json' | 'foldnano_edit' | 'live';
 
 /**
  * How the host applies the plugin result to the model.
@@ -14,7 +14,7 @@ export type PluginFormat = 'cadnano_json' | 'foldnano_json' | 'foldnano_mini' | 
  * - replacePart: full part replacement, no annotation re-grafting
  * - replaceRegionKeepAnnotationsWhereMatched: replace only the active region; re-graft annotations
  * - replaceRegion: replace only the active region, no annotation re-grafting
- * - replayMutationLog: replay a foldnano_mini mutation log against the existing part (whole-part scope)
+ * - replayMutationLog: replay a foldnano_edit mutation log against the existing part (whole-part scope)
  * - replayMutationLogInRegion: as above, but each op's target VH must belong to the active region
  * - previewOnly: show diff, never apply
  */
@@ -176,7 +176,7 @@ export interface PythonPlugin {
 	sidePanelValues: Record<string, unknown>;
 	/** Current side panel code editor contents; initialized from sidePanel.codeEditor.initialCode */
 	sidePanelCode: string;
-	/** Count of foldnano_mini ops produced by the most recent run, if known. */
+	/** Count of foldnano_edit ops produced by the most recent run, if known. */
 	lastRunMutationLogLength: number | null;
 	/** Set for plugins the user made in this browser (Make Plugin); only these are editable. */
 	authoring: PluginAuthoring | null;

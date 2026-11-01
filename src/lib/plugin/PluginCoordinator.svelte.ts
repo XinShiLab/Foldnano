@@ -845,11 +845,11 @@ export class PluginCoordinator {
 					cadnanoJsonIn = JSON.stringify(regionJson);
 				} else if (
 					plugin.manifest.format === 'foldnano_json' ||
-					plugin.manifest.format === 'foldnano_mini'
+					plugin.manifest.format === 'foldnano_edit'
 				) {
 					foldnanoJsonIn = preRunSnapshotJson ?? undefined;
 					// Forward the active region (if any) so region-scoped foldnano_json /
-					// foldnano_mini plugins can read ctx.active_region_id. Unlike
+					// foldnano_edit plugins can read ctx.active_region_id. Unlike
 					// cadnano_json, an active region is not required.
 					activeRegionId = this.getActiveRegion?.()?.id ?? null;
 				}

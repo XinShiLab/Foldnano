@@ -38,7 +38,7 @@ With agent runs the agent never edits the design file. It writes Python against 
 
 ### What the plugin system adds
 
-- **Edits go through the editor's own operations.** With a [`foldnano_mini`](/docs/plugin-development/foldnano-mini-api) plugin, the recommended setup for agent runs, every change the script makes (connect, break, recolour, add a helix) is recorded as an operation and replayed by the same code the editor uses.
+- **Edits go through the editor's own operations.** With a [`foldnano_edit`](/docs/plugin-development/foldnano-edit-api) plugin, the recommended setup for agent runs, every change the script makes (connect, break, recolour, add a helix) is recorded as an operation and replayed by the same code the editor uses.
 - **Nothing reaches your design unchecked.** A change the editor would refuse fails with an error the agent can read, instead of being applied. A plugin that returns a whole design instead of a list of changes (the `foldnano_json` and `cadnano_json` formats, which suit plugin development better than agent work) has its result validated and rebuilt on a scratch copy first, and Foldnano asks before giving it a design its format can't fully hold. Either way, a bad result is rejected and your design is not touched.
 - **Never over your newer edits.** If you change the design while a script runs, its result is thrown away rather than applied over your work, and the agent is told to run it again.
 - **A sandbox.** Scripts run in the same sandbox as any plugin: no access to your disk, and network access only to hosts the plugin declares, which you must approve.
@@ -57,7 +57,7 @@ With agent runs the agent never edits the design file. It writes Python against 
 
 You need a Chromium-based browser (Chrome, Edge, Brave, Arc), Python 3.9 or newer, and a coding agent that can run shell commands.
 
-1. **Make a folder for the project** and link it in Plugins → **Dev** (see [Plugin Dev Mode](/docs/plugin-development/plugin-dev-mode)). For design work, create the plugin with format `foldnano_mini` and apply strategy `replayMutationLog`: the agent then works with the design as Python objects, and every change is recorded as an operation. Keeping the folder in git gives you a history of the agent's scripts.
+1. **Make a folder for the project** and link it in Plugins → **Dev** (see [Plugin Dev Mode](/docs/plugin-development/plugin-dev-mode)). For design work, create the plugin with format `foldnano_edit` and apply strategy `replayMutationLog`: the agent then works with the design as Python objects, and every change is recorded as an operation. Keeping the folder in git gives you a history of the agent's scripts.
 2. **Turn on Agent runs.** Under the **Plugin dev mode** switch, turn on **Agent runs** (marked *Experimental*).
 3. **Open the design** the agent should work on, then click **Agent runs** on the folder's bar. Foldnano asks for permission to write to the folder and connects the folder to that design. It adds:
    - `.foldnano/run.py`, the command the agent uses (Python standard library only);

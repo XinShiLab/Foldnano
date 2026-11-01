@@ -32,7 +32,7 @@ from __future__ import annotations
 
 import json
 
-from foldnano.plugin import PluginContext
+from foldnano import PluginContext
 
 
 def _find_nicks(stap: list[list[int]]) -> list[tuple[int, int, int, int]]:

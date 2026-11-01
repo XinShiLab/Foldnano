@@ -548,7 +548,7 @@ describe('creating a plugin in a folder', () => {
 			name: 'Dev Example',
 			version: '0.1.0',
 			description: '',
-			format: 'foldnano_mini',
+			format: 'foldnano_edit',
 			applyStrategy: 'replayMutationLog',
 			requirements: [],
 			network: [],
@@ -633,7 +633,7 @@ describe('checkLinkedPluginFolder', () => {
 
 	it('reports manifest errors the way install does', async () => {
 		expect(await messages(pluginTree({}, { applyStrategy: 'replayMutationLog' }), 'error')).toEqual(
-			[expect.stringMatching(/requires format "foldnano_mini"/)]
+			[expect.stringMatching(/requires format "foldnano_edit"/)]
 		);
 	});
 

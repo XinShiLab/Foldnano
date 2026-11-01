@@ -53,7 +53,7 @@ The **Hub** tab lists the curated **Core Plugins**, each with its description an
 
 Each installed plugin is a card showing its name, version, and badges:
 
-- **format** (`cadnano_json`, `foldnano_json`, `foldnano_mini`) and **apply strategy**,
+- **format** (`cadnano_json`, `foldnano_json`, `foldnano_edit`) and **apply strategy**,
 - **standard env** (shares the Python runtime with other plugins) or **custom env** (needs its own runtime; only one custom-environment plugin can be active at a time).
 
 Click a plugin's name to show its description and any papers its author asks you to cite, with a link and a copy button. A small quote mark next to the name means the plugin has a citation. If you use the plugin in published work, please cite them. Citations also appear when you review a plugin before installing it.
@@ -104,9 +104,9 @@ Plugins declare which design format they operate on:
 | --- | --- |
 | `cadnano_json` | cadnano-compatible topology workflows (lossy for Foldnano metadata) |
 | `foldnano_json` | full Foldnano snapshots |
-| `foldnano_mini` | structured mutation logs replayed by the app |
+| `foldnano_edit` | structured mutation logs replayed by the app |
 
-If a plugin needs **sequences, modifications, explicit scaffold labels, or freeform regions**, prefer a Foldnano-native format (`foldnano_json` or `foldnano_mini`). A `cadnano_json` plugin can't see or preserve that metadata.
+If a plugin needs **sequences, modifications, explicit scaffold labels, or freeform regions**, prefer a Foldnano-native format (`foldnano_json` or `foldnano_edit`). A `cadnano_json` plugin can't see or preserve that metadata.
 
 ## Installing Plugins
 

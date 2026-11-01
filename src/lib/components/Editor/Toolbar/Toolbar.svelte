@@ -38,6 +38,7 @@
 		History,
 		Keyboard,
 		LineSquiggle,
+		Pyramid,
 		LoaderCircle,
 		Moon,
 		Puzzle,
@@ -197,7 +198,7 @@
 		docNameInput = foldnanoDoc.name;
 	}
 
-	const startAddRegion = (kind: 'HONEYCOMB' | 'SQUARE' | 'FREEFORM') => {
+	const startAddRegion = (kind: 'HONEYCOMB' | 'SQUARE' | 'FREEFORM' | 'WIREFRAME') => {
 		addPartMenuOpen = false;
 		editorViewContext.enterPlaneSelectionMode(kind);
 	};
@@ -527,6 +528,11 @@
 								<DropdownMenu.Item onclick={() => startAddRegion('FREEFORM')}>
 									<LineSquiggle />Add Freeform Region
 								</DropdownMenu.Item>
+								{#if editorViewContext.pluginDevMode.enabled}
+									<DropdownMenu.Item onclick={() => startAddRegion('WIREFRAME')}>
+										<Pyramid />Add Wireframe Region
+									</DropdownMenu.Item>
+								{/if}
 								<DropdownMenu.Separator />
 								<DropdownMenu.Item
 									onclick={() => {

@@ -39,7 +39,10 @@
 		type TransformGizmoResult,
 	} from './transformGizmo';
 	import { createPlaneOverlay, type PlaneOverlayResult } from './planeOverlay';
-	import { getEditorViewContext } from '$lib/components/Editor/context/EditorViewContext.svelte';
+	import {
+		BASIS_PLANE_TRANSFORMS,
+		getEditorViewContext,
+	} from '$lib/components/Editor/context/EditorViewContext.svelte';
 	import { exportBaseName } from '$lib/model/io/designFileName';
 	import { disposeGroup } from './threeUtils';
 	import {
@@ -49,7 +52,13 @@
 		downloadOxDnaFiles,
 	} from './exportUtils';
 	import { createCursor, type CursorResult } from './cursor';
+	import type { PlaneTransform } from '$lib/commands/planes';
 	import { createPlaneSelector, type PlaneSelectorResult } from './planeSelector';
+	import {
+		createReferenceMeshOverlay,
+		type ReferenceMeshItem,
+		type ReferenceMeshOverlay,
+	} from './referenceMeshOverlay';
 	import {
 		GizmoDragController,
 		OverlayGizmoTarget,
@@ -189,6 +198,7 @@
 	let scene: THREE.Scene | undefined;
 	let cursor: CursorResult | undefined;
 	let planeSelector: PlaneSelectorResult | undefined;
+	let referenceMeshOverlay: ReferenceMeshOverlay | undefined;
 	let vhXYCache = new Map<number, { x: number; y: number }>();
 
 	// ── RBS simulation state (drives geometry rebuild + bindable props) ────────
@@ -208,6 +218,9 @@
 	const _raycaster = new THREE.Raycaster();
 	const _mouse = new THREE.Vector2();
 	let _mouseDownPos = { x: 0, y: 0 };
+
+	const MESH_DRAFT_KEY = 'mesh-draft';
+	const planeTransformOf = ({ origin, u, v, normal }: PlaneTransform) => ({ origin, u, v, normal });
 
 	const editorViewContext = getEditorViewContext();
 	const exportFileBase = $derived(exportBaseName(editorViewContext.currentDoc.name));
@@ -304,6 +317,11 @@
 	resetCameraFn = () => {
 		if (!currentGroup) return;
 		const box = new THREE.Box3().setFromObject(currentGroup);
+		// A wireframe region can hold a mesh and no helices yet.
+		if (box.isEmpty() && referenceMeshOverlay && !referenceMeshOverlay.bounds().isEmpty()) {
+			frameBox(referenceMeshOverlay.bounds());
+			return;
+		}
 		const center = box.isEmpty() ? new THREE.Vector3(0, 0, 0) : box.getCenter(new THREE.Vector3());
 		resetCameraToDesign(currentGroup, center);
 	};
@@ -540,10 +558,38 @@
 	$effect(() => {
 		if (!threeRenderer || !planeAxes) return;
 		const region = editorViewContext.activeRegion;
-		const plane = region?.kind === 'FREEFORM' ? editorViewContext.activePlane : null;
+		const plane = region?.supportsFreeformPlacement ? editorViewContext.activePlane : null;
 		planeAxes.setPlane(
 			plane ? { origin: plane.origin, u: plane.u, v: plane.v, normal: plane.normal } : null
 		);
+		_markDirty?.();
+	});
+
+	// Reference meshes follow their region's plane. `referenceGeometry` is a plain field, and every
+	// change to it comes with a history revision. The draft takes the place of the mesh it would replace.
+	$effect(() => {
+		if (!threeRenderer || !referenceMeshOverlay) return;
+		void editorViewContext.historyStack.revision;
+		const draft = editorViewContext.scaledMeshDraft;
+		const isCreating = editorViewContext.planeSelectionMode;
+		const items: ReferenceMeshItem[] = [];
+		for (const region of part.regions) {
+			const mesh = region.referenceMesh;
+			const plane = part.getPlaneById(region.planeId);
+			if (!mesh || !plane || editorViewContext.hiddenReferenceMeshRegionIds.has(region.id))
+				continue;
+			if (draft && !isCreating && region.id === editorViewContext.activeRegionId) continue;
+			items.push({ key: region.id, mesh, plane: planeTransformOf(plane) });
+		}
+		const draftPlane = isCreating
+			? BASIS_PLANE_TRANSFORMS[editorViewContext.pendingBasePlane]
+			: editorViewContext.activePlane;
+		if (draft && draftPlane) {
+			items.push({ key: MESH_DRAFT_KEY, mesh: draft, plane: planeTransformOf(draftPlane) });
+		}
+		referenceMeshOverlay.update(items);
+		// A file's size is unknown in advance, so the camera comes to the preview.
+		if (draft) frameBox(referenceMeshOverlay.boundsOf(MESH_DRAFT_KEY) ?? new THREE.Box3());
 		_markDirty?.();
 	});
 
@@ -951,6 +997,8 @@
 		// ── Basis-plane selector ───────────────────────────────────────────────
 		planeSelector = createPlaneSelector();
 		scene.add(planeSelector.group);
+		referenceMeshOverlay = createReferenceMeshOverlay();
+		scene.add(referenceMeshOverlay.group);
 
 		// ── Expose scene-dependent functions to parent ─────────────────────────
 		downloadFn = () => downloadScreenshot(renderer, localScene, camera, `${exportFileBase}.png`);
@@ -1084,6 +1132,11 @@
 				planeSelector.dispose();
 				scene!.remove(planeSelector.group);
 				planeSelector = undefined;
+			}
+			if (referenceMeshOverlay) {
+				referenceMeshOverlay.dispose();
+				scene!.remove(referenceMeshOverlay.group);
+				referenceMeshOverlay = undefined;
 			}
 
 			if (currentGroup) {

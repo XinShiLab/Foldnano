@@ -124,30 +124,30 @@ describe('agent files', () => {
 	it('points AGENTS.md at the API of the plugin format', () => {
 		const manifest = (format: string, applyStrategy: string) =>
 			({ format, applyStrategy }) as unknown as PluginManifest;
-		const mini = agentsMdText(manifest('foldnano_mini', 'replayMutationLog'), 'https://x.test');
-		expect(mini).toContain('.foldnano-stubs/foldnano_mini/');
+		const mini = agentsMdText(manifest('foldnano_edit', 'replayMutationLog'), 'https://x.test');
+		expect(mini).toContain('.foldnano-stubs/foldnano/edit/');
 		const ctxStub = /`\.foldnano-stubs\/(foldnano\/[\w.]+\.pyi)` \(`PluginContext`/.exec(mini)![1];
 		expect(fs.readFileSync(path.resolve(__dirname, 'python/stubs', ctxStub), 'utf8')).toMatch(
 			/^class PluginContext\b/m
 		);
 		expect(mini).toContain('ctx.set_result_mutation_log(part.mutation_log)');
 		expect(mini).not.toContain('previewOnly');
-		expect(mini).toContain('https://x.test/docs/plugin-development/foldnano-mini-api.md');
+		expect(mini).toContain('https://x.test/docs/plugin-development/foldnano-edit-api.md');
 		expect(mini).toContain('https://x.test/llms.txt');
 
 		const cadnano = agentsMdText(manifest('cadnano_json', 'replaceRegion'), 'https://x.test');
 		expect(cadnano).toContain('ctx.set_result_cadnano_json');
 		expect(cadnano).toMatch(/2\. Look up the API .*\n {3}`\.foldnano-stubs\/foldnano\/`/);
-		expect(cadnano).toContain('ask the user for a `foldnano_mini` plugin');
+		expect(cadnano).toContain('ask the user for a `foldnano_edit` plugin');
 		expect(cadnano).toContain('https://x.test/docs/plugin-development/plugin-api.md');
 
-		const preview = agentsMdText(manifest('foldnano_mini', 'previewOnly'), 'https://x.test');
+		const preview = agentsMdText(manifest('foldnano_edit', 'previewOnly'), 'https://x.test');
 		expect(preview).toContain('runs never change the design');
 	});
 
 	it('tells the agent what each way of applying does, and never offers --no-apply', () => {
 		const text = agentsMdText(
-			{ format: 'foldnano_mini', applyStrategy: 'replayMutationLog' } as unknown as PluginManifest,
+			{ format: 'foldnano_edit', applyStrategy: 'replayMutationLog' } as unknown as PluginManifest,
 			'https://x.test'
 		);
 		expect(text).toContain('--dry-run');
@@ -158,14 +158,14 @@ describe('agent files', () => {
 
 	it('starts AGENTS.md with first steps and a map of the folder, local stubs before web docs', () => {
 		const text = agentsMdText(
-			{ format: 'foldnano_mini', applyStrategy: 'replayMutationLog' } as unknown as PluginManifest,
+			{ format: 'foldnano_edit', applyStrategy: 'replayMutationLog' } as unknown as PluginManifest,
 			'https://x.test'
 		);
 		const sections = [...text.matchAll(/^## (.+)$/gm)].map((m) => m[1]);
 		expect(sections.slice(0, 2)).toEqual(['First steps', 'This folder']);
 		expect(text).toMatch(/1\. See the design: `python \.foldnano\/run\.py --describe`/);
 		expect(text).toMatch(
-			/2\. Look up the API .*not on the web:\n {3}`\.foldnano-stubs\/foldnano_mini\/`/
+			/2\. Look up the API .*not on the web:\n {3}`\.foldnano-stubs\/foldnano\/edit\/`/
 		);
 		expect(text).toContain("Only if the stubs don't answer");
 		const commands = text.match(/^python \.foldnano\/run\.py.*$/gm) ?? [];
@@ -175,7 +175,7 @@ describe('agent files', () => {
 
 	it('marks the AGENTS.md it writes, so it can tell an unedited copy from an edited one', async () => {
 		const file = await agentsMdFile(
-			{ format: 'foldnano_mini', applyStrategy: 'replayMutationLog' } as unknown as PluginManifest,
+			{ format: 'foldnano_edit', applyStrategy: 'replayMutationLog' } as unknown as PluginManifest,
 			'https://x.test'
 		);
 		expect(await isUneditedAgentsMd(file)).toBe(true);

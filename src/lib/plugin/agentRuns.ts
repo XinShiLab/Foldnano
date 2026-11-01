@@ -253,11 +253,11 @@ function formatApiText(manifest: PluginManifest): string {
 		manifest.applyStrategy === 'previewOnly'
 			? '\n- This plugin is `previewOnly`: runs never change the design. Report with `print()` or\n  `ctx.set_result({...})`.'
 			: '';
-	if (manifest.format === 'foldnano_mini') {
+	if (manifest.format === 'foldnano_edit') {
 		return `The stubs have the exact signatures and work offline:
 
 - ${ctx}
-- \`${STUBS_DIR}/foldnano_mini/\`: the design as mutable Python objects. Start with
+- \`${STUBS_DIR}/foldnano/edit/\`: the design as mutable Python objects. Start with
   \`__init__.pyi\` (\`load_part\`), then \`part.pyi\`, \`oligo.pyi\`, \`vh.pyi\`, \`region.pyi\`.
 
 Pattern: \`part = load_part(ctx.get_part_as_foldnano_json(), active_region_id=ctx.active_region_id)\`,
@@ -274,7 +274,7 @@ an operation the editor replays; only use the API, never edit the JSON.${preview
 - \`${STUBS_DIR}/foldnano/\`: read-only helpers for parsing the design.
 
 ${io} Each applied run replaces it whole, so a mistake anywhere in the JSON
-shows up in the result. For step-by-step design edits, ask the user for a \`foldnano_mini\` plugin
+shows up in the result. For step-by-step design edits, ask the user for a \`foldnano_edit\` plugin
 (apply strategy \`replayMutationLog\`): it records each change as an operation.${preview}`;
 }
 
@@ -290,14 +290,14 @@ function commandLines(commands: [args: string, comment: string][]): string {
 
 /** Doc-site pages (plugin-development slugs) for the format, most specific first. */
 function apiPages(manifest: PluginManifest): string[] {
-	const formatPage = manifest.format === 'foldnano_mini' ? 'foldnano-mini-api' : 'plugin-api';
+	const formatPage = manifest.format === 'foldnano_edit' ? 'foldnano-edit-api' : 'plugin-api';
 	return [formatPage, 'context-api', 'plugin-formats', 'plugin-patterns'];
 }
 
 /** `origin` is the editor's own (docs live on the same site). */
 export function agentsMdText(manifest: PluginManifest, origin: string): string {
 	const stubs =
-		manifest.format === 'foldnano_mini' ? `${STUBS_DIR}/foldnano_mini/` : `${STUBS_DIR}/foldnano/`;
+		manifest.format === 'foldnano_edit' ? `${STUBS_DIR}/foldnano/edit/` : `${STUBS_DIR}/foldnano/`;
 	return `# Working on this Foldnano plugin folder
 
 This folder is linked to a Foldnano editor tab (Plugins panel → Dev → Agent runs). You can run

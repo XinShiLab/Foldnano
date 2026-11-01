@@ -1,6 +1,6 @@
 ---
 title: Plugin Patterns
-description: Round-trip mutation, foldnano_mini mutable API, user-configurable parameters, and patterns by use case
+description: Round-trip mutation, foldnano.edit mutable API, user-configurable parameters, and patterns by use case
 category: plugin-development
 order: 8
 slug: plugin-patterns
@@ -16,8 +16,7 @@ For `foldnano_json` plugins that mutate the design:
 
 ```python
 import json
-from foldnano.io import parse_foldnano_json
-from foldnano.plugin import PluginContext
+from foldnano import PluginContext, parse_foldnano_json
 
 def run(ctx: PluginContext) -> None:
     # 1. Parse into typed proxies
@@ -43,13 +42,13 @@ def run(ctx: PluginContext) -> None:
 
 ---
 
-## Writing plugins with `foldnano_mini`
+## Writing plugins with `foldnano.edit`
 
-`foldnano_mini` is a mutable, ergonomic Python API. You assign to attributes and call methods on the part; each mutation is recorded as a structured op in `part.mutation_log`, and the host replays the log against the real JS-side `Part` inside one history transaction.
+`foldnano.edit` is a mutable, ergonomic Python API. You assign to attributes and call methods on the part; each mutation is recorded as a structured op in `part.mutation_log`, and the host replays the log against the real JS-side `Part` inside one history transaction.
 
 ```python
-from foldnano.plugin import PluginContext
-from foldnano_mini import LatticedRegion, load_part
+from foldnano import PluginContext
+from foldnano.edit import LatticedRegion, load_part
 
 def run(ctx: PluginContext) -> None:
     part = load_part(
@@ -78,7 +77,7 @@ def run(ctx: PluginContext) -> None:
 
 Two generated references list the whole surface, so you don't need to memorise it:
 
-- **Type stubs** in the repository under `src/lib/plugin/python/stubs/`. `foldnano_mini/__init__.pyi` and `foldnano/__init__.pyi` each hold every public class, method and property of their package, with signatures and docstrings. Read them, give them to a coding agent, or point your type checker at that folder (`MYPYPATH`, or pyright's `stubPath`) to get completion and type errors in your own editor.
+- **Type stubs** in the repository under `src/lib/plugin/python/stubs/`. `foldnano/edit/__init__.pyi` and `foldnano/__init__.pyi` each hold every public class, method and property of their package, with signatures and docstrings. Read them, give them to a coding agent, or point your type checker at that folder (`MYPYPATH`, or pyright's `stubPath`) to get completion and type errors in your own editor.
 - **Script Lab autocomplete**, which is built from the same data. See [Script Lab](/docs/guide/script-lab).
 
 ### Loading and the active region
@@ -91,7 +90,7 @@ part = load_part(json_str, active_region_id=None)  # -> MutablePart
 
 ### API reference
 
-Every public name, with what it does and whether it reads or changes the design, is on its own page: [foldnano_mini API Reference](/docs/plugin-development/foldnano-mini-api). The sections below show how the pieces fit together.
+Every public name, with what it does and whether it reads or changes the design, is on its own page: [foldnano.edit API Reference](/docs/plugin-development/foldnano-edit-api). The sections below show how the pieces fit together.
 
 ### Asking before you edit
 
@@ -231,8 +230,7 @@ n_helices = int(ctx.get_param("n_helices", 8))
 
 ```python
 import csv, io
-from foldnano.io import parse_foldnano_json
-from foldnano.plugin import PluginContext
+from foldnano import PluginContext, parse_foldnano_json
 
 def run(ctx: PluginContext) -> None:
     part = parse_foldnano_json(ctx.get_part_as_foldnano_json())
@@ -256,8 +254,7 @@ def run(ctx: PluginContext) -> None:
 
 ```python
 import json
-from foldnano.io import parse_foldnano_json
-from foldnano.plugin import PluginContext
+from foldnano import PluginContext, parse_foldnano_json
 
 def run(ctx: PluginContext) -> None:
     part = parse_foldnano_json(ctx.get_part_as_foldnano_json())

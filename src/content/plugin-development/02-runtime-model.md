@@ -61,9 +61,21 @@ Python never receives direct access to the live JavaScript `Part`. This keeps un
 | --- | --- | --- |
 | `cadnano_json` | cadnano JSON string | cadnano JSON result or preview output |
 | `foldnano_json` | Foldnano `Part.toJSON()` snapshot | Foldnano JSON result or preview output |
-| `foldnano_mini` | Foldnano JSON loaded into a mutable Python mirror | structured mutation log |
+| `foldnano_edit` | Foldnano JSON loaded into a mutable Python mirror | structured mutation log |
 
-`foldnano_mini` is the preferred model for direct edits because the host replays the mutation log into the real part inside one undoable command transaction.
+`foldnano_edit` is the preferred model for direct edits because the host replays the mutation log into the real part inside one undoable command transaction.
+
+## Which Package To Import
+
+| You want to | Import from | Main names |
+| --- | --- | --- |
+| Type `ctx`, read inputs, log, return results | `foldnano` | `PluginContext` |
+| Read a design without changing it | `foldnano` | `parse_foldnano_json`, `PartData` |
+| Edit a design | `foldnano.edit` | `load_part`, `MutablePart` |
+| Store a wireframe region's geometry | `foldnano` | `ReferenceGeometry`, `ReferenceMesh` |
+| Convert nm to bp along a helix | `foldnano` | `BACKBONE_RISE_NM` |
+
+`foldnano` reads a design. `foldnano.edit` edits one, recording each change so the host can replay it as one undo step. An editing plugin usually imports from both.
 
 ## Region Scope
 

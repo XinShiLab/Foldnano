@@ -1,5 +1,5 @@
 // Editor-agnostic Python completions for the plugin API, driven by the index that
-// scripts/gen_python_api.py generates from the bundled `foldnano` / `foldnano_mini` packages.
+// scripts/gen_python_api.py generates from the bundled `foldnano` / `foldnano.edit` packages.
 // Type inference is deliberately shallow: annotations, `x = <chain>`, `for x in <chain>`.
 
 import generatedIndex from './python-api-index.generated.json';
@@ -617,7 +617,7 @@ function scopeCompletions(
 			boost: 1,
 		});
 	}
-	const importable = [index.modules.foldnano_mini, index.modules['foldnano.plugin']].flat();
+	const importable = [index.modules['foldnano.edit'], index.modules['foldnano.plugin']].flat();
 	for (const name of importable) add({ ...apiNameCompletion(name, index) });
 	for (const word of KEYWORDS) add({ label: word, kind: 'keyword', boost: -1 });
 	for (const word of BUILTINS) add({ label: word, kind: 'function', detail: 'builtin', boost: -1 });

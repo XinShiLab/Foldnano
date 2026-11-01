@@ -27,13 +27,18 @@ import {
 	FreeformRegion,
 	HoneycombRegion,
 	SquareRegion,
+	WireframeRegion,
+	type ReferenceGeometry,
+	type ReferenceMesh,
 } from '$lib/model/Part/DesignRegion';
+import { scaleReferenceMesh } from '$lib/model/geometry3d/referenceMesh';
+import { readPlyMeshFile } from '$lib/model/io/plyMesh';
 import { Plane } from '$lib/model/Part/Plane.svelte';
 import type { SolverParams } from '$lib/model/rbs/rbsTypes';
 import type { GizmoMode } from '../View3D/transformGizmo';
 import type { OverlayInstance } from '../View3D/overlayInstance';
 import { addPlaneCmd, removePlaneCmd } from '$lib/commands/planes';
-import { addRegionAndPlaneCmd } from '$lib/commands/regions';
+import { addRegionAndPlaneCmd, setRegionReferenceGeometryCmd } from '$lib/commands/regions';
 import { BUILTIN_MODIFICATIONS } from '$lib/model/modifications';
 import FoldnanoDocument from '$lib/model/document.svelte';
 import { CadnanoJSON } from '$lib/model/io/cadnanoJSON';
@@ -118,7 +123,7 @@ export interface View3DToolbarController {
 	planeSelectionMode: boolean;
 	pendingBasePlane: 'XY' | 'XZ' | 'YZ';
 	pendingRegionKind: RegionKind | null;
-	toolPanelMode: 'inspector' | 'overlays';
+	toolPanelMode: 'inspector' | 'overlays' | 'mesh';
 	onToggleLock: () => void;
 	onResetCamera?: () => void;
 	onFrameActivePlane?: () => void;
@@ -295,6 +300,13 @@ export interface SerializableStrandViewContext {
 	activeCsRegionId: string | null;
 }
 
+export interface MeshDraft {
+	mesh: ReferenceMesh;
+	fileName: string;
+	/** Nanometres per file unit. */
+	scale: number;
+}
+
 export class EditorViewContext {
 	strandViewContext: StrandViewContext = new StrandViewContext();
 	selectedFreeformVhIndices: SvelteSet<number> = new SvelteSet();
@@ -324,6 +336,12 @@ export class EditorViewContext {
 	planeSelectionMode: boolean = $state(false);
 	pendingRegionKind: RegionKind | null = $state(null);
 	pendingBasePlane: 'XY' | 'XZ' | 'YZ' = $state('XY');
+	/** A chosen mesh not yet on a region: previewed in 3D until it is confirmed or cancelled. */
+	meshDraft: MeshDraft | null = $state.raw(null);
+	scaledMeshDraft: ReferenceMesh | null = $derived(
+		this.meshDraft ? scaleReferenceMesh(this.meshDraft.mesh, this.meshDraft.scale) : null
+	);
+	hiddenReferenceMeshRegionIds = new SvelteSet<string>();
 	isAddingRegionToExistingPart: boolean = $state(false);
 	activeRegionId: string | null = $state(null);
 	footnote: string = $derived(`${this.otherFootnote} | ${this.strandViewContext.footnote}`);
@@ -590,9 +608,50 @@ export class EditorViewContext {
 		}
 		this.pendingRegionKind = kind;
 		this.pendingBasePlane = 'XY';
+		this.meshDraft = null;
 		this.planeSelectionMode = true;
 		this.show3D = true;
 		this.setActiveViewer('VIEW3D');
+	}
+
+	/** Dropping a mesh on the empty editor opens the new-region panel with it filled in. */
+	async startWireframeRegionFromFile(file: File): Promise<void> {
+		const draft = await this._readMeshDraft(file);
+		if (!draft) return;
+		this.enterPlaneSelectionMode('WIREFRAME');
+		this.meshDraft = draft;
+	}
+
+	async loadMeshDraft(file: File): Promise<void> {
+		const draft = await this._readMeshDraft(file);
+		if (draft) this.meshDraft = draft;
+	}
+
+	private async _readMeshDraft(file: File): Promise<MeshDraft | null> {
+		try {
+			return { mesh: await readPlyMeshFile(file), fileName: file.name, scale: 1 };
+		} catch (err) {
+			toast.error('Could not read this mesh', {
+				description: err instanceof Error ? err.message : String(err),
+			});
+			return null;
+		}
+	}
+
+	setMeshDraftScale(scale: number): void {
+		if (this.meshDraft && Number.isFinite(scale) && scale > 0) {
+			this.meshDraft = { ...this.meshDraft, scale };
+		}
+	}
+
+	clearMeshDraft(): void {
+		this.meshDraft = null;
+	}
+
+	toggleReferenceMeshHidden(regionId: string): void {
+		if (!this.hiddenReferenceMeshRegionIds.delete(regionId)) {
+			this.hiddenReferenceMeshRegionIds.add(regionId);
+		}
 	}
 
 	selectPendingBasePlane(plane: 'XY' | 'XZ' | 'YZ'): void {
@@ -606,6 +665,7 @@ export class EditorViewContext {
 	cancelRegionCreation(): void {
 		this.planeSelectionMode = false;
 		this.pendingRegionKind = null;
+		this.meshDraft = null;
 		if (!this.isAddingRegionToExistingPart) {
 			this.historyStack.undoOnce();
 		}
@@ -654,6 +714,10 @@ export class EditorViewContext {
 	confirmRegionCreation(): void {
 		const part = this.currentDoc.parts[0];
 		if (!part) return;
+		const meshDraft = this.scaledMeshDraft;
+		const geometry: ReferenceGeometry | undefined = meshDraft
+			? { unit: 'nm', mesh: meshDraft }
+			: undefined;
 
 		if (this.isAddingRegionToExistingPart) {
 			if (!this.pendingRegionKind) return;
@@ -673,18 +737,28 @@ export class EditorViewContext {
 					? new SquareRegion(name, plane.id)
 					: kind === 'FREEFORM'
 						? new FreeformRegion(name, plane.id)
-						: new HoneycombRegion(name, plane.id);
+						: kind === 'WIREFRAME'
+							? new WireframeRegion(name, plane.id)
+							: new HoneycombRegion(name, plane.id);
+			// Set before the region joins the part, so adding it stays one undo step.
+			if (region instanceof WireframeRegion) region.referenceGeometry = geometry;
 			addRegionAndPlaneCmd(this.historyStack, part, plane, region);
 			this.setActiveRegion(region.id);
 		} else {
-			this.setActiveRegion(part.getDefaultRegion().id);
+			const regionId = part.getDefaultRegion().id;
+			if (geometry) setRegionReferenceGeometryCmd(this.historyStack, part, regionId, geometry);
+			this.setActiveRegion(regionId);
 		}
 
 		this.planeSelectionMode = false;
 		this.pendingRegionKind = null;
+		this.meshDraft = null;
 		this.isAddingRegionToExistingPart = false;
-		this.show3D = false;
-		this.setActiveViewer('HELIX');
+		// A reference mesh is drawn only in 3D, so leaving 3D here would hide what was just added.
+		if (!geometry) {
+			this.show3D = false;
+			this.setActiveViewer('HELIX');
+		}
 	}
 
 	addPlaneBasedOnSelected(): void {

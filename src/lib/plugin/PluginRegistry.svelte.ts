@@ -7,7 +7,12 @@ import type {
 	PluginOrigin,
 	PluginStatus,
 } from './types';
-import { classifyManifest, MANIFEST_SCHEMA_VERSION, withSchemaVersion } from './manifestValidation';
+import {
+	classifyManifest,
+	MANIFEST_SCHEMA_VERSION,
+	withCurrentFormat,
+	withSchemaVersion,
+} from './manifestValidation';
 import {
 	foldnanoIndexedDb,
 	type FoldnanoIndexedDb,
@@ -397,8 +402,8 @@ export class PluginRegistry {
 			for (const record of records) {
 				const stored = (record as { manifest?: Partial<PluginManifest> }).manifest;
 				if (stored && !this.plugins.has(record.id)) {
-					// Records from before versioning carry no schemaVersion.
-					const manifest = withSchemaVersion(stored) as PluginManifest;
+					// Older records can lack schemaVersion or carry the old format name.
+					const manifest = withCurrentFormat(withSchemaVersion(stored)) as PluginManifest;
 					const state = new PluginState(manifest, record.linked ? 'linked' : 'user');
 					if (record.linked) {
 						state.linked = { ...record.linked, access: 'unknown', lastReadAt: null };

@@ -32,7 +32,7 @@ describe('owned plugin packaging', () => {
 		expect(manifest).toMatchObject({
 			name: 'Staple Tidy',
 			version: '1.0.0',
-			format: 'foldnano_mini',
+			format: 'foldnano_edit',
 			applyStrategy: 'replayMutationLog',
 			requirements: ['numpy'],
 			[AUTHORING_HINT_KEY]: { source: 'scriptLab' },

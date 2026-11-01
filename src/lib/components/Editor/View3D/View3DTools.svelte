@@ -17,6 +17,7 @@
 		ChevronDown,
 		Axis3d,
 		CirclePile,
+		Pyramid,
 		Shapes,
 		ChartBar,
 	} from '@lucide/svelte/icons';
@@ -59,7 +60,7 @@
 		solverParams: SolverParams;
 		showCoordinateAxis: boolean;
 		showPlanes: boolean;
-		toolPanelMode: 'inspector' | 'overlays';
+		toolPanelMode: 'inspector' | 'overlays' | 'mesh';
 		selectedPlaneId?: string | null;
 		gizmoMode: GizmoMode;
 		showStats: boolean;
@@ -166,6 +167,10 @@
 	function toggleOverlayPanel() {
 		toolPanelMode = toolPanelMode === 'overlays' ? 'inspector' : 'overlays';
 	}
+
+	function toggleMeshPanel() {
+		toolPanelMode = toolPanelMode === 'mesh' ? 'inspector' : 'mesh';
+	}
 </script>
 
 <div class="flex h-8 min-w-0 flex-1 items-center overflow-hidden">
@@ -202,6 +207,22 @@
 				<Shapes />
 				<span>3D Overlay</span>
 			</Button>
+			{#if editorCtx.activeRegion?.supportsReferenceGeometry}
+				<Button
+					variant={toolPanelMode === 'mesh' ? 'default' : 'outline'}
+					size="sm"
+					title={toolPanelMode === 'mesh' ? 'Show 3D inspector panel' : 'Show reference mesh panel'}
+					onclick={toggleMeshPanel}
+					{@attach help({
+						title: 'Reference Mesh',
+						text: 'Add, replace or remove the reference mesh of this wireframe region. Switches the tool panel to Reference Mesh.',
+						doc: 'wireframe',
+					})}
+				>
+					<Pyramid />
+					<span>Mesh</span>
+				</Button>
+			{/if}
 		</ButtonGroup.Root>
 
 		<Separator.Root orientation="vertical" class="h-5" />

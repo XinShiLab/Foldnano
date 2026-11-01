@@ -17,7 +17,7 @@ export interface VirtualHelixFrame {
 // OXDNA_NM = 0.8518 nm/unit, OXDNA_BASE_BASE = 0.3897628551303122 units/bp,
 // OXDNA_SQ_DIST = 2.6 units, OXDNA_HEX_DIST = 2.55 units (inter-helix, center-to-center).
 const _OXDNA_NM = 0.8518;
-export const BACKBONE_RISE_NM = 0.3897628551303122 * _OXDNA_NM; // ~0.3317 nm/bp
+export const BACKBONE_RISE_NM = 0.3897628551303122 * _OXDNA_NM; // ~0.3320 nm/bp
 // Backbone (phosphate) is at CM_center (0.6) + CM_to_backbone (0.4) = 1.0 oxDNA units from helix axis
 export const BACKBONE_RADIUS_NM = 1.0 * _OXDNA_NM; // ~0.852 nm
 

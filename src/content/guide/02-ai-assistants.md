@@ -51,7 +51,7 @@ Coding agents are especially useful for plugins: point one at [/docs/plugin-deve
 
 <Callout type="warning" title="Check the answer against the docs">
 
-AI assistants can still get details wrong, such as a menu name, a keyboard shortcut, or a `foldnano_mini` method that does not exist. Ask the assistant which page it used, then open that page to confirm. The text files always match the current version of these docs, but an assistant may also mix in older knowledge from its training.
+AI assistants can still get details wrong, such as a menu name, a keyboard shortcut, or a `foldnano.edit` method that does not exist. Ask the assistant which page it used, then open that page to confirm. The text files always match the current version of these docs, but an assistant may also mix in older knowledge from its training.
 
 </Callout>
 

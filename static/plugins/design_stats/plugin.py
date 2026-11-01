@@ -17,7 +17,7 @@ from __future__ import annotations
 import json
 import numpy as np
 
-from foldnano.plugin import PluginContext
+from foldnano import PluginContext
 
 
 # ---------------------------------------------------------------------------

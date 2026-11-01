@@ -1,6 +1,7 @@
 <script lang="ts">
 	import * as Empty from '$lib/components/ui/empty';
 	import * as Dialog from '$lib/components/ui/dialog';
+	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button';
 	import { buttonVariants } from '$lib/components/ui/button';
 	import {
@@ -11,7 +12,9 @@
 		Hexagon,
 		Square,
 		LineSquiggle,
+		Pyramid,
 	} from '@lucide/svelte';
+	import { resolve } from '$app/paths';
 	import Open from './Toolbar/Open.svelte';
 	import { getEditorViewContext } from './context/EditorViewContext.svelte';
 	import { help } from '$lib/components/help/help';
@@ -42,6 +45,7 @@
 		},
 	];
 
+	let wireframeEnabled = $derived(editorViewContext.pluginDevMode.enabled);
 	let isDialogOpen = $state(false);
 	let isDragOver = $state(false);
 
@@ -71,7 +75,13 @@
 		e.preventDefault();
 		isDragOver = false;
 		const dropped = Array.from(e.dataTransfer?.files ?? []);
-		if (dropped.length > 0) {
+		if (
+			wireframeEnabled &&
+			dropped.length === 1 &&
+			dropped[0].name.toLowerCase().endsWith('.ply')
+		) {
+			void editorViewContext.startWireframeRegionFromFile(dropped[0]);
+		} else if (dropped.length > 0) {
 			pendingFiles = dropped;
 			isDialogOpen = true;
 		}
@@ -107,7 +117,7 @@
 			>
 				Start a new design
 			</p>
-			<div class="grid grid-cols-3 gap-2">
+			<div class="grid grid-cols-4 gap-2">
 				{#each regionKinds as kind (kind.value)}
 					<button
 						class="flex flex-col items-center gap-1.5 rounded-md border border-border p-3 text-xs
@@ -120,6 +130,42 @@
 						<span class="text-muted-foreground">Region</span>
 					</button>
 				{/each}
+				<div
+					class="group relative"
+					{@attach help({
+						title: 'Wireframe region',
+						text: "Planned. No routing method is available yet, so you can't design a wireframe structure here. An early plugin API is available for developers.",
+						doc: 'wireframe',
+					})}
+				>
+					<button
+						class="relative flex h-full w-full flex-col items-center gap-1.5 rounded-md border border-border p-3 text-xs transition-colors hover:border-primary hover:bg-accent"
+						onclick={() => editorViewContext.enterPlaneSelectionMode('WIREFRAME')}
+					>
+						<Badge
+							variant="outline"
+							class="absolute -top-2 left-1/2 h-4 -translate-x-1/2 bg-background px-1 text-[10px] font-normal text-muted-foreground"
+						>
+							API preview
+						</Badge>
+						<Pyramid size={20} class="text-muted-foreground opacity-50" />
+						<span class="font-medium opacity-50">Wireframe</span>
+						<span class="text-muted-foreground opacity-50">Region</span>
+					</button>
+					<!-- pt-1 bridges the hover gap; touch has no hover, so the link stays visible there. -->
+					<div
+						class="pointer-events-none absolute top-full right-0 z-10 pt-1 whitespace-nowrap opacity-0 transition-opacity group-focus-within:pointer-events-auto group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100 pointer-coarse:pointer-events-auto pointer-coarse:opacity-100"
+					>
+						<a
+							class="block rounded-md border border-border bg-popover px-2 py-1 text-xs text-muted-foreground underline underline-offset-2 shadow-sm hover:text-foreground"
+							href={resolve('/docs/[...slug]', { slug: 'guide/wireframe' })}
+							target="_blank"
+							rel="noopener noreferrer"
+						>
+							Wireframe support: current status
+						</a>
+					</div>
+				</div>
 			</div>
 		</div>
 
@@ -137,7 +183,7 @@
 				area: true,
 				placement: 'left',
 				title: 'Open an existing design',
-				text: 'Drop a Foldnano .fn.json or a cadnano .json here; a cadnano file opens as a new document. Plugin .zip files are offered for install.',
+				text: `Drop a Foldnano .fn.json or a cadnano .json here; a cadnano file opens as a new document.${wireframeEnabled ? ' A single .ply mesh starts a new wireframe region.' : ''} Plugin .zip files are offered for install.`,
 				doc: 'creating-a-design',
 			})}
 		>
@@ -154,7 +200,9 @@
 				</Empty.Title>
 				<Empty.Description>
 					Drop a <code>.json</code>, <code>.cadnano.json</code>, or <code>.fn.json</code> file here
-					to open it, or drop a plugin <code>.zip</code> to install it.
+					to open it,
+					{#if wireframeEnabled}a <code>.ply</code> mesh to start a wireframe region,{/if}
+					or a plugin <code>.zip</code> to install it.
 				</Empty.Description>
 			</Empty.Header>
 

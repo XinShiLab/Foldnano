@@ -1,7 +1,7 @@
 """
-Mutation Test (foldnano_mini)
+Mutation Test (foldnano.edit)
 =============================
-Exercises every op kind in the foldnano_mini vocabulary against the active
+Exercises every op kind in the foldnano.edit vocabulary against the active
 part. The plugin emits a single mutation log, the host replays it through
 real Part methods inside one snapshotTx, producing one undo step.
 
@@ -30,8 +30,8 @@ of 14 — the report flags this.
 
 from __future__ import annotations
 
-from foldnano.plugin import PluginContext
-from foldnano_mini import LatticedRegion, load_part
+from foldnano import PluginContext
+from foldnano.edit import LatticedRegion, load_part
 
 
 def _pick_lattice_region(part):
@@ -71,7 +71,7 @@ def _pick_freeform_vh(part):
 
 
 def run(ctx: PluginContext) -> None:
-    ctx.log("=== Mutation Test (foldnano_mini) ===")
+    ctx.log("=== Mutation Test (foldnano.edit) ===")
 
     part = load_part(
         ctx.get_part_as_foldnano_json(),

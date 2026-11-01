@@ -146,6 +146,7 @@ The recorder emits targeted patch kinds, including:
 | `DocumentSnapshotChange`                     | Whole-document fallback for large or awkward edits                                                                  |
 | `PlaneTransformChange` / `PlaneAdd`/`Remove` | Undoable transform / add / remove of a persisted `Plane`                                                            |
 | `RegionAdd`/`RegionRemove`                   | Undoable add / remove of a `DesignRegion`                                                                           |
+| `RegionReferenceGeometryChange`              | Undoable set / clear of a wireframe region's `referenceGeometry`                                                    |
 | `OverlayPlacementSet`/`Remove`               | Undoable upsert / clear of one external-structure overlay placement (`Part.overlayPlacements`); see `overlays.ts`   |
 
 ### `PartScopeCapture`

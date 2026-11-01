@@ -97,7 +97,7 @@ Each per-area doc ends with a "Boundaries / Don'ts" section — load the relevan
 
 ### Keeping docs in sync
 
-Each `docs/*.md` declares the code it describes in front matter (`covers:` globs; `status: snapshot` for dated reviews). Doc-site pages in `src/content/guide/` and `src/content/plugin-development/` can declare `covers:` too; that is how UI and plugin-API files map to the public page explaining them. The plugin API reference pages (Context, Parse, foldnano_mini) are also checked name-by-name by `pnpm test:python`.
+Each `docs/*.md` declares the code it describes in front matter (`covers:` globs; `status: snapshot` for dated reviews). Doc-site pages in `src/content/guide/` and `src/content/plugin-development/` can declare `covers:` too; that is how UI and plugin-API files map to the public page explaining them. The plugin API reference pages (Context, Parse, foldnano_edit) are also checked name-by-name by `pnpm test:python`.
 
 - **Update the covering doc in the same commit** when you change behavior, public names, ownership, or a boundary in its area. `pnpm docs:check --file <path>` tells you which doc that is; the pre-commit hook warns about covered code staged without its doc.
 - **After renaming or moving a symbol/file**, grep `docs/` and `src/content/` for the old name.
@@ -141,9 +141,9 @@ These are wired together but distinct — keep responsibilities on the right sid
 
 **Crossover direction:** always 3'→5' — `ThreePrimeEnd.connectTo(FivePrimeEnd)`.
 
-**Plugin formats:** `cadnano_json`, `foldnano_json`, `foldnano_mini` (mutable Python API + replayed mutation log). `live` is reserved and rejected by `validateManifest`.
+**Plugin formats:** `cadnano_json`, `foldnano_json`, `foldnano_edit` (mutable Python API + replayed mutation log). `live` is reserved and rejected by `validateManifest`.
 
-**Apply strategies:** `previewOnly`, `replacePart[KeepAnnotationsWhereMatched]`, `replaceRegion[KeepAnnotationsWhereMatched]`, `replayMutationLog[InRegion]`. `foldnano_mini` is required for replay strategies; manifest validation enforces this.
+**Apply strategies:** `previewOnly`, `replacePart[KeepAnnotationsWhereMatched]`, `replaceRegion[KeepAnnotationsWhereMatched]`, `replayMutationLog[InRegion]`. `foldnano_edit` is required for replay strategies; manifest validation enforces this.
 
 ## Style
 

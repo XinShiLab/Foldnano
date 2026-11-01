@@ -1,4 +1,4 @@
-from foldnano.plugin import PluginContext
+from foldnano import PluginContext
 import json
 
 

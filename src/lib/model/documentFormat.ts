@@ -6,7 +6,7 @@ export const FOLDNANO_FORMAT = 'foldnano';
  * Bump when an older app would misread the saved JSON or silently drop part of it on re-save,
  * which includes adding new fields. Register the upgrade from the old version in MIGRATIONS.
  */
-export const CURRENT_FORMAT_VERSION = 1;
+export const CURRENT_FORMAT_VERSION = 2;
 
 export interface SavedWith {
 	app: string;
@@ -24,7 +24,10 @@ export type RawDocumentJson = Record<string, unknown>;
 export type DocumentMigration = (raw: RawDocumentJson) => RawDocumentJson;
 
 /** `MIGRATIONS[n]` upgrades a version-n document to version n + 1. */
-export const MIGRATIONS: Readonly<Record<number, DocumentMigration>> = {};
+export const MIGRATIONS: Readonly<Record<number, DocumentMigration>> = {
+	// v2 adds the WIREFRAME region kind and optional referenceGeometry; v1 content is unchanged.
+	1: (raw) => raw,
+};
 
 export type DocumentFormatErrorReason = 'too-new' | 'malformed';
 

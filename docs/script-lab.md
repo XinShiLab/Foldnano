@@ -26,7 +26,7 @@ Script Lab is a built-in Python plugin that lets the user edit and run arbitrary
 Key properties:
 
 - it is implemented as a normal plugin manifest, not a one-off editor feature
-- it uses `format: "foldnano_mini"` and `applyStrategy: "replayMutationLog"`
+- it uses `format: "foldnano_edit"` and `applyStrategy: "replayMutationLog"`
 - the current editor contents are the Python entrypoint for that run
 - each run executes in a fresh Python module namespace against a fresh Foldnano snapshot
 - the Pyodide runtime is reused across runs, but user code state is not
@@ -72,7 +72,7 @@ Related generic runtime files:
 - `src/lib/plugin/worker/bridge.ts`
 - `src/lib/plugin/worker/pyodide.worker.ts`
 - `src/lib/plugin/python/foldnano/plugin.py`
-- `src/lib/plugin/python/foldnano_mini/*`
+- `src/lib/plugin/python/foldnano/edit/*`
 
 ---
 
@@ -92,7 +92,7 @@ Script Lab is built from four layers:
 Current contract:
 
 - `id: "script-lab"`
-- `format: "foldnano_mini"`
+- `format: "foldnano_edit"`
 - `applyStrategy: "replayMutationLog"`
 - `sidePanel.type: "codeEditor"`
 - `sidePanel.icon: "code"`
@@ -210,7 +210,7 @@ The shell's header button moves the whole editor surface (toolbar, editor, outpu
 
 ### 7. API autocomplete
 
-`PluginCodeEditorShell` adds `foldnano` / `foldnano_mini` completions to every code-editor plugin, not only Script Lab (every plugin runs with both packages on its path).
+`PluginCodeEditorShell` adds `foldnano` / `foldnano.edit` completions to every code-editor plugin, not only Script Lab (every plugin runs with both packages on its path).
 
 - `python-completions.ts` is the editor-agnostic engine: given the text before the caret it returns members for the receiver's type, module exports after `from … import`, or scope names, keywords and builtins for a bare identifier.
 - Type inference is deliberately shallow and runs on every keystroke: parameter/assignment annotations, `x = <chain>`, `for x in <chain>` (element type), `next((x for x in <chain> …))`, indexing, and method return types from the index. An unannotated `ctx` is `PluginContext`. No `isinstance` narrowing, no flow analysis; the last binding before the caret wins.
@@ -314,7 +314,7 @@ Script Lab ships three built-in starters in `scriptLabManifest.ts`:
 
 - `SCRIPT_LAB_MUTATION_TEMPLATE`
 - `SCRIPT_LAB_ANALYSIS_TEMPLATE`
-- `SCRIPT_LAB_FULL_API_DEMO_TEMPLATE` — exercises every `foldnano_mini` op kind against the current active region/design (discovering VHs, oligos, and regions dynamically rather than using a fixed fixture, and using the `can_*` checks to skip a step with its reason instead of failing). Users load it from **Script Lab Help → Load Full API Demo**. It runs in sections A–I, each skipped with a `SKIPPED` line when its preconditions are missing:
+- `SCRIPT_LAB_FULL_API_DEMO_TEMPLATE` — exercises every `foldnano.edit` op kind against the current active region/design (discovering VHs, oligos, and regions dynamically rather than using a fixed fixture, and using the `can_*` checks to skip a step with its reason instead of failing). Users load it from **Script Lab Help → Load Full API Demo**. It runs in sections A–I, each skipped with a `SKIPPED` line when its preconditions are missing:
   A oligo color / name / scaffold flag; B modifications, slot sequence, skips and insertions;
   C helix and region length; D `create_segment` and `create_oligo`; E `break_oligo` and
   `move_terminus`; F adding lattice and freeform helices; G moving, reframing and reordering
@@ -331,7 +331,7 @@ Why keep them in code instead of static files:
 Current expectations for the mutation starter:
 
 - import `PluginContext`
-- import `load_part` from `foldnano_mini`
+- import `load_part` from `foldnano.edit`
 - load the current part with `ctx.active_region_id`
 - demonstrate a direct mutable edit
 - call `ctx.set_result(...)`
@@ -366,7 +366,7 @@ The minimal manifest shape for a similar plugin is:
 	"id": "my-script-plugin",
 	"name": "My Script Plugin",
 	"version": "1.0.0",
-	"format": "foldnano_mini",
+	"format": "foldnano_edit",
 	"applyStrategy": "replayMutationLog",
 	"entrypoint": "def run(ctx):\n    raise RuntimeError('Editor contents should execute instead')\n",
 	"sidePanel": {
@@ -375,7 +375,7 @@ The minimal manifest shape for a similar plugin is:
 		"icon": "code",
 		"codeEditor": {
 			"filename": "script.py",
-			"initialCode": "from foldnano.plugin import PluginContext\n\n\ndef run(ctx: PluginContext) -> None:\n    pass\n",
+			"initialCode": "from foldnano import PluginContext\n\n\ndef run(ctx: PluginContext) -> None:\n    pass\n",
 			"execution": "entrypoint"
 		}
 	}
@@ -408,7 +408,7 @@ Use this when the plugin itself is a code-writing environment.
 
 Recommended manifest choices:
 
-- `format: "foldnano_mini"` if users should mutate the model directly
+- `format: "foldnano_edit"` if users should mutate the model directly
 - `applyStrategy: "replayMutationLog"` unless you need strict region scoping
 - `sidePanel.type: "codeEditor"`
 - `sidePanel.codeEditor.execution: "entrypoint"`
@@ -587,7 +587,7 @@ ends ownership and drops the draft; the replace dialog warns first (`endsEditing
 every editable plugin standard tier.
 
 **What Make Plugin writes** (`createOwnedPlugin`): `fplugin.json` + `plugin.py`, Script Lab's run
-contract (`foldnano_mini` + `replayMutationLog`, no parameters), version `1.0.0`, and a generated
+contract (`foldnano.edit` + `replayMutationLog`, no parameters), version `1.0.0`, and a generated
 `local.<8 chars>` id shown read-only in the dialog (renaming never changes it; the prefix keeps
 owned ids apart from distributed ones). The manifest carries `x-foldnano-authoring` as a
 restore hint only, and is written at the current manifest `schemaVersion`.

@@ -1,7 +1,7 @@
 /**
- * opDispatch — single source of truth for the foldnano_mini op vocabulary.
+ * opDispatch — single source of truth for the foldnano.edit op vocabulary.
  *
- * The Python `foldnano_mini` package emits a JSON-serialisable list of ops
+ * The Python `foldnano.edit` package emits a JSON-serialisable list of ops
  * (`MutationOp[]`) when a plugin runs. The host-side replayer in
  * `ResultApplicator` calls `dispatchOp(op, part)` for each op inside a single
  * `historyStack.snapshotTx`, producing one undo step for the whole run.
@@ -28,6 +28,7 @@ import {
 	DesignRegion,
 	LatticedDesignRegion,
 	type DesignRegionJSON,
+	type ReferenceGeometry,
 	type RegionKind,
 } from '$lib/model/Part/DesignRegion';
 import { Plane, type PlaneVec3 } from '$lib/model/Part/Plane.svelte';
@@ -40,6 +41,7 @@ import {
 	removeRepeatInstance,
 	syncRepeatGroups,
 } from '$lib/model/Part/repeatGroups';
+import { checkReferenceGeometryShape } from '$lib/model/checks/shape/foldnanoJsonShape';
 import { InvalidOperationError } from '$lib/errors';
 import {
 	isRightHandedBasis,
@@ -49,7 +51,7 @@ import {
 } from '$lib/model/geometry3d/dnaGeometry';
 
 // ---------------------------------------------------------------------------
-// Op shapes (mirror the Python foldnano_mini.mutations module)
+// Op shapes (mirror the Python foldnano.edit.mutations module)
 // ---------------------------------------------------------------------------
 
 export type MutationOp =
@@ -70,7 +72,6 @@ export type MutationOp =
 	| RemoveVhsOp
 	| BreakOligoOp
 	| MoveTerminusOp
-	| SetVhLengthOp
 	| SetRegionMaxBaseOp
 	| MoveLatticeVhOp
 	| AddFreeformVhOp
@@ -78,6 +79,7 @@ export type MutationOp =
 	| TransformPlaneOp
 	| AddRegionAndPlaneOp
 	| SplitRegionOp
+	| SetRegionReferenceGeometryOp
 	| CreateRepeatGroupOp
 	| AddRepeatInstanceOp
 	| RemoveRepeatInstanceOp
@@ -179,7 +181,6 @@ interface AddVhAtCoordsOp {
 	row: number;
 	col: number;
 	newVhId: string;
-	length?: number;
 }
 
 interface SetVhLocalFrameOp {
@@ -210,12 +211,6 @@ interface MoveTerminusOp {
 	toIndex: number;
 }
 
-interface SetVhLengthOp {
-	op: 'set_vh_length';
-	vhId: string;
-	length: number;
-}
-
 interface SetRegionMaxBaseOp {
 	op: 'set_region_max_base';
 	regionId: string;
@@ -236,7 +231,6 @@ interface AddFreeformVhOp {
 	origin: [number, number, number];
 	axis: [number, number, number];
 	radial0: [number, number, number];
-	length?: number;
 }
 
 interface ReorderVhOp {
@@ -279,6 +273,12 @@ interface SplitRegionOp {
 	splitAfterVhId: string;
 	newPlaneId: string;
 	newRegionId: string;
+}
+
+interface SetRegionReferenceGeometryOp {
+	op: 'set_region_reference_geometry';
+	regionId: string;
+	geometry: ReferenceGeometry | null;
 }
 
 interface CreateRepeatGroupOp {
@@ -525,8 +525,7 @@ export function dispatchOp(op: MutationOp, part: Part, options: DispatchOptions 
 				);
 			}
 			assertVhIdAvailable(part, op.newVhId);
-			const vh = region.addVhAtCoords(part, op.col, op.row, op.newVhId);
-			if (op.length != null) vh.length = op.length;
+			region.addVhAtCoords(part, op.col, op.row, op.newVhId);
 			return;
 		}
 		case 'set_vh_local_frame': {
@@ -567,12 +566,6 @@ export function dispatchOp(op: MutationOp, part: Part, options: DispatchOptions 
 			guardVhInRegion(part, seg.inVirtualHelix.regionId, activeRegionId);
 			const end = op.end === '5' ? seg.fivePrime : seg.threePrime;
 			part.moveOligoTerminusTo(end, op.toIndex);
-			return;
-		}
-		case 'set_vh_length': {
-			const vh = findVh(part, op.vhId);
-			guardVhInRegion(part, vh.regionId, activeRegionId);
-			vh.length = op.length;
 			return;
 		}
 		case 'set_region_max_base': {
@@ -631,7 +624,7 @@ export function dispatchOp(op: MutationOp, part: Part, options: DispatchOptions 
 				radial0: { x: op.radial0[0], y: op.radial0[1], z: op.radial0[2] },
 			});
 			const vh = part.addVirtualHelix({ id: op.newVhId });
-			vh.length = op.length ?? region.maxBase;
+			vh.length = region.maxBase;
 			vh.regionId = op.regionId;
 			vh.localFrame = localFrame;
 			if (!region.vhOrder.includes(op.newVhId)) region.vhOrder.push(op.newVhId);
@@ -711,6 +704,23 @@ export function dispatchOp(op: MutationOp, part: Part, options: DispatchOptions 
 			part.syncListRows();
 			return;
 		}
+		case 'set_region_reference_geometry': {
+			if (activeRegionId && op.regionId !== activeRegionId) {
+				throw new Error(
+					`set_region_reference_geometry targets region ${regionLabel(part, op.regionId)} but active region is ${regionLabel(part, activeRegionId)}`
+				);
+			}
+			const region = part.getRegionById(op.regionId);
+			if (!region) throw new Error(`Region ${op.regionId} not found`);
+			const geometry = op.geometry ?? undefined;
+			checkReferenceGeometryShape({
+				id: region.id,
+				kind: region.kind,
+				referenceGeometry: geometry,
+			});
+			part.setRegionReferenceGeometry(op.regionId, geometry);
+			return;
+		}
 		case 'create_repeat_group': {
 			const oligos = op.oligoIds.map((id) => findOligo(part, id));
 			for (const oligo of oligos) guardOligoInRegion(part, oligo, activeRegionId);
@@ -782,7 +792,7 @@ export class MutationReplayError extends Error {
 }
 
 /**
- * Replay a `foldnano_mini` mutation log onto `part`, op by op.
+ * Replay a `foldnano_edit` mutation log onto `part`, op by op.
  *
  * Mirrors are re-synced after every op that can move them, because the Python side rebuilds
  * them after each op too: a later op may use space a mirror just left. Attribute writes wait

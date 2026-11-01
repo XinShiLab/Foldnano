@@ -94,11 +94,13 @@ class TestParseFoldnanoJson:
 
     def test_lattice_type(self, minimal_part_foldnano_json):
         part = parse_foldnano_json(minimal_part_foldnano_json)
-        assert part.lattice_type == "HONEYCOMB"
+        with pytest.warns(FutureWarning):
+            assert part.lattice_type == "HONEYCOMB"
 
     def test_max_base(self, minimal_part_foldnano_json):
         part = parse_foldnano_json(minimal_part_foldnano_json)
-        assert part.max_base == 21
+        with pytest.warns(FutureWarning):
+            assert part.max_base == 21
 
     def test_raw_preserved(self, minimal_part_foldnano_json):
         part = parse_foldnano_json(minimal_part_foldnano_json)

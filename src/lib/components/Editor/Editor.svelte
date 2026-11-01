@@ -502,12 +502,11 @@
 				}
 
 				if (editorViewContext.selectedFreeformVhIndices.size > 0) {
-					const selectedInActiveRegion =
-						activeKind === 'FREEFORM'
-							? Array.from(editorViewContext.selectedFreeformVhIndices).filter(
-									(vhIndex) => part.getVhByIndex(vhIndex)?.regionId === activeRegion!.id
-								)
-							: [];
+					const selectedInActiveRegion = activeRegion?.supportsFreeformPlacement
+						? Array.from(editorViewContext.selectedFreeformVhIndices).filter(
+								(vhIndex) => part.getVhByIndex(vhIndex)?.regionId === activeRegion!.id
+							)
+						: [];
 					if (selectedInActiveRegion.length > 0) {
 						deleteFreeformVirtualHelicesCmd(
 							{ part, vhIndices: selectedInActiveRegion },

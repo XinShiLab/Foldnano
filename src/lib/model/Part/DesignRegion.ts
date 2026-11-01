@@ -9,7 +9,22 @@ import {
 import type { CrossoverSite, Part } from './Part.svelte';
 import { toCoord } from './latticeOffsets';
 
-export type RegionKind = 'HONEYCOMB' | 'SQUARE' | 'FREEFORM';
+export type RegionKind = 'HONEYCOMB' | 'SQUARE' | 'FREEFORM' | 'WIREFRAME';
+
+export interface ReferenceMesh {
+	vertices: [number, number, number][];
+	/** Vertex indices of each polygon. */
+	faces: number[][];
+	/** Vertex index pairs; a router's edge set is these plus the face boundaries. */
+	edges: [number, number][];
+}
+
+/** A wireframe's input shape, in region-local coordinates. Reference only: helices are the source
+ * of truth and nothing syncs between them. Replaced whole, never mutated, so copies may share it. */
+export interface ReferenceGeometry {
+	unit: 'nm';
+	mesh?: ReferenceMesh;
+}
 
 export type DesignRegionJSON = {
 	id: string;
@@ -24,6 +39,7 @@ export type DesignRegionJSON = {
 	minBase: number;
 	maxBase: number;
 	defaultMaxBase?: number; // legacy key — read-only fallback for old files
+	referenceGeometry?: ReferenceGeometry;
 };
 
 const HONEYCOMB_DEFAULTS = { step: 21, turnsPerStep: 2, subStepSize: 7, twistOffset: 340 };
@@ -42,6 +58,7 @@ export function defaultsForKind(kind: RegionKind) {
 		case 'HONEYCOMB':
 			return HONEYCOMB_DEFAULTS;
 		case 'FREEFORM':
+		case 'WIREFRAME':
 		default:
 			return FREEFORM_DEFAULTS;
 	}
@@ -166,6 +183,21 @@ export class DesignRegion {
 	get supportsLatticeAutoStaple(): boolean {
 		return false;
 	}
+	get supportsFreeformPlacement(): boolean {
+		return false;
+	}
+	get supportsPlaneAxisEditing(): boolean {
+		return false;
+	}
+
+	/** Whether the region can carry a reference mesh (`referenceGeometry`). */
+	get supportsReferenceGeometry(): boolean {
+		return false;
+	}
+
+	get referenceMesh(): ReferenceMesh | undefined {
+		return undefined;
+	}
 
 	adjacentVhs(_vh: VirtualHelix): VirtualHelix[] {
 		return [];
@@ -209,6 +241,8 @@ export class DesignRegion {
 		switch (json.kind) {
 			case 'FREEFORM':
 				return FreeformRegion.fromJSON(json);
+			case 'WIREFRAME':
+				return WireframeRegion.fromJSON(json);
 			case 'SQUARE':
 				return SquareRegion.fromJSON(json);
 			case 'HONEYCOMB':
@@ -641,6 +675,13 @@ export class FreeformRegion extends DesignRegion {
 		);
 	}
 
+	override get supportsFreeformPlacement(): boolean {
+		return true;
+	}
+	override get supportsPlaneAxisEditing(): boolean {
+		return true;
+	}
+
 	override getLocalVirtualHelixFrame(vh: VirtualHelix): VirtualHelixFrame {
 		if (!vh.localFrame) {
 			console.warn(`Freeform region: VH ${vh.index} has no localFrame; falling back to origin/+Z.`);
@@ -695,6 +736,74 @@ export class FreeformRegion extends DesignRegion {
 			json.twistOffset,
 			json.maxBase ?? json.defaultMaxBase,
 			json.minBase
+		);
+	}
+}
+
+export class WireframeRegion extends FreeformRegion {
+	referenceGeometry?: ReferenceGeometry;
+
+	constructor(
+		name: string,
+		planeId: string,
+		id?: string,
+		vhOrder: string[] = [],
+		step?: number,
+		turnsPerStep?: number,
+		subStepSize?: number,
+		twistOffset?: number,
+		defaultMaxBase?: number,
+		minBase?: number,
+		referenceGeometry?: ReferenceGeometry
+	) {
+		super(
+			name,
+			planeId,
+			id,
+			vhOrder,
+			step,
+			turnsPerStep,
+			subStepSize,
+			twistOffset,
+			defaultMaxBase,
+			minBase
+		);
+		this.kind = 'WIREFRAME';
+		this.referenceGeometry = referenceGeometry;
+	}
+
+	// Plane-view axis edits set the axis z to 0, which would flatten a helix pointing out of the plane.
+	override get supportsPlaneAxisEditing(): boolean {
+		return false;
+	}
+
+	override get supportsReferenceGeometry(): boolean {
+		return true;
+	}
+
+	override get referenceMesh(): ReferenceMesh | undefined {
+		return this.referenceGeometry?.mesh;
+	}
+
+	override toJSON(): DesignRegionJSON {
+		const json = super.toJSON();
+		if (this.referenceGeometry) json.referenceGeometry = this.referenceGeometry;
+		return json;
+	}
+
+	static override fromJSON(json: DesignRegionJSON): WireframeRegion {
+		return new WireframeRegion(
+			json.name,
+			json.planeId,
+			json.id,
+			json.vhOrder,
+			json.step,
+			json.turnsPerStep,
+			json.subStepSize,
+			json.twistOffset,
+			json.maxBase ?? json.defaultMaxBase,
+			json.minBase,
+			json.referenceGeometry
 		);
 	}
 }

@@ -72,7 +72,7 @@
 					{/each}
 				</div>
 
-				<div class="mt-3 font-medium text-foreground">foldnano_mini patterns</div>
+				<div class="mt-3 font-medium text-foreground">foldnano.edit patterns</div>
 				<div class="mt-1 space-y-1">
 					{#each miniPatterns as line (line)}
 						<div>{line}</div>

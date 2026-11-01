@@ -1,6 +1,6 @@
 ---
 title: Parse API Reference
-description: Every name in foldnano.io, the read-only view of a Foldnano JSON design, with PartData and its oligo, segment, helix, region and plane proxies
+description: The read-only view of a Foldnano JSON design in the foldnano package, with PartData and its oligo, segment, helix, region and plane proxies
 category: plugin-development
 order: 6
 slug: plugin-api
@@ -14,10 +14,10 @@ covers:
 
 # Parse API Reference
 
-`parse_foldnano_json()` turns the JSON string from `ctx.get_part_as_foldnano_json()` into read-only Python objects, so you can walk the design instead of indexing raw dicts. It is the reading half of the `foldnano_json` format: to change the design, edit `part._raw` and hand it back with `ctx.set_result_foldnano_json(json.dumps(part._raw))` (see the [round-trip pattern](/docs/plugin-development/plugin-patterns#round-trip-mutation-pattern)). For an API you edit directly, use [foldnano_mini](/docs/plugin-development/foldnano-mini-api).
+`parse_foldnano_json()` turns the JSON string from `ctx.get_part_as_foldnano_json()` into read-only Python objects, so you can walk the design instead of indexing raw dicts. These names come from the `foldnano` package ([which package to import](/docs/plugin-development/runtime-model#which-package-to-import)). It is the reading half of the `foldnano_json` format: to change the design, edit `part._raw` and hand it back with `ctx.set_result_foldnano_json(json.dumps(part._raw))` (see the [round-trip pattern](/docs/plugin-development/plugin-patterns#round-trip-mutation-pattern)). For an API you edit directly, use [foldnano.edit](/docs/plugin-development/foldnano-edit-api).
 
 ```python
-from foldnano.io import parse_foldnano_json
+from foldnano import parse_foldnano_json
 
 part = parse_foldnano_json(ctx.get_part_as_foldnano_json(), active_region_id=ctx.active_region_id)
 ```
@@ -39,10 +39,12 @@ The proxies are snapshots of the JSON at parse time. Bases (`bp`) are 0-based in
 | `PartData` | class | The parsed part ([below](#partdata)). |
 | `OligoProxy`, `OligoSegmentProxy` | class | An oligo and one of its segments. |
 | `VirtualHelixProxy` | class | A helix. |
-| `RegionProxy`, `LatticedRegionProxy`, `FreeformRegionProxy` | class | A region; lattice and freeform regions are subclasses. Test `region.supports_lattice_grid` rather than the class. |
+| `RegionProxy`, `LatticedRegionProxy`, `FreeformRegionProxy`, `WireframeRegionProxy` | class | A region; lattice and freeform regions are subclasses, and a `WireframeRegionProxy` is a `FreeformRegionProxy`. Test `region.supports_lattice_grid` rather than the class. |
 | `PlaneProxy` | class | The plane a region lives on. |
+| `ReferenceGeometry`, `ReferenceMesh` | class | The geometry a wireframe region was built from. |
+| `BACKBONE_RISE_NM` | constant | The rise along a helix axis, in nm per bp, that Foldnano draws and exports helices with (about 0.332). |
 
-All of these import from `foldnano` (and the two functions from `foldnano.io`).
+All of these import from `foldnano`.
 
 ## `PartData`
 
@@ -50,8 +52,8 @@ All of these import from `foldnano` (and the two functions from `foldnano.io`).
 | --- | --- | --- |
 | `part.name`, `part.id` | read‑only | The part's name and id. |
 | `part.virtual_helices`, `part.oligos`, `part.regions`, `part.planes` | read‑only | Everything in the part, in JSON order. |
-| `part.lattice_type` | read‑only | `'HONEYCOMB'`, `'SQUARE'` or `'FREEFORM'`: the first region's kind. Check `region.kind` in multi-region parts. |
-| `part.max_base` | read‑only | The first region's default length. |
+| `part.lattice_type` | read‑only | **Deprecated, and logs a warning.** The first region's kind only. Use `region.kind`. |
+| `part.max_base` | read‑only | **Deprecated, and logs a warning.** The first region's length only. Use `region.max_base`. |
 | `part.active_region_id`, `part.active_region` | read‑only | The region passed to `parse_foldnano_json` (id, and its proxy or `None`). |
 | `part._raw` | read‑only | The parsed JSON dict itself. Change it and serialise it back to return an edited design. |
 | `part.get_vh(index)`, `part.get_oligo(id)`, `part.get_region(id)`, `part.get_plane(id)` | query | The proxy with that index or id, or `None`. |
@@ -104,11 +106,17 @@ All of these import from `foldnano` (and the two functions from `foldnano.io`).
 
 | API | Kind | Behaviour |
 | --- | --- | --- |
-| `region.id`, `region.name`, `region.kind`, `region.plane_id` | read‑only | Identity, name, `'HONEYCOMB'` / `'SQUARE'` / `'FREEFORM'`, and its plane. |
+| `region.id`, `region.name`, `region.kind`, `region.plane_id` | read‑only | Identity, name, `'HONEYCOMB'` / `'SQUARE'` / `'FREEFORM'` / `'WIREFRAME'`, and its plane. |
 | `region.vh_order` | read‑only | Its helices' `id`s in display order (ids, not indices; use `part.vhs_in_region` for helices). |
 | `region.step`, `region.turns_per_step`, `region.sub_step_size`, `region.twist_offset` | read‑only | Helical geometry: bases per step (21 honeycomb, 32 square), turns per step, crossover sub-step, and twist offset. |
 | `region.min_base`, `region.default_max_base` | read‑only | Its first base, and the default length of new helices. |
+| `region.max_base` | read‑only | The length of every helix in the region. |
 | `region.supports_lattice_grid` | read‑only | True for honeycomb and square regions. |
+| `region.reference_geometry` | read‑only | Wireframe regions only: the `ReferenceGeometry` it was built from, or `None`. |
+| `geometry.mesh`, `geometry.unit` | read‑only | Its `ReferenceMesh` or `None`, and the unit, always `'nm'`. |
+| `mesh.vertices`, `mesh.faces`, `mesh.edges` | read‑only | `(x, y, z)` positions in nm in the region's frame, faces of three or more vertex indices, and `(a, b)` vertex pairs. |
+| `mesh.all_edges()` | query | Every distinct edge as a sorted `(a, b)` pair: `mesh.edges` plus the sides of `mesh.faces`. |
+| `mesh.to_ply()` | query | The mesh as ASCII PLY text. |
 
 ## `PlaneProxy`
 

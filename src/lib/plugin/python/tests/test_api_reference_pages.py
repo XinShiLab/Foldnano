@@ -1,5 +1,5 @@
 """
-The three API reference pages on the doc site (Context, Parse, foldnano_mini) must match the code.
+The three API reference pages on the doc site (Context, Parse, foldnano.edit) must match the code.
 
 Each page lists its API in tables whose first column is ``API``. This test checks both ways:
 
@@ -23,7 +23,7 @@ import pytest
 
 import foldnano
 import foldnano.plugin
-import foldnano_mini
+import foldnano.edit
 from foldnano import (
     FreeformRegionProxy,
     LatticedRegionProxy,
@@ -32,8 +32,11 @@ from foldnano import (
     PartData,
     PlaneProxy,
     PluginContext,
+    ReferenceGeometry,
+    ReferenceMesh,
     RegionProxy,
     VirtualHelixProxy,
+    WireframeRegionProxy,
 )
 
 PAGES_DIR = (
@@ -132,15 +135,17 @@ PARSE = PageSpec(
         "oligo": [OligoProxy],
         "seg": [OligoSegmentProxy],
         "vh": [VirtualHelixProxy],
-        "region": [RegionProxy, LatticedRegionProxy, FreeformRegionProxy],
+        "region": [RegionProxy, LatticedRegionProxy, FreeformRegionProxy, WireframeRegionProxy],
         "plane": [PlaneProxy],
+        "geometry": [ReferenceGeometry],
+        "mesh": [ReferenceMesh],
     },
     ignore={"from_json": "classmethod the parser calls; plugins never build proxies"},
 )
 
-M = foldnano_mini
+M = foldnano.edit
 MINI = PageSpec(
-    slug="foldnano-mini-api",
+    slug="foldnano-edit-api",
     module_names=list(M.__all__),
     prefixes={
         "part": [M.MutablePart],
@@ -155,7 +160,10 @@ MINI = PageSpec(
         "region": [M.MutableRegion],
         "lattice_region": [M.LatticedRegion],
         "freeform_region": [M.FreeformRegion],
+        "wireframe_region": [M.WireframeRegion],
         "plane": [M.MutablePlane],
+        "geometry": [ReferenceGeometry],
+        "mesh": [ReferenceMesh],
         "group": [M.MutableRepeatGroup],
     },
 )

@@ -137,13 +137,16 @@ placement and lattice behavior through regions.
 
 UI and exporters use capability flags instead of `instanceof` checks. The flags live on `DesignRegion` (see below), not on `Part` — a mixed part with both lattice and freeform regions has no honest part-level answer, so callers gate on the _active_ region (`editorViewContext.activeRegion`):
 
-| Getter                          | Meaning                         |
-| ------------------------------- | ------------------------------- |
-| `supportsLatticeGrid`           | show lattice plane editor       |
-| `supportsConstrainedXoverSites` | show constrained xover overlays |
-| `supportsLatticeAutoStaple`     | allow auto-staple               |
+| Getter                          | Meaning                                                                                          |
+| ------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `supportsLatticeGrid`           | show lattice plane editor                                                                        |
+| `supportsConstrainedXoverSites` | show constrained xover overlays                                                                  |
+| `supportsLatticeAutoStaple`     | allow auto-staple                                                                                |
+| `supportsFreeformPlacement`     | helices placed by `localFrame`: show the freeform plane editor and tools                         |
+| `supportsPlaneAxisEditing`      | plane-view axis edits (rotate handle, direction field), which set the axis `z` to 0              |
+| `supportsReferenceGeometry`     | can carry a reference mesh: the 3D toolbar shows the Mesh button; `referenceMesh` reads the mesh |
 
-`DesignRegion` (and `FreeformRegion`) return `false` for all three; `LatticedDesignRegion` (and its `HoneycombRegion` / `SquareRegion` subclasses) return `true`. Cadnano import/export is gated the same way, by checking whether the active region is a lattice region (e.g. `Toolbar.svelte`'s `activeLatticeRegion`), not by a dedicated capability getter.
+`DesignRegion` and `FreeformRegion` return `false` for the three lattice flags; `LatticedDesignRegion` (and its `HoneycombRegion` / `SquareRegion` subclasses) return `true`. `FreeformRegion` returns `true` for the last two; `WireframeRegion` keeps `supportsFreeformPlacement` and turns off `supportsPlaneAxisEditing`, since its helices usually point out of the plane. Check these flags, not `kind === 'FREEFORM'`, which misses the subclass. Cadnano import/export is gated the same way, by checking whether the active region is a lattice region (e.g. `Toolbar.svelte`'s `activeLatticeRegion`), not by a dedicated capability getter.
 
 ### Geometry entry point
 
@@ -315,6 +318,22 @@ there is no separate roll field. Roll is derived, not stored:
 - Changing the axis (rotate drag, direction field) must carry the roll over with
   `withRoll(newFrame, rollDegOf(oldFrame))`, never reset `radial0`.
 
+### WireframeRegion
+
+`WireframeRegion extends FreeformRegion`: helices are placed exactly as in a freeform region, and the
+distinct `WIREFRAME` kind is what lets plugins and later tooling recognise the design. The main app does
+not place helices from the geometry: how many helices an edge gets, their lengths and their roll belong to
+the routing method. `vh.length === region.maxBase` holds here too, so edges of different lengths are helices
+of one length whose strands cover only the bases each edge needs.
+
+It adds an optional `referenceGeometry` (input shape, region-local, in nm), set through
+`setRegionReferenceGeometryCmd`. It is reference only: helices are the source of truth and nothing syncs
+between them. It is replaced whole and never mutated, so copies such as `splitRegionCmd`'s may share it.
+
+Wireframe support is a developer preview: the start card is always clickable but greyed, and **Add Region**
+and `.ply` drop work only while `pluginDevMode.enabled` is on. That is a UI gate, not a model rule: saved
+wireframe regions still open and edit with it off, and plugins can still create them.
+
 ### DesignRegion creation
 
 Region names follow the pattern `KIND Region N` (e.g. `HONEYCOMB Region 1`,
@@ -412,7 +431,7 @@ StrandSet
 
 Segments are resolved through `part.segmentsLookup`.
 
-Paths that create oligos or segments take the caller's ids when given (`createOligo` opts, `breakOligoAt`'s `newOligoId` / `newSegmentId`, `removeSegmentFromOligo`'s `newOligoId`): `foldnano_mini` replay names everything it creates, so later ops in the same log can refer to it.
+Paths that create oligos or segments take the caller's ids when given (`createOligo` opts, `breakOligoAt`'s `newOligoId` / `newSegmentId`, `removeSegmentFromOligo`'s `newOligoId`): `foldnano.edit` replay names everything it creates, so later ops in the same log can refer to it.
 
 Any path that destroys a segment must also `part.unregisterSegment` it (e.g. `Oligo.removeEndSegment`, used by the adjacent-end merge `SegmentEnd.mergeTo`); a stale entry makes undo/redo throw when it re-registers the id.
 
@@ -695,6 +714,7 @@ There is no backward-compat loader for pre-region documents: `Part.fromJSON()` t
 - **Don't change the saved JSON shape without bumping `formatVersion`** and adding a migration and fixture (see "Document format version"). New fields count: an older app drops them on re-save.
 - **Don't branch on `savedWith`.** It is provenance only; `formatVersion` is the sole compatibility signal.
 
+- **Don't derive helices from `referenceGeometry` in the model, or keep the two in sync.** It's reference material; a router decides the helices.
 - **Don't mutate the model outside a command.** Wrap every mutation in `historyStack.tx(...)` (targeted patches) or `historyStack.snapshotTx(...)` (whole-doc snapshot). Direct mutations are reactive but won't undo.
 - **Don't bypass `Part`.** All segment create/connect/break/move/remove operations go through `Part` methods so `segmentsLookup` and `SpatialIndexService` stay in sync.
 - **Don't write to `vh.listRow` directly** — change region order or `vhOrder`, then `Part.syncListRows()` propagates.

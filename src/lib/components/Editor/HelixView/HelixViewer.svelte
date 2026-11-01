@@ -77,7 +77,7 @@
 		planeSelectionMode: false,
 		pendingBasePlane: 'XY' as 'XY' | 'XZ' | 'YZ',
 		pendingRegionKind: null as import('$lib/model/Part/DesignRegion').RegionKind | null,
-		toolPanelMode: 'inspector' as 'inspector' | 'overlays',
+		toolPanelMode: 'inspector' as 'inspector' | 'overlays' | 'mesh',
 		onSimulate: undefined as (() => void) | undefined,
 		onResetCamera: undefined as (() => void) | undefined,
 		onFrameActivePlane: undefined as (() => void) | undefined,
@@ -408,10 +408,9 @@
 			: {
 					area: true,
 					title: 'Plane view',
-					text:
-						editorViewContext.activeRegion?.kind === 'FREEFORM'
-							? 'In Draw mode (N), drag to draw an in-plane helix or double-click to add a perpendicular one. Each helix gets a row in the strand viewer.'
-							: 'In Draw mode (N), click an empty lattice cell to add a helix; Select mode only selects and moves. Each helix gets a row in the strand viewer.',
+					text: editorViewContext.activeRegion?.supportsFreeformPlacement
+						? 'In Draw mode (N), drag to draw an in-plane helix or double-click to add a perpendicular one. Each helix gets a row in the strand viewer.'
+						: 'In Draw mode (N), click an empty lattice cell to add a helix; Select mode only selects and moves. Each helix gets a row in the strand viewer.',
 					newVsCadnano: true,
 					doc: 'views',
 				}

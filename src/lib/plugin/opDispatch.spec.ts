@@ -2,7 +2,11 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { dispatchOp, type MutationOp } from './opDispatch';
 import FoldnanoDocument from '$lib/model/document.svelte';
 import type { Part } from '$lib/model/Part';
-import { LatticedDesignRegion } from '$lib/model/Part/DesignRegion';
+import {
+	LatticedDesignRegion,
+	type ReferenceGeometry,
+	type WireframeRegion,
+} from '$lib/model/Part/DesignRegion';
 import { addLatticeVh } from '$lib/model/test/testHelpers';
 
 function newHoneycomb(): Part {
@@ -439,6 +443,91 @@ describe('opDispatch', () => {
 			expect(() =>
 				runLog(part, [{ op: 'connect', fromSegmentId: 'sA', toSegmentId: 'sB' }])
 			).toThrow(/must be free/);
+		});
+	});
+
+	describe('helix length', () => {
+		it('gives a new freeform helix the region length, whatever the op says', () => {
+			const free = new FoldnanoDocument('doc', 'f').addNewPart('FREEFORM');
+			const region = free.getDefaultRegion();
+
+			dispatchOp(
+				{
+					op: 'add_freeform_vh',
+					regionId: region.id,
+					newVhId: 'vh-new',
+					origin: [0, 0, 0],
+					axis: [0, 0, 1],
+					radial0: [1, 0, 0],
+					length: region.maxBase + 1,
+				} as MutationOp,
+				free
+			);
+
+			expect(free.getVhById('vh-new')?.length).toBe(region.maxBase);
+		});
+
+		it('has no op that sets one helix on its own', () => {
+			const vh = part.virtualHelices[0];
+
+			expect(() =>
+				dispatchOp({ op: 'set_vh_length', vhId: vh.id, length: 99 } as unknown as MutationOp, part)
+			).toThrow();
+			expect(vh.length).not.toBe(99);
+		});
+	});
+
+	describe('set_region_reference_geometry', () => {
+		const geometry: ReferenceGeometry = {
+			unit: 'nm',
+			mesh: {
+				vertices: [
+					[0, 0, 0],
+					[1, 0, 0],
+					[0, 1, 0],
+				],
+				faces: [[0, 1, 2]],
+				edges: [],
+			},
+		};
+
+		function wireframe() {
+			const wirePart = new FoldnanoDocument('doc', 'w').addNewPart('WIREFRAME');
+			return { wirePart, region: wirePart.getDefaultRegion() as WireframeRegion };
+		}
+		const setOp = (regionId: string, value: unknown) =>
+			({ op: 'set_region_reference_geometry', regionId, geometry: value }) as MutationOp;
+
+		it('sets and clears the geometry', () => {
+			const { wirePart, region } = wireframe();
+
+			dispatchOp(setOp(region.id, geometry), wirePart);
+			expect(region.referenceGeometry).toEqual(geometry);
+
+			dispatchOp(setOp(region.id, null), wirePart);
+			expect(region.referenceGeometry).toBeUndefined();
+		});
+
+		it('refuses a malformed mesh and leaves the region alone', () => {
+			const { wirePart, region } = wireframe();
+			const bad = { unit: 'nm', mesh: { ...geometry.mesh, faces: [[0, 1, 9]] } };
+
+			expect(() => dispatchOp(setOp(region.id, bad), wirePart)).toThrow(/referenceGeometry/);
+			expect(region.referenceGeometry).toBeUndefined();
+		});
+
+		it('refuses a region that is not a wireframe', () => {
+			expect(() => dispatchOp(setOp(part.getDefaultRegion().id, geometry), part)).toThrow(
+				/only allowed on a wireframe region/
+			);
+		});
+
+		it('refuses a region other than the active one', () => {
+			const { wirePart, region } = wireframe();
+
+			expect(() =>
+				dispatchOp(setOp(region.id, geometry), wirePart, { activeRegionId: 'other' })
+			).toThrow(/active region/);
 		});
 	});
 

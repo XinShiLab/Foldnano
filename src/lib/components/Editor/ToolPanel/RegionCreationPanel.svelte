@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { getEditorViewContext } from '../context/EditorViewContext.svelte';
-	import { Hexagon, Square, LineSquiggle } from '@lucide/svelte';
+	import { Hexagon, Square, LineSquiggle, Pyramid } from '@lucide/svelte';
 	import type { Part } from '$lib/model/Part';
 	import { help } from '$lib/components/help/help';
+	import ReferenceMeshPicker from './ReferenceMeshPicker.svelte';
 
 	// Accepts part prop for compatibility with ToolPanel's <PanelToRender {part} /> call
 	interface Props {
@@ -23,6 +24,7 @@
 		HONEYCOMB: { label: 'Honeycomb', icon: Hexagon, color: 'text-blue-500' },
 		SQUARE: { label: 'Square', icon: Square, color: 'text-green-500' },
 		FREEFORM: { label: 'Freeform', icon: LineSquiggle, color: 'text-purple-500' },
+		WIREFRAME: { label: 'Wireframe', icon: Pyramid, color: 'text-orange-500' },
 	};
 
 	let meta = $derived(
@@ -31,6 +33,7 @@
 			: kindMeta['HONEYCOMB']
 	);
 	let selectedPlane = $derived(editorViewContext.pendingBasePlane);
+	let isWireframe = $derived(editorViewContext.pendingRegionKind === 'WIREFRAME');
 </script>
 
 <div class="flex flex-col gap-3">
@@ -74,6 +77,20 @@
 
 	<hr class="border-border" />
 
+	{#if isWireframe}
+		<div class="flex flex-col gap-1.5">
+			<span class="text-[10px] font-semibold tracking-wide text-muted-foreground uppercase"
+				>Reference Mesh</span
+			>
+			<ReferenceMeshPicker />
+			<p class="text-[10px] text-muted-foreground">
+				Mesh x, y, z map to the plane's U, V, W. You can add a mesh later from the 3D view toolbar.
+			</p>
+		</div>
+
+		<hr class="border-border" />
+	{/if}
+
 	<!-- Action buttons -->
 	<div class="flex flex-col gap-1.5">
 		<button
@@ -85,7 +102,11 @@
 				doc: 'creating-a-design',
 			})}
 		>
-			Create {meta?.label ?? ''} Region Here
+			{#if isWireframe && !editorViewContext.meshDraft}
+				Create Without Mesh
+			{:else}
+				Create {meta?.label ?? ''} Region Here
+			{/if}
 		</button>
 		<button
 			class="w-full rounded-md border border-border px-3 py-1.5 text-xs transition-colors hover:bg-accent"

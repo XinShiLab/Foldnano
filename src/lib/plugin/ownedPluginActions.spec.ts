@@ -55,7 +55,7 @@ describe('owned plugin actions', () => {
 				id: 'local.abc12345',
 				name: 'Mine',
 				version: '1.0.4',
-				format: 'foldnano_mini',
+				format: 'foldnano_edit',
 				applyStrategy: 'replayMutationLog',
 				requirements: ['scipy'],
 			},

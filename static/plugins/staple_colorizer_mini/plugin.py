@@ -1,7 +1,7 @@
 """
 Staple Colorizer (mini)
 =======================
-foldnano_mini port of staple_colorizer. Operates on the active region;
+foldnano.edit port of staple_colorizer. Operates on the active region;
 recolors every non-scaffold oligo whose segments live entirely inside the
 active region.
 
@@ -11,8 +11,8 @@ replays the log via `replayMutationLogInRegion`, producing one undo step.
 
 from __future__ import annotations
 
-from foldnano.plugin import PluginContext
-from foldnano_mini import load_part
+from foldnano import PluginContext
+from foldnano.edit import load_part
 
 
 def hsl_to_rgb(h: float, s: float, l: float) -> tuple[int, int, int]:

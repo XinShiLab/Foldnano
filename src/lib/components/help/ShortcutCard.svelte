@@ -106,7 +106,7 @@
 	const planeMouseRows = $derived.by(() => {
 		if (activeViewer !== 'HELIX' || !ctx.activeRegion) return [];
 		if (editorMode === 'DRAW') {
-			return ctx.activeRegion.kind === 'FREEFORM'
+			return ctx.activeRegion.supportsFreeformPlacement
 				? [
 						{ keys: ['Drag'], label: 'Draw in-plane helix' },
 						{ keys: ['Double-click'], label: 'Add perpendicular helix' },

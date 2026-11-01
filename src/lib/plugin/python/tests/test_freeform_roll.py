@@ -5,8 +5,8 @@ from __future__ import annotations
 import pytest
 
 from foldnano import parse_foldnano_json
-from foldnano_mini import FreeformRegion, load_part
-from foldnano_mini import mutations as M
+from foldnano.edit import FreeformRegion, load_part
+from foldnano.edit import mutations as M
 
 
 def test_add_vh_at_uses_plane_normal_as_roll_zero(multi_region_part_foldnano_json: str) -> None:
