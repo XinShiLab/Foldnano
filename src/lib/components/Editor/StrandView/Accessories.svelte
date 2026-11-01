@@ -5,6 +5,7 @@
 	import Crossover from './crossover';
 	import { MIRROR_OPACITY } from './drawingContext';
 	import CrossRegionArrow from './crossover/CrossRegionArrow.svelte';
+	import { isCrossoverHidden } from './crossover/connectionMarks';
 	import Insert from './Insert/Insert.svelte';
 	import Skip from './Skip/Skip.svelte';
 	import VhTag from './Grid/VhTag.svelte';
@@ -47,7 +48,7 @@
 			{@const segmentResult = d.getEffectiveDisplayRowForVh(segment.inVirtualHelix.id)}
 
 			<!-- Outgoing 3' connection -->
-			{#if segment.threePrime.connectedEnd && !hideTypes.crossovers && segmentResult !== null && !segmentResult.isCollapsed}
+			{#if segment.threePrime.connectedEnd && !isCrossoverHidden(hideTypes, segment.threePrime, segment.threePrime.connectedEnd) && segmentResult !== null && !segmentResult.isCollapsed}
 				{@const connectedEnd = segment.threePrime.connectedEnd}
 				{@const connectedResult = d.getEffectiveDisplayRowForVh(
 					connectedEnd.segment.inVirtualHelix.id
@@ -102,9 +103,9 @@
 			{/if}
 
 			<!-- Incoming 5' connection from a collapsed source region -->
-			{#if !segment.fivePrime.isFree && !hideTypes.crossovers && segmentResult !== null && !segmentResult.isCollapsed}
+			{#if !segment.fivePrime.isFree && segmentResult !== null && !segmentResult.isCollapsed}
 				{@const sourceEnd = segment.fivePrime.connectedEnd}
-				{#if sourceEnd}
+				{#if sourceEnd && !isCrossoverHidden(hideTypes, segment.fivePrime, sourceEnd)}
 					{@const sourceResult = d.getEffectiveDisplayRowForVh(sourceEnd.segment.inVirtualHelix.id)}
 					{#if sourceResult !== null && sourceResult.isCollapsed}
 						{@const sourceRegionId = sourceEnd.segment.inVirtualHelix.regionId ?? ''}

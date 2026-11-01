@@ -3,6 +3,8 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js';
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import { makeHoneycombPart, addLatticeVh } from '$lib/model/test/testHelpers';
+import { Plane } from '$lib/model/Part/Plane.svelte';
+import { HoneycombRegion } from '$lib/model/Part/DesignRegion';
 import {
 	buildPhysicalOffsetMaps,
 	getSegmentEndPhysicalIndex,
@@ -109,6 +111,48 @@ describe('3D crossover stress colors', () => {
 });
 
 describe('3D strand selection emphasis', () => {
+	it('leaves hidden regions out of the scene and their crossovers with them', () => {
+		const part = makeHoneycombPart('hidden-region');
+		const vhA = addLatticeVh(part, 0, 0);
+		const planeB = new Plane('Plane B', undefined, { x: 0, y: 0, z: 10 });
+		const regionB = new HoneycombRegion('Honeycomb 2', planeB.id);
+		part.addPlane(planeB);
+		part.addRegion(regionB);
+		const vhB = regionB.addVhAtCoords(part, 0, 0);
+		const oligoA = part.createOligo(vhA, 0, 10, '#ff0000');
+		const oligoB = part.createOligo(vhB, 0, 10, '#00ff00');
+		[...oligoA.segments][0].threePrime.connectTo([...oligoB.segments][0].fivePrime);
+		part.createOligo(vhA, 15, 25, '#ffff00');
+		part.createOligo(vhB, 15, 25, '#0000ff');
+
+		const lineColors = (group: THREE.Group) =>
+			group.children
+				.filter((child): child is LineSegments2 => child instanceof LineSegments2)
+				.map((line) => (line.material as LineMaterial).color.getHexString());
+
+		withMockCanvas(() => {
+			const shown = buildScene(part);
+			expect(shown.labels.children).toHaveLength(2);
+			expect(shown.crossovers.children).toHaveLength(1);
+			expect(lineColors(shown.group)).toEqual(expect.arrayContaining(['ffff00', '0000ff']));
+
+			const hidden = buildScene(
+				part,
+				false,
+				undefined,
+				null,
+				null,
+				undefined,
+				undefined,
+				new Set([regionB.id])
+			);
+			expect(hidden.labels.children).toHaveLength(1);
+			expect(hidden.crossovers.children).toHaveLength(0);
+			expect(lineColors(hidden.group)).toContain('ffff00');
+			expect(lineColors(hidden.group)).not.toContain('0000ff');
+		});
+	});
+
 	it('dims non-focused strand segments while keeping focused ones solid', () => {
 		const part = makeHoneycombPart('focus');
 		const vh = addLatticeVh(part, 0, 0);

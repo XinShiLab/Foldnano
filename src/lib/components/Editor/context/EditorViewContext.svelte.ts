@@ -234,6 +234,7 @@ class StrandViewContext {
 
 	hideContext: Record<CanHide, boolean> = $state({
 		crossovers: false,
+		unconstrained_crossovers: false,
 		sequence: false,
 	});
 	highlightContext: Record<CanHighlight, boolean> = $state({
@@ -341,6 +342,7 @@ export class EditorViewContext {
 		this.meshDraft ? scaleReferenceMesh(this.meshDraft.mesh, this.meshDraft.scale) : null
 	);
 	hiddenReferenceMeshRegionIds = new SvelteSet<string>();
+	hidden3DRegionIds = new SvelteSet<string>();
 	isAddingRegionToExistingPart: boolean = $state(false);
 	activeRegionId: string | null = $state(null);
 	footnote: string = $derived(`${this.otherFootnote} | ${this.strandViewContext.footnote}`);
@@ -659,6 +661,12 @@ export class EditorViewContext {
 		}
 	}
 
+	toggleRegionHiddenIn3D(regionId: string): void {
+		if (!this.hidden3DRegionIds.delete(regionId)) {
+			this.hidden3DRegionIds.add(regionId);
+		}
+	}
+
 	selectPendingBasePlane(plane: 'XY' | 'XZ' | 'YZ'): void {
 		this.pendingBasePlane = plane;
 		if (this.isAddingRegionToExistingPart) return;
@@ -856,6 +864,7 @@ export class EditorViewContext {
 		// Rebuilt key by key: saved contexts may hold the removed `connections` option, and the Hide menu lists every key.
 		this.strandViewContext.hideContext = {
 			crossovers: data.hideContext.crossovers,
+			unconstrained_crossovers: data.hideContext.unconstrained_crossovers ?? false,
 			sequence: data.hideContext.sequence,
 		};
 		this.strandViewContext.highlightContext = data.highlightContext;

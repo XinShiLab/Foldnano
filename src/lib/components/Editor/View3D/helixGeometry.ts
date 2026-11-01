@@ -504,17 +504,35 @@ function isOligoHighlighted(oligo: Oligo, h: Record<CanHighlight, boolean>): boo
 	return false;
 }
 
+function excludeHiddenRegions(
+	part: Part,
+	filterSegments: Set<OligoSegment> | null,
+	hiddenRegionIds?: ReadonlySet<string>
+): Set<OligoSegment> | null {
+	if (!hiddenRegionIds?.size) return filterSegments;
+	const kept = new Set<OligoSegment>();
+	for (const oligo of part.oligos) {
+		for (const seg of oligo.segments) {
+			if (filterSegments && !filterSegments.has(seg)) continue;
+			if (!hiddenRegionIds.has(part.getRegionForVh(seg.inVirtualHelix).id)) kept.add(seg);
+		}
+	}
+	return kept;
+}
+
 export function buildScene(
 	part: Part,
 	showNtModel = false,
 	highlightContext: Record<CanHighlight, boolean> = DEFAULT_HIGHLIGHT_CONTEXT,
-	filterSegments: Set<OligoSegment> | null = null,
+	segmentFilter: Set<OligoSegment> | null = null,
 	focusedSegments: Set<OligoSegment> | null = null,
 	segPositionOverrides?: Map<string, BlockTransformOverride>,
 	/** Crossover length ratio per constraint ID. When present, crossover arcs are colored by stress instead of oligo color. */
-	stressMap?: Map<string, number>
+	stressMap?: Map<string, number>,
+	hiddenRegionIds?: ReadonlySet<string>
 ): BuildResult {
 	const group = new THREE.Group();
+	const filterSegments = excludeHiddenRegions(part, segmentFilter, hiddenRegionIds);
 
 	// Collect per-VH frames and twist params for all geometry; keyed by vh.index
 	const vhFrames = new Map<number, VirtualHelixFrame>();
@@ -563,6 +581,7 @@ export function buildScene(
 			twistPerBaseDeg: region.twistPerBaseInDeg,
 		});
 
+		if (hiddenRegionIds?.has(region.id)) continue;
 		const occ = vhOccupied.get(vh.index);
 		if (!occ) continue; // no strands → hide cylinder entirely
 		const clipLo = Math.max(0, occ.lo - CYLINDER_MARGIN_BP);
@@ -921,12 +940,14 @@ export function buildExportScene(
 	part: Part,
 	insertEffects = true,
 	highlightContext: Record<CanHighlight, boolean> = DEFAULT_HIGHLIGHT_CONTEXT,
-	filterSegments: Set<OligoSegment> | null = null,
+	segmentFilter: Set<OligoSegment> | null = null,
 	focusedSegments: Set<OligoSegment> | null = null,
 	includeGrid = false,
-	segPositionOverrides?: Map<string, BlockTransformOverride>
+	segPositionOverrides?: Map<string, BlockTransformOverride>,
+	hiddenRegionIds?: ReadonlySet<string>
 ): THREE.Group {
 	const group = new THREE.Group();
+	const filterSegments = excludeHiddenRegions(part, segmentFilter, hiddenRegionIds);
 
 	// ── Occupied bp range per VH (needed for optional grid cylinders) ─────
 	const CYLINDER_MARGIN_BP = 7;
@@ -959,7 +980,7 @@ export function buildExportScene(
 			twistPerBaseDeg: region.twistPerBaseInDeg,
 		});
 
-		if (includeGrid) {
+		if (includeGrid && !hiddenRegionIds?.has(region.id)) {
 			const occ = vhOccupied.get(vh.index);
 			if (occ) {
 				const clipLo = Math.max(0, occ.lo - CYLINDER_MARGIN_BP);

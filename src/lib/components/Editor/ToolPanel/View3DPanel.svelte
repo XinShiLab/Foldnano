@@ -1,12 +1,12 @@
 <script lang="ts">
-	import { Box, Layers, Move3d, Plus, Rotate3d, Trash2 } from '@lucide/svelte/icons';
+	import { Eye, EyeOff, Layers, Move3d, Plus, Rotate3d, Trash2 } from '@lucide/svelte/icons';
 	import * as ToggleGroup from '$lib/components/ui/toggle-group/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import { Separator } from '$lib/components/ui/separator/index.js';
 	import type { Part } from '$lib/model/Part';
+	import { getPlaneColor, planeColorAsCss } from '$lib/model/Part/planeColors';
 	import { getEditorViewContext } from '../context/EditorViewContext.svelte';
-	import type { RegionKind } from '$lib/model/Part/DesignRegion';
 
 	type Props = {
 		part: Part;
@@ -32,9 +32,19 @@
 		return `${vec.x.toFixed(digits)}, ${vec.y.toFixed(digits)}, ${vec.z.toFixed(digits)}`;
 	}
 
-	function startAddRegion(kind: RegionKind) {
-		editorViewContext.enterPlaneSelectionMode(kind);
-	}
+	// Region names and helix membership are plain fields; every change comes with a history revision.
+	let regionRows = $derived.by(() => {
+		void editorViewContext.historyStack.revision;
+		void part.virtualHelices.length;
+		return part.regions.map((region) => ({
+			id: region.id,
+			name: region.name,
+			vhCount: part.virtualHelices.filter((vh) => part.getRegionForVh(vh).id === region.id).length,
+			color: planeColorAsCss(
+				getPlaneColor(part.planes.findIndex((plane) => plane.id === region.planeId))
+			),
+		}));
+	});
 </script>
 
 {#if !view3DToolbar}
@@ -43,123 +53,107 @@
 	</div>
 {:else}
 	<div class="flex flex-col gap-3 text-xs">
-		<!-- Add Region -->
-		{#if part.regions.length >= 1}
+		<!-- Region visibility -->
+		{#if regionRows.length >= 1}
 			<div class="rounded-md border border-border p-2">
-				<Label class="text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
-					Add Region
-				</Label>
-				<p class="mt-1 mb-2 text-muted-foreground">
-					Add a new design region on its own base plane.
-				</p>
-				<div class="grid grid-cols-2 gap-1">
-					{#each ['HONEYCOMB', 'SQUARE', 'FREEFORM', 'WIREFRAME'] as const as kind (kind)}
-						{#if kind !== 'WIREFRAME' || editorViewContext.pluginDevMode.enabled}
-							<button
-								class="rounded border border-border px-2 py-1 text-[11px] transition-colors hover:bg-accent"
-								onclick={() => startAddRegion(kind)}
+				<Label class="text-[10px] tracking-[0.14em] text-muted-foreground uppercase">Regions</Label>
+				<ul class="mt-1 flex flex-col gap-0.5">
+					{#each regionRows as row (row.id)}
+						{@const hidden = editorViewContext.hidden3DRegionIds.has(row.id)}
+						<li class="flex items-center gap-2" class:text-muted-foreground={hidden}>
+							<span class="size-2 shrink-0 rounded-full" style:background-color={row.color}></span>
+							<span class="min-w-0 flex-1 truncate" title={row.name}>{row.name}</span>
+							<span class="font-mono text-muted-foreground">{row.vhCount}</span>
+							<Button
+								variant="ghost"
+								size="icon-xs"
+								aria-label={`${hidden ? 'Show' : 'Hide'} ${row.name} in 3D`}
+								aria-pressed={hidden}
+								title={hidden ? 'Show in 3D' : 'Hide in 3D'}
+								onclick={() => editorViewContext.toggleRegionHiddenIn3D(row.id)}
 							>
-								{kind === 'HONEYCOMB'
-									? 'Honeycomb'
-									: kind === 'SQUARE'
-										? 'Square'
-										: kind === 'FREEFORM'
-											? 'Freeform'
-											: 'Wireframe'}
-							</button>
-						{/if}
+								{#if hidden}<EyeOff />{:else}<Eye />{/if}
+							</Button>
+						</li>
 					{/each}
-				</div>
+				</ul>
 			</div>
 		{/if}
 
-		<!-- Plane Overlay -->
-		<div class="flex items-center justify-between gap-2 rounded-md border border-border p-2">
-			<div class="space-y-1">
-				<Label class="text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
-					Plane Overlay
-				</Label>
-				<p class="text-muted-foreground">
-					{view3DToolbar.showPlanes ? 'Planes are visible in the 3D scene.' : 'Planes are hidden.'}
-				</p>
-			</div>
-			<Button
-				variant={view3DToolbar.showPlanes ? 'default' : 'outline'}
-				size="sm"
-				onclick={() => {
-					view3DToolbar.showPlanes = !view3DToolbar.showPlanes;
-				}}
-			>
-				<Layers />
-				<span>{view3DToolbar.showPlanes ? 'Hide' : 'Show'}</span>
-			</Button>
-		</div>
-
-		{#if view3DToolbar.showPlanes}
-			<button
-				class="flex w-full items-center justify-center gap-1.5 rounded-md border border-border px-2 py-1.5 text-xs transition-colors hover:bg-accent"
-				onclick={() => view3DToolbar.onAddPlane?.()}
-			>
-				<Plus size={11} /> Add Plane
-			</button>
-		{/if}
-
+		<!-- Planes -->
 		<div class="rounded-md border border-border p-2">
-			<div class="flex items-start justify-between gap-3">
-				<div class="space-y-1">
-					<Label class="text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
-						Selected Plane
-					</Label>
-					{#if selectedPlane}
-						<div class="space-y-1">
-							<p class="font-medium text-foreground">{selectedPlane.name}</p>
-							<p class="font-mono text-muted-foreground">{selectedPlane.id}</p>
-						</div>
-					{:else}
-						<div class="space-y-1 text-muted-foreground">
-							<p>No plane selected.</p>
-							<p>Enable planes, then click a plane in the 3D view.</p>
-						</div>
-					{/if}
-				</div>
-
-				<ToggleGroup.Root
-					type="single"
-					variant="outline"
+			<div class="flex items-center justify-between gap-2">
+				<Label class="text-[10px] tracking-[0.14em] text-muted-foreground uppercase">Planes</Label>
+				<Button
+					variant={view3DToolbar.showPlanes ? 'default' : 'outline'}
 					size="sm"
-					value={view3DToolbar.gizmoMode}
-					onValueChange={(value) => {
-						if (value === 'rotate' || value === 'translate') {
-							view3DToolbar.gizmoMode = value;
-						}
+					onclick={() => {
+						view3DToolbar.showPlanes = !view3DToolbar.showPlanes;
 					}}
 				>
-					<ToggleGroup.Item value="rotate" title="Rotate selected plane">
-						<Rotate3d />
-					</ToggleGroup.Item>
-					<ToggleGroup.Item value="translate" title="Move selected plane">
-						<Move3d />
-					</ToggleGroup.Item>
-				</ToggleGroup.Root>
+					<Layers />
+					<span>{view3DToolbar.showPlanes ? 'Hide' : 'Show'}</span>
+				</Button>
 			</div>
 
-			{#if selectedPlane}
+			<!-- The gizmo only appears while planes are shown, so the editing controls go with them. -->
+			{#if view3DToolbar.showPlanes}
 				<Separator class="my-2" />
-				<div class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-muted-foreground">
-					<span>Origin</span>
-					<span class="font-mono text-foreground">{formatVec3(selectedPlane.origin)}</span>
-					<span>Normal</span>
-					<span class="font-mono text-foreground">{formatVec3(selectedPlane.normal)}</span>
-				</div>
-				{#if canRemovePlane}
-					<Separator class="my-2" />
-					<button
-						class="flex w-full items-center justify-center gap-1.5 rounded-md border border-destructive/40 px-2 py-1.5 text-xs text-destructive transition-colors hover:bg-destructive/10"
-						onclick={() => view3DToolbar.onRemovePlane?.()}
+				<div class="flex items-start justify-between gap-3">
+					{#if selectedPlane}
+						<div class="min-w-0 space-y-1">
+							<p class="font-medium text-foreground">{selectedPlane.name}</p>
+							<p class="truncate font-mono text-muted-foreground">{selectedPlane.id}</p>
+						</div>
+					{:else}
+						<p class="text-muted-foreground">Click a plane in the 3D view to select it.</p>
+					{/if}
+
+					<ToggleGroup.Root
+						type="single"
+						variant="outline"
+						size="sm"
+						value={view3DToolbar.gizmoMode}
+						onValueChange={(value) => {
+							if (value === 'rotate' || value === 'translate') {
+								view3DToolbar.gizmoMode = value;
+							}
+						}}
 					>
-						<Trash2 size={11} /> Remove Plane
-					</button>
+						<ToggleGroup.Item value="rotate" title="Rotate selected plane">
+							<Rotate3d />
+						</ToggleGroup.Item>
+						<ToggleGroup.Item value="translate" title="Move selected plane">
+							<Move3d />
+						</ToggleGroup.Item>
+					</ToggleGroup.Root>
+				</div>
+
+				{#if selectedPlane}
+					<div class="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-muted-foreground">
+						<span>Origin</span>
+						<span class="font-mono text-foreground">{formatVec3(selectedPlane.origin)}</span>
+						<span>Normal</span>
+						<span class="font-mono text-foreground">{formatVec3(selectedPlane.normal)}</span>
+					</div>
 				{/if}
+
+				<div class="mt-2 flex flex-col gap-1">
+					<button
+						class="flex w-full items-center justify-center gap-1.5 rounded-md border border-border px-2 py-1.5 text-xs transition-colors hover:bg-accent"
+						onclick={() => view3DToolbar.onAddPlane?.()}
+					>
+						<Plus size={11} /> Add Plane
+					</button>
+					{#if canRemovePlane}
+						<button
+							class="flex w-full items-center justify-center gap-1.5 rounded-md border border-destructive/40 px-2 py-1.5 text-xs text-destructive transition-colors hover:bg-destructive/10"
+							onclick={() => view3DToolbar.onRemovePlane?.()}
+						>
+							<Trash2 size={11} /> Remove Plane
+						</button>
+					{/if}
+				</div>
 			{/if}
 		</div>
 
@@ -186,15 +180,5 @@
 				</div>
 			</div>
 		{/if}
-
-		<div class="rounded-md border border-dashed border-border p-2 text-muted-foreground">
-			<div class="flex items-center gap-2 font-medium text-foreground">
-				<Box size={14} />
-				<span>3D workflow</span>
-			</div>
-			<p class="mt-1">
-				Use the region buttons above to add honeycomb, square, or freeform regions to this part.
-			</p>
-		</div>
 	</div>
 {/if}

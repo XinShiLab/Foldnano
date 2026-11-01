@@ -338,6 +338,10 @@ With `hideContext.crossovers` on, `Accessories` drops the arcs and cross-region 
 (`R2:12[34]` when the target region is collapsed; text only above a zoom threshold). The same toggle
 hides crossovers in 3D, but the marks are strand-view only.
 
+`hideContext.unconstrained_crossovers` does the same for crossovers without two constrained ends and leaves
+the constrained arcs drawn. It is strand-view only: 3D draws every arc as one group. `isCrossoverHidden` is the one
+rule, used by `Accessories` to skip a line and by `buildConnectionMarks` to add its mark, so each crossover gets one or the other.
+
 - **Batched and non-listening.** Designs reach thousands of marks, so they are one `Shape` fed by
   `buildConnectionMarks` (bucketed by display row), with no Konva node per mark.
 - **Placement.** A label extends over its end's own segment, so the two ends of a DX pair point apart,

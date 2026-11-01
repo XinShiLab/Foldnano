@@ -74,7 +74,15 @@ function setup(
 		...createDrawingDimensions(16, SIDE, 1),
 		getEffectiveDisplayRowForVh: (vhId: string) => rows[vhId] ?? null,
 	} as unknown as ReturnType<typeof createDrawingDimensions>;
-	return { part, d, marks: buildConnectionMarks(part, d) };
+	return {
+		part,
+		d,
+		marks: buildConnectionMarks(part, d, {
+			crossovers: true,
+			unconstrained_crossovers: false,
+			sequence: false,
+		}),
+	};
 }
 
 const visibleRows = {
@@ -83,6 +91,26 @@ const visibleRows = {
 };
 
 describe('buildConnectionMarks', () => {
+	it('marks only unconstrained crossovers when just those are hidden', () => {
+		const a = fakeSegment('a', 12, 'r1', 0, 10, 34);
+		const b = fakeSegment('b', 13, 'r1', 1, 20, 40);
+		const c = fakeSegment('c', 12, 'r1', 0, 50, 60);
+		const e = fakeSegment('e', 13, 'r1', 1, 70, 80);
+		connect(a, b);
+		connect(c, e);
+		c.threePrime.isConstrained = false;
+		const { part, d } = setup([a, b, c, e], visibleRows);
+
+		const marks = buildConnectionMarks(part, d, {
+			crossovers: false,
+			unconstrained_crossovers: true,
+			sequence: false,
+		});
+
+		expect(marks.get(0)?.map((m) => m.xoverId)).toEqual(['XOVER#c#to#e']);
+		expect(marks.get(1)?.map((m) => m.xoverId)).toEqual(['XOVER#c#to#e']);
+	});
+
 	it('marks both ends with the VH[bp] of the other end', () => {
 		const a = fakeSegment('a', 12, 'r1', 0, 10, 34);
 		const b = fakeSegment('b', 13, 'r1', 1, 20, 40);

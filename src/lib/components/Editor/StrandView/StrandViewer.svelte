@@ -97,9 +97,10 @@
 	const { dimensions, getBpCoordsByRowAndBpIdx } = d;
 	setDimensionContext(d);
 
-	let crossoversHidden = $derived(editorViewContext.strandViewContext.hideContext.crossovers);
+	let hideContext = $derived(editorViewContext.strandViewContext.hideContext);
+	let crossoversHidden = $derived(hideContext.crossovers || hideContext.unconstrained_crossovers);
 	let connectionMarks = $derived(
-		crossoversHidden ? buildConnectionMarks(part, d) : NO_CONNECTION_MARKS
+		crossoversHidden ? buildConnectionMarks(part, d, hideContext) : NO_CONNECTION_MARKS
 	);
 	let selectedMarks = $derived(
 		selectedConnectionMarks(connectionMarks, editorViewContext.strandViewContext.selected.ends)

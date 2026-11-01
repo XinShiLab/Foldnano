@@ -129,7 +129,7 @@
 			longer_than_90: false,
 			shorter_than_15: false,
 		},
-		hideContext = { crossovers: false, sequence: false },
+		hideContext = { crossovers: false, unconstrained_crossovers: false, sequence: false },
 		filterSegments = null,
 		focusedSegments = null,
 		useRelaxedPositions = $bindable(false),
@@ -199,6 +199,7 @@
 	let cursor: CursorResult | undefined;
 	let planeSelector: PlaneSelectorResult | undefined;
 	let referenceMeshOverlay: ReferenceMeshOverlay | undefined;
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity
 	let vhXYCache = new Map<number, { x: number; y: number }>();
 
 	// ── RBS simulation state (drives geometry rebuild + bindable props) ────────
@@ -576,7 +577,12 @@
 		for (const region of part.regions) {
 			const mesh = region.referenceMesh;
 			const plane = part.getPlaneById(region.planeId);
-			if (!mesh || !plane || editorViewContext.hiddenReferenceMeshRegionIds.has(region.id))
+			if (
+				!mesh ||
+				!plane ||
+				editorViewContext.hiddenReferenceMeshRegionIds.has(region.id) ||
+				editorViewContext.hidden3DRegionIds.has(region.id)
+			)
 				continue;
 			if (draft && !isCreating && region.id === editorViewContext.activeRegionId) continue;
 			items.push({ key: region.id, mesh, plane: planeTransformOf(plane) });
@@ -730,6 +736,8 @@
 		void simStressMap;
 		void useRelaxedPositions;
 		void showStress;
+		const hiddenRegionIds = editorViewContext.hidden3DRegionIds;
+		void hiddenRegionIds.size;
 		for (const plane of part.planes) {
 			void plane.u;
 		}
@@ -751,7 +759,8 @@
 				filterSegments,
 				focusedSegments,
 				simOverridesArg,
-				stressArg
+				stressArg,
+				hiddenRegionIds
 			);
 		} catch (err) {
 			// The NT-model builder throws on designs it can't represent (e.g. a deletion
@@ -769,7 +778,8 @@
 				filterSegments,
 				focusedSegments,
 				simOverridesArg,
-				stressArg
+				stressArg,
+				hiddenRegionIds
 			);
 		}
 		const { group, cylinders, labels, crossovers, center } = built;
@@ -792,6 +802,9 @@
 
 		untrack(() => {
 			vhXYCache = getVhXYMap(part);
+			for (const vh of part.virtualHelices) {
+				if (hiddenRegionIds.has(part.getRegionForVh(vh).id)) vhXYCache.delete(vh.index);
+			}
 			cursor!.rebuildRings(vhXYCache);
 			cursor!.updateMarkers(csCursorIdx, part, vhXYCache);
 		});
@@ -1011,7 +1024,8 @@
 				filterSegments,
 				focusedSegments,
 				showVH,
-				useRelaxedPositions ? (simOverrides ?? undefined) : undefined
+				useRelaxedPositions ? (simOverrides ?? undefined) : undefined,
+				editorViewContext.hidden3DRegionIds
 			);
 			exportGlb(exportGroup, `${exportFileBase}.glb`);
 		};

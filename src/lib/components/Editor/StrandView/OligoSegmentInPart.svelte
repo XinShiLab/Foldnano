@@ -10,6 +10,7 @@
 	import type { Context } from 'konva/lib/Context';
 	import { getModificationColor, truncateModificationName } from '$lib/model/modifications';
 	import type { TemporalPartInfo } from '../context/types';
+	import { canvasTheme } from '$lib/canvasEditor/theme.svelte';
 
 	const MOD_ZOOM_THRESHOLD = 0.6;
 	const MOD_DOT_RADIUS = 3;
@@ -157,7 +158,7 @@
 			];
 
 			ctx.font = '5px sans-serif';
-			ctx.fillStyle = isInsert ? 'rgba(0, 0, 0, 0.9)' : 'rgba(0, 0, 0, 0.5)';
+			ctx.fillStyle = isInsert ? canvasTheme.colors.seqInsertText : canvasTheme.colors.seqText;
 			ctx.fillText(charToShow, x_nuc, y_nuc + 1);
 		}
 
@@ -281,7 +282,7 @@
 			<!-- Batch render all sequence text in a single Shape for performance. Viewport
 			     gating is on `visible` (canvas attr), not `{#if}`, to avoid DOM churn on
 			     pan/zoom — see the Group note above. -->
-			{#key sequenceData}
+			{#key `${sequenceData}|${canvasTheme.isDark}`}
 				<Shape
 					visible={isInView &&
 						editorViewContext.strandViewContext.viewportScale > 0.6 &&

@@ -1,6 +1,7 @@
 import type Oligo from '$lib/model/Oligo';
 import type { SegmentEnd } from '$lib/model/Oligo';
 import type { Part } from '$lib/model/Part';
+import type { CanHide } from '../../context/types';
 import { MIRROR_OPACITY } from '../drawingContext';
 import type { DrawingDimensions } from '../drawingDimensions';
 
@@ -60,7 +61,20 @@ export interface ConnectionMarkHit {
 
 export const NO_CONNECTION_MARKS: ConnectionMarksByRow = new Map();
 
-export function buildConnectionMarks(part: Part, d: DrawingDimensions): ConnectionMarksByRow {
+export function isCrossoverHidden(
+	hide: Record<CanHide, boolean>,
+	end: SegmentEnd,
+	partner: SegmentEnd
+): boolean {
+	if (hide.crossovers) return true;
+	return hide.unconstrained_crossovers && !(end.isConstrained && partner.isConstrained);
+}
+
+export function buildConnectionMarks(
+	part: Part,
+	d: DrawingDimensions,
+	hide: Record<CanHide, boolean>
+): ConnectionMarksByRow {
 	const marks: ConnectionMarksByRow = new Map();
 	for (const oligo of part.oligos) {
 		for (const segment of oligo.segments) {
@@ -68,7 +82,7 @@ export function buildConnectionMarks(part: Part, d: DrawingDimensions): Connecti
 			if (own === null || own.isCollapsed) continue;
 			for (const end of [segment.fivePrime, segment.threePrime]) {
 				const partner = end.connectedEnd;
-				if (!partner) continue;
+				if (!partner || !isCrossoverHidden(hide, end, partner)) continue;
 				const target = d.getEffectiveDisplayRowForVh(partner.segment.inVirtualHelix.id);
 				if (target === null) continue;
 

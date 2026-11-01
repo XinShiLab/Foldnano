@@ -34,7 +34,7 @@ export type CanHighlight =
 
 export type CanWarn = 'mismatch';
 
-export type CanHide = 'crossovers' | 'sequence';
+export type CanHide = 'crossovers' | 'unconstrained_crossovers' | 'sequence';
 
 export type ColorContext = {
 	currentColor: string;

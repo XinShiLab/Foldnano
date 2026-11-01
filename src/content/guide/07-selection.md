@@ -207,9 +207,11 @@ The same menu has a separate **Warnings** group below Highlight, for flagging de
 
 Sequence mismatch is the most common result of sliding a whole strand (see [Moving selected ends](#moving-selected-ends) above): the strand keeps its own sequence, its complementary partner doesn't necessarily move with it, and the two can end up out of sync. Turning the warning off only hides the markers: it doesn't fix anything, and mismatched bases still need to be corrected by hand.
 
-**Hide toggles:** crossovers, sequence.
+**Hide toggles:** crossovers, unconstrained crossovers, sequence.
 
 Hiding crossovers clears the lines but keeps the information: each crossover end shows a small arrow labeled with where it goes, such as `12[34]` for helix 12, base 34. A target in a collapsed region also names the region, such as `R2:12[34]`. When you zoom far out, only the arrows remain.
+
+**Unconstrained crossovers** applies this only to crossovers that aren't constrained, and keeps the lines of constrained crossovers. It affects the strand view only, while **crossovers** also hides them in 3D.
 
 - **Hover** a label or its crossover end to show the line temporarily.
 - **Click** a label to select the crossover. A selected crossover keeps its line until you deselect it, including every crossover of a selected oligo.
