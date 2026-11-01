@@ -30,7 +30,7 @@
 		cadnano_json:
 			'Plugin receives your active Design Region as cadnano JSON. Lossy — only topology and colors are passed.',
 		foldnano_json: 'Plugin receives the entire Part as Foldnano JSON (lossless).',
-		foldnano_mini:
+		foldnano_edit:
 			'Plugin uses the mutable Python API and emits a mutation log replayed against the Part under one undo step.',
 		live: 'Reserved (not currently installable).',
 	};

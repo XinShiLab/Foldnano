@@ -3,8 +3,8 @@ import type { PluginManifest } from './types';
 export const SCRIPT_LAB_ID = 'script-lab';
 export const SCRIPT_LAB_FILENAME = 'script_lab.py';
 
-export const SCRIPT_LAB_BLANK_TEMPLATE = `from foldnano.plugin import PluginContext
-from foldnano_mini import load_part
+export const SCRIPT_LAB_BLANK_TEMPLATE = `from foldnano import PluginContext
+from foldnano.edit import load_part
 
 
 def run(ctx: PluginContext) -> None:
@@ -14,8 +14,8 @@ def run(ctx: PluginContext) -> None:
     )
 `;
 
-export const SCRIPT_LAB_MUTATION_TEMPLATE = `from foldnano.plugin import PluginContext
-from foldnano_mini import load_part
+export const SCRIPT_LAB_MUTATION_TEMPLATE = `from foldnano import PluginContext
+from foldnano.edit import load_part
 
 
 def run(ctx: PluginContext) -> None:
@@ -55,8 +55,8 @@ def run(ctx: PluginContext) -> None:
     ctx.set_result_mutation_log(part.mutation_log)
 `;
 
-export const SCRIPT_LAB_ANALYSIS_TEMPLATE = `from foldnano.plugin import PluginContext
-from foldnano_mini import load_part
+export const SCRIPT_LAB_ANALYSIS_TEMPLATE = `from foldnano import PluginContext
+from foldnano.edit import load_part
 
 
 def run(ctx: PluginContext) -> None:
@@ -91,12 +91,12 @@ def run(ctx: PluginContext) -> None:
 
 export const SCRIPT_LAB_FULL_API_DEMO_TEMPLATE = `from itertools import product
 
-from foldnano.plugin import PluginContext
-from foldnano_mini import KNOWN_OPS, FreeformRegion, LatticedRegion, load_part
+from foldnano import PluginContext, ReferenceGeometry, ReferenceMesh
+from foldnano.edit import KNOWN_OPS, FreeformRegion, LatticedRegion, load_part
 
 
 def run(ctx: PluginContext) -> None:
-    """Full API Demo — exercises every foldnano_mini op kind on the active design.
+    """Full API Demo — exercises every foldnano.edit op kind on the active design.
 
     Sections A–H annotate / resize / restructure existing content; new VHs and
     segments created in sections F–G are removed in section I so the net
@@ -185,14 +185,7 @@ def run(ctx: PluginContext) -> None:
     else:
         ctx.log("[set_segment_modification/set_slot_*] SKIPPED — no segment available")
 
-    # ── C  VH and region sizing (set_vh_length / set_region_max_base) ────
-    if vhs:
-        old_len = vhs[0].length
-        vhs[0].length = old_len + 1
-        ctx.log(f"[set_vh_length]         vh[{vhs[0].index}]: {old_len} → {old_len + 1}")
-    else:
-        ctx.log("[set_vh_length] SKIPPED — no VHs in region")
-
+    # ── C  Region sizing (set_region_max_base) ───────────────────────────
     if region.step > 0:
         old_max = region.max_base
         region.increase_length_by(region.step)
@@ -273,7 +266,6 @@ def run(ctx: PluginContext) -> None:
         new_free_vh = free_region.add_vh_at(
             origin=(100.0, 100.0, 0.0),
             direction=(0.0, 0.0, 1.0),
-            length=free_region.max_base,
         )
         ctx.log(
             f"[add_freeform_vh]       vh {new_free_vh.id} "
@@ -354,6 +346,11 @@ def run(ctx: PluginContext) -> None:
     )
     ctx.log(f"[add_region_and_plane]  new region {demo_region.id!r} (FREEFORM, max_base=42)")
 
+    wire_region = part.add_region("WIREFRAME", "API Demo Wireframe", 42)
+    triangle = ReferenceMesh([(0, 0, 0), (10, 0, 0), (5, 8, 0)], [(0, 1, 2)])
+    wire_region.set_reference_geometry(ReferenceGeometry(mesh=triangle))
+    ctx.log(f"[set_region_reference_geometry] {wire_region.id!r}: a triangle")
+
     split_done = False
     for r in part.regions:
         r_vhs = part.vhs_in_region(r.id)
@@ -413,7 +410,7 @@ export const scriptLabManifest: PluginManifest = {
 		'Write and run your own Python scripts against the open design. Scripts run in the plugin ' +
 		"sandbox: they can't reach the internet, your GitHub account, or your other designs, and " +
 		'they change the design only when you click Apply.',
-	format: 'foldnano_mini',
+	format: 'foldnano_edit',
 	applyStrategy: 'replayMutationLog',
 	entrypoint: SCRIPT_LAB_ENTRYPOINT_PLACEHOLDER,
 	sidePanel: {

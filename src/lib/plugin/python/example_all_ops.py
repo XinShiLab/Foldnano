@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-example_all_ops.py — exercises every foldnano_mini op kind at least once.
+example_all_ops.py — exercises every foldnano.edit op kind at least once.
 
 Run from src/lib/plugin/python/:
     python example_all_ops.py
@@ -19,12 +19,13 @@ import json
 import pathlib
 import sys
 
-# Make foldnano_mini importable from the plugin directory.
+# Make foldnano.edit importable from the plugin directory.
 _PLUGIN_DIR = pathlib.Path(__file__).resolve().parent
 if str(_PLUGIN_DIR) not in sys.path:
     sys.path.insert(0, str(_PLUGIN_DIR))
 
-from foldnano_mini import FreeformRegion, InvalidOperationError, LatticedRegion, load_part  # noqa: E402
+from foldnano import ReferenceGeometry, ReferenceMesh  # noqa: E402
+from foldnano.edit import FreeformRegion, InvalidOperationError, LatticedRegion, load_part  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Fixture — same JSON as tests/fixtures/multi_region_part.foldnano.json
@@ -343,15 +344,6 @@ ok("slot[12] insert x2 on both strands", seg_a0.slot_at(12).seq)
 # GROUP 4 — VH and region sizing
 # ───────────────────────────────────────────────────────────────────────────
 
-sep("Op 9 — set_vh_length")
-# Extend vh-id-2 (SQUARE, currently 64 bp) to 96 bp directly.
-vh_square = part.get_vh(2)
-assert vh_square is not None
-assert vh_square.length == 64
-vh_square.length = 96
-assert vh_square.length == 96
-ok("vh[2] length (64 → 96)", vh_square.length)
-
 sep("Op 10 — set_region_max_base  (via increase_length_by)")
 # Extend all VHs in the HONEYCOMB region by one step (21 bp: 42 → 63).
 region_honey = part.get_region("region-honey")
@@ -452,7 +444,6 @@ n_vhs = len(part.virtual_helices)
 new_free_vh = region_free.add_vh_at(
     origin=(10.0, 0.0, 0.0),
     direction=(0.0, 0.0, 1.0),
-    length=42,
 )
 assert new_free_vh.is_freeform is True
 assert new_free_vh.region_id == "region-free"
@@ -542,6 +533,13 @@ ok("extra_region kind", extra_region.kind)
 ok("extra_region max_base", extra_region.max_base)
 ok("extra_region id (py- prefix)", extra_region.id.startswith("py-region-"))
 ok("total regions now", len(part.regions))
+
+sep("Op 23b — set_region_reference_geometry  (a triangle on a new WIREFRAME region)")
+wire_region = part.add_region("WIREFRAME", "wire", max_base=42)
+triangle = ReferenceMesh([(0, 0, 0), (10, 0, 0), (5, 8, 0)], [(0, 1, 2)])
+wire_region.set_reference_geometry(ReferenceGeometry(mesh=triangle))
+assert wire_region.reference_geometry.mesh == triangle
+ok("wire_region vertices", len(wire_region.reference_geometry.mesh.vertices))
 
 sep("Op 23 — split_region  (split HONEYCOMB region after vh-id-1)")
 # HONEYCOMB vhOrder after reorder: ["vh-id-1", new_lattice_vh.id, "vh-id-0"]
@@ -661,7 +659,7 @@ for i, kind in enumerate(op_kinds, 1):
     print(f"  {i:2d}. {kind}")
 
 # Verify every op kind appears at least once.
-from foldnano_mini.mutations import KNOWN_OPS
+from foldnano.edit.mutations import KNOWN_OPS
 
 missing = KNOWN_OPS - set(op_kinds)
 assert not missing, f"MISSING ops: {missing}"

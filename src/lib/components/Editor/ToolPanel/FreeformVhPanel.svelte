@@ -46,6 +46,9 @@
 	const isSingle = $derived(vhs.length === 1);
 	const allPerpendicular = $derived(vhs.every((vh) => isPerpendicularFrame(vh.localFrame)));
 	const allInPlane = $derived(vhs.every((vh) => !isPerpendicularFrame(vh.localFrame)));
+	const canEditDirection = $derived(
+		allInPlane && vhs.every((vh) => part?.getRegionForVh(vh)?.supportsPlaneAxisEditing)
+	);
 
 	const commonRoll = $derived(
 		common(
@@ -213,7 +216,7 @@
 					onchange={(e) => onCoordChange(e, coord)}
 				/>
 			{/each}
-			{#if allInPlane}
+			{#if canEditDirection}
 				<label for="freeform-direction" class="text-muted-foreground">Direction (°)</label>
 				<Input
 					id="freeform-direction"

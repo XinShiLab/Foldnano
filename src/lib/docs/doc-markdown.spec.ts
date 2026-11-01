@@ -17,7 +17,7 @@ order: 1
 
 Intro with a [link](/docs/guide/other) and ![shot](/screenshots/a.webp).
 
-## Using \`foldnano_mini\` **today**
+## Using \`foldnano_edit\` **today**
 
 Body text.
 
@@ -84,7 +84,7 @@ describe('splitDocSections', () => {
 	it('splits at ## and ### with rehype-slug style anchors, deduplicated in order', () => {
 		expect(sections.map((s) => [s.href, s.heading])).toEqual([
 			['/docs/guide/demo', 'Demo Page'],
-			['/docs/guide/demo#using-foldnano_mini-today', 'Using foldnano_mini today'],
+			['/docs/guide/demo#using-foldnano_edit-today', 'Using foldnano_edit today'],
 			['/docs/guide/demo#details', 'Details'],
 			['/docs/guide/demo#details-1', 'Details'],
 		]);

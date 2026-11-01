@@ -49,7 +49,7 @@ export interface OwnedManifestFields {
 	hasIcon?: boolean;
 }
 
-/** Script Lab's run contract (`foldnano_mini` + `replayMutationLog`) as a packaged manifest. */
+/** Script Lab's run contract (`foldnano_edit` + `replayMutationLog`) as a packaged manifest. */
 export function buildOwnedManifest(fields: OwnedManifestFields): PluginManifest {
 	const description = fields.description?.trim();
 	return {
@@ -57,7 +57,7 @@ export function buildOwnedManifest(fields: OwnedManifestFields): PluginManifest 
 		id: fields.id,
 		name: fields.name.trim(),
 		version: fields.version ?? OWNED_PLUGIN_FIRST_VERSION,
-		format: 'foldnano_mini',
+		format: 'foldnano_edit',
 		applyStrategy: 'replayMutationLog',
 		...(description ? { description } : {}),
 		...(fields.hasIcon ? { icon: OWNED_PLUGIN_ICON_FILE } : {}),

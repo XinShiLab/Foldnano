@@ -36,7 +36,7 @@ MAIN THREAD
 WEB WORKER (module worker from a data: URL, origin "null")
   pyodide.worker.ts               ← Pyodide runtime, runs plugin code
         │
-  /foldnano/ + /foldnano_mini/ (virtual filesystem) ← bundled Python packages
+  /foldnano/ + /foldnano/edit/ (virtual filesystem) ← bundled Python packages
 ```
 
 **Separation of concerns:**
@@ -113,7 +113,7 @@ src/lib/plugin/
     io.py                           ← cadnano_json / foldnano_json helpers
     vh.py, oligo.py                 ← VirtualHelixProxy, OligoProxy (Phase 6 live mode)
     document.py, part.py            ← PartProxy (Phase 6 live mode)
-  python/foldnano_mini/
+  python/foldnano/edit/
     __init__.py                     ← mutable plugin entrypoint
     loader.py                       ← load_part(...)
     mutations.py                    ← mutation-log vocabulary (KNOWN_OPS)
@@ -126,9 +126,9 @@ src/lib/plugin/
     repeat_group.py                 ← MutableRepeatGroup, RepeatInstance, MirrorInfo
     transport.py                    ← offline mirror transport
     part.py, region.py, vh.py, oligo.py, plane.py
-  python/tests/fixtures/foldnano_mini_parity.golden.json ← host verdicts, written by foldnanoMiniParity.spec.ts
-  python/tests/fixtures/foldnano_mini_replay.golden.json ← Python log + predicted state, replayed by foldnanoMiniReplay.spec.ts
-  python/tests/fixtures/foldnano_mini_repeat_replay.golden.json ← repeat-group log + state, replayed by foldnanoMiniRepeatReplay.spec.ts
+  python/tests/fixtures/foldnano_edit_parity.golden.json ← host verdicts, written by foldnanoEditParity.spec.ts
+  python/tests/fixtures/foldnano_edit_replay.golden.json ← Python log + predicted state, replayed by foldnanoEditReplay.spec.ts
+  python/tests/fixtures/foldnano_edit_repeat_replay.golden.json ← repeat-group log + state, replayed by foldnanoEditRepeatReplay.spec.ts
   python/example_all_ops.py         ← standalone CPython script exercising every op kind; run with `python example_all_ops.py`
   core_plugins/
     design_stats.fplugin.json       ← demo plugin manifest (previewOnly, cadnano_json)
@@ -137,8 +137,8 @@ src/lib/plugin/
     sequence_report.fplugin.json    ← demo plugin manifest (previewOnly, foldnano_json)
     gc_colorizer.fplugin.json       ← demo plugin manifest (replacePartKeepAnnotationsWhereMatched, foldnano_json)
     crossover_analyzer.fplugin.json ← demo plugin manifest (previewOnly, cadnano_json, zip bundle)
-    staple_colorizer_mini.fplugin.json ← demo plugin manifest (replayMutationLogInRegion, foldnano_mini)
-    mutation_test.fplugin.json      ← demo plugin manifest (replayMutationLog, foldnano_mini)
+    staple_colorizer_mini.fplugin.json ← demo plugin manifest (replayMutationLogInRegion, foldnano_edit)
+    mutation_test.fplugin.json      ← demo plugin manifest (replayMutationLog, foldnano_edit)
     hello_world.fplugin.json        ← demo plugin manifest (replaceRegionKeepAnnotationsWhereMatched, cadnano_json, minimal inline entrypoint)
     pyOrigamiBreak.fplugin.json     ← demo plugin manifest (replaceRegion, cadnano_json, custom-tier: numpy/pandas/matplotlib + cadnano2_5_mini wheel)
     side_panel_form_demo.fplugin.json ← demo plugin manifest (previewOnly, foldnano_json, form side panel)
@@ -153,8 +153,8 @@ static/plugins/
   nick_remover/plugin.py            ← demo: join adjacent staple nicks
   sequence_report/plugin.py         ← demo: per-oligo CSV report using foldnano_json
   gc_colorizer/plugin.py            ← demo: GC-based color gradient using foldnano_json
-  staple_colorizer_mini/plugin.py   ← demo: region-scoped recolor via foldnano_mini
-  mutation_test/plugin.py           ← demo: every foldnano_mini op kind; used to verify JS replay end-to-end
+  staple_colorizer_mini/plugin.py   ← demo: region-scoped recolor via foldnano_edit
+  mutation_test/plugin.py           ← demo: every foldnano_edit op kind; used to verify JS replay end-to-end
   crossover_analyzer/
     plugin.py                       ← demo (multi-file): orchestration entry point
     analyzer.py                     ← demo (multi-file): crossover extraction module
@@ -233,7 +233,7 @@ All fields are typed in `src/lib/plugin/types.ts`:
 | `id`            | `string`                                               | Unique identifier and registry key; must match `PLUGIN_ID_PATTERN` (checked at install only).             |
 | `name`          | `string`                                               | Human-readable display name.                                                                              |
 | `version`       | `string`                                               | Semver, `PLUGIN_VERSION_PATTERN` (checked at install only).                                               |
-| `format`        | `"cadnano_json" \| "foldnano_json" \| "foldnano_mini"` | Input/output format (see below). `"live"` is reserved for a future phase and is rejected at install time. |
+| `format`        | `"cadnano_json" \| "foldnano_json" \| "foldnano_edit"` | Input/output format (see below). `"live"` is reserved for a future phase and is rejected at install time. |
 | `applyStrategy` | see below                                              | How the host applies the plugin result.                                                                   |
 | `entrypoint`    | `string?`                                              | Placeholder inline source — only valid for `sidePanel.codeEditor` plugins with `execution: "entrypoint"`. |
 | `entrypointUrl` | `string?`                                              | URL of the plugin `.zip` bundle, fetched at install time. Mutually exclusive with `entrypoint`.           |
@@ -410,7 +410,7 @@ This is the model used by the built-in Script Lab plugin. See [script-lab.md](sc
 | --------------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `cadnano_json`  | Classic cadnano JSON string          | Topology and colors. **Lossy**: sequences, modifications, and oligo names are dropped. Foldnano's `Oligo.isScaffold` flag is **not** read or written — cadnano IO is purely topological; the `scaf` / `stap` array assignment is a file-format directional adapter (see `docs/cadnano-import.md`), not a scaffold-identity claim.       |
 | `foldnano_json` | Part-level JSON via `Part.toJSON()`  | Everything — sequences, modifications, oligo names, `isScaffold` flag, UUIDs.                                                                                                                                                                                                                                                           |
-| `foldnano_mini` | `foldnano_json` in, mutation log out | Direct Python-side mutations captured as a structured op log and replayed against the existing JS `Part` in one undo step. `vh.id`, `oligo.id`, and `seg.id` are the canonical cross-runtime identifiers. Newly added lattice `vh.index` values in Python are mirror-local and may differ from the host-assigned JS index after replay. |
+| `foldnano_edit` | `foldnano_json` in, mutation log out | Direct Python-side mutations captured as a structured op log and replayed against the existing JS `Part` in one undo step. `vh.id`, `oligo.id`, and `seg.id` are the canonical cross-runtime identifiers. Newly added lattice `vh.index` values in Python are mirror-local and may differ from the host-assigned JS index after replay. |
 | `live`          | _(blocked — reserved for Phase 6)_   | Lossless, direct in-worker model access via Python proxy objects. Manifests declaring `format: "live"` are rejected at install time. The `"live"` value is preserved in the `PluginFormat` union type for forward-compatibility but must not be used in released plugins.                                                               |
 
 ### Apply strategies
@@ -421,7 +421,7 @@ This is the model used by the built-in Script Lab plugin. See [script-lab.md](sc
 | `replacePart`                              | Whole-part replacement for `foldnano_json` plugins. No annotation re-grafting. Shows a data-loss warning before apply.                                                                   |
 | `replaceRegionKeepAnnotationsWhereMatched` | Region replacement for `cadnano_json` plugins. Re-grafts matched annotations (sequences, mods, names, scaffold label) inside the active latticed region and restores cross-region links. |
 | `replaceRegion`                            | Region replacement for `cadnano_json` plugins without annotation re-grafting. Cross-region links are restored where possible.                                                            |
-| `replayMutationLog`                        | Replay a `foldnano_mini` mutation log against the current part under one undo step.                                                                                                      |
+| `replayMutationLog`                        | Replay a `foldnano_edit` mutation log against the current part under one undo step.                                                                                                      |
 | `replayMutationLogInRegion`                | As above, but every target VH must stay inside the recorded active region or the replay aborts cleanly.                                                                                  |
 | `previewOnly`                              | Output shown as a diff only; never written to the model. Suitable for analysis plugins.                                                                                                  |
 
@@ -429,7 +429,7 @@ Install-time validation rejects unsupported format/strategy pairs:
 
 - `cadnano_json`: `previewOnly`, `replaceRegion`, `replaceRegionKeepAnnotationsWhereMatched`
 - `foldnano_json`: `previewOnly`, `replacePart`, `replacePartKeepAnnotationsWhereMatched`
-- `foldnano_mini`: `previewOnly`, `replayMutationLog`, `replayMutationLogInRegion`
+- `foldnano_edit`: `previewOnly`, `replayMutationLog`, `replayMutationLogInRegion`
 
 ---
 
@@ -462,7 +462,7 @@ Pyodide (~13 MB WASM) is loaded once on the first `activate()` call and reused f
 Every plugin receives a single `ctx` argument in its `run(ctx)` function.
 
 ```python
-from foldnano.plugin import PluginContext
+from foldnano import PluginContext
 
 def run(ctx: PluginContext) -> None:
     ...
@@ -477,14 +477,14 @@ ctx.get_part_as_cadnano_json(part_index: int = 0) -> str
 
 ctx.get_part_as_foldnano_json(part_index: int = 0) -> str
     # Returns the active part as a Foldnano JSON string (Part.toJSON() schema).
-    # Only valid when format == "foldnano_json", "foldnano_mini", or "live".
+    # Only valid when format == "foldnano_json", "foldnano_edit", or "live".
 
 ctx.format -> str
-    # "cadnano_json" | "foldnano_json" | "foldnano_mini" | "live"
+    # "cadnano_json" | "foldnano_json" | "foldnano_edit" | "live"
 
 ctx.active_region_id -> str | None
     # ID of the host region that was active when the plugin was launched.
-    # Used by region-scoped replace/replay strategies and by foldnano_mini
+    # Used by region-scoped replace/replay strategies and by foldnano_edit
     # plugins that want region-aware helper methods.
 
 ctx.params -> dict
@@ -516,7 +516,7 @@ ctx.set_result_foldnano_json(json_str: str) -> None
     # Store the modified design as Foldnano JSON (Part.toJSON() schema).
 
 ctx.set_result_mutation_log(log: list[dict]) -> None
-    # Store a foldnano_mini mutation log. Only valid when format == "foldnano_mini".
+    # Store a foldnano_edit mutation log. Only valid when format == "foldnano_edit".
     # The host replays the log via replayMutationLog / replayMutationLogInRegion.
 
 ctx.log(msg: str) -> None
@@ -531,12 +531,12 @@ ctx.set_result(data: dict) -> None
 
 `ctx.log()` also writes to stdout, so `print()` calls are captured too.
 
-For `foldnano_mini` plugins, prefer `vh.id` over `vh.index` whenever you need a stable handle across Python and JS. The offline Python mirror may assign a provisional `vh.index` to newly created lattice helices before the host replays the mutation log.
+For `foldnano_edit` plugins, prefer `vh.id` over `vh.index` whenever you need a stable handle across Python and JS. The offline Python mirror may assign a provisional `vh.index` to newly created lattice helices before the host replays the mutation log.
 
 ### Example — cadnano_json mode
 
 ```python
-from foldnano.plugin import PluginContext
+from foldnano import PluginContext
 import json
 
 def run(ctx: PluginContext) -> None:
@@ -555,8 +555,7 @@ def run(ctx: PluginContext) -> None:
 Use `parse_foldnano_json()` from `foldnano.io` to get typed proxy objects instead of working with raw dicts:
 
 ```python
-from foldnano.plugin import PluginContext
-from foldnano.io import parse_foldnano_json
+from foldnano import PluginContext, parse_foldnano_json
 import json
 
 def run(ctx: PluginContext) -> None:
@@ -572,7 +571,7 @@ def run(ctx: PluginContext) -> None:
     ctx.set_result_foldnano_json(json.dumps(part._raw))
 ```
 
-The complete proxy API is on the doc site's API reference pages (`src/content/plugin-development/`: Context, Parse and foldnano_mini); `tests/test_api_reference_pages.py` fails when they drift from the code.
+The complete proxy API is on the doc site's API reference pages (`src/content/plugin-development/`: Context, Parse and foldnano.edit); `tests/test_api_reference_pages.py` fails when they drift from the code.
 
 ---
 
@@ -595,7 +594,7 @@ Defined in `src/lib/plugin/worker/protocol.ts`.
     pluginCode?: string;      // mutually exclusive with pluginZipData
     pluginZipData?: ArrayBuffer;
     pluginLabel: string;
-    format: 'cadnano_json' | 'foldnano_json' | 'foldnano_mini' | 'live';
+    format: 'cadnano_json' | 'foldnano_json' | 'foldnano_edit' | 'live';
     cadnanoJsonIn?: string;
     foldnanoJsonIn?: string;
     activePartIndex: number;
@@ -625,7 +624,7 @@ Defined in `src/lib/plugin/worker/protocol.ts`.
     primaryArtifact: string | null;   // cadnano or Foldnano JSON out
     artifacts: Record<string, string | Uint8Array>;
     pluginResult: Record<string, unknown> | null;
-    mutationLog: Record<string, unknown>[] | null;  // foldnano_mini only
+    mutationLog: Record<string, unknown>[] | null;  // foldnano_edit only
     logs: string[];
 }
 { type: 'PLUGIN_ERROR';  requestId: string; error: string; traceback: string }
@@ -832,7 +831,7 @@ async run(pluginId: string): Promise<void>
 
 1. Validates plugin is `'active'` and has resolved code.
 2. Clears previous logs / artifacts / result; sets `plugin.status = 'running'`.
-3. Serializes the active Part to the format declared in the manifest (`cadnano_json`, `foldnano_json`, or `foldnano_mini`) and captures a foldnano snapshot for annotation re-grafting / mutation-log replay.
+3. Serializes the active Part to the format declared in the manifest (`cadnano_json`, `foldnano_json`, or `foldnano_edit`) and captures a foldnano snapshot for annotation re-grafting / mutation-log replay.
 4. Reads `plugin.paramValues` (written by the panel from the run dialog) and JSON-encodes them as `paramsJson`.
 5. Uses `pluginId` as `requestId` and calls `bridge.runPlugin(...)`. Using `pluginId` (not a fresh UUID) ensures the `onLog` callback can route streamed log lines back to the correct plugin via `registry.get(requestId)`.
 6. On success: populates `plugin.logs`, `plugin.artifacts`, `plugin.pluginResult`; sets status back to `'active'`.
@@ -1015,15 +1014,26 @@ open design through files in one linked folder; no server or port. Next steps an
 
 ---
 
-## The `foldnano` And `foldnano_mini` Python Packages
+## The `foldnano` And `foldnano.edit` Python Packages
+
+`foldnano_mini` is the old name of `foldnano.edit`, and the manifest format `foldnano_mini` the old name
+of `foldnano_edit`. Both still work so saved scripts and installed plugins keep running: the
+`foldnano_mini/` package aliases every module to its `foldnano.edit` one, and `withCurrentFormat`
+converts the format when a manifest is validated or loaded. Don't use the old names in new code or docs,
+except the deprecation note at the top of the API reference page (`07-foldnano-edit-api.md`).
+
+Deprecated names warn through `foldnano/_deprecation.py`: `part.lattice_type` and `part.max_base`, which
+describe only the first region, and importing `foldnano_mini`. It uses `FutureWarning` because Python hides
+`DeprecationWarning` outside `__main__`, and the worker points stderr at the plugin log. Host code reading
+these values must use the private fields, or it warns about itself.
 
 The worker bundles both Python packages at build time from one import,
 `virtual:foldnano-python-packages` (provided by `scripts/vite-sandbox-worker.ts`, see
-`docs/dev-tooling.md`): every `.py` file under `python/foldnano/` and `python/foldnano_mini/`,
+`docs/dev-tooling.md`): every `.py` file under `python/foldnano/` and `python/foldnano/edit/`,
 keyed `'<package>/<module>.py'`. Don't list modules by hand in `pyodide.worker.ts`; a new module
 is picked up automatically.
 
-All files are written to Pyodide's virtual filesystem at `INIT_RUNTIME` time, so both `from foldnano.plugin import PluginContext` and `from foldnano_mini import load_part` work in every plugin regardless of network availability.
+All files are written to Pyodide's virtual filesystem at `INIT_RUNTIME` time, so both `from foldnano.plugin import PluginContext` and `from foldnano.edit import load_part` work in every plugin regardless of network availability.
 
 ### Generated API stubs and completion index
 
@@ -1114,7 +1124,7 @@ The actual whole-part / region reconstruction (`performReplacePart`, `performRep
 | `replacePart`                                                | Deserializes the returned JSON into a new `Part` and swaps it directly into `doc.parts[partIndex]`. All UUIDs are regenerated. No annotation re-grafting.                                                                                                                                                    |
 | `replacePartKeepAnnotationsWhereMatched`                     | Deserializes the returned JSON, then re-grafts sequences, skip/insert structure, modifications, and oligo names from the pre-run foldnano snapshot onto any segment whose coordinates (VH index, strand index, 5' bp, 3' bp) are unchanged. Unmatched segments get no sequence. New Part is then swapped in. |
 | `replaceRegion` / `replaceRegionKeepAnnotationsWhereMatched` | Replaces only the active latticed region, preserves unaffected regions, restores cross-region links, and optionally re-grafts matched annotations inside the target region.                                                                                                                                  |
-| `replayMutationLog` / `replayMutationLogInRegion`            | Replays a `foldnano_mini` mutation log against the existing JS `Part` inside one history transaction, through `replayMutationLog()` in `opDispatch.ts` (see below). The region-scoped variant rejects any op that targets a VH outside the recorded active region.                                           |
+| `replayMutationLog` / `replayMutationLogInRegion`            | Replays a `foldnano_edit` mutation log against the existing JS `Part` inside one history transaction, through `replayMutationLog()` in `opDispatch.ts` (see below). The region-scoped variant rejects any op that targets a VH outside the recorded active region.                                           |
 
 ### Mutation-log replay and repeat groups
 
@@ -1122,8 +1132,8 @@ The actual whole-part / region reconstruction (`performReplacePart`, `performRep
 `ResultApplicator` and the replay specs both use it. It dispatches op by op and throws
 `MutationReplayError` naming the failing op. When the part has repeat groups it also runs
 `syncRepeatGroups` after every op except attribute writes (color, name, scaffold flag,
-modification, slot sequence), and after every group op. `foldnano_mini` rebuilds mirrors
-in Python after each op (`foldnano_mini/repeat.py` `apply_op`), so a later op in the log
+modification, slot sequence), and after every group op. `foldnano.edit` rebuilds mirrors
+in Python after each op (`foldnano/edit/repeat.py` `apply_op`), so a later op in the log
 may use bases a mirror just left; syncing only at the end of the transaction would hit
 the stale mirror. Attribute writes can't move a mirror, so they wait for the
 transaction's sync (Python copies them onto mirrors in place, with the same result).
@@ -1146,6 +1156,16 @@ so it stays out of the generated stubs and API pages.
 (`assertRightHandedPlane` / `assert_right_handed_plane`) before touching anything; a
 `foldnano_json` result with one fails the `mirrored-plane` shape rule (`docs/design-guards.md`).
 
+Plugins can't give a helix its own length, because `vh.length === region.maxBase` is a shape rule
+(`docs/dna-model.md`): the `vh.length` setter and a mismatched `length` in `add_vh_at` raise, and only
+`set_region_max_base` changes lengths. No op carries a helix length.
+
+`set_region_reference_geometry` applies to wireframe regions only. `ReferenceMesh` checks its values
+when built, and the host re-checks the op with `checkReferenceGeometryShape`, the rule a saved file
+goes through. `BACKBONE_RISE_NM` mirrors the TypeScript constant, and a test compares them. It, `ReferenceGeometry` and `ReferenceMesh` live in `foldnano/region.py` and are exported
+by `foldnano` alone, so the parse and editing APIs share one type; `scripts/gen_python_api.py` lists
+the annotation type in `CROSS_PACKAGE_IMPORTS` for the `foldnano.edit` stub.
+
 ### Coordinate key for annotation matching
 
 ```
@@ -1158,7 +1178,7 @@ so it stays out of the generated stubs and API pages.
 
 `replacePart` and `replacePartKeepAnnotationsWhereMatched` both create a new `Part` from the deserialized JSON, so all `VirtualHelix`, `Oligo`, and `OligoSegment` UUIDs are freshly generated after each run. This is expected — coordinate-based matching is used, not ID matching.
 
-For `foldnano_mini` replay, ids are shared across Python and JS for newly created entities during the run. Python allocates ids against the current offline mirror, the host adopts them verbatim, and replay/model code still rejects duplicates as a hard invariant. This removes replay's dependence on Python predicting JS numbering, but it does not make newly added offline lattice `vh.index` values authoritative after replay.
+For `foldnano_edit` replay, ids are shared across Python and JS for newly created entities during the run. Python allocates ids against the current offline mirror, the host adopts them verbatim, and replay/model code still rejects duplicates as a hard invariant. This removes replay's dependence on Python predicting JS numbering, but it does not make newly added offline lattice `vh.index` values authoritative after replay.
 
 ---
 
@@ -1219,7 +1239,7 @@ my_plugin/
 
 ```python
 # my_plugin/plugin.py
-from foldnano.plugin import PluginContext
+from foldnano import PluginContext
 from helper import analyse   # resolves via /plugin_run/helper.py
 
 def run(ctx: PluginContext) -> None:
@@ -1471,9 +1491,9 @@ Coverage: `initRuntime` idempotency, RUNTIME_ERROR retry, concurrent installs an
 | Done     | `pendingApply` confirm/cancel flow with diff summary in the plugin panel.                                                                                                                                                                                                                                                                                                          |
 | Done     | **Unified zip packaging** — every file/URL-delivered plugin is one zip (`fplugin.json` + `plugin.py` + assets); the inner manifest is authoritative; both local and pointer installs converge on `PluginInstaller`; the worker extracts to `/plugin_run/` on `sys.path`. Core zips are generated by `pnpm build:plugins`. Legacy inline/.py records are flagged `needs-reinstall`. |
 | Done     | **Plugin parameter system** — `parameters` array in the manifest; `PluginRunDialog` shown on Run when parameters exist; `ctx.params` / `ctx.get_param()` in Python. Demo: `staple_colorizer` (v1.1.0).                                                                                                                                                                             |
-| Done     | **Mutation-log replay API** — `foldnano_mini`, `replayMutationLog`, `replayMutationLogInRegion`, offline mirror tests, and demo plugins such as `staple_colorizer_mini` and `mutation_test`.                                                                                                                                                                                       |
+| Done     | **Mutation-log replay API** — `foldnano_edit`, `replayMutationLog`, `replayMutationLogInRegion`, offline mirror tests, and demo plugins such as `staple_colorizer_mini` and `mutation_test`.                                                                                                                                                                                       |
 | Done     | **Host-rendered side panels** — `form` and `codeEditor` side panels, including `codeEditor.execution` modes (`input` and `entrypoint`).                                                                                                                                                                                                                                            |
-| Done     | **Built-in Script Lab** — always-available `foldnano_mini` code-editor plugin that executes the editor buffer as the runtime entrypoint.                                                                                                                                                                                                                                           |
+| Done     | **Built-in Script Lab** — always-available `foldnano_edit` code-editor plugin that executes the editor buffer as the runtime entrypoint.                                                                                                                                                                                                                                           |
 | Done     | **Stop / cancellation** — `stopPlugin(pluginId)` terminates the Pyodide worker, resets all active plugins to `'registered'`, and auto-reactivates plugins with no requirements (Script Lab). Stop buttons added to the ScriptLab panel, form side panel, and My Plugins list.                                                                                                      |
 | Done     | **Result validation + Design verification** — `replacePart*` / `replaceRegion*` results are shape-checked and reconstructed on a detached scratch `Part` before `pendingApply` is ever created; `confirmApply()` also catches a failing real Apply and surfaces `PluginApplyError` instead of leaving a half-applied result.                                                       |
 | Deferred | **Live proxy API** — direct in-worker model proxy objects (`format: "live"`). The type is still reserved, but manifests declaring it are rejected by `validateManifest()`.                                                                                                                                                                                                         |
@@ -1493,11 +1513,11 @@ Coverage: `initRuntime` idempotency, RUNTIME_ERROR retry, concurrent installs an
 
 This file is for **Foldnano developers** working on the host side of the plugin system. Plugin authors should read the doc site's Plugin Development pages (`src/content/plugin-development/`).
 
-- **The worker never mutates the app model.** It returns artifacts and (for `foldnano_mini`) a structured mutation log. The main thread applies them via `ResultApplicator` inside `historyStack.snapshotTx` — one undo step per plugin run.
+- **The worker never mutates the app model.** It returns artifacts and (for `foldnano_edit`) a structured mutation log. The main thread applies them via `ResultApplicator` inside `historyStack.snapshotTx` — one undo step per plugin run.
 - **Don't change what an existing manifest field means** in a new schema version; add a new field. Unversioned manifests are read as v1, so a changed meaning would be misread silently.
 - **Don't add a manifest field without bumping `schemaVersion`** and publishing a new schema. Older apps must refuse a manifest they can't fully understand, and `manifestSchema.spec.ts` fails until the schema and validator agree.
 - **Don't render a plugin icon as markup.** No `{@html}`, inline `<svg>` or `<object>`: draw `iconSvg` through `PluginIcon.svelte` (CSS mask). Validation is defence in depth, not a sanitizer.
-- **Don't bypass `validateManifest`.** It is the only enforcement point for `format` × `applyStrategy` compatibility (e.g. `replayMutationLog*` requires `foldnano_mini`; `live` is rejected).
+- **Don't bypass `validateManifest`.** It is the only enforcement point for `format` × `applyStrategy` compatibility (e.g. `replayMutationLog*` requires `foldnano_edit`; `live` is rejected).
 - **Don't offer `pendingApply` for an unchecked result.** For non-replay strategies, `runWithOptions()` must run Result validation (`result-format-validation-*.ts`) and Design verification (`design-verification.ts`) on `result.primaryArtifact` before creating `pendingApply` — both run against a detached scratch `Part`, never `doc.parts`. `confirmApply()` still wraps the real `ResultApplicator.applyResult()` call in a try/catch (`PluginApplyError`) as a last-resort net, but it should not be the first place a malformed result is caught.
 - **Don't assume all `codeEditor` side panels execute editor code directly.** `execution: "input"` remains the default; `execution: "entrypoint"` is an explicit opt-in.
 - **Don't share a single `PyodideWorkerBridge` across documents.** `PluginCoordinator` owns the worker; teardown happens with the editor session.
@@ -1509,7 +1529,7 @@ This file is for **Foldnano developers** working on the host side of the plugin 
 - **Don't widen the sandbox CSP casually.** `connect-src` is the network permission boundary; `'unsafe-eval'` is not needed by Pyodide.
 - **Don't extend the protocol without updating both sides.** The discriminated unions in `worker/protocol.ts` are the contract; main and worker must stay in lockstep.
 - **Don't special-case Script Lab inside the worker.** The "execute editor buffer as source" behavior belongs in host-side code resolution, not in Pyodide's runtime harness.
-- **`foldnano_mini` mutation logs are replayed against a snapshot taken before the run.** Don't reorder ops inside the dispatcher — replay order is part of the contract.
+- **`foldnano_edit` mutation logs are replayed against a snapshot taken before the run.** Don't reorder ops inside the dispatcher — replay order is part of the contract.
 - **Replay a log through `replayMutationLog`, not a bare `dispatchOp` loop.** The per-op repeat-group sync is part of the contract: Python predicts it.
-- **Keep `foldnano_mini/repeat.py` in step with `repeatGroups.ts` and `Part.canDuplicateOligosBy` / `duplicateOligos`** (`docs/repeat-units.md`); `foldnanoMiniRepeatReplay.spec.ts` replays a Python-written log on the real `Part`.
-- **Cadnano-format plugins are lattice-only.** `cadnano_json` plugins require an active `LatticedDesignRegion` — `runWithOptions()` throws before the worker even starts if the active region is freeform or missing. A freeform-only design (or a design with no lattice region active) can't drive a `cadnano_json` plugin; use `foldnano_json` or `foldnano_mini` instead.
+- **Keep `foldnano/edit/repeat.py` in step with `repeatGroups.ts` and `Part.canDuplicateOligosBy` / `duplicateOligos`** (`docs/repeat-units.md`); `foldnanoEditRepeatReplay.spec.ts` replays a Python-written log on the real `Part`.
+- **Cadnano-format plugins are lattice-only.** `cadnano_json` plugins require an active `LatticedDesignRegion` — `runWithOptions()` throws before the worker even starts if the active region is freeform or missing. A freeform-only design (or a design with no lattice region active) can't drive a `cadnano_json` plugin; use `foldnano_json` or `foldnano_edit` instead.

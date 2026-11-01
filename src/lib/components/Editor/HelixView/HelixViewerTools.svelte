@@ -34,7 +34,7 @@
 	const selectedFreeformVhsInActiveRegion = $derived.by(() => {
 		const part = session.currentDoc.parts[0];
 		const activeRegion = ctx.activeRegion;
-		if (!part || activeRegion?.kind !== 'FREEFORM') return [];
+		if (!part || !activeRegion?.supportsFreeformPlacement) return [];
 		return Array.from(ctx.selectedFreeformVhIndices)
 			.map((vhIndex) => part.getVhByIndex(vhIndex))
 			.filter((vh): vh is VirtualHelix => vh?.regionId === activeRegion.id);
@@ -66,12 +66,11 @@
 			ctx.clearSelectedLatticeVhs();
 		} else if (ctx.selectedFreeformVhIndices.size > 0) {
 			const activeRegion = ctx.activeRegion;
-			const selectedInActiveRegion =
-				activeRegion?.kind === 'FREEFORM'
-					? Array.from(ctx.selectedFreeformVhIndices).filter(
-							(vhIndex) => part.getVhByIndex(vhIndex)?.regionId === activeRegion.id
-						)
-					: [];
+			const selectedInActiveRegion = activeRegion?.supportsFreeformPlacement
+				? Array.from(ctx.selectedFreeformVhIndices).filter(
+						(vhIndex) => part.getVhByIndex(vhIndex)?.regionId === activeRegion.id
+					)
+				: [];
 			if (selectedInActiveRegion.length > 0) {
 				deleteFreeformVirtualHelicesCmd(
 					{ part, vhIndices: selectedInActiveRegion },

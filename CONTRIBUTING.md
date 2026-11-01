@@ -140,7 +140,7 @@ Commands live in `src/lib/commands/`. Each command is a plain function that:
 
 ## Adding a Plugin Operation
 
-Freeform-part plugin operations are dispatched through `src/lib/plugin/opDispatch.ts`. Add a new case to the `dispatchOp` switch and a corresponding Python-side method in `src/lib/plugin/python/foldnano_mini/mutations.py`.
+Freeform-part plugin operations are dispatched through `src/lib/plugin/opDispatch.ts`. Add a new case to the `dispatchOp` switch and a corresponding Python-side method in `src/lib/plugin/python/foldnano/edit/mutations.py`.
 
 ## Branch Model
 

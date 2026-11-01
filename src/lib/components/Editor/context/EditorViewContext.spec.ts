@@ -210,7 +210,7 @@ describe('EditorViewContext', () => {
 			id,
 			name: id,
 			version: '1.0.0',
-			format: 'foldnano_mini',
+			format: 'foldnano_edit',
 			applyStrategy: 'replayMutationLog',
 		});
 

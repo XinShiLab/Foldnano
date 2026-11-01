@@ -26,7 +26,7 @@ This page is the end-to-end workflow, from an empty document to a routed, scaffo
 
 Click **New Document** in the top toolbar. A design starts empty; you then add a region and place virtual helices into it.
 
-Every design has a **part** at the top, the container that owns your planes and regions. Starting a design (as honeycomb, square, or freeform) creates that part together with a default **plane** and a default **design region**, and you can **Add Region** for more later. See [Mental Model](/docs/guide/mental-model) for what those terms mean.
+Every design has a **part** at the top, the container that owns your planes and regions. Starting a design (as honeycomb, square or freeform) creates that part together with a default **plane** and a default **design region**, and you can **Add Region** for more later. See [Mental Model](/docs/guide/mental-model) for what those terms mean.
 
 ![Empty-document state right after New Document, with the Add Region button highlighted](/screenshots/guide/creating-a-design/01-empty-document.webp)
 
@@ -34,7 +34,7 @@ Every design has a **part** at the top, the container that owns your planes and 
 
 ## Add A Region
 
-Use **Add Region** in the top toolbar. The dropdown offers **Add Honeycomb Region**, **Add Square Region**, **Add Freeform Region**, and **Load Cadnano Design as a Region** (which imports an existing cadnano file into a new region).
+Use **Add Region** in the top toolbar. The dropdown offers **Add Honeycomb Region**, **Add Square Region**, **Add Freeform Region**, and **Load Cadnano Design as a Region** (which imports an existing cadnano file into a new region). Wireframe design is planned; see [Wireframe Designs](/docs/guide/wireframe) for where it stands.
 
 | Choice | Use when |
 | --- | --- |

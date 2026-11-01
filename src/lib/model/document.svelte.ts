@@ -14,7 +14,7 @@ export interface DocSnapshot extends DocumentFormatHeader {
 	parts: ReturnType<Part['toJSON']>[];
 }
 
-export type PartType = 'HONEYCOMB' | 'SQUARE' | 'FREEFORM';
+export type PartType = 'HONEYCOMB' | 'SQUARE' | 'FREEFORM' | 'WIREFRAME';
 
 /**
  * Factory that creates a generic Part with the correct geometry for the given type.
@@ -87,7 +87,7 @@ export default class FoldnanoDocument {
 	}
 
 	addNewPart(type: PartType): Part {
-		const KNOWN_TYPES: PartType[] = ['HONEYCOMB', 'SQUARE', 'FREEFORM'];
+		const KNOWN_TYPES: PartType[] = ['HONEYCOMB', 'SQUARE', 'FREEFORM', 'WIREFRAME'];
 		if (!KNOWN_TYPES.includes(type)) throw new Error(`Part type "${type}" not implemented`);
 		const part = Part.forType(type, `Part ${this.parts.length + 1}`);
 		this.parts.push(part);

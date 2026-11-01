@@ -112,7 +112,7 @@ export interface PluginResultResponse {
 	pluginResult: Record<string, unknown> | null;
 	/**
 	 * Foldnano_mini mutation log set via ctx.set_result_mutation_log(...).
-	 * Present only when the plugin format is foldnano_mini.
+	 * Present only when the plugin format is foldnano_edit.
 	 */
 	mutationLog: Record<string, unknown>[] | null;
 	/** All log lines captured during the run */

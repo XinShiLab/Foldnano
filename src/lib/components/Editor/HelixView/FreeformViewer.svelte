@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
+	import { SvelteMap } from 'svelte/reactivity';
 	import { Stage, Layer, Group, Rect, Arrow, Text, Line, Circle } from 'svelte-konva';
 	import type { Stage as StageType, KonvaPointerEvent } from 'svelte-konva';
 	import type { Part } from '$lib/model/Part/Part.svelte';
@@ -33,6 +34,7 @@
 		rollReferenceAngle,
 	} from './rollDial';
 	import { PLANE_AXIS_COLORS } from './planeAxes';
+	import { depthFadeOpacity, helixDepthW } from './planeDepthFade';
 	import { canvasTheme } from '$lib/canvasEditor/theme.svelte';
 
 	interface Props {
@@ -120,6 +122,29 @@
 
 	// Only VHs belonging to this region
 	const regionVhs = $derived(part.virtualHelices.filter((vh) => vh.regionId === region.id));
+
+	const depthByVhIndex = $derived.by(() => {
+		const depths = new SvelteMap<number, number>();
+		for (const vh of regionVhs) {
+			if (vh.localFrame) depths.set(vh.index, helixDepthW(vh.localFrame, segmentsForVh(vh)));
+		}
+		return depths;
+	});
+	const minDepthW = $derived(Math.min(...depthByVhIndex.values()));
+	const maxDepthW = $derived(Math.max(...depthByVhIndex.values()));
+	// Far first, so where helices overlap the nearer one is on top and takes the click.
+	const drawnVhs = $derived(
+		[...regionVhs].sort(
+			(a, b) => (depthByVhIndex.get(b.index) ?? 0) - (depthByVhIndex.get(a.index) ?? 0)
+		)
+	);
+
+	function vhOpacity(vh: VirtualHelix): number {
+		const depth = depthByVhIndex.get(vh.index);
+		if (depth === undefined || selectedVhIndices.has(vh.index) || hoveredVhIdx === vh.index)
+			return 1;
+		return depthFadeOpacity(depth, minDepthW, maxDepthW);
+	}
 
 	function nmToCanvas(xNm: number, yNm: number): { x: number; y: number } {
 		return { x: xNm * SCALE + OFFSET_X, y: yNm * SCALE + OFFSET_Y };
@@ -1022,14 +1047,14 @@
 				/>
 			{/if}
 
-			{#each regionVhs as vh (vh.index)}
+			{#each drawnVhs as vh (vh.index)}
 				{@const xNm = vh.localFrame ? vh.localFrame.origin.x : 0}
 				{@const yNm = vh.localFrame ? vh.localFrame.origin.y : 0}
 				{@const { x, y } = nmToCanvas(xNm, yNm)}
 				{@const perpendicular = isPerpendicular(vh.localFrame)}
 				{@const selected = selectedVhIndices.has(vh.index)}
 
-				<Group {x} {y} onpointerdown={(e) => onVhPointerDown(e, vh.index)}>
+				<Group {x} {y} opacity={vhOpacity(vh)} onpointerdown={(e) => onVhPointerDown(e, vh.index)}>
 					{#if perpendicular}
 						{#if selected}
 							<Circle
@@ -1221,7 +1246,7 @@
 								fill={themeColors.vhText}
 								listening={false}
 							/>
-							{#if hoveredVhIdx === vh.index || activeRotate?.vhIdx === vh.index}
+							{#if region.supportsPlaneAxisEditing && (hoveredVhIdx === vh.index || activeRotate?.vhIdx === vh.index)}
 								<Group x={lengthPx} y={0} onpointerdown={(e) => onRotatePointerDown(e, vh.index)}>
 									<Rect
 										offsetX={3}

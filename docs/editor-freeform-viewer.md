@@ -2,6 +2,7 @@
 covers:
   - src/lib/components/Editor/HelixView/FreeformViewer.svelte
   - src/lib/components/Editor/HelixView/rollDial.ts
+  - src/lib/components/Editor/HelixView/planeDepthFade.ts
   - src/lib/components/Editor/HelixView/planeAxes.ts
   - src/lib/components/Editor/HelixView/radialDistribute.ts
   - src/lib/components/Editor/ToolPanel/FreeformVhPanel.svelte
@@ -239,7 +240,7 @@ turns out of the drawing plane and a projected tick only shows sin(roll). So:
 from this viewer or by clicking a freeform VH's tag in the strand view)
 has a `RollDial` plus a Roll field, origin U/V/W fields (absolute for one helix,
 Δ for several, so a group doesn't collapse onto one point) and, when every
-selected helix is in-plane, a direction angle. Mixed values show blank; typing
+selected helix is in-plane and its region has `supportsPlaneAxisEditing`, a direction angle. Mixed values show blank; typing
 one applies it to all. Edits go through `setFreeformVhRollCmd` and
 `moveFreeformVirtualHelicesCmd`. The dial commits on release only (no live
 preview), so the 3D view updates then.
@@ -305,6 +306,11 @@ The current implementation is intentionally focused:
   lattice plane viewer uses); full strand routing happens in the strand viewer
 - only endpoint-level strand editing exists in this viewer
 - rotate handles are per-VH, not group-rotation tools
+- wireframe regions have no rotate handle or direction field, and helices pointing out of the plane are
+  drawn at full length with no foreshortening
+- depth is shown only by opacity and draw order (`planeDepthFade.ts`): +W points into the screen, so the
+  most negative W in the region is solid and the most positive is faintest, and nearer helices draw on top
+  and take the click; a helix's depth is the middle of its dsDNA, and selected or hovered helices stay solid
 - the viewer is region-scoped and does not yet expose a richer multi-plane 2D UI
 
 Those are current product boundaries, not just documentation gaps.
@@ -313,6 +319,7 @@ Those are current product boundaries, not just documentation gaps.
 
 ## Boundaries / Don'ts
 
+- **Don't offer an axis edit that sets `z` to 0 without checking `region.supportsPlaneAxisEditing`.** It flattens a helix pointing out of the plane, so wireframe regions turn off the rotate handle and the direction field.
 - **Don't use parity helpers** (`isEvenParity`, `scaffoldStrandIndex`) on freeform VHs — they require lattice coords and will throw.
 - **Don't write `vh.localFrame` directly outside live drag.** The transient mutation during pointer-move is intentional but must end with one of the freeform commands so undo/redo captures it.
 - **Don't reuse the strand-view priority dispatch here.** This viewer handles Konva pointer events directly with a small handler set; cross-pollination duplicates state.

@@ -1,6 +1,7 @@
 {
 	"modules": {
 		"foldnano": [
+			"BACKBONE_RISE_NM",
 			"PluginContext",
 			"PartData",
 			"parse_cadnano_json",
@@ -11,7 +12,19 @@
 			"RegionProxy",
 			"LatticedRegionProxy",
 			"FreeformRegionProxy",
+			"WireframeRegionProxy",
+			"ReferenceGeometry",
+			"ReferenceMesh",
 			"PlaneProxy"
+		],
+		"foldnano.region": [
+			"BACKBONE_RISE_NM",
+			"RegionProxy",
+			"LatticedRegionProxy",
+			"FreeformRegionProxy",
+			"WireframeRegionProxy",
+			"ReferenceGeometry",
+			"ReferenceMesh"
 		],
 		"foldnano.plugin": [
 			"PluginContext"
@@ -28,21 +41,17 @@
 			"OligoProxy",
 			"OligoSegmentProxy"
 		],
-		"foldnano.region": [
-			"RegionProxy",
-			"LatticedRegionProxy",
-			"FreeformRegionProxy"
-		],
 		"foldnano.plane": [
 			"PlaneProxy"
 		],
-		"foldnano_mini": [
+		"foldnano.edit": [
 			"load_part",
 			"MutablePart",
 			"MutablePlane",
 			"MutableRegion",
 			"LatticedRegion",
 			"FreeformRegion",
+			"WireframeRegion",
 			"MutableVirtualHelix",
 			"MutableStrandSet",
 			"MutableOligo",
@@ -67,26 +76,27 @@
 			"Transport",
 			"OfflineTransport"
 		],
-		"foldnano_mini.loader": [
+		"foldnano.edit.loader": [
 			"load_part"
 		],
-		"foldnano_mini.part": [
+		"foldnano.edit.part": [
 			"MutablePart",
 			"SegmentSpec"
 		],
-		"foldnano_mini.plane": [
+		"foldnano.edit.plane": [
 			"MutablePlane"
 		],
-		"foldnano_mini.region": [
+		"foldnano.edit.region": [
 			"MutableRegion",
 			"LatticedRegion",
-			"FreeformRegion"
+			"FreeformRegion",
+			"WireframeRegion"
 		],
-		"foldnano_mini.vh": [
+		"foldnano.edit.vh": [
 			"MutableVirtualHelix",
 			"MutableStrandSet"
 		],
-		"foldnano_mini.oligo": [
+		"foldnano.edit.oligo": [
 			"MutableOligo",
 			"MutableSegment",
 			"MutableSegmentEnd",
@@ -97,26 +107,26 @@
 			"SegmentEndView",
 			"SlotView"
 		],
-		"foldnano_mini.repeat_group": [
+		"foldnano.edit.repeat_group": [
 			"MutableRepeatGroup",
 			"RepeatInstance",
 			"MirrorInfo"
 		],
-		"foldnano_mini.repeat": [
+		"foldnano.edit.repeat": [
 			"MIRROR_EDIT_ERROR"
 		],
-		"foldnano_mini.lattice": [
+		"foldnano.edit.lattice": [
 			"CrossoverSite"
 		],
-		"foldnano_mini.checks": [
+		"foldnano.edit.checks": [
 			"Check",
 			"InvalidOperationError"
 		],
-		"foldnano_mini.mutations": [
+		"foldnano.edit.mutations": [
 			"MutationLog",
 			"KNOWN_OPS"
 		],
-		"foldnano_mini.transport": [
+		"foldnano.edit.transport": [
 			"Transport",
 			"OfflineTransport"
 		]
@@ -135,7 +145,7 @@
 			"doc": "Parse a foldnano_json string (Part.toJSON() output) into a PartData object."
 		},
 		"load_part": {
-			"module": "foldnano_mini",
+			"module": "foldnano.edit",
 			"signature": "(json_str: str, active_region_id: str | None=None)",
 			"returns": "MutablePart",
 			"doc": "Parse a foldnano_json string and return a mutable view onto it."
@@ -204,7 +214,7 @@
 					"kind": "method",
 					"signature": "(log: list[dict[str, Any]])",
 					"returns": "None",
-					"doc": "Store a foldnano_mini mutation log to be replayed against the host's canonical ``Part`` under one undo step (apply strategy ``replayMutationLog`` / ``replayMutationLogInRegion``)."
+					"doc": "Store a foldnano_edit mutation log to be replayed against the host's canonical ``Part`` under one undo step (apply strategy ``replayMutationLog`` / ``replayMutationLogInRegion``)."
 				},
 				{
 					"name": "log",
@@ -281,16 +291,6 @@
 					"type": "str"
 				},
 				{
-					"name": "lattice_type",
-					"kind": "attribute",
-					"type": "str"
-				},
-				{
-					"name": "max_base",
-					"kind": "attribute",
-					"type": "int"
-				},
-				{
 					"name": "virtual_helices",
 					"kind": "attribute",
 					"type": "list[VirtualHelixProxy]"
@@ -314,6 +314,18 @@
 					"name": "active_region_id",
 					"kind": "attribute",
 					"type": "Optional[str]"
+				},
+				{
+					"name": "lattice_type",
+					"kind": "property",
+					"type": "str",
+					"doc": "Deprecated: use ``region.kind``. Kind of the first region only."
+				},
+				{
+					"name": "max_base",
+					"kind": "property",
+					"type": "int",
+					"doc": "Deprecated: use ``region.max_base``. Length of the first region only."
 				},
 				{
 					"name": "get_vh",
@@ -648,6 +660,11 @@
 					"type": "int"
 				},
 				{
+					"name": "max_base",
+					"kind": "attribute",
+					"type": "int"
+				},
+				{
 					"name": "from_json",
 					"kind": "method",
 					"signature": "(region_json: dict[str, Any])",
@@ -725,6 +742,11 @@
 					"type": "int"
 				},
 				{
+					"name": "max_base",
+					"kind": "attribute",
+					"type": "int"
+				},
+				{
 					"name": "from_json",
 					"kind": "method",
 					"signature": "(region_json: dict[str, Any])",
@@ -792,6 +814,11 @@
 					"type": "int"
 				},
 				{
+					"name": "max_base",
+					"kind": "attribute",
+					"type": "int"
+				},
+				{
 					"name": "from_json",
 					"kind": "method",
 					"signature": "(region_json: dict[str, Any])",
@@ -801,6 +828,139 @@
 					"name": "supports_lattice_grid",
 					"kind": "property",
 					"type": "bool"
+				}
+			]
+		},
+		"WireframeRegionProxy": {
+			"module": "foldnano",
+			"doc": "Wireframe region \u2014 a freeform region that can hold the geometry it was built from.",
+			"members": [
+				{
+					"name": "reference_geometry",
+					"kind": "attribute",
+					"type": "ReferenceGeometry | None"
+				},
+				{
+					"name": "id",
+					"kind": "attribute",
+					"type": "str"
+				},
+				{
+					"name": "name",
+					"kind": "attribute",
+					"type": "str"
+				},
+				{
+					"name": "kind",
+					"kind": "attribute",
+					"type": "RegionKind"
+				},
+				{
+					"name": "plane_id",
+					"kind": "attribute",
+					"type": "str"
+				},
+				{
+					"name": "vh_order",
+					"kind": "attribute",
+					"type": "list[str]"
+				},
+				{
+					"name": "step",
+					"kind": "attribute",
+					"type": "int"
+				},
+				{
+					"name": "turns_per_step",
+					"kind": "attribute",
+					"type": "int"
+				},
+				{
+					"name": "sub_step_size",
+					"kind": "attribute",
+					"type": "int"
+				},
+				{
+					"name": "twist_offset",
+					"kind": "attribute",
+					"type": "float"
+				},
+				{
+					"name": "min_base",
+					"kind": "attribute",
+					"type": "int"
+				},
+				{
+					"name": "default_max_base",
+					"kind": "attribute",
+					"type": "int"
+				},
+				{
+					"name": "max_base",
+					"kind": "attribute",
+					"type": "int"
+				},
+				{
+					"name": "from_json",
+					"kind": "method",
+					"signature": "(region_json: dict[str, Any])",
+					"returns": "RegionProxy"
+				},
+				{
+					"name": "supports_lattice_grid",
+					"kind": "property",
+					"type": "bool"
+				}
+			]
+		},
+		"ReferenceGeometry": {
+			"module": "foldnano",
+			"doc": "What a wireframe region was built from, kept with the design.",
+			"members": [
+				{
+					"name": "mesh",
+					"kind": "attribute",
+					"type": "ReferenceMesh | None"
+				},
+				{
+					"name": "unit",
+					"kind": "attribute",
+					"type": "Literal[nm]"
+				}
+			]
+		},
+		"ReferenceMesh": {
+			"module": "foldnano",
+			"doc": "A polygon mesh in nanometres: what a wireframe design was built from.",
+			"members": [
+				{
+					"name": "vertices",
+					"kind": "attribute",
+					"type": "Sequence[Sequence[float]]"
+				},
+				{
+					"name": "faces",
+					"kind": "attribute",
+					"type": "Sequence[Sequence[int]]"
+				},
+				{
+					"name": "edges",
+					"kind": "attribute",
+					"type": "Sequence[Sequence[int]]"
+				},
+				{
+					"name": "all_edges",
+					"kind": "method",
+					"signature": "()",
+					"returns": "tuple[tuple[int, int], ...]",
+					"doc": "Every distinct edge as a sorted ``(a, b)`` pair: ``edges`` plus the sides of ``faces``."
+				},
+				{
+					"name": "to_ply",
+					"kind": "method",
+					"signature": "()",
+					"returns": "str",
+					"doc": "The mesh as ASCII PLY text, in nm, for tools that read a mesh file."
 				}
 			]
 		},
@@ -847,7 +1007,7 @@
 			]
 		},
 		"MutablePart": {
-			"module": "foldnano_mini",
+			"module": "foldnano.edit",
 			"doc": "Top-level mutable view onto a foldnano_json part.",
 			"members": [
 				{
@@ -882,13 +1042,13 @@
 					"name": "lattice_type",
 					"kind": "property",
 					"type": "str",
-					"doc": "Kind of the first region (HONEYCOMB / SQUARE / FREEFORM)."
+					"doc": "Deprecated: use ``region.kind``. Kind of the first region only."
 				},
 				{
 					"name": "max_base",
 					"kind": "property",
 					"type": "int",
-					"doc": "Default-region ``defaultMaxBase``."
+					"doc": "Deprecated: use ``region.max_base``. Length of the first region only."
 				},
 				{
 					"name": "active_region_id",
@@ -1263,7 +1423,7 @@
 			]
 		},
 		"MutablePlane": {
-			"module": "foldnano_mini",
+			"module": "foldnano.edit",
 			"doc": "Read-only view of a plane dict from the mirror.",
 			"members": [
 				{
@@ -1299,7 +1459,7 @@
 			]
 		},
 		"MutableRegion": {
-			"module": "foldnano_mini",
+			"module": "foldnano.edit",
 			"doc": "",
 			"members": [
 				{
@@ -1401,7 +1561,7 @@
 			]
 		},
 		"LatticedRegion": {
-			"module": "foldnano_mini",
+			"module": "foldnano.edit",
 			"doc": "HONEYCOMB / SQUARE region \u2014 supports adding VHs at lattice coordinates.",
 			"members": [
 				{
@@ -1510,7 +1670,7 @@
 			]
 		},
 		"FreeformRegion": {
-			"module": "foldnano_mini",
+			"module": "foldnano.edit",
 			"doc": "Freeform region \u2014 VHs placed by ``localFrame`` rather than lattice coords.",
 			"members": [
 				{
@@ -1618,8 +1778,129 @@
 				}
 			]
 		},
+		"WireframeRegion": {
+			"module": "foldnano.edit",
+			"doc": "Wireframe region \u2014 a freeform region that can hold the geometry it was built from.",
+			"members": [
+				{
+					"name": "reference_geometry",
+					"kind": "property",
+					"type": "ReferenceGeometry | None"
+				},
+				{
+					"name": "set_reference_geometry",
+					"kind": "method",
+					"signature": "(geometry: ReferenceGeometry | None)",
+					"returns": "None",
+					"doc": "Store the geometry this region was built from, or remove it with ``None``."
+				},
+				{
+					"name": "add_vh_at",
+					"kind": "method",
+					"signature": "(origin: tuple[float, float, float], direction: tuple[float, float, float]=(0.0, 0.0, 1.0), length: int | None=None)",
+					"returns": "MutableVirtualHelix",
+					"doc": "Add a new VH to this freeform region at the given 3D position."
+				},
+				{
+					"name": "id",
+					"kind": "property",
+					"type": "str"
+				},
+				{
+					"name": "name",
+					"kind": "property",
+					"type": "str"
+				},
+				{
+					"name": "kind",
+					"kind": "property",
+					"type": "str"
+				},
+				{
+					"name": "plane_id",
+					"kind": "property",
+					"type": "str"
+				},
+				{
+					"name": "vh_order",
+					"kind": "property",
+					"type": "list[str]"
+				},
+				{
+					"name": "step",
+					"kind": "property",
+					"type": "int"
+				},
+				{
+					"name": "default_max_base",
+					"kind": "property",
+					"type": "int"
+				},
+				{
+					"name": "max_base",
+					"kind": "property",
+					"type": "int"
+				},
+				{
+					"name": "min_base",
+					"kind": "property",
+					"type": "int"
+				},
+				{
+					"name": "set_max_base",
+					"kind": "method",
+					"signature": "(new_max_base: int)",
+					"returns": "None",
+					"doc": "Lengthen or shorten every VH in this region so the region ends at ``new_max_base``."
+				},
+				{
+					"name": "can_set_max_base",
+					"kind": "method",
+					"signature": "(new_max_base: int)",
+					"returns": "Check"
+				},
+				{
+					"name": "increase_length_by",
+					"kind": "method",
+					"signature": "(delta: int)",
+					"returns": "None",
+					"doc": "Extend all VHs in this region by ``delta`` bases."
+				},
+				{
+					"name": "reduce_unused_length",
+					"kind": "method",
+					"signature": "()",
+					"returns": "None",
+					"doc": "Shorten the region to the strands it holds, rounded up to ``step`` and at least two steps, like the strand view's reduce-length button. Does nothing when already that short."
+				},
+				{
+					"name": "remove_all_skips",
+					"kind": "method",
+					"signature": "()",
+					"returns": "int",
+					"doc": "Turn every skip in this region back into a plain base; returns how many."
+				},
+				{
+					"name": "remove_all_insertions",
+					"kind": "method",
+					"signature": "()",
+					"returns": "int",
+					"doc": "Turn every insertion in this region back into a plain base; returns how many."
+				},
+				{
+					"name": "supports_lattice_grid",
+					"kind": "property",
+					"type": "bool"
+				},
+				{
+					"name": "virtual_helices",
+					"kind": "property",
+					"type": "list[MutableVirtualHelix]"
+				}
+			]
+		},
 		"MutableVirtualHelix": {
-			"module": "foldnano_mini",
+			"module": "foldnano.edit",
 			"doc": "",
 			"members": [
 				{
@@ -1717,7 +1998,7 @@
 			]
 		},
 		"MutableStrandSet": {
-			"module": "foldnano_mini",
+			"module": "foldnano.edit",
 			"doc": "One strand of a VH \u2014 mirrors the host's ``StrandSet``.",
 			"members": [
 				{
@@ -1784,7 +2065,7 @@
 			]
 		},
 		"MutableOligo": {
-			"module": "foldnano_mini",
+			"module": "foldnano.edit",
 			"doc": "A strand of linked segments: an ordinary oligo or a repeat group's original.",
 			"members": [
 				{
@@ -1893,7 +2174,7 @@
 			]
 		},
 		"MutableSegment": {
-			"module": "foldnano_mini",
+			"module": "foldnano.edit",
 			"doc": "A stretch of one strand of one VH, part of an oligo.",
 			"members": [
 				{
@@ -2020,7 +2301,7 @@
 			]
 		},
 		"MutableSegmentEnd": {
-			"module": "foldnano_mini",
+			"module": "foldnano.edit",
 			"doc": "One end of a segment \u2014 mirrors the host's ``SegmentEnd``. Setting ``index`` moves the end, like assigning ``SegmentEnd.index`` on the host.",
 			"members": [
 				{
@@ -2094,7 +2375,7 @@
 			]
 		},
 		"MutableSlot": {
-			"module": "foldnano_mini",
+			"module": "foldnano.edit",
 			"doc": "One position on a segment \u2014 sequence, skip, or insertion.",
 			"members": [
 				{
@@ -2149,7 +2430,7 @@
 			]
 		},
 		"MirrorOligo": {
-			"module": "foldnano_mini",
+			"module": "foldnano.edit",
 			"doc": "A mirror oligo: the copy of a repeat group's original at one instance's offset.",
 			"members": [
 				{
@@ -2252,7 +2533,7 @@
 			]
 		},
 		"OligoView": {
-			"module": "foldnano_mini",
+			"module": "foldnano.edit",
 			"doc": "A strand of linked segments (read-only). See :class:`MutableOligo` and :class:`MirrorOligo`.",
 			"members": [
 				{
@@ -2349,7 +2630,7 @@
 			]
 		},
 		"SegmentView": {
-			"module": "foldnano_mini",
+			"module": "foldnano.edit",
 			"doc": "A stretch of one strand of one VH, part of an oligo (read-only).",
 			"members": [
 				{
@@ -2453,7 +2734,7 @@
 			]
 		},
 		"SegmentEndView": {
-			"module": "foldnano_mini",
+			"module": "foldnano.edit",
 			"doc": "One end of a segment \u2014 mirrors the host's ``SegmentEnd`` (``FivePrimeEnd`` / ``ThreePrimeEnd``), read-only.",
 			"members": [
 				{
@@ -2518,7 +2799,7 @@
 			]
 		},
 		"SlotView": {
-			"module": "foldnano_mini",
+			"module": "foldnano.edit",
 			"doc": "One position on a segment \u2014 sequence, skip, or insertion (read-only).",
 			"members": [
 				{
@@ -2539,7 +2820,7 @@
 			]
 		},
 		"MutableRepeatGroup": {
-			"module": "foldnano_mini",
+			"module": "foldnano.edit",
 			"doc": "A repeat group (the host's ``RepeatGroup``): originals plus one copy per instance.",
 			"members": [
 				{
@@ -2621,27 +2902,27 @@
 			]
 		},
 		"RepeatInstance": {
-			"module": "foldnano_mini",
+			"module": "foldnano.edit",
 			"doc": "One copy of a repeat group: its id and its bp offset from the originals.",
 			"members": []
 		},
 		"MirrorInfo": {
-			"module": "foldnano_mini",
+			"module": "foldnano.edit",
 			"doc": "What a mirror oligo copies: ``oligo.mirror_of``.",
 			"members": []
 		},
 		"SegmentSpec": {
-			"module": "foldnano_mini",
+			"module": "foldnano.edit",
 			"doc": "One segment of a :meth:`MutablePart.create_oligo` path: a VH and its 5\u2032/3\u2032 bp.",
 			"members": []
 		},
 		"CrossoverSite": {
-			"module": "foldnano_mini",
+			"module": "foldnano.edit",
 			"doc": "One potential crossover site, as the host's ``CrossoverSite``.",
 			"members": []
 		},
 		"Check": {
-			"module": "foldnano_mini",
+			"module": "foldnano.edit",
 			"doc": "``ok`` plus the ``reason`` it is not, like the host's ``DuplicateCheck``.",
 			"members": [
 				{
@@ -2676,12 +2957,12 @@
 			]
 		},
 		"InvalidOperationError": {
-			"module": "foldnano_mini",
+			"module": "foldnano.edit",
 			"doc": "An edit the model refuses (occupied range, out of bounds, ...).",
 			"members": []
 		},
 		"MutationLog": {
-			"module": "foldnano_mini",
+			"module": "foldnano.edit",
 			"doc": "Append-only ordered log of ops.",
 			"members": [
 				{
@@ -2706,7 +2987,7 @@
 			]
 		},
 		"Transport": {
-			"module": "foldnano_mini",
+			"module": "foldnano.edit",
 			"doc": "Common interface for offline (mirror) and live (JS RPC) transports.",
 			"members": [
 				{
@@ -2729,7 +3010,7 @@
 			]
 		},
 		"OfflineTransport": {
-			"module": "foldnano_mini",
+			"module": "foldnano.edit",
 			"doc": "In-process transport.",
 			"members": [
 				{

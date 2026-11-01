@@ -55,10 +55,12 @@ class PluginContext:
         side_panel_input_json: str | None = None,
         active_region_id: str | None = None,
     ) -> None:
-        if format not in ("cadnano_json", "foldnano_json", "foldnano_mini", "live"):
+        if format == "foldnano_mini":  # the old name
+            format = "foldnano_edit"
+        if format not in ("cadnano_json", "foldnano_json", "foldnano_edit", "live"):
             raise ValueError(
                 f"Unknown plugin format {format!r}. "
-                "Expected 'cadnano_json', 'foldnano_json', 'foldnano_mini', or 'live'."
+                "Expected 'cadnano_json', 'foldnano_json', 'foldnano_edit', or 'live'."
             )
         self._format = format
         self._cadnano_json_in = cadnano_json_in
@@ -74,7 +76,7 @@ class PluginContext:
         self.artifacts: dict[str, Union[str, bytes]] = {}
         self.plugin_result: dict | None = None
         self.logs: list[str] = []
-        # Set by foldnano_mini plugins via set_result_mutation_log().
+        # Set by foldnano_edit plugins via set_result_mutation_log().
         self.mutation_log: list[dict] | None = None
 
     # ------------------------------------------------------------------
@@ -117,12 +119,12 @@ class PluginContext:
         Return the active part as a Foldnano JSON string (Part.toJSON() format).
 
         Valid when the plugin manifest declared ``format = "foldnano_json"``,
-        ``"foldnano_mini"``, or ``"live"``.
+        ``"foldnano_edit"``, or ``"live"``.
         """
-        if self._format not in ("foldnano_json", "foldnano_mini", "live"):
+        if self._format not in ("foldnano_json", "foldnano_edit", "live"):
             raise RuntimeError(
                 f"get_part_as_foldnano_json() called but plugin format is {self._format!r}. "
-                "Declare 'format': 'foldnano_json' or 'foldnano_mini' in the manifest."
+                "Declare 'format': 'foldnano_json' or 'foldnano_edit' in the manifest."
             )
         if self._foldnano_json_in is None:
             raise RuntimeError("No Foldnano JSON input was provided to this PluginContext.")
@@ -139,22 +141,22 @@ class PluginContext:
         self.primary_artifact = json_str
 
     # ------------------------------------------------------------------
-    # foldnano_mini mode
+    # foldnano_edit mode
     # ------------------------------------------------------------------
 
     def set_result_mutation_log(self, log: list[dict[str, Any]]) -> None:
         """
-        Store a foldnano_mini mutation log to be replayed against the host's
+        Store a foldnano_edit mutation log to be replayed against the host's
         canonical ``Part`` under one undo step (apply strategy
         ``replayMutationLog`` / ``replayMutationLogInRegion``).
 
-        Only valid when the plugin manifest declared ``format = "foldnano_mini"``.
+        Only valid when the plugin manifest declared ``format = "foldnano_edit"``.
         Each op must be a JSON-serialisable dict with an ``op`` key.
         """
-        if self._format != "foldnano_mini":
+        if self._format != "foldnano_edit":
             raise RuntimeError(
                 f"set_result_mutation_log() called but plugin format is {self._format!r}. "
-                "Declare 'format': 'foldnano_mini' in the manifest."
+                "Declare 'format': 'foldnano_edit' in the manifest."
             )
         if not isinstance(log, list):
             raise TypeError(f"Expected list, got {type(log).__name__}")

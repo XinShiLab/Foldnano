@@ -151,7 +151,7 @@ describe('prepareLocalZipInstall / preparePointerInstall', () => {
 		const fetchSpy = vi.fn();
 		vi.stubGlobal('fetch', fetchSpy);
 		const pointer = makeManifest({
-			format: 'foldnano_mini',
+			format: 'foldnano_edit',
 			applyStrategy: 'replayMutationLog',
 			entrypoint: 'def run(ctx): raise RuntimeError("placeholder")',
 			sidePanel: { type: 'codeEditor', codeEditor: { execution: 'entrypoint' } },
@@ -169,7 +169,7 @@ describe('prepareLocalZipInstall / preparePointerInstall', () => {
 	it('returns blocked-busy when the registry reports the id busy, and writes nothing', async () => {
 		const registry = makeClassifyRegistry({ busy: { busy: true, reason: 'currently running' } });
 		const pointer = makeManifest({
-			format: 'foldnano_mini',
+			format: 'foldnano_edit',
 			applyStrategy: 'replayMutationLog',
 			entrypoint: 'def run(ctx): raise RuntimeError("placeholder")',
 			sidePanel: { type: 'codeEditor', codeEditor: { execution: 'entrypoint' } },
@@ -188,7 +188,7 @@ describe('prepareLocalZipInstall / preparePointerInstall', () => {
 			busy: { busy: true, reason: 'registry busy-check is not configured' },
 		});
 		const pointer = makeManifest({
-			format: 'foldnano_mini',
+			format: 'foldnano_edit',
 			applyStrategy: 'replayMutationLog',
 			entrypoint: 'def run(ctx): raise RuntimeError("placeholder")',
 			sidePanel: { type: 'codeEditor', codeEditor: { execution: 'entrypoint' } },
@@ -208,7 +208,7 @@ describe('prepareLocalZipInstall / preparePointerInstall', () => {
 			existing: makePlugin(existingManifest, 'user'),
 		});
 		const pointer = makeManifest({
-			format: 'foldnano_mini',
+			format: 'foldnano_edit',
 			applyStrategy: 'replayMutationLog',
 			entrypoint: 'def run(ctx): raise RuntimeError("placeholder")',
 			sidePanel: { type: 'codeEditor', codeEditor: { execution: 'entrypoint' } },
@@ -229,7 +229,7 @@ describe('prepareLocalZipInstall / preparePointerInstall', () => {
 		const fetchSpy = vi.fn();
 		vi.stubGlobal('fetch', fetchSpy);
 		const pointer = makeManifest({
-			format: 'foldnano_mini',
+			format: 'foldnano_edit',
 			applyStrategy: 'replayMutationLog',
 			entrypoint: 'def run(ctx): raise RuntimeError("placeholder")',
 			sidePanel: { type: 'codeEditor', codeEditor: { execution: 'entrypoint' } },

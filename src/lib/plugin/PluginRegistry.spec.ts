@@ -477,7 +477,7 @@ describe('PluginRegistry owned plugins', () => {
 			id: 'local.abc12345',
 			name: 'Mine',
 			version,
-			format: 'foldnano_mini',
+			format: 'foldnano_edit',
 			applyStrategy: 'replayMutationLog',
 		};
 	}

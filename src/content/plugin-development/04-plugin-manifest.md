@@ -38,7 +38,7 @@ covers:
 | `id` | Yes | Unique key used by the registry. Starts with a letter, then letters, digits, `.`, `_` or `-`, up to 64 characters; kebab-case such as `my-plugin` is recommended. Checked when the plugin is installed. |
 | `name` | Yes | Display name in the panel. |
 | `version` | Yes | A [semantic version](https://semver.org) such as `1.0.0` or `1.2.0-beta.1` (not `latest` or `v1`). Bump it whenever the plugin's files change. Checked when the plugin is installed. |
-| `format` | Yes | `"cadnano_json"` \| `"foldnano_json"` \| `"foldnano_mini"`. (`"live"` is reserved and rejected at install time.) |
+| `format` | Yes | `"cadnano_json"` \| `"foldnano_json"` \| `"foldnano_edit"`. (`"live"` is reserved and rejected at install time.) |
 | `applyStrategy` | Yes | Must match the selected `format`. |
 | `entrypoint` | Either/or | Inline Python source string. Only valid for `sidePanel.codeEditor` plugins with `execution: "entrypoint"`; see below. |
 | `entrypointUrl` | Either/or | URL to a `.zip` plugin bundle. Required for every other plugin. |
@@ -183,7 +183,7 @@ Use this when the editor buffer is the full Python source of truth. In this mode
 	"id": "my-script-plugin",
 	"name": "My Script Plugin",
 	"version": "1.0.0",
-	"format": "foldnano_mini",
+	"format": "foldnano_edit",
 	"applyStrategy": "replayMutationLog",
 	"entrypoint": "def run(ctx):\n    raise RuntimeError('Editor contents execute at runtime')\n",
 	"sidePanel": {
@@ -192,7 +192,7 @@ Use this when the editor buffer is the full Python source of truth. In this mode
 		"icon": "code",
 		"codeEditor": {
 			"filename": "script.py",
-			"initialCode": "from foldnano.plugin import PluginContext\n\n\ndef run(ctx: PluginContext) -> None:\n    pass\n",
+			"initialCode": "from foldnano import PluginContext\n\n\ndef run(ctx: PluginContext) -> None:\n    pass\n",
 			"execution": "entrypoint"
 		}
 	}

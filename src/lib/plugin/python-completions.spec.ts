@@ -8,13 +8,13 @@ import {
 } from './python-completions';
 
 // Keeps the Python sources in this spec's import graph so `vitest --changed` reruns the drift check.
-const PYTHON_SOURCES = import.meta.glob('./python/{foldnano,foldnano_mini}/*.py', {
+const PYTHON_SOURCES = import.meta.glob('./python/{foldnano,foldnano/edit}/*.py', {
 	query: '?raw',
 	eager: true,
 });
 
-const HEADER = `from foldnano.plugin import PluginContext
-from foldnano_mini import load_part
+const HEADER = `from foldnano import PluginContext
+from foldnano.edit import load_part
 
 
 def run(ctx: PluginContext) -> None:
@@ -103,14 +103,17 @@ describe('completePython member access', () => {
 
 describe('completePython names and imports', () => {
 	it('completes module exports after from ... import', () => {
-		expect(labels('from foldnano_mini import ')).toEqual(
+		expect(labels('from foldnano.edit import ')).toEqual(
 			expect.arrayContaining(['load_part', 'MutablePart'])
 		);
 		expect(labels('from foldnano.plugin import Plug')).toEqual(['PluginContext']);
+		expect(labels('from foldnano import Plug')).toEqual(
+			expect.arrayContaining(['PluginContext', 'ReferenceMesh'])
+		);
 	});
 
 	it('completes module names', () => {
-		expect(labels('from foldnano')).toEqual(expect.arrayContaining(['foldnano', 'foldnano_mini']));
+		expect(labels('from foldnano')).toEqual(expect.arrayContaining(['foldnano', 'foldnano.edit']));
 	});
 
 	it('offers typed scope variables, API names and keywords for a bare identifier', () => {
@@ -179,7 +182,7 @@ describe('signatureHelpPython', () => {
 	});
 
 	it('resolves module-level API functions', () => {
-		const out = help('from foldnano_mini import load_part\npart = load_part(s, ');
+		const out = help('from foldnano.edit import load_part\npart = load_part(s, ');
 		expect(out?.label).toBe('load_part');
 		expect(out?.returns).toBe('MutablePart');
 		expect(out?.activeParam).toBe(1);

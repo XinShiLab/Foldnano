@@ -35,7 +35,7 @@
 	const editorCtx = getEditorViewContext();
 
 	const FORMAT_LABELS: Record<ScaffoldFormat, string> = {
-		foldnano_mini: 'foldnano_mini: Python API, edits replayed as one undo step',
+		foldnano_edit: 'foldnano_edit: Python API, edits replayed as one undo step',
 		foldnano_json: 'foldnano_json: the whole part as JSON',
 		cadnano_json: 'cadnano_json: the active lattice region as cadnano JSON',
 	};
@@ -54,7 +54,7 @@
 	let idEdited = $state(false);
 	let version = $state(DEFAULT_NEW_PLUGIN_VERSION);
 	let description = $state('');
-	let format: ScaffoldFormat = $state('foldnano_mini');
+	let format: ScaffoldFormat = $state('foldnano_edit');
 	let applyStrategy: ApplyStrategy = $state('replayMutationLog');
 	let requirements = $state('');
 	let network = $state('');
@@ -69,7 +69,7 @@
 		idEdited = false;
 		version = DEFAULT_NEW_PLUGIN_VERSION;
 		description = '';
-		format = 'foldnano_mini';
+		format = 'foldnano_edit';
 		applyStrategy = 'replayMutationLog';
 		requirements = '';
 		network = '';
@@ -261,7 +261,7 @@
 					<div class="space-y-0.5">
 						<Label for="new-plugin-stubs">Add API stubs for editor autocomplete</Label>
 						<p class="text-xs text-muted-foreground">
-							Writes the foldnano and foldnano_mini type stubs into <code>.foldnano-stubs/</code>
+							Writes the foldnano and foldnano.edit type stubs into <code>.foldnano-stubs/</code>
 							and a
 							<code>pyrightconfig.json</code> for VS Code / Pylance. Neither is part of the plugin.
 						</p>

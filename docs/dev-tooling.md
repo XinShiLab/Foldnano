@@ -37,7 +37,7 @@ A dirty `vite.config.ts` or `package.json` makes `vitest --changed` rerun every 
 worker bundled by esbuild into one self-contained ES module string, with `import.meta.env` replaced by Vite's
 env object. esbuild has no `import.meta.glob`, so the plugin provides
 `virtual:foldnano-python-packages` instead: every `.py` file of the bundled Python packages
-(`foldnano`, `foldnano_mini`), read at bundle time, so a new module ships without touching the
+(`foldnano`, `foldnano.edit`), read at bundle time, so a new module ships without touching the
 worker. In dev, adding or removing a module there invalidates the bundle and reloads the page. The Python plugin sandbox starts it as a module worker from a
 `data:` URL inside an opaque-origin iframe, where a `blob:` module worker fails silently (see
 `docs/python-plugin-system.md` § Sandbox). It runs the same way in dev and build and registers
@@ -88,7 +88,7 @@ by hand in the file header, the About dialog and `THIRD_PARTY_NOTICES.md`.
 
 GitHub Actions runs on every pull request and on pushes to `main`: a frozen-lockfile install,
 then `pnpm lint` (which includes `docs:verify`), `pnpm check`, `pnpm test:all`, `pnpm build` and
-`pnpm test:python` (pytest for the bundled `foldnano` / `foldnano_mini` packages, via uv), the same
+`pnpm test:python` (pytest for the bundled `foldnano` / `foldnano.edit` packages, via uv), the same
 commands as a local final check. Node comes from `.nvmrc` and pnpm from `package.json`
 `packageManager`, so CI and local machines use the same versions. The checkout fetches Git LFS
 files because the bundled plugin wheel and the doc-site `.webp` screenshots live there. `src/lib/plugin/python/.python-version` pins

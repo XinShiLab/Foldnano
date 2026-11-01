@@ -19,7 +19,7 @@
 
 	const regionVhs = $derived(part.virtualHelices.filter((vh) => vh.regionId === region.id));
 	const isEmpty = $derived(regionVhs.length === 0);
-	const isFreeform = $derived(region.kind === 'FREEFORM');
+	const isFreeform = $derived(region.supportsFreeformPlacement);
 	// The hint keeps naming the unused gesture: a user who finds drag may never try double-click.
 	const hasPerpendicularVh = $derived(regionVhs.some((vh) => isPerpendicular(vh.localFrame)));
 	const hasInPlaneVh = $derived(regionVhs.some((vh) => !isPerpendicular(vh.localFrame)));

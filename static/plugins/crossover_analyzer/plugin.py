@@ -20,7 +20,7 @@ Strategy: previewOnly   (read-only; no model changes)
 
 from __future__ import annotations
 import json
-from foldnano.plugin import PluginContext
+from foldnano import PluginContext
 
 # These modules live alongside plugin.py inside the zip bundle.
 from analyzer import extract_crossovers

@@ -75,7 +75,7 @@ The **Help** menu offers three starters. Loading one replaces the editor content
 | --- | --- |
 | **Load Mutation Starter** | Load the part, recolor one staple, and return the change so it can be applied |
 | **Load Analysis Starter** | Inspect the part and report counts without changing anything |
-| **Load Full API Demo** | Exercise every kind of `foldnano_mini` edit on the active design (it makes many changes, so try it on a scratch design) |
+| **Load Full API Demo** | Exercise every kind of `foldnano.edit` edit on the active design (it makes many changes, so try it on a scratch design) |
 
 The same menu lists the essentials:
 
@@ -84,7 +84,7 @@ The same menu lists the essentials:
 - `ctx.log("...")`: print to the console
 - `ctx.set_result({...})`: show structured JSON output
 - `ctx.set_result_mutation_log(part.mutation_log)`: make the run's edits applicable
-- `load_part(...)` from `foldnano_mini`, then `part.oligos`, `part.virtual_helices`, `part.regions`, and `part.get_region(...)`
+- `load_part(...)` from `foldnano.edit`, then `part.oligos`, `part.virtual_helices`, `part.regions`, and `part.get_region(...)`
 
 For the full API, see [Plugin API](/docs/plugin-development/plugin-api).
 

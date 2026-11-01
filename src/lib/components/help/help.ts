@@ -15,6 +15,7 @@ export type GuideSlug =
 	| 'duplicates-repeat-groups'
 	| 'simulation-export'
 	| '3d-overlays'
+	| 'wireframe'
 	| 'oligo-report'
 	| 'saving-github'
 	| 'plugins-for-users'

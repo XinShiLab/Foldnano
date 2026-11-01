@@ -16,7 +16,7 @@ Example (cadnano_json mode)::
 Example (foldnano_json mode)::
 
     def run(ctx):
-        from foldnano.io import parse_foldnano_json
+        from foldnano import parse_foldnano_json
         part = parse_foldnano_json(
             ctx.get_part_as_foldnano_json(),
             active_region_id=ctx.active_region_id,
@@ -31,10 +31,19 @@ from .plugin import PluginContext
 from .io import PartData, parse_cadnano_json, parse_foldnano_json
 from .vh import VirtualHelixProxy
 from .oligo import OligoProxy, OligoSegmentProxy
-from .region import RegionProxy, LatticedRegionProxy, FreeformRegionProxy
+from .region import (
+    BACKBONE_RISE_NM,
+    RegionProxy,
+    LatticedRegionProxy,
+    FreeformRegionProxy,
+    WireframeRegionProxy,
+    ReferenceGeometry,
+    ReferenceMesh,
+)
 from .plane import PlaneProxy
 
 __all__ = [
+    "BACKBONE_RISE_NM",
     "PluginContext",
     "PartData",
     "parse_cadnano_json",
@@ -45,5 +54,8 @@ __all__ = [
     "RegionProxy",
     "LatticedRegionProxy",
     "FreeformRegionProxy",
+    "WireframeRegionProxy",
+    "ReferenceGeometry",
+    "ReferenceMesh",
     "PlaneProxy",
 ]

@@ -3,6 +3,8 @@ covers:
   - src/lib/components/Editor/View3D/**
   - src/lib/model/geometry3d/**
   - src/lib/components/Editor/ToolPanel/View3DPanel.svelte
+  - src/lib/components/Editor/ToolPanel/ReferenceMesh*.svelte
+  - src/lib/model/io/plyMesh*.ts
 ---
 
 # Editor - 3D View
@@ -228,6 +230,23 @@ parsers, geometry, ghost mode, gizmo placement, and remembered placement.
 
 ---
 
+## Reference Mesh
+
+A wireframe region's `referenceGeometry` mesh is drawn by `referenceMeshOverlay.ts`, in orange, through
+the region's plane. Mesh coordinates are region-local (x, y, z = U, V, W), so moving the plane moves the
+mesh without rebuilding geometry. It is not in `currentGroup`: it stays out of raycasts and the GLB export.
+`referenceGeometry` is a plain field, so the effect that feeds the overlay subscribes to
+`historyStack.revision`; every write goes through history.
+
+`meshDraft` on `EditorViewContext` is a chosen mesh not yet on a region. `plyMesh.ts` parses the file, and
+`ReferenceMeshPicker` (used by `RegionCreationPanel` and `ReferenceMeshPanel`) fills the draft in and sets
+its scale. The overlay previews `scaledMeshDraft` on the pending base plane or the active region's plane,
+in place of any mesh it would replace, and the camera frames the preview because a file's size is unknown
+in advance. Hidden meshes are `hiddenReferenceMeshRegionIds`: view state, not saved and not undoable.
+
+`toolPanelMode: 'mesh'` opens `ReferenceMeshPanel`. The mode survives a change of region, and `ToolPanel`
+falls back to the inspector while the active region lacks `supportsReferenceGeometry`.
+
 ## Rigid-Body Simulation
 
 Simulation flow:
@@ -303,6 +322,8 @@ change.
 
 ## Boundaries / Don'ts
 
+- **Don't write a reference mesh outside history.** The overlay learns of changes from `historyStack.revision`.
+- **Don't apply a mesh draft's scale twice.** `scaledMeshDraft` is what gets stored; a stored mesh is already in nm and has no scale.
 - **Don't read VH placement from `vh.latticeCoords` or `vh.localFrame` directly.** Use `part.getVirtualHelixFrame(vh)`; it applies plane transforms.
 - **Don't persist RBS overrides.** `simOverrides` is render-only — never feed it back into `vh.localFrame` or `vh.latticeCoords`.
 - **Don't commit a plane edit on every move event.** Live drag mutates via `part.setPlaneTransform(...)`; the single `transformPlaneCmd` lands at pointer-up. Calling the command per move floods undo history.

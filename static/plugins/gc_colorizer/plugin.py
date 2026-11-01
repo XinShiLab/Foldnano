@@ -25,8 +25,7 @@ from __future__ import annotations
 
 import json
 
-from foldnano.io import parse_foldnano_json
-from foldnano.plugin import PluginContext
+from foldnano import PluginContext, parse_foldnano_json
 
 
 # ---------------------------------------------------------------------------

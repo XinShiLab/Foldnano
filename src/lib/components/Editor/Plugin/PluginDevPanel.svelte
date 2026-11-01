@@ -300,11 +300,11 @@
 							and results are applied straight away (each run is one undo step). Instructions for
 							the agent are in <code>AGENTS.md</code>.
 						</p>
-						{#if plugin.manifest.format !== 'foldnano_mini'}
+						{#if plugin.manifest.format !== 'foldnano_edit'}
 							<p class="px-3 pt-1 text-xs text-amber-600">
 								Agent scripts run as <code>{plugin.manifest.format}</code> and replace the whole
 								{plugin.manifest.format === 'cadnano_json' ? 'region' : 'part'} on each run. For step-by-step
-								design edits, a <code>foldnano_mini</code> plugin records each change instead.
+								design edits, a <code>foldnano_edit</code> plugin records each change instead.
 							</p>
 						{/if}
 					{/if}

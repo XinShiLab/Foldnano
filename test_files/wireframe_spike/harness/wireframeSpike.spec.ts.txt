@@ -1,0 +1,168 @@
+// Temporary spike harness: not for commit.
+import { execFileSync } from 'child_process';
+import * as fs from 'fs';
+import * as path from 'path';
+import { describe, expect, it } from 'vitest';
+
+import { Part } from '$lib/model/Part';
+import FoldnanoDocument from '$lib/model/document.svelte';
+import { checkPartIntegrity } from '$lib/model/checks/integrity';
+import { checkSimulationProfile } from '$lib/model/checks/simulation';
+import { checkFoldnanoPartJsonShape } from '$lib/model/checks/shape/foldnanoJsonShape';
+import { exportPartToOxDna } from '$lib/model/io/oxdnaExport';
+import { buildBlocksAndConstraints } from '$lib/model/rbs/buildBlocks';
+import { runSimulation } from '$lib/model/rbs/rbsEngine';
+import { dispatchOp, type MutationOp } from './opDispatch';
+
+const SCRATCH = process.env.SPIKE_SCRATCH as string;
+const OUT_DIR = path.resolve(__dirname, '../../../test_files/wireframe_spike');
+const PY_DIR = path.resolve(__dirname, 'python');
+
+const pct = (v: number[], q: number) =>
+	v.length ? [...v].sort((a, b) => a - b)[Math.floor((v.length - 1) * q)] : 0;
+const stats = (v: number[]) => ({
+	n: v.length,
+	min: +pct(v, 0).toFixed(2),
+	median: +pct(v, 0.5).toFixed(2),
+	max: +pct(v, 1).toFixed(2),
+});
+
+/** Backbone jumps across every `next` link in the exported oxDNA files. */
+function oxDnaBackbone(top: string, dat: string) {
+	const topLines = top.trim().split('\n').slice(1);
+	const pos = dat
+		.trim()
+		.split('\n')
+		.slice(3)
+		.map((l) => l.split(' ').slice(0, 3).map(Number));
+	const d: number[] = [];
+	topLines.forEach((l, i) => {
+		const next = Number(l.split(' ')[2]);
+		if (next < 0) return;
+		const [a, b] = [pos[i], pos[next]];
+		// oxDNA length unit 0.8518 nm.
+		d.push(Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]) * 0.8518);
+	});
+	return d;
+}
+
+describe('wireframe spike', () => {
+	it('runs', () => {
+		const empty = Part.forType('FREEFORM', 'wireframe-spike', 'spike-part');
+		const emptyPath = path.join(SCRATCH, 'empty.json');
+		const outPath = path.join(SCRATCH, 'variants.json');
+		const emptyJson = JSON.stringify(empty.toJSON());
+		fs.writeFileSync(emptyPath, emptyJson);
+		console.log(
+			execFileSync(
+				'uv',
+				[
+					'run',
+					'--locked',
+					'--extra',
+					'dev',
+					'python',
+					path.join(SCRATCH, 'gen.py'),
+					OUT_DIR,
+					emptyPath,
+					outPath,
+				],
+				{ cwd: PY_DIR, encoding: 'utf8', env: { ...process.env, PYTHONPATH: PY_DIR } }
+			)
+		);
+		const variants = JSON.parse(fs.readFileSync(outPath, 'utf8'));
+		const report: Record<string, unknown> = {};
+		for (const [name, v] of Object.entries<{
+			log: MutationOp[];
+			facts: unknown;
+			mirror: { oligos: unknown[] };
+		}>(variants)) {
+			const part = Part.fromJSON(JSON.parse(emptyJson));
+			const t0 = performance.now();
+			v.log.forEach((op) => dispatchOp(op, part));
+			const replayMs = performance.now() - t0;
+			const json = part.toJSON();
+			checkFoldnanoPartJsonShape(JSON.parse(JSON.stringify(json)));
+			const reloaded = Part.fromJSON(JSON.parse(JSON.stringify(json)));
+			const roundTrip = JSON.stringify(reloaded.toJSON()) === JSON.stringify(json);
+
+			const integrity = checkPartIntegrity(part);
+			const simulation = checkSimulationProfile(part);
+			const { blocks, constraints } = buildBlocksAndConstraints(part);
+			const before = runSimulation(blocks, constraints, { iterations: 0 });
+			const t1 = performance.now();
+			const after = runSimulation(blocks, constraints);
+			const rbsMs = performance.now() - t1;
+			const ox = exportPartToOxDna(part);
+			const ratio = (m: Map<string, number>) => stats([...m.values()]);
+			const backbone = oxDnaBackbone(ox.top, ox.dat);
+			const allOligos = [...part.oligos];
+			const scaffoldOligos = allOligos.filter((o) => o.isScaffold);
+			const ends = (oligos: { segments: Record<string, never>[] }[]) =>
+				JSON.stringify(
+					oligos
+						.flatMap((o) =>
+							o.segments.map((s: Record<string, never>) => {
+								const seg = s as unknown as {
+									id: string;
+									fivePrime: { index: number; connectedSegmentId: string | null };
+									threePrime: { index: number; connectedSegmentId: string | null };
+								};
+								return [
+									seg.id,
+									seg.fivePrime.index,
+									seg.threePrime.index,
+									seg.fivePrime.connectedSegmentId,
+									seg.threePrime.connectedSegmentId,
+								];
+							})
+						)
+						.sort((a, b) => String(a[0]).localeCompare(String(b[0])))
+				);
+			const mirrorMatches =
+				ends(v.mirror.oligos as never) === ends(JSON.parse(JSON.stringify(json)).oligos);
+			const centers = new Map(blocks.map((b) => [b.blockId, b]));
+			const moved = [...after.transforms.entries()].map(([id, t]) => {
+				const b = centers.get(id);
+				const p = (t as unknown as { position: { x: number; y: number; z: number } }).position;
+				const o = b?.originalCenter;
+				return o ? Math.hypot(p.x - o.x, p.y - o.y, p.z - o.z) : -1;
+			});
+
+			report[name] = {
+				facts: v.facts,
+				maxBase: part.regions[0].maxBase,
+				oligos: allOligos.length,
+				mirrorMatches,
+				blockMovedNm: stats(moved),
+				scaffoldOligos: scaffoldOligos.length,
+				scaffoldCircular: scaffoldOligos.map((o) => o.isCircular),
+				replayMs: Math.round(replayMs),
+				roundTrip,
+				jsonKB: Math.round(JSON.stringify(json).length / 1024),
+				integrity: integrity.map((i) => i.rule),
+				simulation: simulation.map((i) => i.rule),
+				blocks: blocks.length,
+				constraints: constraints.length,
+				stressBeforeRatio: ratio(before.stressMap),
+				stressAfterRatio: ratio(after.stressMap),
+				maxOverlapBefore: +before.maxOverlap.toFixed(2),
+				maxOverlapAfter: +after.maxOverlap.toFixed(2),
+				rbsMs: Math.round(rbsMs),
+				nt: ox.nucleotideCount,
+				strands: ox.strandCount,
+				oxDnaBackboneNm: stats(backbone),
+				oxDnaBackboneOver2nm: backbone.filter((d) => d > 2).length,
+			};
+
+			fs.mkdirSync(OUT_DIR, { recursive: true });
+			const doc = new FoldnanoDocument(undefined, name);
+			doc.parts.push(part);
+			fs.writeFileSync(path.join(OUT_DIR, `${name}.fn.json`), JSON.stringify(doc.toJSON()));
+			fs.writeFileSync(path.join(OUT_DIR, `${name}.top`), ox.top);
+			fs.writeFileSync(path.join(OUT_DIR, `${name}.dat`), ox.dat);
+		}
+		fs.writeFileSync(path.join(SCRATCH, 'report.json'), JSON.stringify(report, null, 1));
+		expect(Object.keys(report).length).toBeGreaterThan(0);
+	}, 300_000);
+});

@@ -8,6 +8,7 @@
 	import SkipInsertPanel from './SkipInsertPanel.svelte';
 	import View3DPanel from './View3DPanel.svelte';
 	import View3DOverlayPanel from './View3DOverlayPanel.svelte';
+	import ReferenceMeshPanel from './ReferenceMeshPanel.svelte';
 	import RegionCreationPanel from './RegionCreationPanel.svelte';
 	import CircularScaffoldMapPanel from './CircularScaffoldMapPanel.svelte';
 	import { getEditorViewContext } from '../context/EditorViewContext.svelte';
@@ -45,6 +46,10 @@
 	let view3DToolPanelMode = $derived(
 		editorViewContext.view3DToolbarController?.toolPanelMode ?? 'inspector'
 	);
+	// The mesh mode outlives a change of region; a region without meshes falls back to the inspector.
+	let isMeshPanel = $derived(
+		view3DToolPanelMode === 'mesh' && !!editorViewContext.activeRegion?.supportsReferenceGeometry
+	);
 	let isScaffoldMapPanel = $derived(
 		!isRegionCreationMode && !isView3DPanel && editorViewContext.showScaffoldMap
 	);
@@ -52,9 +57,11 @@
 		(isRegionCreationMode
 			? RegionCreationPanel
 			: isView3DPanel
-				? view3DToolPanelMode === 'overlays'
-					? View3DOverlayPanel
-					: View3DPanel
+				? isMeshPanel
+					? ReferenceMeshPanel
+					: view3DToolPanelMode === 'overlays'
+						? View3DOverlayPanel
+						: View3DPanel
 				: isScaffoldMapPanel
 					? CircularScaffoldMapPanel
 					: mapModeToPanel[editorViewContext.editorMode]) as import('svelte').Component<{
@@ -65,9 +72,11 @@
 		isRegionCreationMode
 			? 'New Region'
 			: isView3DPanel
-				? view3DToolPanelMode === 'overlays'
-					? '3D Overlays'
-					: '3D View Inspector'
+				? isMeshPanel
+					? 'Reference Mesh'
+					: view3DToolPanelMode === 'overlays'
+						? '3D Overlays'
+						: '3D View Inspector'
 				: isScaffoldMapPanel
 					? 'Circular Scaffold Map'
 					: mapModeToHeading[editorViewContext.editorMode]
@@ -111,6 +120,10 @@
 		'3D Overlays': {
 			text: 'Load an external structure (mrDNA .txt or PDB) to compare with your design in 3D.',
 			doc: '3d-overlays',
+		},
+		'Reference Mesh': {
+			text: "Add, replace or remove the active wireframe region's reference mesh, or hide it in the 3D view. The mesh never changes helices.",
+			doc: 'wireframe',
 		},
 		'Circular Scaffold Map': {
 			text: 'How staples bind the scaffold: each scaffold as a circle, each staple as an arc between the positions it binds.',

@@ -263,7 +263,7 @@ describe('PluginCoordinator', () => {
 			id: 'script-lab',
 			name: 'Script Lab',
 			version: '1.0.0',
-			format: 'foldnano_mini',
+			format: 'foldnano_edit',
 			applyStrategy: 'replayMutationLog',
 			entrypoint: 'def run(ctx): raise RuntimeError("placeholder")',
 			sidePanel: {
@@ -324,7 +324,7 @@ describe('PluginCoordinator', () => {
 			id: 'script-lab',
 			name: 'Script Lab',
 			version: '1.0.0',
-			format: 'foldnano_mini',
+			format: 'foldnano_edit',
 			applyStrategy: 'replayMutationLog',
 			entrypoint: 'def run(ctx): pass',
 		};
@@ -1012,7 +1012,7 @@ function runtimeCodeManifest(id: string, requirements?: string[]): PluginManifes
 		id,
 		name: id,
 		version: '1.0.0',
-		format: 'foldnano_mini',
+		format: 'foldnano_edit',
 		applyStrategy: 'previewOnly',
 		entrypoint: 'def run(ctx): pass',
 		sidePanel: { type: 'codeEditor', codeEditor: { execution: 'entrypoint' } },
@@ -1551,7 +1551,7 @@ describe('PluginCoordinator owned-plugin drafts', () => {
 		id: 'local.abc12345',
 		name: 'Mine',
 		version: '1.0.0',
-		format: 'foldnano_mini',
+		format: 'foldnano_edit',
 		applyStrategy: 'replayMutationLog',
 	};
 	const DRAFT = 'import numpy\n\ndef run(ctx):\n    ctx.log("draft")\n';

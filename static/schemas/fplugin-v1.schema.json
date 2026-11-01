@@ -26,8 +26,8 @@
 			"description": "The plugin's own version, as a semantic version (e.g. \"1.2.0\"). Bump it whenever plugin files change: Foldnano caches files by this value. Checked at install."
 		},
 		"format": {
-			"enum": ["cadnano_json", "foldnano_json", "foldnano_mini"],
-			"description": "Input/output format the plugin uses."
+			"enum": ["cadnano_json", "foldnano_json", "foldnano_edit", "foldnano_mini"],
+			"description": "Input/output format the plugin uses. foldnano_mini is the old name of foldnano_edit."
 		},
 		"applyStrategy": {
 			"enum": [
@@ -98,7 +98,7 @@
 			}
 		},
 		{
-			"if": { "properties": { "format": { "const": "foldnano_mini" } } },
+			"if": { "properties": { "format": { "enum": ["foldnano_edit", "foldnano_mini"] } } },
 			"then": {
 				"properties": {
 					"applyStrategy": {

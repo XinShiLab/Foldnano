@@ -70,6 +70,7 @@ Used when helix positions should **not** snap to a lattice. The 2D editor draws 
 - **Click a perpendicular VH** (Draw mode) fills it with a strand.
 - **Click a free 3′ end, then a free 5′ end** (Draw mode) connects them.
 - **Drag selected VHs** moves them.
+- **Opacity shows depth.** The view looks along +W, so VHs at more negative W are nearer and more solid, and VHs at more positive W are fainter. Where VHs overlap, the nearer one is on top and takes the click. Selected and hovered VHs stay solid.
 - **Drag a rotate handle** rotates one in-plane VH.
 - **Drag a free endpoint** (Select mode) resizes that segment.
 - **Distribute in a circle** (plane view toolbar) spaces three or more selected perpendicular VHs evenly on a circle around their centre, keeping their order. Its sibling, **Distribute in a circle, facing the centre**, also rolls each VH so roll 0 points at the centre.
@@ -109,6 +110,7 @@ The 3D toolbar controls what's shown and what runs:
 - **Export**: image (PNG), **GLB**, **oxDNA**, and **mrDNA**.
 - **Reset camera** and **performance stats**.
 - **3D Overlay**, which switches the tool panel to [3D Overlays](/docs/guide/3d-overlays) for loading mrDNA or PDB structures.
+- **Mesh**, shown for a wireframe region, which switches the tool panel to [Reference Mesh](/docs/plugin-development/wireframe-plugins#manage-the-mesh).
 
 Every button is listed in the [Interface Reference](/docs/guide/interface-reference#3d-view-toolbar).
 

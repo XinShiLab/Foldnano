@@ -1,29 +1,29 @@
 ---
 title: Testing Plugins
-description: Offline unit testing for foldnano_mini plugins using CPython, pytest fixtures, and the self-consistency replay check
+description: Offline unit testing for foldnano.edit plugins using CPython, pytest fixtures and the self-consistency replay check, and testing in the app with Plugin Dev Mode
 category: plugin-development
 order: 9
 slug: plugin-testing
 covers:
-  - src/lib/plugin/python/foldnano_mini/transport.py
-  - src/lib/plugin/python/foldnano_mini/invariants.py
+  - src/lib/plugin/python/foldnano/edit/transport.py
+  - src/lib/plugin/python/foldnano/edit/invariants.py
 ---
 
 # Testing Plugins
 
-## Testing `foldnano_mini` plugins offline
+## Testing `foldnano.edit` plugins offline
 
-The offline transport is pure Python, so `foldnano_mini` plugins can be unit-tested in CPython without Pyodide or the browser. There are three layers:
+The offline transport is pure Python, so `foldnano.edit` plugins can be unit-tested in CPython without Pyodide or the browser. There are three layers:
 
 ### 1. Local invariants
 
-`foldnano_mini/invariants.py` runs cheap validators _before_ an op is appended to the log: hex-color shape, integer endpoint distinctness, strand-set-index ∈ {0, 1}, etc. They fail fast with a clear `ValueError` / `TypeError` and never touch the JS side.
+`foldnano/edit/invariants.py` runs cheap validators _before_ an op is appended to the log: hex-color shape, integer endpoint distinctness, strand-set-index ∈ {0, 1}, etc. They fail fast with a clear `ValueError` / `TypeError` and never touch the JS side.
 
 Topology edits are checked the same way, before anything is recorded: occupancy, region bounds, end moves, crossovers, breaks, and skip or insertion placement. A refused edit raises `InvalidOperationError` (a `ValueError`) with the reason, and every such call has a `can_*` twin that returns the same answer without raising, so tests can assert on either:
 
 ```python
 import pytest
-from foldnano_mini import InvalidOperationError, load_part
+from foldnano.edit import InvalidOperationError, load_part
 
 def test_occupied_range_refused(multi_region_part_foldnano_json):
     part = load_part(multi_region_part_foldnano_json)
@@ -38,7 +38,7 @@ These checks are kept in step with the editor's own rules by parity tests in the
 
 ```python
 import pytest
-from foldnano_mini import load_part
+from foldnano.edit import load_part
 
 def test_bad_color_rejected(multi_region_part_foldnano_json):
     part = load_part(multi_region_part_foldnano_json)
@@ -62,7 +62,7 @@ def test_my_plugin(multi_region_part_foldnano_json):
     from my_plugin.plugin import run
 
     ctx = PluginContext(
-        format="foldnano_mini",
+        format="foldnano_edit",
         foldnano_json_in=multi_region_part_foldnano_json,
         active_region_id="region-honey",
     )
@@ -77,7 +77,7 @@ Available pytest fixtures: `minimal_part_foldnano_json`, `multi_region_part_fold
 `MutablePart.replay_log_into_fresh_mirror(json_str, log)` re-applies a captured log onto a fresh mirror and returns the resulting dict. Asserting it matches `part.to_json()` catches op-encoding bugs and replay determinism issues:
 
 ```python
-from foldnano_mini import MutablePart, load_part
+from foldnano.edit import MutablePart, load_part
 
 def test_replay_matches_mirror(multi_region_part_foldnano_json):
     part = load_part(multi_region_part_foldnano_json)
@@ -100,10 +100,10 @@ uv run pytest tests/ -v
 
 Reference test files:
 
-- `tests/test_foldnano_mini_offline.py`: offline transport behaviour, op recording, validation.
-- `tests/test_foldnano_mini_replay_self.py`: self-consistency between mirror and replay.
-- `tests/test_foldnano_mini_topology.py`: occupancy queries, segment ends, `can_*` checks, `create_oligo` and the editor-level calls.
-- `tests/test_foldnano_mini_parity.py` and `tests/test_foldnano_mini_replay_host.py`: agreement with the app's own model, in both directions.
+- `tests/test_foldnano_edit_offline.py`: offline transport behaviour, op recording, validation.
+- `tests/test_foldnano_edit_replay_self.py`: self-consistency between mirror and replay.
+- `tests/test_foldnano_edit_topology.py`: occupancy queries, segment ends, `can_*` checks, `create_oligo` and the editor-level calls.
+- `tests/test_foldnano_edit_parity.py` and `tests/test_foldnano_edit_replay_host.py`: agreement with the app's own model, in both directions.
 - `tests/test_foldnano_regions.py`: Plane / DesignRegion proxy surface.
 
 ### What is _not_ covered offline
@@ -112,7 +112,7 @@ Reference test files:
 - 3D / view-side regressions.
 - Cross-plugin interactions in the editor.
 
-Validate those by running the plugin in `pnpm dev` against a real design and confirming the resulting state visually + with a single Undo.
+Validate those by running the plugin in the app (see [Testing In The App](#testing-in-the-app)) against a real design, and confirming the result visually and with a single Undo.
 
 ---
 
@@ -122,7 +122,7 @@ Validate those by running the plugin in `pnpm dev` against a real design and con
 
 ```python
 import json
-from foldnano.plugin import PluginContext
+from foldnano import PluginContext
 
 with open("my_design.json") as f:
     cadnano_str = f.read()
@@ -143,7 +143,7 @@ print(ctx.plugin_result)
 print(list(ctx.artifacts.keys()))
 ```
 
-The `foldnano` and `foldnano_mini` packages live at `src/lib/plugin/python/`. Add it to your `PYTHONPATH` when running outside the browser:
+The `foldnano` and `foldnano.edit` packages live at `src/lib/plugin/python/`. Add it to your `PYTHONPATH` when running outside the browser:
 
 ```bash
 PYTHONPATH=src/lib/plugin/python python my_plugin_test.py
@@ -153,16 +153,35 @@ cd src/lib/plugin/python && uv run pytest tests/ -v
 
 ---
 
+## Testing In The App
+
+Offline tests are fast and repeatable, but they don't run your plugin in Pyodide or apply its result to a real design. To check those, use [Plugin Dev Mode](/docs/plugin-development/plugin-dev-mode): link your plugin folder, and each **Run** reads the folder again, with no zipping or reinstalling.
+
+Dev mode is the place to check:
+
+- **Your manifest and run dialog.** **Check** lists what would stop the plugin installing or running.
+- **Your dependencies.** Packages load in Pyodide, not your local Python, so something that passes in pytest can still fail here.
+- **The applied result.** Check it in the strand and 3D views, and confirm one Undo reverts it.
+- **Repeat groups and `replayMutationLogInRegion`.** The offline checks don't model these.
+
+For a quick script, [Script Lab](/docs/guide/script-lab) needs no folder or manifest.
+
+Dev mode needs a Chromium-based browser. In other browsers, use **Import zip** for each change.
+
+---
+
 ## New Plugin Checklist
 
 - [ ] `<plugin_dir>/plugin.py`: `run(ctx: PluginContext)` entry point, at the root of the plugin folder
 - [ ] `<plugin_dir>/fplugin.json`: manifest with unique `id` (kebab-case), correct `format`, and correct `applyStrategy`, also at the root
 - [ ] Zipped together with no subdirectory prefix: `cd <plugin_dir> && zip <id>.zip fplugin.json plugin.py`
 - [ ] For `foldnano_json` mutations: mutate `part._raw`, return via `set_result_foldnano_json`
-- [ ] For `foldnano_mini` mutations: thread `ctx.active_region_id` into `load_part`, return via `set_result_mutation_log(part.mutation_log)`
+- [ ] For `foldnano_edit` mutations: thread `ctx.active_region_id` into `load_part`, return via `set_result_mutation_log(part.mutation_log)`
 - [ ] For sequence-based computations: strip `"N"` placeholders before computing GC or other stats
 - [ ] Log a summary at the end: counts of processed/skipped items
 - [ ] `applyStrategy: previewOnly` unless the plugin intentionally mutates the model
+- [ ] **Check** in dev mode reports no problems
+- [ ] Final test: **Zip**, unlink, then **Import zip**, because a linked plugin runs in its own dev environment rather than the one an installed copy gets
 
 ### Parameters checklist
 

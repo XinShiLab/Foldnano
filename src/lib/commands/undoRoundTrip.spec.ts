@@ -395,6 +395,25 @@ const CASES: Record<string, Case> = {
 			regions.splitRegionCmd(history, part, region.id, vh0.id)
 		);
 	},
+	setRegionReferenceGeometryCmd: () => {
+		const doc = new FoldnanoDocument('doc', 'round-trip');
+		const part = doc.addNewPart('WIREFRAME');
+		const history = createTestHistory(doc);
+		expectUndoRoundTrip(doc, history, () =>
+			regions.setRegionReferenceGeometryCmd(history, part, part.getDefaultRegion().id, {
+				unit: 'nm',
+				mesh: {
+					vertices: [
+						[0, 0, 0],
+						[1, 0, 0],
+						[0, 1, 0],
+					],
+					faces: [[0, 1, 2]],
+					edges: [],
+				},
+			})
+		);
+	},
 	changeRegionLengthCmd: () => {
 		const { doc, region, history } = latticeScene();
 		expectUndoRoundTrip(doc, history, () => regions.changeRegionLengthCmd(history, region, 21));

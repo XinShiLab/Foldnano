@@ -9,11 +9,15 @@ const QUERY = '?sandbox-worker';
 const PYTHON_PACKAGES_ID = 'virtual:foldnano-python-packages';
 const PYTHON_PACKAGES_NAMESPACE = 'foldnano-python-packages';
 const PYTHON_ROOT = 'src/lib/plugin/python';
-const PYTHON_PACKAGES = ['foldnano', 'foldnano_mini'];
+const PYTHON_PACKAGES = ['foldnano', 'foldnano/edit', 'foldnano_mini'];
 
 /** Every `.py` file of the bundled packages, read when the worker is built, so a new module can't
  * be left out of the runtime by a forgotten import. */
-function pythonPackages(packageDirs: string[], onRead: (files: string[]) => void): EsbuildPlugin {
+function pythonPackages(
+	pythonRoot: string,
+	packageDirs: string[],
+	onRead: (files: string[]) => void
+): EsbuildPlugin {
 	return {
 		name: 'foldnano-python-packages',
 		setup(b) {
@@ -27,7 +31,7 @@ function pythonPackages(packageDirs: string[], onRead: (files: string[]) => void
 				for (const dir of packageDirs) {
 					for (const file of (await readdir(dir)).filter((f) => f.endsWith('.py')).sort()) {
 						const filePath = path.join(dir, file);
-						sources[`${path.basename(dir)}/${file}`] = await readFile(filePath, 'utf8');
+						sources[path.relative(pythonRoot, filePath)] = await readFile(filePath, 'utf8');
 						read.push(filePath);
 					}
 				}
@@ -48,6 +52,7 @@ function pythonPackages(packageDirs: string[], onRead: (files: string[]) => void
 export function sandboxWorkerSource(): Plugin {
 	let env: Record<string, unknown> = {};
 	let minify = false;
+	let pythonRoot = '';
 	let packageDirs: string[] = [];
 
 	return {
@@ -55,7 +60,8 @@ export function sandboxWorkerSource(): Plugin {
 		configResolved(config) {
 			env = config.env;
 			minify = config.command === 'build';
-			packageDirs = PYTHON_PACKAGES.map((pkg) => path.resolve(config.root, PYTHON_ROOT, pkg));
+			pythonRoot = path.resolve(config.root, PYTHON_ROOT);
+			packageDirs = PYTHON_PACKAGES.map((pkg) => path.resolve(pythonRoot, pkg));
 		},
 		configureServer(server) {
 			// Edits re-bundle through the watch files; a module added or removed only shows up here.
@@ -84,7 +90,7 @@ export function sandboxWorkerSource(): Plugin {
 				logLevel: 'silent',
 				// A data: worker gets no Vite transform, so inline Vite's env object.
 				define: { 'import.meta.env': JSON.stringify(env) },
-				plugins: [pythonPackages(packageDirs, (files) => (pythonFiles = files))],
+				plugins: [pythonPackages(pythonRoot, packageDirs, (files) => (pythonFiles = files))],
 			});
 			for (const file of pythonFiles) this.addWatchFile(file);
 			for (const input of Object.keys(result.metafile.inputs)) {

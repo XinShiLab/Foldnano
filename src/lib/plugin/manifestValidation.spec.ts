@@ -5,7 +5,9 @@ import {
 	SUPPORTED_REQUIREMENTS_ALLOWLIST,
 	citationLink,
 	classifyManifest,
+	looksLikePluginManifest,
 	validateManifest,
+	withCurrentFormat,
 } from './manifestValidation';
 
 function manifest(overrides: Record<string, unknown>) {
@@ -22,7 +24,7 @@ function manifest(overrides: Record<string, unknown>) {
 /** Runtime-code (Script-Lab-like) manifest: placeholder inline entrypoint. */
 function runtimeCodeManifest(overrides: Record<string, unknown> = {}) {
 	return manifest({
-		format: 'foldnano_mini',
+		format: 'foldnano_edit',
 		applyStrategy: 'replayMutationLog',
 		entrypoint: 'def run(ctx): raise RuntimeError("placeholder")',
 		entrypointUrl: undefined,
@@ -790,5 +792,26 @@ describe('validateManifest', () => {
 				)
 			).toThrow(/default "c" is not in options/);
 		});
+	});
+});
+
+describe('the old format name', () => {
+	const old = {
+		schemaVersion: 2,
+		id: 'old-plugin',
+		name: 'Old Plugin',
+		version: '1.0.0',
+		format: 'foldnano_mini',
+		applyStrategy: 'replayMutationLog',
+	};
+
+	it('reads foldnano_mini as foldnano_edit', () => {
+		expect(validateManifest(old, { allowNoEntrypoint: true }).format).toBe('foldnano_edit');
+		expect(looksLikePluginManifest(old)).toBe(true);
+	});
+
+	it('leaves other formats alone', () => {
+		const current = { format: 'foldnano_json' };
+		expect(withCurrentFormat(current)).toBe(current);
 	});
 });

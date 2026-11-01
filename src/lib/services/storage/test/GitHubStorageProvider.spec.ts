@@ -155,7 +155,11 @@ describe('GitHubStorageProvider', () => {
 
 	it('pulls the latest version from GitHub and overwrites the IndexedDB working copy', async () => {
 		const pulledSnapshot = { id: 'doc-123', name: 'Pulled Design', parts: [] };
-		const upgraded = { ...pulledSnapshot, format: FOLDNANO_FORMAT, formatVersion: 1 };
+		const upgraded = {
+			...pulledSnapshot,
+			format: FOLDNANO_FORMAT,
+			formatVersion: CURRENT_FORMAT_VERSION,
+		};
 		provider.setFileMetadata('doc-123', SAMPLE_META);
 		mockRemoteFile(pulledSnapshot);
 

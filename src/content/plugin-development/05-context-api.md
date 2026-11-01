@@ -12,7 +12,7 @@ covers:
 
 Every plugin's `run(ctx)` receives one `PluginContext`. It is the plugin's only connection to the host: it hands in the design, the parameters and the side-panel state, and it takes back the result, the log and any downloads. It never changes the design itself; the host applies the result afterwards, using the manifest's apply strategy (see [Formats and Apply Strategies](/docs/plugin-development/plugin-formats)).
 
-To read the design as objects instead of a JSON string, pass `ctx.get_part_as_foldnano_json()` to the [Parse API](/docs/plugin-development/plugin-api) or to [foldnano_mini](/docs/plugin-development/foldnano-mini-api).
+To read the design as objects instead of a JSON string, pass `ctx.get_part_as_foldnano_json()` to the [Parse API](/docs/plugin-development/plugin-api) or to [foldnano_edit](/docs/plugin-development/foldnano-edit-api).
 
 **Kind** says what each name does:
 
@@ -25,16 +25,16 @@ To read the design as objects instead of a JSON string, pass `ctx.get_part_as_fo
 
 | API | Kind | Behaviour |
 | --- | --- | --- |
-| `PluginContext` | class | The type of `ctx`, imported with `from foldnano.plugin import PluginContext` (or `from foldnano import PluginContext`). The host builds it; you construct one yourself only in tests ([below](#in-tests)). |
+| `PluginContext` | class | The type of `ctx`, imported with `from foldnano import PluginContext`. `from foldnano.plugin import PluginContext` also works. The host builds it; you construct one yourself only in tests ([below](#in-tests)). |
 | `MAX_ARTIFACT_BYTES` | constant | The most all of one run's artifacts may add up to: 100 MB (text counts as UTF-8). In `foldnano.plugin`. |
 
 ## Input
 
 | API | Kind | Behaviour |
 | --- | --- | --- |
-| `ctx.format` | read‑only | The manifest's `format`: `'cadnano_json'`, `'foldnano_json'` or `'foldnano_mini'`. |
+| `ctx.format` | read‑only | The manifest's `format`: `'cadnano_json'`, `'foldnano_json'` or `'foldnano_edit'`. |
 | `ctx.get_part_as_cadnano_json(part_index=0)` | query | The active part as a cadnano JSON string. Only for `format: "cadnano_json"`; any other format raises `RuntimeError`. |
-| `ctx.get_part_as_foldnano_json(part_index=0)` | query | The active part as a Foldnano JSON string (the `Part.toJSON()` shape). For `foldnano_json` and `foldnano_mini`; `cadnano_json` raises `RuntimeError`. |
+| `ctx.get_part_as_foldnano_json(part_index=0)` | query | The active part as a Foldnano JSON string (the `Part.toJSON()` shape). For `foldnano_json` and `foldnano_edit`; `cadnano_json` raises `RuntimeError`. |
 | `ctx.active_region_id` | read‑only | The id of the region that was active in the strand view when the plugin started, or `None`. Region-scoped plugins pass it to `parse_foldnano_json` or `load_part`. |
 | `ctx.params` | read‑only | Every parameter value confirmed in the run dialog, keyed by the `id`s in the manifest's `parameters`. |
 | `ctx.get_param(key, default=None)` | query | One parameter value, or `default` if it isn't set. |
@@ -49,7 +49,7 @@ Documents hold one part, so `part_index` must be 0; any other value raises `NotI
 | --- | --- | --- |
 | `ctx.set_result_cadnano_json(json_str)` | output | The changed design as a cadnano JSON string: the result the apply strategy applies. |
 | `ctx.set_result_foldnano_json(json_str)` | output | The changed design as a Foldnano JSON string, for `foldnano_json` plugins. |
-| `ctx.set_result_mutation_log(log)` | output | A `foldnano_mini` mutation log (normally `part.mutation_log`), replayed onto the design as one undo step. Only for `format: "foldnano_mini"`; each entry must be a dict with an `op` key. |
+| `ctx.set_result_mutation_log(log)` | output | A `foldnano_edit` mutation log (normally `part.mutation_log`), replayed onto the design as one undo step. Only for `format: "foldnano_edit"`; each entry must be a dict with an `op` key. |
 | `ctx.set_result(data)` | output | A JSON-serialisable dict shown in the plugin output panel. It doesn't change the design. |
 | `ctx.write_artifact(name, data)` | output | A named download (a CSV, a PDB file, ...) of text or bytes, listed in the plugin output panel. Writing the same name again replaces it. Raises `ValueError` when the run's artifacts would pass `MAX_ARTIFACT_BYTES`. |
 | `ctx.log(msg)` | output | Add a line to the plugin log, shown when the run finishes. `print()` output is captured too, one log line per printed line. The log keeps the first 5,000 lines, each up to 10,000 characters. |
