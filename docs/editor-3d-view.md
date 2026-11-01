@@ -238,9 +238,14 @@ mesh without rebuilding geometry. It is not in `currentGroup`: it stays out of r
 `referenceGeometry` is a plain field, so the effect that feeds the overlay subscribes to
 `historyStack.revision`; every write goes through history.
 
+Faces are drawn with fan triangulation from each face's first vertex, on purpose: the mesh is a reference
+drawing. A concave polygon can therefore fill outside its outline. Triangles and other convex faces are
+exact, and the edge lines are always right.
+
 `meshDraft` on `EditorViewContext` is a chosen mesh not yet on a region. `plyMesh.ts` parses the file, and
 `ReferenceMeshPicker` (used by `RegionCreationPanel` and `ReferenceMeshPanel`) fills the draft in and sets
-its scale. The overlay previews `scaledMeshDraft` on the pending base plane or the active region's plane,
+its scale. `setMeshDraftScale` refuses a scale that makes a coordinate non-finite, because JSON would save
+it as null and the mesh would reopen damaged. The overlay previews `scaledMeshDraft` on the pending base plane or the active region's plane,
 in place of any mesh it would replace, and the camera frames the preview because a file's size is unknown
 in advance. Hidden meshes are `hiddenReferenceMeshRegionIds`: view state, not saved and not undoable.
 

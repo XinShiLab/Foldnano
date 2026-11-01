@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { checkReferenceGeometryShape } from '$lib/model/checks/shape/foldnanoJsonShape';
 import {
+	hasFiniteVertices,
 	nmToApproxBp,
 	referenceMeshEdges,
 	scaleReferenceMesh,
@@ -185,6 +186,23 @@ describe('reference mesh geometry', () => {
 			shortestEdge: 3,
 			longestEdge: 12,
 		});
+	});
+
+	it('summarizes a mesh too large to spread into Math.max', () => {
+		const large = {
+			vertices: Array.from({ length: 200_000 }, (_, i): [number, number, number] => [i, 0, -i]),
+			faces: [],
+			edges: [],
+		};
+
+		expect(summarizeReferenceMesh(large).size).toEqual([199_999, 0, 199_999]);
+	});
+
+	it('tells finite vertices from ones that overflowed in scaling', () => {
+		const small = { vertices: [[10, 0, 0]] as [number, number, number][], faces: [], edges: [] };
+
+		expect(hasFiniteVertices(scaleReferenceMesh(small, 2))).toBe(true);
+		expect(hasFiniteVertices(scaleReferenceMesh(small, 1e308))).toBe(false);
 	});
 
 	it('scales positions and leaves the source mesh alone', () => {

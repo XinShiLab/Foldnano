@@ -58,6 +58,8 @@ Adding, replacing and removing are undoable and saved with the design. Showing o
 
 The mesh is drawn in the 3D view only, in orange, and it moves with the region's plane. It can't be clicked, and it doesn't appear in the plane or strand views.
 
+Faces are drawn simply, as a fan of triangles from each face's first vertex, so a concave polygon can fill outside its outline. Triangles and other convex faces are exact, and the edge lines are always right.
+
 ### Helices In The Plane View
 
 Helices are placed as in a [freeform region](/docs/guide/creating-a-design), at any position and angle, and you edit strands as usual. The plane view does not offer the rotate handle or direction field, because those edits would flatten a helix into the plane.

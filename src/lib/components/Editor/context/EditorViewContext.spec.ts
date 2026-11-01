@@ -57,6 +57,21 @@ class MockStorageProvider implements StorageProvider {
 }
 
 describe('EditorViewContext', () => {
+	it('keeps the mesh draft scale when a new one would overflow its coordinates', () => {
+		const editorViewContext = new EditorViewContext();
+		editorViewContext.meshDraft = {
+			mesh: { vertices: [[10, 0, 0]], faces: [], edges: [] },
+			fileName: 'mesh.ply',
+			scale: 1,
+		};
+
+		editorViewContext.setMeshDraftScale(2);
+		expect(editorViewContext.meshDraft.scale).toBe(2);
+
+		editorViewContext.setMeshDraftScale(1e308);
+		expect(editorViewContext.meshDraft.scale).toBe(2);
+	});
+
 	it('keeps the UI facade aligned with the document session after document replacement and reset', () => {
 		const editorViewContext = new EditorViewContext();
 		const replacement = new FoldnanoDocument('doc-shared-session', 'Shared Session');
