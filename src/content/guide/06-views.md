@@ -114,13 +114,19 @@ The 3D toolbar controls what's shown and what runs:
 
 Every button is listed in the [Interface Reference](/docs/guide/interface-reference#3d-view-toolbar).
 
-Next to the 3D view, the **3D View Inspector** panel offers **Add Region** buttons (honeycomb, square, freeform), plane visibility with **Add Plane**, the selected plane's details, and simulation diagnostics.
+Next to the 3D view, the **3D View Inspector** panel offers [region visibility](#hiding-regions-in-3d), plane visibility with **Add Plane**, the selected plane's details, and simulation diagnostics.
 
 See [Simulation And Export](/docs/guide/simulation-export) for the simulation and export workflows.
 
 ![3D view of a routed design with the 3D toolbar visible, showing the RBS relax, relaxed-positions, stress, and export controls](/screenshots/guide/views-and-regions/04-3d-toolbar.webp)
 
 *3D view of a routed design with the 3D toolbar visible, showing the RBS relax, relaxed-positions, stress, and export controls.*
+
+## Hiding Regions in 3D
+
+The **Regions** list at the top of the **3D View Inspector** has an eye button for each region. Hiding a region removes its helices, strands, and reference mesh from the 3D view, along with any crossover that connects to it. A GLB export or screenshot leaves it out too.
+
+Hiding is only a view setting. It isn't saved with the design, can't be undone with `Ctrl/Cmd + Z`, and doesn't affect the strand view, relaxation, or oxDNA and mrDNA exports. Its plane still follows the plane visibility toggle, so you can keep repositioning it.
 
 ## Plane Gizmo
 

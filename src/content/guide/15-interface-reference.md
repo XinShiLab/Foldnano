@@ -136,7 +136,7 @@ The toolbar row below the top toolbar belongs to whichever viewer you last worke
 | --- | --- |
 | **S** badge | Scaffold sequence indicator: green when every scaffold's sequence is applied and current, red when it needs re-applying. Click it to toggle the **scaffold** highlight. See [Editing Tools](/docs/guide/editing-tools#scaffold-sequence-indicator). |
 | **Highlight strands** (highlighter) | Highlight and Warnings menu (see [Selection](/docs/guide/selection#highlighting-and-hiding)) |
-| **Hide strands** (crossed eye) | Hide crossovers or sequence. Hidden crossovers leave [labeled marks](/docs/guide/selection#highlighting-and-hiding) |
+| **Hide strands** (crossed eye) | Hide all crossovers, only unconstrained crossovers, or sequence. Hidden crossovers leave [labeled marks](/docs/guide/selection#highlighting-and-hiding) |
 | **Circular Scaffold Map** | Opens the [Circular Scaffold Map](#circular-scaffold-map) panel. Disabled until an oligo is marked as scaffold. |
 | **Show / Hide RBS blocks** | Shades the rigid blocks that [rigid-body simulation](/docs/guide/simulation-export) treats as single bodies |
 | **PNG** | Downloads the strand view as a PNG image |
@@ -228,9 +228,8 @@ A QC view of how staples bind the scaffold (explained in [Selection And Highligh
 
 | Section | Controls |
 | --- | --- |
-| **Add Region** | **Honeycomb**, **Square**, **Freeform**: add a region on its own base plane |
-| **Plane Overlay** | **Show / Hide** the design planes in 3D; **Add Plane** |
-| **Selected Plane** | Name and ID of the plane you clicked; **Rotate** / **Move** gizmo mode; origin and normal; **Remove Plane** (only for a plane no region uses, and never the last plane) |
+| **Regions** | Each region's plane color, name, and helix count; the eye button [hides or shows it in 3D](/docs/guide/views#hiding-regions-in-3d) |
+| **Planes** | **Show / Hide** the design planes in 3D. While shown: name and ID of the plane you clicked; **Rotate** / **Move** gizmo mode; origin and normal; **Add Plane**; **Remove Plane** (only for a plane no region uses, and never the last plane) |
 | **Simulation Diagnostics** | After a run: blocks, constraints, RMS error, and max overlap |
 
 See [Views And Regions](/docs/guide/views#plane-gizmo) for plane editing.

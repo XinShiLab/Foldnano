@@ -249,6 +249,14 @@ it as null and the mesh would reopen damaged. The overlay previews `scaledMeshDr
 in place of any mesh it would replace, and the camera frames the preview because a file's size is unknown
 in advance. Hidden meshes are `hiddenReferenceMeshRegionIds`: view state, not saved and not undoable.
 
+## Hiding regions
+
+`View3DPanel` lists the part's regions with an eye toggle backed by `hidden3DRegionIds` on `EditorViewContext`: view
+state, not saved and not undoable. `buildScene` drops a hidden region's segments, cylinders and labels, plus any
+crossover touching it; the cursor rings and the region's reference mesh go too. GLB export and screenshots follow the
+view. oxDNA, mrDNA and RBS always use the whole part, so hiding a region never changes a simulation or those exports.
+Its plane stays under the plane overlay toggle, so a hidden region can still be repositioned.
+
 `toolPanelMode: 'mesh'` opens `ReferenceMeshPanel`. The mode survives a change of region, and `ToolPanel`
 falls back to the inspector while the active region lacks `supportsReferenceGeometry`.
 
