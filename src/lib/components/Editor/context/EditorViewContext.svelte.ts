@@ -234,7 +234,6 @@ class StrandViewContext {
 
 	hideContext: Record<CanHide, boolean> = $state({
 		crossovers: false,
-		connections: false,
 		sequence: false,
 	});
 	highlightContext: Record<CanHighlight, boolean> = $state({
@@ -848,7 +847,11 @@ export class EditorViewContext {
 				builtinModifications: [...BUILTIN_MODIFICATIONS],
 			};
 		}
-		this.strandViewContext.hideContext = data.hideContext;
+		// Rebuilt key by key: saved contexts may hold the removed `connections` option, and the Hide menu lists every key.
+		this.strandViewContext.hideContext = {
+			crossovers: data.hideContext.crossovers,
+			sequence: data.hideContext.sequence,
+		};
 		this.strandViewContext.highlightContext = data.highlightContext;
 		this.strandViewContext.warningContext = data.warningContext ?? { mismatch: true };
 		this.strandViewContext.designChecks = { ...DEFAULT_DESIGN_CHECKS, ...data.designChecks };

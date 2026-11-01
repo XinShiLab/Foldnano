@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { makeHoneycombPart, addLatticeVh } from '$lib/model/test/testHelpers';
+import { makeHoneycombPart, addLatticeVh, addFreeformVh } from '$lib/model/test/testHelpers';
+import FoldnanoDocument from '$lib/model/document.svelte';
+import { BACKBONE_RISE_NM } from '$lib/model/geometry3d/dnaGeometry';
 import { collectOxDnaNucleotides, exportPartToOxDna } from './oxdnaExport';
 import type { BlockTransformOverride } from '$lib/model/rbs/rbsTypes';
 import type OligoSegment from '$lib/model/Oligo/OligoSegment.svelte';
@@ -17,6 +19,93 @@ function setSymmetricSkipsAndInserts(
 	segA.skipsAndInserts = entries;
 	segB.skipsAndInserts = entries;
 }
+
+function parseDat(dat: string): { side: number; positions: number[][] } {
+	const lines = dat.trim().split('\n');
+	return {
+		side: Number(lines[1].split(' ')[2]),
+		positions: lines.slice(3).map((line) => line.split(' ').slice(0, 3).map(Number)),
+	};
+}
+
+// oxView's load step: recenter on the periodic mean, then wrap anything over half a box from it.
+function nucleotidesOxViewWouldWrap(dat: string): number {
+	const { side, positions } = parseDat(dat);
+	let wrapped = 0;
+	for (const axis of [0, 1, 2]) {
+		let cos = 0;
+		let sin = 0;
+		for (const position of positions) {
+			const angle = (position[axis] / side) * 2 * Math.PI;
+			cos += Math.cos(angle);
+			sin += Math.sin(angle);
+		}
+		const center = (side / (2 * Math.PI)) * (Math.atan2(-sin, -cos) + Math.PI);
+		wrapped += positions.filter((p) => Math.abs(p[axis] - center) > side / 2).length;
+	}
+	return wrapped;
+}
+
+function makeHollowCubePart() {
+	const part = new FoldnanoDocument('doc', 'cube').addNewPart('FREEFORM');
+	const half = 10;
+	const edgeBp = 40;
+	const start = -(edgeBp * BACKBONE_RISE_NM) / 2;
+	const corners = [-half, half];
+	const edges: [[number, number, number], [number, number, number]][] = corners.flatMap((a) =>
+		corners.flatMap((b) => [
+			[
+				[start, a, b],
+				[1, 0, 0],
+			],
+			[
+				[a, start, b],
+				[0, 1, 0],
+			],
+			[
+				[a, b, start],
+				[0, 0, 1],
+			],
+		])
+	) as [[number, number, number], [number, number, number]][];
+	for (const [origin, axis] of edges) {
+		const vh = addFreeformVh(part, origin, axis);
+		part.createOligo(vh, 0, edgeBp - 1);
+		part.createOligo(vh, edgeBp - 1, 0);
+	}
+	return part;
+}
+
+describe('oxDNA box and viewer recentering', () => {
+	it('keeps a hollow cube whole when a viewer recenters on the periodic mean', () => {
+		const { dat } = exportPartToOxDna(makeHollowCubePart());
+		const { side, positions } = parseDat(dat);
+		expect(nucleotidesOxViewWouldWrap(dat)).toBe(0);
+
+		const xs = positions.map((p) => p[0]);
+		const spread = Math.max(...xs) - Math.min(...xs);
+		expect(side).toBeGreaterThanOrEqual(spread * 2);
+		// Sanity check on the test's premise: at the compact box size this cube does flip.
+		const compact = (spread + 8) * 1.1;
+		const flipped = dat.replace(/^b = .*$/m, `b = ${compact} ${compact} ${compact}`);
+		expect(nucleotidesOxViewWouldWrap(flipped)).toBeGreaterThan(0);
+	});
+
+	it('keeps the compact box for a design that already survives recentering', () => {
+		const part = makeHoneycombPart('compact-box');
+		const vh = addLatticeVh(part, 0, 0);
+		part.createOligo(vh, 0, 20);
+		part.createOligo(vh, 20, 0);
+
+		const { dat } = exportPartToOxDna(part);
+		const { side, positions } = parseDat(dat);
+		const maxDev = Math.max(
+			...[0, 1, 2].map((axis) => Math.max(...positions.map((p) => Math.abs(p[axis] - side / 2))))
+		);
+		expect(side).toBeCloseTo((maxDev * 2 + 8) * 1.1, 3);
+		expect(nucleotidesOxViewWouldWrap(dat)).toBe(0);
+	});
+});
 
 describe('oxDNA export', () => {
 	it('emits inserted nts and omits skipped nts', () => {

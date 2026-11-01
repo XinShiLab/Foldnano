@@ -142,10 +142,43 @@ function computeBoxSize(maxDev: Vec3, padding = 4): Vec3 {
 	return { x: side, y: side, z: side };
 }
 
-// oxView (and other COM-based PBC tools) recenter on load using the *mean* nucleotide
-// position, not the bounding-box midpoint — sizing/centering around the mean instead of the
-// bbox midpoint keeps every nucleotide within the half-box distance of wherever such a tool
-// independently recenters to. See docs/oxdna-export.md § Simulation Box.
+// Same formula as oxView: the angle of each coordinate on a circle one box side around.
+function periodicMean(values: number[], side: number): number {
+	let cos = 0;
+	let sin = 0;
+	for (const value of values) {
+		const angle = (value / side) * 2 * Math.PI;
+		cos += Math.cos(angle);
+		sin += Math.sin(angle);
+	}
+	return (side / (2 * Math.PI)) * (Math.atan2(-sin, -cos) + Math.PI);
+}
+
+function survivesPeriodicRecentering(values: number[], mean: number, side: number): boolean {
+	const inBox = values.map((value) => value - mean + side / 2);
+	const center = periodicMean(inBox, side);
+	return inBox.every((value) => Math.abs(value - center) <= side / 2);
+}
+
+// A hollow shape can have its periodic mean on the box edge, not its centre, and oxView then
+// wraps the far sides across. See docs/oxdna-export.md § Simulation Box.
+function computeBoxForPeriodicViewers(nts: OxDnaNucleotide[], mean: Vec3, maxDev: Vec3): Vec3 {
+	const box = computeBoxSize(maxDev);
+	const fits = (['x', 'y', 'z'] as const).every((axis) =>
+		survivesPeriodicRecentering(
+			nts.map((nt) => nt.position[axis]),
+			mean[axis],
+			box[axis]
+		)
+	);
+	if (fits) return box;
+	// Within a quarter box of the mean on every axis, the periodic mean can't leave that quarter.
+	const side = Math.max(box.x, Math.max(maxDev.x, maxDev.y, maxDev.z) * 4 * 1.1);
+	return { x: side, y: side, z: side };
+}
+
+// Centering on the mean rather than the bbox midpoint keeps every nucleotide within half a box of
+// wherever a viewer recenters to. See docs/oxdna-export.md § Simulation Box.
 function anchorNucleotidesInBox(nts: OxDnaNucleotide[], mean: Vec3, box: Vec3): OxDnaNucleotide[] {
 	const shift = { x: mean.x - box.x / 2, y: mean.y - box.y / 2, z: mean.z - box.z / 2 };
 	return nts.map((nt) => ({
@@ -163,7 +196,7 @@ function formatDat(nts: OxDnaNucleotide[]): string {
 		return 't = 0\nb = 100.000000 100.000000 100.000000\nE = 0 0 0\n';
 	}
 	const { mean, maxDev } = computeMeanAndMaxDeviation(nts);
-	const box = computeBoxSize(maxDev);
+	const box = computeBoxForPeriodicViewers(nts, mean, maxDev);
 	const anchored = anchorNucleotidesInBox(nts, mean, box);
 	const lines = [
 		't = 0',

@@ -38,6 +38,15 @@
 	import { createHoverInfoBehavior } from '../../../canvasEditor/tools/behaviors/hoverInfo';
 	import { createContextMenuBehavior } from '../../../canvasEditor/tools/behaviors/contextMenu';
 	import BlockLayer from './BlockLayer.svelte';
+	import Crossover from './crossover';
+	import ConnectionMarks from './crossover/ConnectionMarks.svelte';
+	import {
+		buildConnectionMarks,
+		findConnectionMark,
+		hitConnectionMark,
+		NO_CONNECTION_MARKS,
+		selectedConnectionMarks,
+	} from './crossover/connectionMarks';
 	import { help } from '$lib/components/help/help';
 	import { registerStrandCanvasHelp } from './strandCanvasHelp';
 
@@ -87,6 +96,34 @@
 	const d = createDrawingDimensions(radius, sideLength, strokeWidth, () => rowLayout);
 	const { dimensions, getBpCoordsByRowAndBpIdx } = d;
 	setDimensionContext(d);
+
+	let crossoversHidden = $derived(editorViewContext.strandViewContext.hideContext.crossovers);
+	let connectionMarks = $derived(
+		crossoversHidden ? buildConnectionMarks(part, d) : NO_CONNECTION_MARKS
+	);
+	let selectedMarks = $derived(
+		selectedConnectionMarks(connectionMarks, editorViewContext.strandViewContext.selected.ends)
+	);
+	// Held by key so an edit under the pointer drops the preview instead of leaving a stale arc.
+	let hoveredMarkKey = $state<string | null>(null);
+	let hoveredMark = $derived(
+		hoveredMarkKey ? findConnectionMark(connectionMarks, hoveredMarkKey) : null
+	);
+
+	function connectionMarkUnderPointer() {
+		if (!crossoversHidden || !camera) return null;
+		const world = camera.toWorld();
+		return hitConnectionMark(connectionMarks, d.getRowIdxByY(world.y), world.x, world.y);
+	}
+
+	function jumpToConnectionTarget(e: KonvaPointerEvent) {
+		if (editorViewContext.editorMode === 'PAN') return;
+		if ((e.target as Konva.Node).getAttr('id') !== 'EMPTY') return;
+		const markHit = connectionMarkUnderPointer();
+		if (!markHit?.onLabel) return;
+		hoveredMarkKey = null;
+		centerOn(markHit.mark.targetVhId, markHit.mark.targetBpIdx);
+	}
 
 	onMount(() => {
 		editorViewContext.registerStrandToolbarController(strandToolbarController);
@@ -205,9 +242,16 @@
 	});
 
 	function forward(type: PointerEventType, e: KonvaPointerEvent) {
-		if (editorViewContext.editorMode === 'PAN') return;
+		if (editorViewContext.editorMode === 'PAN') {
+			hoveredMarkKey = null;
+			return;
+		}
 
 		const dom = e.evt;
+		const markHit = connectionMarkUnderPointer();
+		if (type === 'cancel') hoveredMarkKey = null;
+		if (type === 'move') hoveredMarkKey = dom.buttons === 0 ? (markHit?.mark.key ?? null) : null;
+
 		if (type === 'down' && dom.button !== 0) {
 			return;
 		}
@@ -225,8 +269,11 @@
 				editorViewContext.setActiveRegion(row.regionId);
 			}
 		}
+		// Marks have no Konva nodes; a label acts as the crossover line it stands in for.
+		const konvaTargetId = (e.target as Konva.Node).getAttr('id');
 		controller.handlePointer({
-			directTargetId: (e.target as Konva.Node).getAttr('id'),
+			directTargetId:
+				konvaTargetId === 'EMPTY' && markHit?.onLabel ? markHit.mark.xoverId : konvaTargetId,
 			type,
 			// pointermove reports -1 ("no button change") where mousemove reported 0; tools expect 0.
 			button: dom.button === -1 ? 0 : dom.button,
@@ -382,6 +429,7 @@
 			onpointerup={(e) => forward('up', e)}
 			onpointerleave={(e) => forward('cancel', e)}
 			onpointercancel={(e) => forward('cancel', e)}
+			onpointerdblclick={jumpToConnectionTarget}
 			oncontextmenu={(e) => {
 				e.evt.preventDefault();
 				forward('contextmenu', e);
@@ -397,6 +445,22 @@
 				fill="transparent"
 				listening={true}
 			/>
+			{#if crossoversHidden}
+				<ConnectionMarks marks={connectionMarks} />
+				{#each selectedMarks as mark (mark.key)}
+					{#if mark.arc}
+						<Crossover
+							id={mark.xoverId}
+							start={mark.arc.start}
+							end={mark.arc.end}
+							isConstrained={mark.arc.isConstrained}
+							color={mark.color}
+							opacity={mark.opacity}
+							strokeWidth={2}
+						/>
+					{/if}
+				{/each}
+			{/if}
 			<Accessories {part} />
 			<Highlights {part} />
 			{#if editorViewContext.activeRegion?.supportsConstrainedXoverSites}
@@ -411,6 +475,17 @@
 		</Layer>
 
 		<Layer listening={false}>
+			{#if hoveredMark?.arc}
+				<Crossover
+					id="CONNECTION_PREVIEW"
+					start={hoveredMark.arc.start}
+					end={hoveredMark.arc.end}
+					isConstrained={hoveredMark.arc.isConstrained}
+					color={hoveredMark.color}
+					opacity={hoveredMark.opacity}
+					strokeWidth={2}
+				/>
+			{/if}
 			<SelectionOverlay selected={editorViewContext.strandViewContext.selected} />
 			<TemporalParts temporalParts={editorViewContext.strandViewContext.tempParts} />
 			<DuplicatePreview />

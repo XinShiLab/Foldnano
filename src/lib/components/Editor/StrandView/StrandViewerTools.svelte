@@ -281,7 +281,7 @@
 								size="icon-sm"
 								title="Hide strands"
 								{@attach help({
-									text: 'Hide crossovers, connections or sequence letters in the strand view.',
+									text: 'Hide crossovers or sequence letters in the strand view. Hidden crossovers leave small marks naming where each one goes.',
 								})}
 							>
 								<EyeOff />

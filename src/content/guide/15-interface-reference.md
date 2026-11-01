@@ -41,7 +41,7 @@ On narrower screens (such as an iPad), the toolbar buttons show only their icons
 | Control | What it does |
 | --- | --- |
 | **Foldnano** (with *beta* badge) | Opens the **About** dialog: the version and build, **What's New** (the last 3 months of changes, some with a **Learn more** link to the guide, and **Show earlier updates** for older ones), the author, the MIT license, and third-party licenses. A small blue dot before the name means What's New has entries you haven't opened yet, and inside What's New those entries carry the same dot and darker text until you next reload; some major changes are also announced once in a card at the bottom right |
-| **New Document** | Creates a new, empty document |
+| **New Document** | Creates a new, empty document. With a GitHub repository connected, it asks whether to create a **New File** in that repository or a **Local-Only Design** kept in this browser |
 | **Open** | Opens the **Load design files here** dialog (see [Open dialog](#open-dialog)) |
 | **Save** | Saves the working copy to browser storage now |
 | **⌄** next to Save | Save menu (see below) |
@@ -136,7 +136,7 @@ The toolbar row below the top toolbar belongs to whichever viewer you last worke
 | --- | --- |
 | **S** badge | Scaffold sequence indicator: green when every scaffold's sequence is applied and current, red when it needs re-applying. Click it to toggle the **scaffold** highlight. See [Editing Tools](/docs/guide/editing-tools#scaffold-sequence-indicator). |
 | **Highlight strands** (highlighter) | Highlight and Warnings menu (see [Selection](/docs/guide/selection#highlighting-and-hiding)) |
-| **Hide strands** (crossed eye) | Hide crossovers, connections, or sequence |
+| **Hide strands** (crossed eye) | Hide crossovers or sequence. Hidden crossovers leave [labeled marks](/docs/guide/selection#highlighting-and-hiding) |
 | **Circular Scaffold Map** | Opens the [Circular Scaffold Map](#circular-scaffold-map) panel. Disabled until an oligo is marked as scaffold. |
 | **Show / Hide RBS blocks** | Shades the rigid blocks that [rigid-body simulation](/docs/guide/simulation-export) treats as single bodies |
 | **PNG** | Downloads the strand view as a PNG image |

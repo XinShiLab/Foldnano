@@ -418,8 +418,10 @@ The box is always **cubic** (equal sides). oxDNA requires a cubic box by default
 `(side/2, side/2, side/2)` before writing the `.dat` file.
 
 This matters because oxView — and any other center-of-mass-based PBC tool — recenters a loaded
-structure using the **mean** nucleotide position, then independently wraps each nucleotide
-("Monomer" inboxing, oxView's default) that falls more than half a box-length from that mean.
+structure on a center of mass, then independently wraps each nucleotide ("Monomer" inboxing,
+oxView's default) that falls more than half a box-length from that center. For a compact design
+that center is close to the mean. It is really a **periodic mean** (each coordinate is an angle on
+a circle one box side around; see `PBC_switchbox.ts` in oxView), which matters for hollow shapes.
 oxView does this unconditionally on every configuration load
 (`parseConf()` → `centerAndPBC()` in `ts/file_handling/io.ts`), using its own
 `centeringMode = 'Origin'` / `inboxingMode = 'Monomer'` defaults — it recomputes its own center
@@ -444,6 +446,19 @@ Two earlier versions of this exporter got this wrong in different ways:
 Sizing and centering around the **mean** (not the bbox midpoint) fixes both: it matches what
 oxView will independently recompute, so its wrap is a no-op, and the padding/margin headroom is
 measured from the point that actually matters.
+
+### Hollow shapes: growing the box
+
+A wireframe cube has its nucleotides on the outside, near the box walls, and little at its centre.
+At the compact box size the two far sides are closer to each other across the periodic boundary
+than through the middle, so the periodic mean lands on the box edge, half a box from the real
+centre. oxView then wraps every helix across, and the cube loads as a `#` shape even though the
+coordinates in the `.dat` are correct.
+
+`computeBoxForPeriodicViewers` runs oxView's formula on the compact box. If any nucleotide would be
+wrapped, the side grows to `4 × maxDev × 1.1`: with every nucleotide within a quarter box of the
+mean, the periodic mean stays inside that quarter too, so no nucleotide is over half a box from it.
+Designs that already survive keep the compact box, so their files don't change.
 
 Velocities and angular momenta are written as zeros, which is correct for a starting configuration.
 

@@ -129,7 +129,7 @@
 			longer_than_90: false,
 			shorter_than_15: false,
 		},
-		hideContext = { crossovers: false, connections: false, sequence: false },
+		hideContext = { crossovers: false, sequence: false },
 		filterSegments = null,
 		focusedSegments = null,
 		useRelaxedPositions = $bindable(false),
