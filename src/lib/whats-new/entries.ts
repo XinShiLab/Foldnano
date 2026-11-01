@@ -30,10 +30,21 @@ export interface WhatsNewEntry {
  * Author date of the newest commit already considered for this list. `pnpm whats-new:draft`
  * only drafts commits authored after it (author dates survive rebases; hashes don't).
  */
-export const WHATS_NEW_REVIEWED_THROUGH = '2026-10-28T23:45:00+01:00';
+export const WHATS_NEW_REVIEWED_THROUGH = '2026-11-01T14:24:23+01:00';
 
 // Newest first. Edit freely; the draft script only inserts new entries at the top.
 export const WHATS_NEW: readonly WhatsNewEntry[] = [
+	{
+		date: '2026-11-01',
+		area: 'Plugins',
+		text: "Early plugin API for wireframe designs: a plugin can read a reference mesh, place helices along its edges and build strands. Routing plugins are still in progress, so you can't design a wireframe structure in Foldnano yet.",
+		link: 'wireframe',
+	},
+	{
+		date: '2026-11-01',
+		area: 'General',
+		text: 'The strand view shows where hidden crossovers go, the freeform plane view shows helix depth as opacity, and the oxDNA box keeps hollow shapes whole in oxView. For plugin authors: plugins can list citations, a helix can no longer be given its own length, and part.lattice_type, part.max_base and foldnano_mini are deprecated.',
+	},
 	{
 		date: '2026-10-28',
 		area: 'Plugins',

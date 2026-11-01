@@ -143,6 +143,10 @@ A banner at the top of the tab warns when the open file is out of sync:
 
 Save menu → **Save to GitHub Repo** opens **Save to GitHub** for a design that isn't on GitHub yet: choose a **Folder**, **File name**, and **Commit message**, then **Publish**. Check whether the repository is private or public before publishing sensitive designs. For a design that's already on GitHub, the same menu item opens the Changes tab instead.
 
+### Creating a design outside the repository
+
+With a repository connected, **New Document** in the top toolbar offers two choices. **New File in** *your repository* opens the **New Design File** dialog described above. **Local-Only Design** creates a design that stays out of the repository's Files and Changes tabs and is listed on the Saved Documents page. You can still publish it later with **Save to GitHub Repo**.
+
 Renaming a GitHub file with the document name field asks you to confirm **Rename & Commit**, since the rename is committed together with any pending local changes.
 
 ### Changes tab

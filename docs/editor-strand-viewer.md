@@ -331,6 +331,26 @@ work without rewriting the underlying DNA model.
 
 ---
 
+## Hidden Crossover Marks
+
+With `hideContext.crossovers` on, `Accessories` drops the arcs and cross-region arrows and
+`crossover/ConnectionMarks.svelte` draws an arrow and `VH[bp]` label at each crossover end
+(`R2:12[34]` when the target region is collapsed; text only above a zoom threshold). The same toggle
+hides crossovers in 3D, but the marks are strand-view only.
+
+- **Batched and non-listening.** Designs reach thousands of marks, so they are one `Shape` fed by
+  `buildConnectionMarks` (bucketed by display row), with no Konva node per mark.
+- **Placement.** A label extends over its end's own segment, so the two ends of a DX pair point apart,
+  and stays in the half of the row gap next to its strand. Centered labels overlapped on most ends.
+- **Pointer handling lives in `StrandViewer`.** `hitConnectionMark` visits only the rows `y` can reach.
+  Hovering a label or end cell reveals the real `Crossover` in the non-listening temporal layer, where
+  it can't steal the pointer. In `forward`, an `EMPTY` target on a label becomes the mark's
+  `XOVER#from#to` id, so every tool and the context menu treat it as the hidden line. End cells keep
+  their usual END hits. Double-clicking a label calls `centerOn`.
+- **Selected crossovers stay visible.** `selectedConnectionMarks` picks those with both ends selected,
+  and `StrandViewer` mounts their `Crossover` in the overlay layer, so the arc stays pickable as usual.
+  This mounts on selection changes only, never on pan/zoom.
+
 ## Design Check Overlay
 
 `EditorViewContext.designIssues` is `collectDesignIssues(part, activeRegion, designChecks)` (see
@@ -357,4 +377,5 @@ document or `historyStack.revision` change. The model is read inside `untrack`, 
 - **Don't reorder `VhGrid` / `MismatchMarkers` / `StrandRoutes` in the world layer without checking z-order.** Mount order there is bottom-to-top paint order, and it's intentional (grid under warnings under sequence text) — see Layer Architecture above.
 - **Don't viewport-cull with `{#if}` / `{#each}`.** Toggle Konva `visible` instead. Mounting/unmounting svelte-konva nodes on pan/zoom mutates the DOM every frame and pins Firefox at ~40% CPU in `RestyleManager`. See _Cull with `visible`, never with `{#if}`_ above.
 - **Don't poke at `strandViewContext.collapsedRegionIds` from inside a tool.** Toggle through the `RegionHeader` interaction so cleanup of `activeAround`, hover, and menu state runs. (`centerOn` sets it directly, but only ever expands a region, which hides nothing.)
+- **Don't mount a component per hidden-crossover mark, or draw the hover preview in a listening layer.** See _Hidden Crossover Marks_.
 - **Don't read the model reactively in `designIssues`.** Keep the check inside `untrack` and depend on `historyStack.revision`; otherwise every drag frame reruns every check.

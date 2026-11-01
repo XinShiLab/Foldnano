@@ -307,13 +307,7 @@
 		editorViewContext.publishToGitHubDialogOpen = true;
 	};
 
-	const createNewDocument = async () => {
-		if (currentRepoCtx && githubAuth.authenticated) {
-			// GitHub repo connected and authenticated: open the new-file dialog (local-first workflow)
-			editorViewContext.newFileDialogOpen = true;
-			return;
-		}
-
+	const createLocalOnlyDocument = async () => {
 		const newDocId = await session.createNewStandaloneDocument();
 		goto(resolve(`/editor/${newDocId}`));
 	};
@@ -366,17 +360,49 @@
 		<div class="flex min-w-0 flex-grow flex-row flex-wrap items-start gap-2">
 			<div class="my-auto flex flex-none flex-row gap-2">
 				<ButtonGroup.Root>
-					<Button
-						variant="outline"
-						size="sm"
-						onclick={createNewDocument}
-						title="New Document"
-						aria-label="New Document"
-						{@attach help({
-							title: 'New Document',
-							text: 'Start an empty design. Your current one stays saved in this browser.',
-						})}><FilePlusCorner /><span class="hidden xl:inline">New Document</span></Button
-					>
+					{#if currentRepoCtx && githubAuth.authenticated}
+						<DropdownMenu.Root>
+							<DropdownMenu.Trigger>
+								{#snippet child({ props })}
+									<Button
+										{...props}
+										variant="outline"
+										size="sm"
+										title="New Document"
+										aria-label="New Document"
+										{@attach help({
+											title: 'New Document',
+											text: 'Start an empty design, as a new file in the connected repository or saved only in this browser. Your current one stays saved in this browser.',
+										})}
+									>
+										<FilePlusCorner /><span class="hidden xl:inline">New Document</span>
+									</Button>
+								{/snippet}
+							</DropdownMenu.Trigger>
+							<DropdownMenu.Content align="start" class="min-w-60 [--radius:1rem]">
+								<DropdownMenu.Group>
+									<DropdownMenu.Item onclick={() => (editorViewContext.newFileDialogOpen = true)}>
+										<GitBranch />New File in {currentRepoCtx.repo}…
+									</DropdownMenu.Item>
+									<DropdownMenu.Item onclick={createLocalOnlyDocument}>
+										<Database />Local-Only Design
+									</DropdownMenu.Item>
+								</DropdownMenu.Group>
+							</DropdownMenu.Content>
+						</DropdownMenu.Root>
+					{:else}
+						<Button
+							variant="outline"
+							size="sm"
+							onclick={createLocalOnlyDocument}
+							title="New Document"
+							aria-label="New Document"
+							{@attach help({
+								title: 'New Document',
+								text: 'Start an empty design. Your current one stays saved in this browser.',
+							})}><FilePlusCorner /><span class="hidden xl:inline">New Document</span></Button
+						>
+					{/if}
 
 					<Dialog.Root bind:open={isDialogOpen}>
 						<Dialog.Trigger
