@@ -267,8 +267,7 @@ export class PluginDevMode {
 		const coordinator = this.#getCoordinator();
 		const busy = coordinator.isPluginBusyOrPending(pluginId);
 		if (busy.busy) throw new Error(`Cannot unlink "${pluginId}": ${busy.reason ?? 'it is busy'}.`);
-		coordinator.deactivate(pluginId);
-		this.#registry.remove(pluginId);
+		coordinator.remove(pluginId);
 	}
 
 	/**

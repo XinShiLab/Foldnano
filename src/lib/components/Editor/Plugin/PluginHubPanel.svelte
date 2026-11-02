@@ -3,20 +3,32 @@
 	import { communityPlugins, type CommunityPluginEntry } from '$lib/plugin/communityPlugins';
 	import { hubPlugins } from '$lib/plugin/corePlugins';
 	import { prepareCommunityInstall, preparePointerInstall } from '$lib/plugin/PluginInstaller';
+	import type { PreparedInstall } from '$lib/plugin/PluginInstaller';
+	import {
+		availableUpdate,
+		listingVersion,
+		prepareListingInstall,
+	} from '$lib/plugin/pluginUpdates';
 	import { DEMO_TAG, countTags, filterByTags, hasTag, tagKey } from '$lib/plugin/pluginTags';
+	import type { PluginManifest, PythonPlugin } from '$lib/plugin/types';
 	import { getEditorViewContext } from '../context/EditorViewContext.svelte';
 	import { toast } from 'svelte-sonner';
+	import { CircleArrowUp, Download, Trash2 } from '@lucide/svelte';
+	import { Button } from '$lib/components/ui/button/index.js';
 	import PluginHubCard from './PluginHubCard.svelte';
+	import PluginInfoDialog from './PluginInfoDialog.svelte';
 	import PluginTagFilter from './PluginTagFilter.svelte';
 
-	const { onInstalled }: { onInstalled: () => void } = $props();
+	const {
+		onInstalled,
+		onRemove,
+	}: { onInstalled: () => void; onRemove: (plugin: PythonPlugin) => void } = $props();
 
 	const editorCtx = getEditorViewContext();
 	const registry = $derived(editorCtx.pluginRegistry);
 
-	// Only one manifest awaits install confirmation at a time.
-	let pendingConfirmId = $state<string | null>(null);
 	let installingId = $state<string | null>(null);
+	let infoId = $state<string | null>(null);
 
 	// One filter for every Hub section.
 	const selectedTags = new SvelteSet<string>();
@@ -39,35 +51,17 @@
 		showDemos = true;
 	}
 
-	async function confirmInstall(manifest: (typeof hubPlugins)[number]) {
-		installingId = manifest.id;
-		try {
-			const outcome = await editorCtx.pluginInstallGate.requestInstall(() =>
-				preparePointerInstall(manifest, registry)
-			);
-			if (outcome.status === 'installed') {
-				pendingConfirmId = null;
-				onInstalled();
-			} else if (outcome.status === 'error') {
-				toast.error('Cannot install plugin', { description: outcome.message });
-			}
-		} finally {
-			installingId = null;
-		}
-	}
-
-	// The listing has no full manifest, so the downloaded zip's is reviewed in the install dialog.
-	async function installCommunity(entry: CommunityPluginEntry) {
-		pendingConfirmId = null;
-		installingId = entry.id;
+	// The spinner covers the download; the install dialog takes over once it opens.
+	async function install(id: string, prepare: () => Promise<PreparedInstall>, review: boolean) {
+		installingId = id;
 		try {
 			const outcome = await editorCtx.pluginInstallGate.requestInstall(
 				async () => {
-					const prepared = await prepareCommunityInstall(entry, registry);
+					const prepared = await prepare();
 					installingId = null;
 					return prepared;
 				},
-				{ review: true }
+				{ review }
 			);
 			if (outcome.status === 'installed') onInstalled();
 			else if (outcome.status === 'error')
@@ -75,6 +69,50 @@
 		} finally {
 			installingId = null;
 		}
+	}
+
+	// From the info dialog a core plugin installs directly: its full manifest was just shown.
+	// A community listing has no full manifest, so its download is always reviewed.
+	function installCore(manifest: PluginManifest, review: boolean) {
+		void install(manifest.id, () => preparePointerInstall(manifest, registry), review);
+	}
+
+	function installCommunity(entry: CommunityPluginEntry) {
+		void install(entry.id, () => prepareCommunityInstall(entry, registry), true);
+	}
+
+	const infoCore = $derived(hubPlugins.find((m) => m.id === infoId) ?? null);
+	const infoEntry = $derived(communityPlugins.find((e) => e.id === infoId) ?? null);
+	const infoInstalled = $derived(infoId ? registry.get(infoId) : undefined);
+	const infoListing = $derived(infoInstalled?.manifest ?? infoCore ?? infoEntry);
+	const infoUpdate = $derived(infoInstalled ? availableUpdate(infoInstalled) : null);
+
+	// The card's Install button doubles as Update: an installed id prepares as a Replace.
+	function updateVersionFor(id: string): string | null {
+		const plugin = registry.get(id);
+		const ref = plugin ? availableUpdate(plugin) : null;
+		return ref ? listingVersion(ref) : null;
+	}
+
+	function updateFromInfo() {
+		const ref = infoUpdate;
+		const id = infoId;
+		infoId = null;
+		if (ref && id) void install(id, () => prepareListingInstall(ref, registry), true);
+	}
+
+	function removeFromInfo() {
+		const plugin = infoInstalled;
+		infoId = null;
+		if (plugin) onRemove(plugin);
+	}
+
+	function installFromInfo() {
+		const core = infoCore;
+		const entry = infoEntry;
+		infoId = null;
+		if (core) installCore(core, false);
+		else if (entry) installCommunity(entry);
 	}
 </script>
 
@@ -109,11 +147,10 @@
 			<PluginHubCard
 				{manifest}
 				installed={registry.get(manifest.id) !== undefined}
-				review={pendingConfirmId === manifest.id ? manifest : null}
+				updateVersion={updateVersionFor(manifest.id)}
 				installing={installingId === manifest.id}
-				onRequestInstall={() => (pendingConfirmId = manifest.id)}
-				onConfirmInstall={() => confirmInstall(manifest)}
-				onCancelInstall={() => (pendingConfirmId = null)}
+				onRequestInstall={() => installCore(manifest, true)}
+				onOpenInfo={() => (infoId = manifest.id)}
 			/>
 		{:else}
 			{@render noMatches('core')}
@@ -133,8 +170,10 @@
 					manifest={entry}
 					iconSvg={entry.iconSvg}
 					installed={registry.get(entry.id) !== undefined}
+					updateVersion={updateVersionFor(entry.id)}
 					installing={installingId === entry.id}
 					onRequestInstall={() => installCommunity(entry)}
+					onOpenInfo={() => (infoId = entry.id)}
 				/>
 			{:else}
 				{@render noMatches('community')}
@@ -142,3 +181,37 @@
 		</section>
 	{/if}
 </div>
+
+{#if infoListing}
+	<!-- An installed plugin shows what is installed, which may be an older version than listed. -->
+	<PluginInfoDialog
+		listing={infoListing}
+		manifest={infoInstalled?.manifest ?? infoCore}
+		iconSvg={infoInstalled?.iconSvg ?? infoEntry?.iconSvg}
+		onClose={() => (infoId = null)}
+	>
+		{#snippet actions()}
+			{#if infoInstalled?.origin === 'user'}
+				<Button
+					variant="destructive"
+					class="gap-1 sm:order-first sm:mr-auto"
+					onclick={removeFromInfo}
+				>
+					<Trash2 size={14} />
+					Remove
+				</Button>
+			{/if}
+			{#if infoUpdate}
+				<Button class="gap-1" onclick={updateFromInfo}>
+					<CircleArrowUp size={14} />
+					Update to {listingVersion(infoUpdate)}
+				</Button>
+			{:else if !infoInstalled}
+				<Button class="gap-1" onclick={installFromInfo}>
+					<Download size={14} />
+					Install
+				</Button>
+			{/if}
+		{/snippet}
+	</PluginInfoDialog>
+{/if}

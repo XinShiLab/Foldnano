@@ -1726,4 +1726,66 @@ describe('PluginCoordinator — cadnano_json input review', () => {
 			'cadnano-strand-class',
 		]);
 	});
+
+	describe('remove', () => {
+		const manifest: PluginManifest = {
+			schemaVersion: 1,
+			id: 'removable',
+			name: 'Removable',
+			version: '1.0.0',
+			format: 'foldnano_json',
+			applyStrategy: 'replacePart',
+			entrypoint: 'def run(ctx): pass',
+		};
+
+		function setup() {
+			const plugin = makePlugin(manifest);
+			const registry = {
+				get: vi.fn((id: string) => (id === manifest.id ? plugin : undefined)),
+				hasReservation: () => false,
+				remove: vi.fn(() => true),
+			};
+			const bridge = {
+				runPlugin: vi.fn().mockResolvedValue({
+					logs: [],
+					artifacts: {},
+					pluginResult: null,
+					primaryArtifact: JSON.stringify(makeHoneycombPart('From Plugin').toJSON()),
+					mutationLog: null,
+				}),
+				terminate: vi.fn(),
+			};
+			const doc = new FoldnanoDocument('doc-remove', 'Remove Doc');
+			doc.parts.push(makeHoneycombPart('Original'));
+			const coordinator = new PluginCoordinator(
+				registry as never,
+				() => doc,
+				undefined,
+				() => null,
+				(() => bridge) as never
+			);
+			return { plugin, registry, coordinator };
+		}
+
+		it('refuses while the plugin runs, leaving it registered', () => {
+			const { plugin, registry, coordinator } = setup();
+			plugin.status = 'running';
+
+			expect(() => coordinator.remove(manifest.id)).toThrow(/currently running/);
+			expect(registry.remove).not.toHaveBeenCalled();
+		});
+
+		it('refuses while the plugin holds an unapplied result, then removes once it is discarded', async () => {
+			const { registry, coordinator } = setup();
+			await coordinator.run(manifest.id);
+			expect(coordinator.pendingApply?.pluginId).toBe(manifest.id);
+
+			expect(() => coordinator.remove(manifest.id)).toThrow(/unapplied result/);
+			expect(registry.remove).not.toHaveBeenCalled();
+
+			coordinator.cancelApply(manifest.id);
+			expect(coordinator.remove(manifest.id)).toBe(true);
+			expect(registry.remove).toHaveBeenCalledWith(manifest.id);
+		});
+	});
 });

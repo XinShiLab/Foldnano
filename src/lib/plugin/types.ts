@@ -164,6 +164,23 @@ export interface PluginManifest {
 	sidePanel?: PluginSidePanelManifest;
 }
 
+/** What the Hub shows for a plugin before install: a core manifest or a community listing entry. */
+export type PluginListing = Pick<
+	PluginManifest,
+	| 'name'
+	| 'version'
+	| 'description'
+	| 'tags'
+	| 'sidePanel'
+	| 'requirements'
+	| 'network'
+	| 'authors'
+	| 'maintainers'
+	| 'license'
+	| 'repository'
+	| 'upstream'
+>;
+
 /**
  * A registered plugin instance with runtime state.
  */

@@ -296,6 +296,22 @@ describe('PluginRegistry registerNew/replaceConfirmed', () => {
 		expect(await db.plugins.get('later-busy-plugin')).toEqual(before);
 	});
 
+	it('refuses remove when the busy check reports busy, keeping the plugin', async () => {
+		const db = await freshDb();
+		const registry = new PluginRegistry(db);
+		registry.setBusyCheck(() => ({ busy: false }));
+		await registry.ready;
+		await registry.registerNew(manifest('busy-remove'), null);
+
+		const busyRegistry = new PluginRegistry(db);
+		busyRegistry.setBusyCheck(() => ({ busy: true, reason: 'has an unapplied result' }));
+		await busyRegistry.ready;
+
+		expect(() => busyRegistry.remove('busy-remove')).toThrow(/Cannot remove.*unapplied result/);
+		expect(busyRegistry.get('busy-remove')).toBeDefined();
+		expect(await db.plugins.get('busy-remove')).toBeDefined();
+	});
+
 	it('lets only one of two concurrent registerNew calls for the same id succeed', async () => {
 		const db = await freshDb();
 		const registry = new PluginRegistry(db);

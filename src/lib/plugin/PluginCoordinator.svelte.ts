@@ -1237,6 +1237,30 @@ export class PluginCoordinator {
 	}
 
 	/**
+	 * Remove an installed or linked plugin. Refuses while it runs, activates or holds an
+	 * unapplied result (that result would block every other run with no card left to discard
+	 * it), and frees a custom or dev worker slot the plugin owns alone.
+	 */
+	remove(pluginId: string): boolean {
+		const plugin = this.registry.get(pluginId);
+		if (!plugin || plugin.origin === 'builtin') return false;
+		const busy = this.isPluginBusyOrPending(pluginId);
+		if (busy.busy) {
+			throw new Error(`Cannot remove "${plugin.manifest.name}": ${busy.reason ?? 'it is busy'}.`);
+		}
+		const removed = this.registry.remove(pluginId);
+		if (this.customSlot?.envOwner.pluginId === pluginId) {
+			this.customSlot.bridge.terminate();
+			this.customSlot = null;
+		}
+		if (this.devSlot?.envOwner.pluginId === pluginId) {
+			this.devSlot.bridge.terminate();
+			this.devSlot = null;
+		}
+		return removed;
+	}
+
+	/**
 	 * Update a plugin's mutable runtime state (e.g. status, logs).
 	 * Used internally and by tests.
 	 */

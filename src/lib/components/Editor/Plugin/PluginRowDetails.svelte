@@ -6,7 +6,6 @@
 		FORMAT_DESCRIPTIONS,
 		envTierDescription,
 	} from '$lib/plugin/manifestDescriptions';
-	import PluginCitations from './PluginCitations.svelte';
 	import PluginCredits from './PluginCredits.svelte';
 
 	const { plugin }: { plugin: PythonPlugin } = $props();
@@ -48,7 +47,4 @@
 		{/each}
 	</div>
 	<PluginCredits {manifest} />
-	{#if manifest.citations?.length}
-		<PluginCitations citations={manifest.citations} />
-	{/if}
 </div>

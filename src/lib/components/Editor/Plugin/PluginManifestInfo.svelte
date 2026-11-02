@@ -47,18 +47,20 @@
 
 	<div class="ml-5 flex flex-col gap-1.5">
 		<PluginCredits {manifest} />
-		<div>
+		<div class="flex flex-wrap items-center gap-1">
+			<span class="font-semibold text-foreground">Type:</span>
 			<span class="rounded bg-background px-1.5 py-0.5 font-mono text-[10px]">
-				Type: {manifest.format}
+				{manifest.format}
 			</span>
 			<span class="text-muted-foreground">
 				{FORMAT_DESCRIPTIONS[manifest.format] ?? ''}
 			</span>
 		</div>
 
-		<div>
+		<div class="flex flex-wrap items-center gap-1">
+			<span class="font-semibold text-foreground">Apply:</span>
 			<span class="rounded bg-background px-1.5 py-0.5 font-mono text-[10px]">
-				Apply: {manifest.applyStrategy}
+				{manifest.applyStrategy}
 			</span>
 			<span class="text-muted-foreground">
 				{APPLY_STRATEGY_DESCRIPTIONS[manifest.applyStrategy] ?? ''}

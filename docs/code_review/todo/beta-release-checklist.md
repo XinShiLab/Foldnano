@@ -96,6 +96,9 @@ gate titles, a use-with-caution note); drop the "beta" badge at 1.0.
   app (`XinShiLab/foldnano-plugins`, `pnpm plugins:sync-listing`; `docs/python-plugin-system.md`
   § Community plugins). Still open: fetching the listing live (needs signing) and letting users
   subscribe to other lists. Manifest `network` stays the enforcement point.
+- Plugin update known limits (reviewed 2026-11-02; low risk, fix when there's a real reason):
+  id-only update matching and other tabs not seeing installs/updates/removals until reload.
+  Details and planned fixes: `docs/python-plugin-system.md` § Plugin updates.
 - pyOrigamiBreak stops with `sys.exit()` on some designs (found 2026-10-07): "SCAFFOLD SEQUENCE
   IS SHORTER THAN SCAFFOLD LENGTH!" (the design needs a longer scaffold than the one chosen) or
   "SOLUTION DOESNT EXIST". This used to kill the Python runtime and show only a red icon; the
