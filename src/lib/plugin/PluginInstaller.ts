@@ -5,6 +5,7 @@ import { isOwnedEditablePackage, isRestorableOwnedZip } from './ownedPlugins';
 import { bundledIconSvg } from './pluginIcon';
 import type { PluginRegistry } from './PluginRegistry.svelte';
 import type { IndexedDbPluginFilesRecord } from '$lib/services/storage/indexedDbTypes';
+import type { CommunityPluginEntry } from './communityPlugins';
 
 import { MAX_PLUGIN_ZIP_BYTES, readResponseCapped, unzipCapped } from './sizeLimits';
 
@@ -19,8 +20,9 @@ export { MAX_PLUGIN_ZIP_BYTES };
  *   ├── *.py / assets  — any supporting files
  *   └── *.whl          — wheels listed as bare filenames in requirements
  *
- * Both delivery routes prepare a result that PluginInstallGate commits after
- * any required confirmation.
+ * Every delivery route (local zip, same-origin pointer, community listing)
+ * prepares a result that PluginInstallGate commits after any required
+ * confirmation.
  *
  * The manifest INSIDE the zip is authoritative — a pasted/hosted manifest is
  * only a locator (id + entrypointUrl). The full zip is stored in IndexedDB at
@@ -234,4 +236,55 @@ export async function preparePointerInstall(
 		sourceUrl: manifest.entrypointUrl,
 		expectedId: manifest.id,
 	});
+}
+
+async function sha256Hex(bytes: Uint8Array): Promise<string> {
+	const digest = await crypto.subtle.digest('SHA-256', bytes as BufferSource);
+	return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * Downloads a community plugin from its listed URL, the one place Foldnano fetches a plugin zip
+ * from another origin: the listing ships with the app and pins the zip's SHA-256, so the bytes
+ * are refused unless they are exactly the ones listed. No `sourceUrl`: the manifest keeps no
+ * cross-origin `entrypointUrl`, and the stored zip's hash identifies the listed version.
+ */
+export async function prepareCommunityInstall(
+	entry: CommunityPluginEntry,
+	registry: InstallReadinessRegistry
+): Promise<PreparedInstall> {
+	let response: Response;
+	try {
+		response = await fetch(entry.zip.url);
+	} catch (e) {
+		throw new Error(
+			`Could not download "${entry.name}": ${e instanceof Error ? e.message : String(e)}`
+		);
+	}
+	if (!response.ok) {
+		throw new Error(
+			`Could not download "${entry.name}": ${response.status} ${response.statusText}`
+		);
+	}
+	const zipBytes = await readResponseCapped(response, MAX_PLUGIN_ZIP_BYTES, 'The plugin zip');
+	if ((await sha256Hex(zipBytes)) !== entry.zip.sha256) {
+		throw new Error(
+			`The file at the listed link for "${entry.name}" has changed since it was listed, so it ` +
+				'was not installed.'
+		);
+	}
+	const prepared = prepareZipBytesInstall(zipBytes, registry, { expectedId: entry.id });
+	const incoming =
+		prepared.status === 'ready'
+			? prepared.manifest
+			: prepared.status === 'needs-confirm'
+				? prepared.incoming
+				: null;
+	const version = incoming?.version;
+	if (version !== undefined && version !== entry.version) {
+		throw new Error(
+			`The zip for "${entry.name}" declares version ${version}, but the listing says ${entry.version}.`
+		);
+	}
+	return prepared;
 }

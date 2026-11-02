@@ -1,8 +1,8 @@
 {
-	"schemaVersion": 1,
+	"schemaVersion": 2,
 	"id": "nick-remover",
 	"name": "Nick Remover",
-	"version": "1.0.1",
+	"version": "1.0.3",
 	"format": "cadnano_json",
 	"applyStrategy": "replaceRegion",
 	"entrypointUrl": "/plugins/nick_remover/nick_remover.zip",

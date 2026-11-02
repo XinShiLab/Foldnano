@@ -27,13 +27,17 @@ covers:
 	"requirements": ["numpy"],
 	"description": "Optional description shown in the plugin panel.",
 	"icon": "icon.svg",
-	"citations": [{ "text": "Author, A. and Author, B., Journal, 2026, 1(2), p.3.", "doi": "10.1234/example" }]
+	"citations": [{ "text": "Author, A. and Author, B., Journal, 2026, 1(2), p.3.", "doi": "10.1234/example" }],
+	"tags": ["auto-staple", "caDNAno"],
+	"authors": [{ "name": "Original Author", "url": "https://example.org" }],
+	"license": "MIT",
+	"repository": "https://github.com/example/my-plugin"
 }
 ```
 
 | Field | Required | Notes |
 | --- | --- | --- |
-| `schemaVersion` | Recommended | Manifest schema version, currently `2`. Read as `1` when missing, but include it; `icon` and `citations` need `2`. Not your plugin's version; see [Versioning](#versioning-and-unknown-fields). |
+| `schemaVersion` | Recommended | Manifest schema version, currently `2`. Read as `1` when missing, but include it; `icon`, `citations`, `tags` and the credit fields need `2`. Not your plugin's version; see [Versioning](#versioning-and-unknown-fields). |
 | `$schema` | No | Link to the [published JSON Schema](#machine-readable-schema) for editor support. Ignored by Foldnano. |
 | `id` | Yes | Unique key used by the registry. Starts with a letter, then letters, digits, `.`, `_` or `-`, up to 64 characters; kebab-case such as `my-plugin` is recommended. Checked when the plugin is installed. |
 | `name` | Yes | Display name in the panel. |
@@ -47,6 +51,12 @@ covers:
 | `description` | No | Human-readable description. |
 | `icon` | No | Path of an SVG icon inside your zip, such as `"icon.svg"`. Needs `"schemaVersion": 2`; see [Plugin icon](#plugin-icon). |
 | `citations` | No | Papers you ask users to cite. Needs `"schemaVersion": 2`; see [Citations](#citations). |
+| `tags` | No | Labels describing your plugin, such as `["auto-staple", "caDNAno"]`. Needs `"schemaVersion": 2`; see [Tags](#tags). |
+| `authors` | No | Who wrote the original work. Needs `"schemaVersion": 2`; see [Credits](#credits). |
+| `maintainers` | No | Who made it a Foldnano plugin and keeps it updated, when that isn't the authors. Needs `"schemaVersion": 2`. |
+| `license` | No | License of the plugin as shipped, as an SPDX id such as `"MIT"`. Needs `"schemaVersion": 2`. |
+| `repository` | No | `https://` link to your plugin's source. Needs `"schemaVersion": 2`. |
+| `upstream` | No | `https://` link to the original project, when your plugin is a fork. Needs `"schemaVersion": 2`. |
 | `parameters` | No | Array of `PluginParamDef`: user-configurable inputs shown in a run dialog. |
 | `sidePanel` | No | Optional host-rendered side panel request. Supports `form` and `codeEditor` UIs. |
 | `x-…` | No | Your own metadata (for example `"x-homepage"`). Allowed at the top level only; ignored by Foldnano. |
@@ -66,11 +76,11 @@ The only case where inline `entrypoint` is allowed is a `sidePanel.codeEditor` p
 
 `schemaVersion` tells Foldnano which version of this manifest format you wrote against. It is separate from `version`, which is your plugin's own release number.
 
-- A manifest without `schemaVersion` is read as version 1, so plugins written before the Foldnano beta keep working. Include `"schemaVersion"` anyway: fields added later (such as `icon` and `citations` in version 2) only work once you declare the version that introduced them.
+- A manifest without `schemaVersion` is read as version 1, so plugins written before the Foldnano beta keep working. Include `"schemaVersion"` anyway: fields added later (such as `icon`, `citations`, `tags` and the credit fields in version 2) only work once you declare the version that introduced them.
 - A manifest with a higher `schemaVersion` than the running app supports is refused with a request to update Foldnano, rather than having its newer fields silently ignored.
 - Unknown fields are rejected, at every level, so a typo such as `"netwrok"` fails loudly instead of quietly doing nothing. Put your own metadata in top-level fields starting with `x-`.
 
-When a field is added, `schemaVersion` normally goes up and the new schema is published next to the old one. During the beta, an optional field that only affects what is displayed can join the current version instead, as `citations` did. Existing fields never change meaning between versions, so a manifest that works today keeps meaning the same thing.
+When a field is added, `schemaVersion` normally goes up and the new schema is published next to the old one. During the beta, an optional field that only affects what is displayed can join the current version instead, as `citations`, `tags` and the credit fields did. Existing fields never change meaning between versions, so a manifest that works today keeps meaning the same thing.
 
 ### Machine-readable schema
 
@@ -79,7 +89,7 @@ Each manifest schema version has a JSON Schema (draft 2020-12), published with t
 | Schema version | Schema |
 | --- | --- |
 | 1 | [`/schemas/fplugin-v1.schema.json`](/schemas/fplugin-v1.schema.json) |
-| 2 | [`/schemas/fplugin-v2.schema.json`](/schemas/fplugin-v2.schema.json) (adds `icon` and `citations`) |
+| 2 | [`/schemas/fplugin-v2.schema.json`](/schemas/fplugin-v2.schema.json) (adds `icon`, `citations`, `tags` and the credit fields) |
 
 Point `$schema` in your manifest at the one matching your `schemaVersion` (for example `"$schema": "https://<foldnano-host>/schemas/fplugin-v2.schema.json"`) and editors such as VS Code will autocomplete fields and flag mistakes as you type. The schema checks structure, types and the `format`/`applyStrategy` pairing. Foldnano checks a little more when installing (allowed URLs, field defaults and ranges, parameters versus side panel forms), so a manifest can pass the schema and still be refused; the install error says why.
 
@@ -166,6 +176,40 @@ Users see citations when they review your plugin before installing it, and when 
 - `doi` is a bare DOI such as `10.1073/pnas.2406769121`, without `https://doi.org/`. Foldnano builds the link.
 - `url` is an `https://` link for work without a DOI. Set `doi` or `url`, not both; both are optional.
 - List at most 10 references.
+
+### Tags
+
+Describe what your plugin does with a few short labels:
+
+```json
+"schemaVersion": 2,
+"tags": ["auto-staple", "caDNAno"]
+```
+
+- Each tag is letters and digits, with single hyphens between words (`auto-staple`, not `auto staple` or `auto_staple`), at most 32 characters. Foldnano shows a tag as you write it, so `caDNAno` keeps its capitals.
+- List at most 10 tags, without repeats. Case is ignored when comparing, so `Demo` and `demo` count as the same tag.
+- Tags only describe your plugin; they never change how it runs.
+
+### Credits
+
+Say who made your plugin and where its source lives. This matters most when your plugin adapts someone else's project:
+
+```json
+"schemaVersion": 2,
+"authors": [{ "name": "Douglas Lab", "url": "https://bionano.ucsf.edu/" }],
+"maintainers": [{ "name": "Xin Shi" }],
+"license": "MIT",
+"repository": "https://github.com/xinshi-kul/pyOrigamiBreak_mini",
+"upstream": "https://github.com/douglaslab/pyOrigamiBreak"
+```
+
+Users see a line such as *by Douglas Lab · plugin by Xin Shi · MIT* with **Source** and **Upstream** links, when they review your plugin before installing it and when they open it in **My Plugins**.
+
+- `authors` lists who wrote the original work; `maintainers` lists who turned it into a Foldnano plugin and keeps it updated. If you wrote the plugin yourself, list yourself under `authors` and leave out `maintainers`.
+- Each person has a `name` (at most 100 characters) and an optional `url`, such as a profile or lab page. List at most 10 people in each.
+- `license` is the [SPDX](https://spdx.org/licenses/) id of the license your plugin ships under, or an expression such as `"MIT AND BSD-3-Clause"` when bundled packages add their own. A fork keeps the original project's license.
+- `repository` links to your plugin's own source; `upstream` links to the original project when your plugin is a fork.
+- Every link must start with `https://`.
 
 ### Code-editor execution modes
 

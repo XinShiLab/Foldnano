@@ -1,12 +1,13 @@
 {
-	"schemaVersion": 1,
+	"schemaVersion": 2,
 	"id": "staple-colorizer",
 	"name": "Staple Colorizer",
-	"version": "1.1.1",
+	"version": "1.1.2",
 	"format": "cadnano_json",
 	"applyStrategy": "replaceRegionKeepAnnotationsWhereMatched",
 	"entrypointUrl": "/plugins/staple_colorizer/staple_colorizer.zip",
 	"description": "Assigns an HSL color palette to all staple strands. Palette style, hue, saturation, and lightness are configurable.",
+	"tags": ["Demo"],
 	"parameters": [
 		{
 			"id": "palette",

@@ -6,20 +6,17 @@
 	import { SvelteSet } from 'svelte/reactivity';
 	import { toPluginSidePanelId } from '../sidePanels';
 	import {
-		ChevronRight,
-		Quote,
+		Ellipsis,
 		Play,
 		Square,
 		Trash2,
-		CircleAlert,
-		CircleCheckBig,
-		Loader,
 		RotateCcw,
 		FolderOpen,
 		FilePen,
 		Download,
 	} from '@lucide/svelte';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
+	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import { exportOwnedPlugin, needsBackup } from '$lib/plugin/ownedPluginActions';
 	import PluginRunDialog from './PluginRunDialog.svelte';
 	import PluginActivationConfirmDialog from './PluginActivationConfirmDialog.svelte';
@@ -33,8 +30,8 @@
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Switch } from '$lib/components/ui/switch/index.js';
-	import PluginIcon from './PluginIcon.svelte';
-	import PluginCitations from './PluginCitations.svelte';
+	import PluginTile, { type PluginTileStatus } from './PluginTile.svelte';
+	import PluginRowDetails from './PluginRowDetails.svelte';
 
 	const editorCtx = getEditorViewContext();
 	const registry = $derived(editorCtx.pluginRegistry);
@@ -98,14 +95,18 @@
 		coordinator.resetPlugin(plugin.manifest.id);
 	}
 
-	function canReset(plugin: PythonPlugin): boolean {
-		const hasRunOutput =
+	function hasRunOutput(plugin: PythonPlugin): boolean {
+		return (
 			plugin.logs.length > 0 ||
 			Object.keys(plugin.artifacts).length > 0 ||
-			plugin.pluginResult !== null;
+			plugin.pluginResult !== null
+		);
+	}
+
+	function canReset(plugin: PythonPlugin): boolean {
 		const isRunError =
 			plugin.status === 'error' && (plugin.resolvedCode !== null || plugin.resolvedZipData != null);
-		return isRunError || (plugin.status === 'active' && hasRunOutput);
+		return isRunError || (plugin.status === 'active' && hasRunOutput(plugin));
 	}
 
 	let pendingRemove: PythonPlugin | null = $state(null);
@@ -141,36 +142,29 @@
 		registry.setEnabled(plugin.manifest.id, enabled);
 	}
 
-	function statusIcon(plugin: PythonPlugin) {
+	function tileStatus(plugin: PythonPlugin): PluginTileStatus | null {
 		switch (plugin.status) {
 			case 'activating':
 			case 'running':
-				return Loader;
+				return 'busy';
 			case 'active':
-				return CircleCheckBig;
+				return 'ready';
 			case 'error':
+				return 'error';
 			case 'needs-reinstall':
-				return CircleAlert;
+				return 'warning';
 			default:
 				return null;
 		}
 	}
 
-	function statusColor(plugin: PythonPlugin): string {
-		switch (plugin.status) {
-			case 'active':
-				return 'text-green-600';
-			case 'error':
-				return 'text-red-500';
-			case 'needs-reinstall':
-				return 'text-amber-500';
-			case 'activating':
-			case 'running':
-				return 'text-blue-500';
-			default:
-				return 'text-gray-400';
-		}
-	}
+	const STATUS_LABELS: Partial<Record<PythonPlugin['status'], string>> = {
+		activating: 'Activating',
+		running: 'Running',
+		active: 'Active: ready to run',
+		error: 'Error',
+		'needs-reinstall': 'Needs reinstall',
+	};
 
 	function openPluginSidePanel(plugin: PythonPlugin) {
 		editorCtx.openSidePanel(toPluginSidePanelId(plugin.manifest.id));
@@ -202,77 +196,87 @@
 </script>
 
 {#snippet pluginRow(plugin: PythonPlugin)}
-	{@const Icon = statusIcon(plugin)}
 	{@const isDisabledBuiltin = plugin.origin === 'builtin' && !plugin.enabled}
-	{@const citations = plugin.manifest.citations ?? []}
-	{@const hasDetails = !!plugin.manifest.description || citations.length > 0}
 	{@const isExpanded = expandedPluginIds.has(plugin.manifest.id)}
-	<div class="border-b border-border px-3 py-2 hover:bg-muted" class:opacity-50={isDisabledBuiltin}>
-		<div class="flex items-center gap-2">
-			<!-- Status icon -->
-			{#if Icon && plugin.enabled}
-				<span class={statusColor(plugin)}>
-					<Icon
-						size={13}
-						class={plugin.status === 'activating' || plugin.status === 'running'
-							? 'animate-spin'
-							: ''}
-					/>
-				</span>
-			{:else}
-				<span class="h-[13px] w-[13px]"></span>
-			{/if}
-
-			{#if plugin.iconSvg}
-				<PluginIcon svg={plugin.iconSvg} size={14} class="text-muted-foreground" />
-			{/if}
-			<!-- Name + version -->
-			{#if hasDetails}
-				<button
-					type="button"
-					class="flex min-w-0 flex-1 items-center gap-1 text-left"
-					aria-expanded={isExpanded}
-					onclick={() => toggleExpanded(plugin.manifest.id)}
-					{@attach help({
-						title: 'Plugin details',
-						text: 'Show what this plugin does and any papers its author asks you to cite.',
-						doc: 'plugins-for-users',
-					})}
-				>
-					<ChevronRight
-						size={12}
-						class="shrink-0 text-muted-foreground transition-transform {isExpanded
-							? 'rotate-90'
-							: ''}"
-					/>
-					<span class="truncate font-medium text-foreground">{plugin.manifest.name}</span>
-					{#if citations.length > 0}
-						<span class="shrink-0 text-muted-foreground" title="Has a citation">
-							<Quote size={10} />
-						</span>
+	{@const isCustomEnv = plugin.origin !== 'linked' && classifyEnv(plugin.manifest) === 'custom'}
+	{@const backupDue = !!plugin.authoring && needsBackup(plugin)}
+	<!-- A collapsed card shows only what needs attention: output, errors, a running plugin's Stop. -->
+	{@const showOutput =
+		isExpanded ||
+		hasRunOutput(plugin) ||
+		plugin.status === 'error' ||
+		coordinator.pendingApply?.pluginId === plugin.manifest.id}
+	{@const showActions = isExpanded || plugin.status === 'running'}
+	<div
+		class="mb-1.5 rounded-md border border-border bg-card p-2 transition-colors hover:border-foreground/20"
+		class:opacity-50={isDisabledBuiltin}
+	>
+		<div class="flex items-start gap-1.5">
+			<button
+				type="button"
+				class="flex min-w-0 flex-1 items-start gap-2.5 text-left"
+				aria-expanded={isExpanded}
+				onclick={() => toggleExpanded(plugin.manifest.id)}
+				{@attach help({
+					title: 'Plugin details',
+					text: 'Click a plugin to show its details, any papers its author asks you to cite, and its Activate, Run and Edit buttons.',
+					doc: 'plugins-for-users',
+				})}
+			>
+				<PluginTile
+					manifest={plugin.manifest}
+					iconSvg={plugin.iconSvg}
+					status={plugin.enabled ? tileStatus(plugin) : null}
+					statusLabel={STATUS_LABELS[plugin.status]}
+				/>
+				<div class="min-w-0 flex-1">
+					<!-- Inline flow: meta follows the last line of a wrapped name. -->
+					<div class="text-xs leading-snug">
+						<span class="font-medium break-words text-foreground">{plugin.manifest.name}</span>
+						{#if plugin.origin !== 'linked'}
+							<span class="ml-1.5 text-[10px] whitespace-nowrap text-muted-foreground"
+								>{plugin.manifest.version}</span
+							>
+						{/if}
+						{#if plugin.authoring}
+							<span
+								class="ml-1.5 inline-block rounded bg-emerald-100 px-1.5 align-[1px] text-[10px] leading-4 whitespace-nowrap text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+								title="You made this plugin in this browser, so you can edit it.">Mine</span
+							>
+						{:else if plugin.origin === 'builtin'}
+							<span class="ml-1.5 text-[10px] whitespace-nowrap text-muted-foreground">· Core</span>
+						{:else if plugin.origin === 'linked'}
+							<span
+								class="ml-1.5 text-[10px] whitespace-nowrap text-violet-700 dark:text-violet-300"
+								title="Linked from a folder on your computer; each run reads it again."
+								>dev · linked</span
+							>
+						{/if}
+						{#if isCustomEnv}
+							<span
+								class="ml-1.5 text-[10px] whitespace-nowrap text-amber-700 dark:text-amber-300"
+								title="Custom environment: only one custom-environment plugin can be active at a time"
+								>· custom env</span
+							>
+						{/if}
+					</div>
+					{#if plugin.manifest.description}
+						<p
+							class="mt-0.5 text-[11px] leading-snug text-muted-foreground {isExpanded
+								? ''
+								: 'truncate'}"
+							title={isExpanded ? undefined : plugin.manifest.description}
+						>
+							{plugin.manifest.description}
+						</p>
 					{/if}
-				</button>
-			{:else}
-				<span class="flex-1 truncate font-medium text-foreground">{plugin.manifest.name}</span>
-			{/if}
-			{#if plugin.authoring}
-				<span
-					class="shrink-0 rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
-					title="You made this plugin in this browser, so you can edit it."
-				>
-					Mine
-				</span>
-			{/if}
+				</div>
+			</button>
 			{#if plugin.origin === 'builtin'}
-				<span
-					class="shrink-0 rounded bg-blue-100 px-1.5 py-0.5 text-[10px] text-blue-700 dark:bg-blue-950 dark:text-blue-300"
-				>
-					Core
-				</span>
 				<Switch
 					checked={plugin.enabled}
 					onCheckedChange={(v) => toggleBuiltinEnabled(plugin, v)}
-					class="h-4 w-7 shrink-0"
+					class="mt-1 h-4 w-7 shrink-0"
 					title={plugin.enabled ? 'Disable this plugin' : 'Enable this plugin'}
 					{@attach help({
 						title: 'Enable',
@@ -280,229 +284,181 @@
 					})}
 				/>
 			{/if}
-			{#if plugin.origin === 'linked'}
-				<span
-					class="shrink-0 rounded bg-violet-100 px-1.5 py-0.5 text-[10px] text-violet-700 dark:bg-violet-950 dark:text-violet-300"
-					title="Linked from a folder on your computer; each run reads it again."
-				>
-					dev · linked
-				</span>
-			{:else}
-				<span class="shrink-0 text-xs text-gray-400">{plugin.manifest.version}</span>
+			{#if plugin.origin === 'user'}
+				<DropdownMenu.Root>
+					<DropdownMenu.Trigger>
+						{#snippet child({ props })}
+							<Button
+								{...props}
+								variant="ghost"
+								size="icon"
+								class="relative size-6 shrink-0"
+								title={backupDue
+									? `More actions. v${plugin.manifest.version} isn't backed up.`
+									: 'More actions'}
+								aria-label="More actions"
+							>
+								<Ellipsis size={12} />
+								{#if backupDue}
+									<span class="absolute top-1 right-1 size-1.5 rounded-full bg-amber-500"></span>
+								{/if}
+							</Button>
+						{/snippet}
+					</DropdownMenu.Trigger>
+					<DropdownMenu.Content align="end" class="w-48">
+						{#if plugin.authoring}
+							<DropdownMenu.Item
+								class={backupDue ? 'text-amber-700 dark:text-amber-300' : ''}
+								onclick={() => void exportPlugin(plugin)}
+							>
+								<Download size={12} />
+								{backupDue ? 'Export zip · not backed up' : 'Export zip'}
+							</DropdownMenu.Item>
+						{/if}
+						<DropdownMenu.Item variant="destructive" onclick={() => removePlugin(plugin)}>
+							<Trash2 size={12} />
+							Remove
+						</DropdownMenu.Item>
+					</DropdownMenu.Content>
+				</DropdownMenu.Root>
 			{/if}
 		</div>
 
 		{#if isExpanded}
-			<div class="mt-1.5 ml-5 flex flex-col gap-2">
-				{#if plugin.manifest.description}
-					<p class="text-[11px] leading-snug text-muted-foreground">
-						{plugin.manifest.description}
-					</p>
-				{/if}
-				{#if citations.length > 0}
-					<PluginCitations {citations} />
-				{/if}
+			<div class="mt-2">
+				<PluginRowDetails {plugin} />
 			</div>
 		{/if}
 
 		{#if plugin.enabled}
-			<!-- Format + strategy + env badges -->
-			{@const envTier = classifyEnv(plugin.manifest)}
-			<div class="mt-1 ml-5 flex flex-wrap gap-1">
-				<span
-					class="max-w-full truncate rounded bg-muted px-1.5 py-0.5 text-[10px] whitespace-nowrap text-muted-foreground"
-				>
-					{plugin.manifest.format}
-				</span>
-				<span
-					class="max-w-full truncate rounded bg-muted px-1.5 py-0.5 text-[10px] whitespace-nowrap text-muted-foreground"
-					title={plugin.manifest.applyStrategy}
-				>
-					{plugin.manifest.applyStrategy}
-				</span>
-				{#if plugin.origin === 'linked'}
-					<span
-						class="max-w-full truncate rounded bg-violet-100 px-1.5 py-0.5 text-[10px] whitespace-nowrap text-violet-700 dark:bg-violet-950 dark:text-violet-300"
-						title="Runs in its own dev environment. Installed, it would run in the {envTier} environment."
-					>
-						dev env · {envTier} when installed
-					</span>
-				{:else}
-					<span
-						class="max-w-full truncate rounded px-1.5 py-0.5 text-[10px] whitespace-nowrap {envTier ===
-						'standard'
-							? 'bg-muted text-muted-foreground'
-							: 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'}"
-						title={envTier === 'standard'
-							? 'Standard environment — shares the persistent Python runtime'
-							: 'Custom environment — only one custom-environment plugin can be active at a time'}
-					>
-						{envTier} env
-					</span>
-				{/if}
-			</div>
-
 			<!-- Legacy-format notice -->
 			{#if plugin.status === 'needs-reinstall'}
-				<div class="mt-1 ml-5 text-xs text-amber-600">
+				<div class="mt-2 text-xs text-amber-600">
 					Plugin format changed — re-import this plugin as a zip (or reinstall it from the Hub).
 				</div>
 			{/if}
 
-			{#if !plugin.manifest.sidePanel}
-				<div class="mt-2 ml-5">
+			{#if !plugin.manifest.sidePanel && showOutput}
+				<div class="mt-2">
 					<PluginRunOutput {plugin} />
 				</div>
 			{/if}
 
-			<!-- Actions -->
-			<div class="mt-2 ml-5 flex gap-1.5">
-				{#if plugin.manifest.sidePanel}
-					<Button
-						variant="outline"
-						size="sm"
-						class="h-6 gap-1 border-blue-200 bg-blue-50 px-2 text-xs text-blue-700 hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300 dark:hover:bg-blue-900"
-						onclick={() => openPluginSidePanel(plugin)}
-						{@attach help({
-							title: 'Open Panel',
-							text: "Open this plugin's own side panel.",
-						})}
-					>
-						Open Panel
-					</Button>
-				{/if}
-				{#if !plugin.manifest.sidePanel && (plugin.status === 'registered' || (plugin.status === 'error' && !plugin.resolvedCode && !plugin.resolvedZipData) || plugin.status === 'deactivated')}
-					<Button
-						variant="outline"
-						size="sm"
-						class="h-6 gap-1 px-2 text-xs"
-						onclick={() => activatePlugin(plugin)}
-						{@attach help({
-							title: 'Activate',
-							text: 'Load the plugin into the Python runtime so it can run.',
-						})}
-					>
-						Activate
-					</Button>
-				{:else if plugin.status === 'active'}
-					{#if !plugin.manifest.sidePanel}
-						{@const activeRegion = editorCtx.activeRegion}
-						{@const isCadnanoPlugin = plugin.manifest.format === 'cadnano_json'}
-						{@const activeRegionIdx = activeRegion
-							? (session.currentDoc.parts[0]?.regions.indexOf(activeRegion) ?? -1)
-							: -1}
+			{#if showActions}
+				<div class="mt-2 flex flex-wrap gap-1.5">
+					{#if plugin.manifest.sidePanel}
 						<Button
 							variant="outline"
 							size="sm"
 							class="h-6 gap-1 border-blue-200 bg-blue-50 px-2 text-xs text-blue-700 hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300 dark:hover:bg-blue-900"
-							onclick={() => runPlugin(plugin)}
+							onclick={() => openPluginSidePanel(plugin)}
 							{@attach help({
-								title: 'Run',
-								text: 'Run the plugin on the open design. Any design change it proposes waits for you to apply it.',
+								title: 'Open panel',
+								text: "Open this plugin's own side panel.",
 							})}
-							disabled={coordinator.pendingApply?.pluginId === plugin.manifest.id}
-							title={isCadnanoPlugin && activeRegion
-								? `Run on region: ${activeRegion.name}`
-								: undefined}
 						>
-							<Play size={11} />
-							Run
-							{#if isCadnanoPlugin}
-								{#if activeRegion && activeRegionIdx >= 0}
-									<span
-										class="my-auto self-center text-[10px] text-muted-foreground"
-										title={activeRegion.name}
-									>
-										on R{activeRegionIdx + 1}
-									</span>
-								{:else}
-									<span class="self-center text-[10px] text-amber-500">no active region</span>
-								{/if}
-							{/if}
+							Open panel
 						</Button>
 					{/if}
-				{/if}
-				{#if plugin.status === 'running'}
-					<Button
-						variant="outline"
-						size="sm"
-						class="h-6 gap-1 px-2 text-xs"
-						onclick={() => coordinator.stopPlugin(plugin.manifest.id)}
-						title="Stop running plugin"
-						{@attach help({ title: 'Stop', text: 'Stop the running plugin.' })}
-					>
-						<Square size={11} />
-						Stop
-					</Button>
-				{/if}
-				{#if canReset(plugin)}
-					<Button
-						variant="outline"
-						size="sm"
-						class="h-6 gap-1 px-2 text-xs"
-						onclick={() => resetPlugin(plugin)}
-						title="Clear run output and reset to ready state"
-						{@attach help({
-							title: 'Reset',
-							text: 'Clear the output, discard a result not yet applied, and return an errored run to ready.',
-						})}
-					>
-						<RotateCcw size={11} />
-						Reset
-					</Button>
-				{/if}
-				{#if plugin.authoring && !plugin.manifest.sidePanel}
-					<Button
-						variant="outline"
-						size="sm"
-						class="h-6 gap-1 px-2 text-xs"
-						onclick={() => editorCtx.openPluginEditor(plugin.manifest.id)}
-						title="Edit this plugin's code"
-						{@attach help({
-							title: 'Edit',
-							text: 'Open this plugin in its own editor to change, test and save new versions.',
-							doc: 'script-lab',
-						})}
-					>
-						<FilePen size={11} />
-						Edit
-					</Button>
-					<Button
-						variant="outline"
-						size="sm"
-						class="h-6 gap-1 px-2 text-xs {needsBackup(plugin)
-							? 'border-amber-300 text-amber-700 dark:border-amber-700 dark:text-amber-300'
-							: ''}"
-						onclick={() => void exportPlugin(plugin)}
-						title={needsBackup(plugin)
-							? `v${plugin.manifest.version} isn't backed up. Download it as a zip.`
-							: `Download v${plugin.manifest.version} as a zip`}
-						{@attach help({
-							title: 'Export',
-							text: 'Download this plugin as a zip. Clearing browser data deletes the in-browser copy.',
-						})}
-					>
-						<Download size={11} />
-						Export
-					</Button>
-				{/if}
-				{#if plugin.origin === 'user'}
-					<Button
-						variant="outline"
-						size="sm"
-						class="h-6 gap-1 px-2 text-xs hover:border-red-300 hover:text-red-500"
-						onclick={() => removePlugin(plugin)}
-						title="Remove plugin"
-						{@attach help({
-							title: 'Remove',
-							text: 'Uninstall this plugin from this browser.',
-						})}
-					>
-						<Trash2 size={11} />
-						Remove
-					</Button>
-				{/if}
-			</div>
+					{#if !plugin.manifest.sidePanel && (plugin.status === 'registered' || (plugin.status === 'error' && !plugin.resolvedCode && !plugin.resolvedZipData) || plugin.status === 'deactivated')}
+						<Button
+							variant="outline"
+							size="sm"
+							class="h-6 gap-1 px-2 text-xs"
+							onclick={() => activatePlugin(plugin)}
+							{@attach help({
+								title: 'Activate',
+								text: 'Load the plugin into the Python runtime so it can run.',
+							})}
+						>
+							Activate
+						</Button>
+					{:else if plugin.status === 'active'}
+						{#if !plugin.manifest.sidePanel}
+							{@const activeRegion = editorCtx.activeRegion}
+							{@const isCadnanoPlugin = plugin.manifest.format === 'cadnano_json'}
+							{@const activeRegionIdx = activeRegion
+								? (session.currentDoc.parts[0]?.regions.indexOf(activeRegion) ?? -1)
+								: -1}
+							<Button
+								variant="outline"
+								size="sm"
+								class="h-6 gap-1 border-blue-200 bg-blue-50 px-2 text-xs text-blue-700 hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300 dark:hover:bg-blue-900"
+								onclick={() => runPlugin(plugin)}
+								{@attach help({
+									title: 'Run',
+									text: 'Run the plugin on the open design. Any design change it proposes waits for you to apply it.',
+								})}
+								disabled={coordinator.pendingApply?.pluginId === plugin.manifest.id}
+								title={isCadnanoPlugin && activeRegion
+									? `Run on region: ${activeRegion.name}`
+									: undefined}
+							>
+								<Play size={11} />
+								Run
+								{#if isCadnanoPlugin}
+									{#if activeRegion && activeRegionIdx >= 0}
+										<span
+											class="my-auto self-center text-[10px] text-muted-foreground"
+											title={activeRegion.name}
+										>
+											on R{activeRegionIdx + 1}
+										</span>
+									{:else}
+										<span class="self-center text-[10px] text-amber-500">no active region</span>
+									{/if}
+								{/if}
+							</Button>
+						{/if}
+					{/if}
+					{#if plugin.status === 'running'}
+						<Button
+							variant="outline"
+							size="sm"
+							class="h-6 gap-1 px-2 text-xs"
+							onclick={() => coordinator.stopPlugin(plugin.manifest.id)}
+							title="Stop running plugin"
+							{@attach help({ title: 'Stop', text: 'Stop the running plugin.' })}
+						>
+							<Square size={11} />
+							Stop
+						</Button>
+					{/if}
+					{#if canReset(plugin)}
+						<Button
+							variant="outline"
+							size="sm"
+							class="h-6 gap-1 px-2 text-xs"
+							onclick={() => resetPlugin(plugin)}
+							title="Clear run output and reset to ready state"
+							{@attach help({
+								title: 'Reset',
+								text: 'Clear the output, discard a result not yet applied, and return an errored run to ready.',
+							})}
+						>
+							<RotateCcw size={11} />
+							Reset
+						</Button>
+					{/if}
+					{#if plugin.authoring && !plugin.manifest.sidePanel}
+						<Button
+							variant="outline"
+							size="sm"
+							class="h-6 gap-1 px-2 text-xs"
+							onclick={() => editorCtx.openPluginEditor(plugin.manifest.id)}
+							title="Edit this plugin's code"
+							{@attach help({
+								title: 'Edit',
+								text: 'Open this plugin in its own editor to change, test and save new versions.',
+								doc: 'script-lab',
+							})}
+						>
+							<FilePen size={11} />
+							Edit
+						</Button>
+					{/if}
+				</div>
+			{/if}
 		{/if}
 	</div>
 {/snippet}
@@ -576,7 +532,7 @@
 
 		<Tabs.Content value="mine" class="mt-0 flex-1 overflow-hidden p-0">
 			<!-- Plugin list -->
-			<div class="h-full flex-1 overflow-y-auto">
+			<div class="h-full flex-1 overflow-y-auto px-3 py-2">
 				{#if plugins.length === 0}
 					<div class="px-4 py-6 text-center text-xs text-gray-400">
 						No plugins installed.<br />

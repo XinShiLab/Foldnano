@@ -4,10 +4,14 @@ import Ajv2020 from 'ajv/dist/2020';
 import { describe, expect, it } from 'vitest';
 import {
 	MANIFEST_CITATION_FIELDS,
+	MANIFEST_PERSON_FIELDS,
 	MANIFEST_SCHEMA_VERSION,
 	MANIFEST_V1_NESTED_FIELDS,
 	manifestFieldsFor,
+	PLUGIN_HTTPS_URL_PATTERN,
 	PLUGIN_ID_PATTERN,
+	PLUGIN_LICENSE_PATTERN,
+	PLUGIN_TAG_PATTERN,
 	PLUGIN_VERSION_PATTERN,
 	validateManifest,
 } from './manifestValidation';
@@ -42,6 +46,7 @@ type ManifestJsonSchema = JsonSchemaObject & {
 		sidePanel: JsonSchemaObject & {
 			properties: { form: JsonSchemaObject; codeEditor: JsonSchemaObject };
 		};
+		person?: JsonSchemaObject;
 	};
 };
 
@@ -175,6 +180,59 @@ describe('fplugin JSON Schema', () => {
 		expect(() => validateManifest(manifest, { allowNoEntrypoint: true })).toThrow();
 	});
 
+	it('accepts "tags" only at schemaVersion 2, like the app', () => {
+		const v2 = { ...PACKAGED_V2, tags: ['auto-staple', 'Demo', 'caDNAno'] };
+		expect(schemaErrors(v2)).toEqual([]);
+		expect(() => validateManifest(v2, { allowNoEntrypoint: true })).not.toThrow();
+		const v1 = { ...v2, schemaVersion: 1 };
+		expect(schemaErrors(v1)).not.toEqual([]);
+		expect(() => validateManifest(v1, { allowNoEntrypoint: true })).toThrow(/schemaVersion/);
+	});
+
+	it.each([
+		['too many entries', Array.from({ length: 11 }, (_, i) => `t${i}`)],
+		['an underscore', ['auto_staple']],
+		['an overlong tag', ['x'.repeat(33)]],
+		['a repeated tag', ['export', 'export']],
+	])('agrees with the app on tags with %s', (_label, tags) => {
+		const manifest = { ...PACKAGED_V2, tags };
+		expect(schemaErrors(manifest)).not.toEqual([]);
+		expect(() => validateManifest(manifest, { allowNoEntrypoint: true })).toThrow();
+	});
+
+	it('accepts the credit fields only at schemaVersion 2, like the app', () => {
+		const v2 = {
+			...PACKAGED_V2,
+			authors: [{ name: 'Douglas Lab', url: 'https://bionano.ucsf.edu/' }],
+			maintainers: [{ name: 'Xin Shi' }],
+			license: 'MIT',
+			repository: 'https://github.com/xinshi-kul/pyOrigamiBreak_mini',
+			upstream: 'https://github.com/douglaslab/pyOrigamiBreak',
+		};
+		expect(schemaErrors(v2)).toEqual([]);
+		expect(() => validateManifest(v2, { allowNoEntrypoint: true })).not.toThrow();
+		const v1 = { ...v2, schemaVersion: 1 };
+		expect(schemaErrors(v1)).not.toEqual([]);
+		expect(() => validateManifest(v1, { allowNoEntrypoint: true })).toThrow(/schemaVersion/);
+	});
+
+	it('lists exactly the person fields validateManifest allows', () => {
+		expect(keys(schema.$defs.person!)).toEqual([...MANIFEST_PERSON_FIELDS].sort());
+	});
+
+	it.each([
+		['too many authors', { authors: Array(11).fill({ name: 'A' }) }],
+		['a blank name', { maintainers: [{ name: ' ' }] }],
+		['an unknown person field', { authors: [{ name: 'A', email: 'a@b.c' }] }],
+		['a non-https person url', { authors: [{ name: 'A', url: 'http://a.org' }] }],
+		['a bad license', { license: 'MIT; GPL' }],
+		['a non-https repository', { repository: 'git@github.com:a/b.git' }],
+	])('agrees with the app on credits with %s', (_label, credits) => {
+		const manifest = { ...PACKAGED_V2, ...credits };
+		expect(schemaErrors(manifest)).not.toEqual([]);
+		expect(() => validateManifest(manifest, { allowNoEntrypoint: true })).toThrow();
+	});
+
 	it('rejects a format/applyStrategy mismatch', () => {
 		expect(schemaErrors({ ...scriptLabManifest, applyStrategy: 'replacePart' })).not.toEqual([]);
 	});
@@ -197,6 +255,11 @@ describe('fplugin JSON Schema', () => {
 		const props = schema.properties as unknown as Record<string, { pattern: string }>;
 		expect(props.id.pattern).toBe(PLUGIN_ID_PATTERN.source);
 		expect(props.version.pattern).toBe(PLUGIN_VERSION_PATTERN.source);
+		const tags = schema.properties.tags as { items: { pattern: string } };
+		expect(tags.items.pattern).toBe(PLUGIN_TAG_PATTERN.source);
+		expect(props.license.pattern).toBe(PLUGIN_LICENSE_PATTERN.source);
+		expect(props.repository.pattern).toBe(PLUGIN_HTTPS_URL_PATTERN.source);
+		expect(props.upstream.pattern).toBe(PLUGIN_HTTPS_URL_PATTERN.source);
 	});
 
 	it('requires "*" to stand alone in network', () => {

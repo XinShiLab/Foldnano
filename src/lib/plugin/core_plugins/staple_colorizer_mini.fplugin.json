@@ -1,12 +1,13 @@
 {
-	"schemaVersion": 1,
+	"schemaVersion": 2,
 	"id": "staple-colorizer-mini",
 	"name": "Staple Colorizer (mini)",
-	"version": "1.0.1",
+	"version": "1.0.2",
 	"format": "foldnano_edit",
 	"applyStrategy": "replayMutationLogInRegion",
 	"entrypointUrl": "/plugins/staple_colorizer_mini/staple_colorizer_mini.zip",
 	"description": "foldnano.edit port of the Staple Colorizer. Recolors all non-scaffold oligos in the active region using an HSL palette. Replays as a single undo step.",
+	"tags": ["Demo"],
 	"parameters": [
 		{
 			"id": "palette",

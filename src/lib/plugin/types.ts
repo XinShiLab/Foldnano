@@ -94,6 +94,12 @@ export interface PluginSidePanelInput {
 }
 
 /** A reference the plugin's author asks users to cite. Links to either a DOI or a URL, not both. */
+export interface PluginPerson {
+	name: string;
+	/** HTTPS link, e.g. a profile or lab page */
+	url?: string;
+}
+
 export interface PluginCitation {
 	/** Formatted reference, shown as plain text */
 	text: string;
@@ -140,6 +146,18 @@ export interface PluginManifest {
 	icon?: string;
 	/** References the author asks users to cite (schemaVersion 2) */
 	citations?: PluginCitation[];
+	/** Labels for display and filtering, compared ignoring case (schemaVersion 2) */
+	tags?: string[];
+	/** Who wrote the original work (schemaVersion 2) */
+	authors?: PluginPerson[];
+	/** Who made it a Foldnano plugin and keeps it updated, when not the authors (schemaVersion 2) */
+	maintainers?: PluginPerson[];
+	/** SPDX license id or expression of the plugin as shipped (schemaVersion 2) */
+	license?: string;
+	/** HTTPS URL of the plugin's own source repository (schemaVersion 2) */
+	repository?: string;
+	/** HTTPS URL of the original project, when the plugin is a fork (schemaVersion 2) */
+	upstream?: string;
 	/** User-configurable parameters shown in the run dialog */
 	parameters?: PluginParamDef[];
 	/** Host-rendered side panel requested by the plugin */

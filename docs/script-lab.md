@@ -630,9 +630,9 @@ one, so several pop-outs work at once. The header's × calls `closePluginEditor`
 a reload, every owned plugin with a draft gets its icon back (with an unsaved dot). Opening a new plugin's editor from the Make Plugin dialog resets Script Lab
 to its starter script.
 
-**Backups.** The dialog downloads the zip by default; afterwards **Export** (editor header and
-Plugins list) downloads the saved version and records `authoring.lastExportedVersion`, which
-drives the amber not-backed-up state. Removing an owned plugin asks first and offers **Export
+**Backups.** The dialog downloads the zip by default; afterwards **Export** (editor header, and the row's ⋯ menu
+in the Plugins list) downloads the saved version and records `authoring.lastExportedVersion`, which
+drives the amber not-backed-up state (a dot on the row's ⋯ button). Removing an owned plugin asks first and offers **Export
 first**; with a draft it says the export doesn't include unsaved edits. Importing a zip that
 `isRestorableOwnedZip` accepts (hint present, `isOwnedEditablePackage`, local file not a Hub URL) offers **Restore as editable** in the install
 dialog (`PluginInstallGate.confirmPending({ asEditable })`).

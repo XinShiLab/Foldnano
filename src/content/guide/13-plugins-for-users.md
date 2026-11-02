@@ -22,7 +22,7 @@ Plugins extend Foldnano with **Python tools** that can analyze a design, report 
 
 | Type | What it does |
 | --- | --- |
-| **Built-in plugin** | Ships inside Foldnano and is always listed in **My Plugins** with a **Core** badge; turn it on with its switch. Today this is [Script Lab](/docs/guide/script-lab). |
+| **Built-in plugin** | Ships inside Foldnano and is always listed in **My Plugins**, marked **Core**; turn it on with its switch. Today this is [Script Lab](/docs/guide/script-lab). |
 | **Plugin Hub entry** | A curated plugin you install from the **Hub** tab (listed there as *Core Plugins*). |
 | **ZIP plugin** | A packaged Python plugin you install from a `.zip` file on your computer. |
 
@@ -32,7 +32,9 @@ Open it from the **Plugins** icon (blocks) in the icon rail on the left edge of 
 
 ### Hub
 
-The **Hub** tab lists the curated **Core Plugins**, each with its description and badges for its format, apply strategy, and environment. Click **Install**, review the plugin's details, then **Confirm** (or **✕** to cancel). Installed plugins show **Installed**, and the panel switches to **My Plugins**. *Community plugins coming soon* marks where third-party listings will appear.
+The **Hub** tab lists the curated **Core Plugins** and the **Community Plugins**, each with its description and tags. A plugin that needs its own Python environment is also marked *custom env*. Click a tag at the top to show only plugins with that tag, or turn off **Show demos** to hide the example plugins tagged *Demo*. Click the **Install** button (download icon), review the plugin's details, including its format and apply strategy, then **Confirm** (or **✕** to cancel). Installed plugins show **Installed**, and the panel switches to **My Plugins**.
+
+**Community Plugins** don't ship with Foldnano. Each card credits its authors and links to its source and license. Among them is **pyOrigamiBreak: Staple Auto-Break**, which optimizes staple break positions with thermodynamic scoring (Aksel et al., PNAS 2024) and changes the design; it was a core plugin before, and a copy you already installed keeps working. Clicking **Install** downloads the plugin from the Foldnano plugins site, checks that it is exactly the file that was listed, and shows its details for you to review before you click **Install** again.
 
 ![Plugin panel Hub tab listing core plugins (Crossover Analyzer marked Installed; Design Statistics, GC Colorizer, Hello World and Mutation Test with Install buttons), each with its format, apply strategy and environment badges](/screenshots/guide/plugins-for-users/02-plugins-hub.webp)
 
@@ -46,17 +48,13 @@ The **Hub** tab lists the curated **Core Plugins**, each with its description an
 | **GC Colorizer** | Colors each staple by GC content (blue GC-rich, red AT-rich); needs sequences | Yes |
 | **Staple Colorizer** / **Staple Colorizer (mini)** | Recolors all staples with a configurable HSL palette | Yes |
 | **Nick Remover** | Joins adjacent staple nicks (consecutive 3′/5′ ends on the same helix) | Yes |
-| **pyOrigamiBreak: Staple Auto-Break** | Optimizes staple break positions with thermodynamic scoring (Aksel et al., PNAS 2024) | Yes |
 | **Hello World**, **Mutation Test**, **Side Panel Form Demo** | Examples for plugin authors | Some |
 
 ### My Plugins
 
-Each installed plugin is a card showing its name, version, and badges:
+Each installed plugin is a card showing its icon, name, version, a one-line description, where it came from (**Mine** for plugins you made, **Core** for built-in ones), and *custom env* in amber when it needs its own Python runtime (only one custom-environment plugin can be active at a time). A dot on the icon shows its state (green when active and ready to run, red after an error). A card also shows a plugin's output after a run, and **Stop** while it runs.
 
-- **format** (`cadnano_json`, `foldnano_json`, `foldnano_edit`) and **apply strategy**,
-- **standard env** (shares the Python runtime with other plugins) or **custom env** (needs its own runtime; only one custom-environment plugin can be active at a time).
-
-Click a plugin's name to show its description and any papers its author asks you to cite, with a link and a copy button. A small quote mark next to the name means the plugin has a citation. If you use the plugin in published work, please cite them. Citations also appear when you review a plugin before installing it.
+Click a plugin to open its card: its full description, labels for its **format** (`cadnano_json`, `foldnano_json`, `foldnano_edit`), **apply strategy** (what it may change in your design) and environment (hover a label for what it means), its tags, any papers its author asks you to cite (with a link and a copy button), and its buttons. If you use the plugin in published work, please cite the papers. Citations also appear when you review a plugin before installing it.
 
 | Button | What it does |
 | --- | --- |
@@ -64,10 +62,15 @@ Click a plugin's name to show its description and any papers its author asks you
 | **Run** | Runs the plugin. A `cadnano_json` plugin shows which region it runs on (for example **on R1**), or *no active region* when none is active. If the plugin has parameters, a dialog asks for them first. |
 | **Stop** | Stops a running plugin |
 | **Reset** | Clears the run output and returns the plugin to ready |
-| **Remove** | Uninstalls the plugin (built-in plugins can't be removed) |
-| **Open Panel** | For plugins with their own side panel, opens it |
+| **Open panel** | For plugins with their own side panel, opens it |
 | **Edit** | For plugins you made with [Script Lab](/docs/guide/script-lab#saving-a-script-as-a-plugin) (marked **Mine**), opens the plugin in its own editor |
-| **Export** | For plugins you made, downloads the saved version as a `.zip` backup |
+
+The **⋯** menu at the end of the row holds the rest:
+
+| Menu item | What it does |
+| --- | --- |
+| **Export zip** | For plugins you made, downloads the saved version as a `.zip` backup. An amber dot on **⋯** means the saved version isn't backed up yet. |
+| **Remove** | Uninstalls the plugin (built-in plugins can't be removed) |
 
 At the top, **Import zip** installs a `.zip` plugin from your computer. A card that says *Plugin format changed* needs to be re-imported as a zip or reinstalled from the Hub.
 
@@ -116,7 +119,7 @@ If a plugin needs **sequences, modifications, explicit scaffold labels, or freef
 
 </Callout>
 
-During the beta, plugins come from two places: the **Hub**, and `.zip` files on your computer. Foldnano does not install plugins from links to other websites, or from a `.fplugin.json` manifest on its own; if someone shares a plugin with you, ask for the `.zip`.
+During the beta, plugins come from two places: the **Hub** (core and community plugins), and `.zip` files on your computer. Foldnano does not install plugins from links to other websites, or from a `.fplugin.json` manifest on its own; if someone shares a plugin with you, ask for the `.zip`.
 
 To install a `.zip`, click **Import zip** in the Plugins panel, or drop the file on the editor's start screen or into the **Open** dialog and click **Install**. Before installing, Foldnano shows what the plugin declares: its type and apply strategy, its **network access**, its environment, and its **Python packages** grouped by where they come from. Packages marked *downloaded from PyPI* are third-party code fetched when you activate the plugin. Plugin code loads only when you click **Activate**, and only receives your design when you click **Run**.
 

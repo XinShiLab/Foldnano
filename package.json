@@ -18,6 +18,7 @@
 		"build": "node scripts/build-plugins.mjs && vite build",
 		"build:plugins": "node scripts/build-plugins.mjs",
 		"gen:pyodide-packages": "node scripts/generate-pyodide-packages.mjs",
+		"plugins:sync-listing": "node scripts/sync-plugin-listing.mjs",
 		"gen:python-api": "python3 scripts/gen_python_api.py",
 		"whats-new:draft": "node scripts/whats-new-draft.ts",
 		"preview": "vite preview",

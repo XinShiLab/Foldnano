@@ -1,7 +1,7 @@
 {
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
 	"title": "Foldnano plugin manifest, schema version 2",
-	"description": "Shape of a Foldnano plugin manifest (fplugin.json / *.fplugin.json) at schemaVersion 2 (adds \"icon\" and \"citations\"; otherwise the same as version 1). Checks structure, types and the format/applyStrategy pairing. Foldnano validates more on install (allowed entrypoint and wheel origins, parameters vs side panel forms, field defaults and ranges), so a manifest can pass this schema and still be refused. Field reference: the Foldnano plugin development guide.",
+	"description": "Shape of a Foldnano plugin manifest (fplugin.json / *.fplugin.json) at schemaVersion 2 (adds \"icon\", \"citations\", \"tags\" and the credit fields \"authors\", \"maintainers\", \"license\", \"repository\" and \"upstream\"; otherwise the same as version 1). Checks structure, types and the format/applyStrategy pairing. Foldnano validates more on install (allowed entrypoint and wheel origins, parameters vs side panel forms, field defaults and ranges), so a manifest can pass this schema and still be refused. Field reference: the Foldnano plugin development guide.",
 	"type": "object",
 	"required": ["schemaVersion", "id", "name", "version", "format", "applyStrategy"],
 	"properties": {
@@ -98,6 +98,40 @@
 			},
 			"description": "References you ask users to cite when they use the plugin in their work."
 		},
+		"tags": {
+			"type": "array",
+			"maxItems": 10,
+			"uniqueItems": true,
+			"items": { "type": "string", "pattern": "^(?=.{1,32}$)[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$" },
+			"description": "Labels that describe the plugin, e.g. [\"auto-staple\", \"export\"]: letters and digits, words joined by hyphens, at most 32 characters each. Repeats are refused ignoring case."
+		},
+		"authors": {
+			"type": "array",
+			"maxItems": 10,
+			"items": { "$ref": "#/$defs/person" },
+			"description": "Who wrote the original work."
+		},
+		"maintainers": {
+			"type": "array",
+			"maxItems": 10,
+			"items": { "$ref": "#/$defs/person" },
+			"description": "Who made it a Foldnano plugin and keeps it updated. Omit when the authors maintain it."
+		},
+		"license": {
+			"type": "string",
+			"pattern": "^(?=.{1,100}$)[A-Za-z0-9.+()-]+(?: [A-Za-z0-9.+()-]+)*$",
+			"description": "SPDX license id or expression of the plugin as shipped, e.g. \"MIT\" or \"MIT AND BSD-3-Clause\"."
+		},
+		"repository": {
+			"type": "string",
+			"pattern": "^https:\\/\\/[^\\s/]\\S*$",
+			"description": "HTTPS URL of the plugin's own source repository."
+		},
+		"upstream": {
+			"type": "string",
+			"pattern": "^https:\\/\\/[^\\s/]\\S*$",
+			"description": "HTTPS URL of the original project, when the plugin is a fork."
+		},
 		"parameters": {
 			"type": "array",
 			"items": { "$ref": "#/$defs/field" },
@@ -143,6 +177,19 @@
 		{ "not": { "required": ["entrypoint", "entrypointUrl"] } }
 	],
 	"$defs": {
+		"person": {
+			"type": "object",
+			"required": ["name"],
+			"properties": {
+				"name": { "type": "string", "pattern": "\\S", "maxLength": 100 },
+				"url": {
+					"type": "string",
+					"pattern": "^https:\\/\\/[^\\s/]\\S*$",
+					"description": "HTTPS link, e.g. a profile or lab page."
+				}
+			},
+			"additionalProperties": false
+		},
 		"field": {
 			"type": "object",
 			"required": ["id", "label", "type"],

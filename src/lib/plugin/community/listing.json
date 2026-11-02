@@ -1,0 +1,55 @@
+{
+	"source": {
+		"repo": "XinShiLab/foldnano-plugins",
+		"commit": "f205ebc94b4d25c7e3bc44e21f5d0211d4784cc5"
+	},
+	"registryVersion": 1,
+	"plugins": [
+		{
+			"id": "pyOrigamiBreak",
+			"version": "1.0.6",
+			"name": "pyOrigamiBreak — Staple Auto-Break",
+			"description": "Optimises staple break positions using thermodynamic (dG) scoring.",
+			"tags": ["caDNAno"],
+			"authors": [
+				{
+					"name": "Douglas Lab",
+					"url": "https://bionano.ucsf.edu/"
+				}
+			],
+			"maintainers": [
+				{
+					"name": "Xin Shi"
+				}
+			],
+			"license": "MIT",
+			"repository": "https://github.com/xinshi-kul/pyOrigamiBreak_mini",
+			"upstream": "https://github.com/douglaslab/pyOrigamiBreak",
+			"zip": {
+				"url": "https://xinshilab.github.io/foldnano-plugins/plugins/pyOrigamiBreak/1.0.6/pyOrigamiBreak-1.0.6.zip",
+				"sha256": "09cfa048ce2100e5775a7a94ad90f49af8ae1266170d9c9f6a5a118d2674cb2d"
+			},
+			"listed": "2026-11-02"
+		},
+		{
+			"id": "community-demo",
+			"version": "1.0.0",
+			"name": "Community Demo",
+			"description": "A minimal community plugin: shows the install path from the Foldnano plugins listing, and counts the oligos in the open design.",
+			"tags": ["Demo"],
+			"authors": [
+				{
+					"name": "Xin Shi"
+				}
+			],
+			"license": "MIT",
+			"repository": "https://github.com/XinShiLab/foldnano-plugins",
+			"iconSvg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z\"/><path d=\"m3.3 7 8.7 5 8.7-5\"/><path d=\"M12 22V12\"/></svg>\n",
+			"zip": {
+				"url": "https://xinshilab.github.io/foldnano-plugins/plugins/community-demo/1.0.0/community-demo-1.0.0.zip",
+				"sha256": "4f46ef685e6065430395c32b059f01d0822c8f79c16efdfc35ef7751d55f36ca"
+			},
+			"listed": "2026-11-02"
+		}
+	]
+}

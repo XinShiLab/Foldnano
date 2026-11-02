@@ -92,9 +92,10 @@ gate titles, a use-with-caution note); drop the "beta" badge at 1.0.
   data/visibility effect split that stops drags and Hide/Show from rebuilding geometry.
 - Plugins from other websites (decided 2026-09-29; beta is same-origin + local zip only). (1) Let
   experienced users install from a URL, opt-in, with a user-managed list of trusted sources.
-  (2) A community-maintained plugin list (a repo of reviewed plugin URLs plus descriptions) that
-  users can choose to subscribe to. Pin each entry to a sha256 of its zip and verify on install,
-  so a reviewed URL can't change underneath. Manifest `network` stays the enforcement point.
+  (2) ~~A community plugin list pinned by sha256~~: done 2026-11-02 as a listing shipped with the
+  app (`XinShiLab/foldnano-plugins`, `pnpm plugins:sync-listing`; `docs/python-plugin-system.md`
+  § Community plugins). Still open: fetching the listing live (needs signing) and letting users
+  subscribe to other lists. Manifest `network` stays the enforcement point.
 - pyOrigamiBreak stops with `sys.exit()` on some designs (found 2026-10-07): "SCAFFOLD SEQUENCE
   IS SHORTER THAN SCAFFOLD LENGTH!" (the design needs a longer scaffold than the one chosen) or
   "SOLUTION DOESNT EXIST". This used to kill the Python runtime and show only a red icon; the

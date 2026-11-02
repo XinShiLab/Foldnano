@@ -16,6 +16,7 @@ import type {
 } from './types';
 import { isStepAligned, normalizeSelectOptions, stepBase } from './fieldValidation';
 import { validateNetwork } from './networkPolicy';
+import { tagKey } from './pluginTags';
 
 /**
  * Manifest schema version this app reads and writes. Bump it (and publish
@@ -43,8 +44,21 @@ export const MANIFEST_V1_FIELDS: readonly string[] = [
 	'sidePanel',
 ];
 
-/** v2 adds `icon` and `citations`. The objects shared with v1 are unchanged. */
-export const MANIFEST_V2_FIELDS: readonly string[] = [...MANIFEST_V1_FIELDS, 'icon', 'citations'];
+/** v2 adds `icon`, `citations`, `tags` and the credit fields. The objects shared with v1 are unchanged. */
+export const MANIFEST_V2_FIELDS: readonly string[] = [
+	...MANIFEST_V1_FIELDS,
+	'icon',
+	'citations',
+	'tags',
+	'authors',
+	'maintainers',
+	'license',
+	'repository',
+	'upstream',
+];
+
+/** Fields allowed in an entry of `authors` or `maintainers`. */
+export const MANIFEST_PERSON_FIELDS: readonly string[] = ['name', 'url'];
 
 /** Fields allowed in an entry of `citations`. */
 export const MANIFEST_CITATION_FIELDS: readonly string[] = ['text', 'doi', 'url'];
@@ -257,7 +271,13 @@ export const PLUGIN_ICON_PATH_PATTERN =
 export const MAX_PLUGIN_CITATIONS = 10;
 export const MAX_PLUGIN_CITATION_TEXT_LENGTH = 500;
 export const PLUGIN_CITATION_DOI_PATTERN = /^10\.\d{4,9}\/\S+$/;
-export const PLUGIN_CITATION_URL_PATTERN = /^https:\/\/[^\s/]\S*$/;
+/** The only links a manifest may hold (citations, credits); never another scheme. */
+export const PLUGIN_HTTPS_URL_PATTERN = /^https:\/\/[^\s/]\S*$/;
+
+export const MAX_PLUGIN_PEOPLE = 10;
+export const MAX_PLUGIN_PERSON_NAME_LENGTH = 100;
+/** An SPDX id or expression such as "MIT" or "MIT AND BSD-3-Clause"; shape only, not the SPDX list. */
+export const PLUGIN_LICENSE_PATTERN = /^(?=.{1,100}$)[A-Za-z0-9.+()-]+(?: [A-Za-z0-9.+()-]+)*$/;
 
 /** Where a citation links to, or null when it has no valid link. Only ever an https:// address. */
 export function citationLink(citation: PluginCitation): { href: string; label: string } | null {
@@ -265,9 +285,66 @@ export function citationLink(citation: PluginCitation): { href: string; label: s
 		const path = citation.doi.split('/').map(encodeURIComponent).join('/');
 		return { href: `https://doi.org/${path}`, label: `doi.org/${citation.doi}` };
 	}
-	if (citation.url && PLUGIN_CITATION_URL_PATTERN.test(citation.url))
+	if (citation.url && PLUGIN_HTTPS_URL_PATTERN.test(citation.url))
 		return { href: citation.url, label: citation.url.slice('https://'.length) };
 	return null;
+}
+
+export const MAX_PLUGIN_TAGS = 10;
+/** Letters and digits, words joined by single hyphens, at most 32 characters. Case is kept for display. */
+export const PLUGIN_TAG_PATTERN = /^(?=.{1,32}$)[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$/;
+
+function validateTags(raw: unknown): void {
+	if (!Array.isArray(raw)) throw new Error('"tags" must be an array of strings');
+	if (raw.length > MAX_PLUGIN_TAGS)
+		throw new Error(`"tags" can list at most ${MAX_PLUGIN_TAGS} tags`);
+	for (const tag of raw as unknown[]) {
+		if (typeof tag !== 'string' || !PLUGIN_TAG_PATTERN.test(tag))
+			throw new Error(
+				`Each tag must be letters and digits, words joined by hyphens, at most 32 characters, e.g. "auto-staple" (got ${JSON.stringify(tag)})`
+			);
+	}
+	if (new Set((raw as string[]).map(tagKey)).size !== raw.length)
+		throw new Error('"tags" must not repeat a tag (ignoring case)');
+}
+
+function validatePeople(raw: unknown, field: 'authors' | 'maintainers'): void {
+	if (!Array.isArray(raw)) throw new Error(`"${field}" must be an array`);
+	if (raw.length > MAX_PLUGIN_PEOPLE)
+		throw new Error(`"${field}" can list at most ${MAX_PLUGIN_PEOPLE} people`);
+	for (const entry of raw as unknown[]) {
+		if (!entry || typeof entry !== 'object' || Array.isArray(entry))
+			throw new Error(`Each entry of "${field}" must be an object with a "name" field`);
+		const p = entry as Record<string, unknown>;
+		rejectUnknownFields(p, MANIFEST_PERSON_FIELDS, `an entry of "${field}"`);
+		if (typeof p.name !== 'string' || !p.name.trim())
+			throw new Error(`Each entry of "${field}" must have a non-empty string "name" field`);
+		if (p.name.length > MAX_PLUGIN_PERSON_NAME_LENGTH)
+			throw new Error(
+				`A name in "${field}" can be at most ${MAX_PLUGIN_PERSON_NAME_LENGTH} characters`
+			);
+		if (p.url !== undefined && (typeof p.url !== 'string' || !PLUGIN_HTTPS_URL_PATTERN.test(p.url)))
+			throw new Error(
+				`A "url" in "${field}" must start with https:// (got ${JSON.stringify(p.url)})`
+			);
+	}
+}
+
+function validateCredits(m: Record<string, unknown>): void {
+	if (m.authors !== undefined) validatePeople(m.authors, 'authors');
+	if (m.maintainers !== undefined) validatePeople(m.maintainers, 'maintainers');
+	if (
+		m.license !== undefined &&
+		(typeof m.license !== 'string' || !PLUGIN_LICENSE_PATTERN.test(m.license))
+	)
+		throw new Error(
+			`"license" must be an SPDX license id or expression, e.g. "MIT" or "GPL-3.0-only" (got ${JSON.stringify(m.license)})`
+		);
+	for (const field of ['repository', 'upstream'] as const) {
+		const url = m[field];
+		if (url !== undefined && (typeof url !== 'string' || !PLUGIN_HTTPS_URL_PATTERN.test(url)))
+			throw new Error(`"${field}" must start with https:// (got ${JSON.stringify(url)})`);
+	}
 }
 
 function validateCitations(raw: unknown): void {
@@ -294,10 +371,7 @@ function validateCitations(raw: unknown): void {
 			throw new Error(
 				`Citation "doi" must be a bare DOI such as "10.1073/pnas.2406769121", without "https://doi.org/" (got ${JSON.stringify(c.doi)})`
 			);
-		if (
-			c.url !== undefined &&
-			(typeof c.url !== 'string' || !PLUGIN_CITATION_URL_PATTERN.test(c.url))
-		)
+		if (c.url !== undefined && (typeof c.url !== 'string' || !PLUGIN_HTTPS_URL_PATTERN.test(c.url)))
 			throw new Error(`Citation "url" must start with https:// (got ${JSON.stringify(c.url)})`);
 	}
 }
@@ -309,10 +383,13 @@ export function validateManifest(raw: unknown, { allowNoEntrypoint = false } = {
 
 	validateSchemaVersion(m);
 	const schemaVersion = (m.schemaVersion as number | undefined) ?? DEFAULT_MANIFEST_SCHEMA_VERSION;
-	if (m.icon !== undefined && schemaVersion < 2)
-		throw new Error('"icon" needs "schemaVersion": 2 (or later) in the manifest');
-	if (m.citations !== undefined && schemaVersion < 2)
-		throw new Error('"citations" needs "schemaVersion": 2 (or later) in the manifest');
+	if (schemaVersion < 2) {
+		const v2Field = MANIFEST_V2_FIELDS.find(
+			(f) => !MANIFEST_V1_FIELDS.includes(f) && m[f] !== undefined
+		);
+		if (v2Field)
+			throw new Error(`"${v2Field}" needs "schemaVersion": 2 (or later) in the manifest`);
+	}
 	rejectUnknownFields(m, manifestFieldsFor(schemaVersion), 'the manifest', true);
 	if (m.$schema !== undefined && typeof m.$schema !== 'string')
 		throw new Error('"$schema" must be a string');
@@ -458,6 +535,10 @@ export function validateManifest(raw: unknown, { allowNoEntrypoint = false } = {
 	}
 
 	if (m.citations !== undefined) validateCitations(m.citations);
+
+	if (m.tags !== undefined) validateTags(m.tags);
+
+	validateCredits(m);
 
 	if (m.parameters !== undefined) {
 		if (!Array.isArray(m.parameters)) throw new Error('"parameters" must be an array');
