@@ -115,8 +115,8 @@ developers directed the work, reviewed and tested the changes, and made the desi
 
 Foldnano reads and writes the cadnano 2 file format and was validated against
 [cadnano 2.5](https://github.com/cadnano/cadnano2.5) (Wyss Institute and UCSF, BSD 3-Clause).
-The bundled pyOrigamiBreak plugin is adapted from
-[pyOrigamiBreak](https://github.com/douglaslab/pyOrigamiBreak) by Tural Aksel (MIT). The 3D
+The pyOrigamiBreak plugin (bundled until 2026-11, now a community plugin) is adapted from
+[pyOrigamiBreak](https://github.com/douglaslab/pyOrigamiBreak) by Shawn M. Douglas lab (MIT). The 3D
 rigid-body relaxation is inspired by the cluster simulation in
 [oxView](https://sulcgroup.github.io/oxdna-viewer/) (an independent implementation). Other
 third-party components are listed in [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md).

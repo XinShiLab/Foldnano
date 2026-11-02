@@ -3,6 +3,7 @@ import {
 	FileCodeCorner,
 	FilePen,
 	GitPullRequestArrow,
+	Puzzle,
 	SlidersHorizontal,
 	Workflow,
 } from '@lucide/svelte';
@@ -158,6 +159,14 @@ function buildPluginSidePanelDescriptor(plugin: PythonPlugin): PluginSidePanelDe
 		hasDraft: false,
 		iconSvg: plugin.iconSvg,
 	};
+}
+
+/** Glyph for a plugin without a bundled icon: its side panel's icon, else a generic plugin piece. */
+export function pluginFallbackIcon(
+	manifest: Pick<PythonPlugin['manifest'], 'sidePanel'>
+): Component {
+	const panel = manifest.sidePanel;
+	return panel ? sidePanelIconComponent(panel.icon ?? defaultSidePanelIcon(panel.type)) : Puzzle;
 }
 
 function defaultSidePanelIcon(

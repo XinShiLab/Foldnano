@@ -3,6 +3,7 @@ covers:
   - src/lib/plugin/**
   - src/lib/components/Editor/Plugin/**
   - scripts/build-plugins.mjs
+  - scripts/sync-plugin-listing.mjs
   - scripts/gen_python_api.py
   - scripts/generate-pyodide-packages.mjs
   - scripts/vite-sandbox-worker.ts
@@ -71,7 +72,7 @@ Plugins are third-party code the user chose to run, so the trust model is "like 
 
 **Blocked requests are explained.** The worker listens for `securitypolicyviolation` (`connect-src`) during a run, waits one task after Python returns (violations from a synchronous run are queued as tasks), and appends one `[sandbox] Blocked a request to <host>…` line per host to that run's logs. Safari/WebKit enforces the CSP but fires the event nowhere a script can see (not in the worker, the iframe document or on the `Worker`), so the worker also wraps `fetch` and `XMLHttpRequest`: a failed request whose URL is outside `connect-src` records its host too. The worker gets its policy in the `SANDBOX_PORT_HANDOFF` message and matches with `isConnectAllowed` (`worker/connectSources.ts`); the host set dedupes browsers that report both ways. This is diagnostics only: the browser still does the blocking, and code that bypasses the wrappers is still blocked, just without the line.
 
-**Disclosure.** `PluginManifestInfo` shows network access and requirements grouped by `requirementSources()` (distribution / PyPI / bundled / first-party), with PyPI and `["*"]` highlighted. It is shown before every install path: the Hub, the Open dialog, and **Import zip**, which asks for review through `PluginInstallGate.requestInstall(…, { review: true })`. A Replace confirmation shows the new version and calls out a changed `network`.
+**Disclosure.** `PluginManifestInfo` shows network access and requirements grouped by `requirementSources()` (distribution / PyPI / bundled / first-party), with PyPI and `["*"]` highlighted. It is shown before every install path: the Hub, the Open dialog, and **Import zip** and community installs, which ask for review through `PluginInstallGate.requestInstall(…, { review: true })`. A Replace confirmation shows the new version and calls out a changed `network`.
 
 **What it does not isolate:** plugins that share the standard-tier worker share one interpreter, so they can observe or monkeypatch each other's modules; and the plugin still receives the full design JSON and can return any result (validated before Apply as usual).
 
@@ -140,7 +141,6 @@ src/lib/plugin/
     staple_colorizer_mini.fplugin.json ← demo plugin manifest (replayMutationLogInRegion, foldnano_edit)
     mutation_test.fplugin.json      ← demo plugin manifest (replayMutationLog, foldnano_edit)
     hello_world.fplugin.json        ← demo plugin manifest (replaceRegionKeepAnnotationsWhereMatched, cadnano_json, minimal inline entrypoint)
-    pyOrigamiBreak.fplugin.json     ← demo plugin manifest (replaceRegion, cadnano_json, custom-tier: numpy/pandas/matplotlib + cadnano2_5_mini wheel)
     side_panel_form_demo.fplugin.json ← demo plugin manifest (previewOnly, foldnano_json, form side panel)
   scriptLabManifest.ts              ← built-in Script Lab manifest + starter templates
 
@@ -160,7 +160,6 @@ static/plugins/
     analyzer.py                     ← demo (multi-file): crossover extraction module
     report.py                       ← demo (multi-file): CSV + summary statistics module
   hello_world/plugin.py             ← demo: minimal inline entrypoint
-  pyOrigamiBreak/                   ← demo (multi-file, wheel dep): thermodynamic staple-break optimizer
   side_panel_form_demo/plugin.py    ← demo: host-rendered form side panel
   cadnano_mini/v0.1.0/*.whl         ← pinned standard-extra wheel referenced by STANDARD_ENV_EXTRAS
 ```
@@ -242,6 +241,12 @@ All fields are typed in `src/lib/plugin/types.ts`:
 | `description`   | `string?`                                              | Optional human-readable description.                                                                      |
 | `icon`          | `string?`                                              | v2 only. Path of an SVG inside the plugin zip; see § Plugin icons.                                        |
 | `citations`     | `PluginCitation[]?`                                    | v2 only. References the author asks users to cite; see § Plugin citations.                                |
+| `tags`          | `string[]?`                                            | v2 only. Display-only labels; see § Plugin tags.                                                          |
+| `authors`       | `PluginPerson[]?`                                      | v2 only. Original authors; see § Plugin credits.                                                          |
+| `maintainers`   | `PluginPerson[]?`                                      | v2 only. Who made and maintains the plugin, when not the authors.                                         |
+| `license`       | `string?`                                              | v2 only. SPDX id or expression (`PLUGIN_LICENSE_PATTERN`, shape only).                                    |
+| `repository`    | `string?`                                              | v2 only. `https://` URL of the plugin's own source.                                                       |
+| `upstream`      | `string?`                                              | v2 only. `https://` URL of the original project, for forks.                                               |
 | `parameters`    | `PluginParamDef[]?`                                    | User-configurable parameters shown in a dialog before each run (see below).                               |
 | `sidePanel`     | `PluginSidePanelManifest?`                             | Optional host-rendered side panel request using built-in `form` or `codeEditor` surfaces.                 |
 
@@ -257,9 +262,9 @@ All fields are typed in `src/lib/plugin/types.ts`:
 
 **Published schemas:** `static/schemas/fplugin-v<N>.schema.json` (JSON Schema 2020-12), one per version and all kept online, documented for authors in `src/content/plugin-development/04-plugin-manifest.md`. `manifestSchema.spec.ts` keeps them in lockstep: every shipped manifest must pass the schema of its own `schemaVersion` and `validateManifest`, each schema's field lists must equal `manifestFieldsFor(N)`, and network-entry rules must agree.
 
-**Versions:** v1 is the original field set (`MANIFEST_V1_FIELDS`). v2 (`MANIFEST_V2_FIELDS`) adds top-level `icon` and `citations`; objects shared with v1 are unchanged. A v1 manifest that uses either is refused with a message naming `schemaVersion`. Owned plugins (Script Lab) always write the current version.
+**Versions:** v1 is the original field set (`MANIFEST_V1_FIELDS`). v2 (`MANIFEST_V2_FIELDS`) adds top-level `icon`, `citations`, `tags` and the credit fields (`authors`, `maintainers`, `license`, `repository`, `upstream`); objects shared with v1 are unchanged. A v1 manifest that uses any of them is refused with a message naming `schemaVersion`. Owned plugins (Script Lab) always write the current version.
 
-**Bumping the version:** add the field to the validator and its field lists, raise `MANIFEST_SCHEMA_VERSION` (and the `schemaVersion` literal type), publish `fplugin-v<N>.schema.json` next to the old one, and update the author docs. **Beta exception:** users load the latest app, so an optional, display-only field may join the current version and its published schema instead, as `citations` joined v2. The cost is that a tab still open on an older build refuses such a manifest as an unknown field until it reloads. Don't use this exception for a field that affects behavior or safety, or after the beta.
+**Bumping the version:** add the field to the validator and its field lists, raise `MANIFEST_SCHEMA_VERSION` (and the `schemaVersion` literal type), publish `fplugin-v<N>.schema.json` next to the old one, and update the author docs. **Beta exception:** users load the latest app, so an optional, display-only field may join the current version and its published schema instead, as `citations`, `tags` and the credit fields joined v2. The cost is that a tab still open on an older build refuses such a manifest as an unknown field until it reloads. Don't use this exception for a field that affects behavior or safety, or after the beta.
 
 **Install-time identity rules.** `validateManifest` requires `id` to match `PLUGIN_ID_PATTERN` and `version` to be semver (`PLUGIN_VERSION_PATTERN`); the published schema carries the same patterns (`manifestSchema.spec.ts` checks they match). `validateManifest` runs only on install paths, so plugins installed before these rules (checked 2026-09-30) keep loading; tightening a v1 field this way is the exception the versioning policy allows only because it never touches stored manifests.
 
@@ -327,7 +332,7 @@ runtime-code (code-editor `execution: "entrypoint"`) plugins.
 
 ### Same-origin installs
 
-Beta supports two ways to get a plugin: what ships with the app (the Hub, built-ins) and a local `.zip` the user imports. Anything the app would **fetch** must come from its own origin, checked by `isSameOriginUrl()` in `manifestValidation.ts`:
+Beta supports three ways to get a plugin: what ships with the app (the Hub's core plugins, built-ins), the community listing that ships with the app (§ Community plugins), and a local `.zip` the user imports. Anything the app would **fetch** must come from its own origin, checked by `isSameOriginUrl()` in `manifestValidation.ts`, with one exception: a community zip, fetched from the URL in the shipped listing and refused unless its SHA-256 matches the pinned one.
 
 - **`entrypointUrl`** (Hub pointer manifests, and the inner manifest if it restates one) must resolve to the app's origin. Other hosts are refused with a hint to download the zip and use **Import zip**.
 - **Wheel requirements:** a bare filename (`"pkg-1.0-py3-none-any.whl"`) must be in the zip, stored at install and never fetched; a path or URL must resolve to the app's origin. `PluginCoordinator` re-checks at activation before fetching, so a manifest stored before this rule can't pull an external wheel.
@@ -335,7 +340,7 @@ Beta supports two ways to get a plugin: what ships with the app (the Hub, built-
 
 `isSameOriginUrl` resolves the URL against the page instead of pattern-matching `http(s)://`, which also catches protocol-relative `//host/…` and whitespace-prefixed URLs that `fetch()` would otherwise send elsewhere. It fails closed when there is no page location.
 
-Installing from other websites (with a user-chosen list of trusted sources, and content hashes) is a planned post-beta feature; see `docs/code_review/todo/beta-release-checklist.md` § After the beta.
+Installing from arbitrary websites (with a user-chosen list of trusted sources) is a planned post-beta feature; see `docs/code_review/todo/beta-release-checklist.md` § After the beta.
 
 ### Plugin side panels
 
@@ -372,8 +377,41 @@ A v2 manifest may name an SVG inside its zip: `"icon": "icon.svg"` (`PLUGIN_ICON
 `citations` lists `{ text, doi? | url? }` entries (`validateCitations`), and the schema keeps the same limits.
 
 - **Untrusted text:** `text` renders as plain text. `citationLink` is the only way to get a link: a DOI always becomes a `https://doi.org/…` address and `url` must be `https://`, so a manifest can't produce another scheme.
-- **Where it shows:** `PluginCitations.svelte`, used by `PluginManifestInfo` (every pre-install review) and by the row expansion in `PluginPanel`. Clicking the name toggles the expansion, which also holds `description`. It is a real button rather than a row click because the row holds a switch, actions and selectable run output. Expansion state is per panel instance and not persisted.
+- **Where it shows:** `PluginCitations.svelte`, used by `PluginManifestInfo` (every pre-install review) and by `PluginRowDetails`, the row expansion in `PluginPanel`. Clicking the name toggles the expansion; it is a real button rather than a row click because the row holds a switch, actions and selectable run output. Expansion state is per panel instance and not persisted.
+
+### My Plugins row
+
+`pluginRow` in `PluginPanel` renders each plugin as a card, like the Hub (`PluginHubCard`): a `PluginTile` on the left (bundled icon, else `pluginFallbackIcon`: the side panel's glyph or a puzzle piece; status as a dot on its corner), the name wrapping freely, and a one-line description that unclamps when open. Collapsed, it shows status, name, description, origin (_Mine_ / _Core_ / _dev · linked_), amber _custom env_, version, Core's switch, and a ⋯ dropdown (**Export zip**, **Remove**; `origin: 'user'` only, with an amber dot for `needsBackup`). Clicking the tile, name or description expands it: `PluginRowDetails` (format / apply / env pills whose tooltips carry the `manifestDescriptions.ts` text, tags, citations) and the action buttons (Open panel / Activate / Run, Reset, **Edit** for owned plugins). A collapsed card still shows what needs attention: run output, errors and a pending Apply (`hasRunOutput`), Stop while running, and the _Plugin format changed_ notice.
+
 - **One source for core plugins:** the Hub lists `core_plugins/*.fplugin.json`, and `scripts/build-plugins.mjs` injects the same manifest into the zip. Installed copies keep their stored manifest until they are reinstalled.
+
+### Plugin credits
+
+`authors` / `maintainers` (`{ name, url? }`, `MANIFEST_PERSON_FIELDS`, ≤ `MAX_PLUGIN_PEOPLE`), `license` and `repository` / `upstream`, checked by `validateCredits`; the schema mirrors them (`$defs.person`) and `manifestSchema.spec.ts` pins the shared patterns.
+
+- **Why two lists:** most community plugins are forks: the maintainer gets the original author's permission, forks the project (keeping its license) and adapts it. `authors` credits the original work, `maintainers` the plugin; a plugin its author maintains uses `authors` only.
+- **Links:** every URL must match `PLUGIN_HTTPS_URL_PATTERN` (shared with citations), so a manifest can't produce another scheme. `license` is checked for shape only, not against the SPDX list, which grows.
+- **Where it shows:** `PluginCredits.svelte`, in `PluginManifestInfo` (every pre-install review) and `PluginRowDetails` (the open My Plugins card).
+
+### Plugin tags
+
+`tags` is up to `MAX_PLUGIN_TAGS` strings matching `PLUGIN_TAG_PATTERN` (letters/digits, hyphen-separated, ≤ 32 chars), checked by `validateTags`; the schema's pattern must equal the regex source (`manifestSchema.spec.ts`).
+
+- **Display-only by contract.** Tags joined v2 under the beta exception, which is only allowed for fields that don't affect behavior or safety. Never gate a capability, runtime choice or permission on a tag; that needs a new field and a version bump.
+- **Case is kept, compared loosely.** Authors' casing is displayed as written (`caDNAno`), but every comparison (repeats, filters) goes through `tagKey`, so `Demo` and `demo` are one tag. The schema's `uniqueItems` is case-sensitive, so the app is stricter there; that's the only gap.
+- **Hub display and filter.** `PluginHubCard` shows tags as pills; `PluginTagFilter` offers one chip per tag (`countTags`) plus a **Show demos** switch for `DEMO_TAG`, which is left out of the chips so the two controls can't contradict each other. `filterByTags` (`pluginTags.ts`) applies both; the Hub keeps one filter state for its Core and Community sections. Filter state isn't persisted.
+- **Core plugin convention:** shipped examples are tagged `Demo`; Nick Remover is the one core tool and carries no `Demo` tag. Real tools may get a descriptive tag (the community pyOrigamiBreak: `caDNAno`). Script Lab is built in and not a Hub entry. Owned plugins keep any `tags` from a restored zip (`saveOwnedPluginVersion` spreads the stored manifest) but Make Plugin has no tags field yet.
+
+### Community plugins
+
+Plugins that don't ship with Foldnano, listed in the Hub's **Community Plugins** section. The listing lives in the public repo `XinShiLab/foldnano-plugins` (`registry.json`, its schema, the zips and a check script run in CI); its README and CONTRIBUTING cover adding an entry.
+
+- **The listing ships with the app.** `pnpm plugins:sync-listing <commit-sha>` (`scripts/sync-plugin-listing.mjs`, run by hand) copies `registry.json` at that commit into `src/lib/plugin/community/listing.json` with `{ repo, commit }`. A listing change reaches users only through a Foldnano release; the app never fetches the listing live (that needs a signed listing, since a compromised listing could change URL and hash together).
+- **Entries are checked with the app's own rules.** `validateCommunityEntry` (`communityPlugins.ts`) runs the display and credit fields through `validateManifest` and the icon through `validatePluginIconSvg`, and requires `repository`, an https `zip.url` and a 64-hex `zip.sha256`. Unknown keys are ignored. `communityPlugins.spec.ts` checks every shipped entry. An id that still ships as a core plugin is left out of `communityPlugins`, so a plugin moving from core shows once.
+- **Install** (`prepareCommunityInstall` in `PluginInstaller.ts`): fetch `zip.url` with `readResponseCapped`, compare its SHA-256 (SubtleCrypto) with `zip.sha256`, then the usual `processPluginZip` with `expectedId`, and require the zip's version to equal the entry's. The listing has no full manifest, so the Hub card's Install goes straight to the install dialog (`review: true`) with the zip's manifest. No `sourceUrl` is passed: the stored manifest gets no cross-origin `entrypointUrl` (which `validateManifest` would refuse on reload). The stored zip bytes are the listed file, so their hash identifies the installed listing version; no separate install-source field is kept.
+- **One delivery route.** Every listed zip is hosted in the plugins repo and served by GitHub Pages (`Access-Control-Allow-Origin: *`). GitHub release downloads send no CORS header, and relaying through Foldnano's server is out (redistribution, and Vercel's 4.5 MB response cap). Listing only plugins whose license allows sharing copies keeps hosting possible.
+- **pyOrigamiBreak moved here from core** (2026-11-02). Its source of truth is the fork (`xinshi-kul/pyOrigamiBreak_mini`, branch `foldnano_plugin`), whose `autobreak/` folder is exactly the zip; versions are packed from there with the plugins repo's pack script (1.0.5 was the files Foldnano used to ship, 1.0.6 the first release from the fork). Copies installed from core keep working (the coordinator runs the stored zip and never fetches `entrypointUrl` again) and keep their old `/plugins/pyOrigamiBreak/…` `entrypointUrl`, which is same-origin and so still validates; reinstalling from the Community section replaces it. It still requires the first-party `cadnano2_5_mini` wheel (`static/plugins/cadnano_mini/`), so a change to that wheel can break a listed plugin: treat the wheel as a public API.
+- **No review policy stated yet.** The Hub and the user guide say nothing about whether community plugins are reviewed: today the maintainer of a listed plugin may be a Foldnano developer, so "not reviewed" would be inaccurate. Add a policy and per-plugin status once outside submissions open.
 
 ### Code-editor execution modes
 
@@ -809,7 +847,7 @@ Dependency isolation follows a two-tier model. `classifyEnv(manifest)` in `src/l
 
 **Custom tier** gets one dedicated worker with single-active semantics: activating custom plugin B evicts custom plugin A (confirm dialog if A is busy or holds an unapplied result; silent toast if idle). The custom→custom switch cost (teardown + reinstall) is accepted and surfaced in the UI. Custom-tier churn never touches the standard worker. Total residency is bounded at two Pyodide instances.
 
-Classification only **routes** plugins — it never refuses them (`SUPPORTED_REQUIREMENTS_ALLOWLIST` in `manifestValidation.ts` is a separate, currently permissive gate). The UI badges each plugin's tier in the plugin list, the install dialog, and the Hub, and every run's log starts with a reproducibility stamp such as `[env] pyodide-0.29.5 · standard`.
+Classification only **routes** plugins — it never refuses them (`SUPPORTED_REQUIREMENTS_ALLOWLIST` in `manifestValidation.ts` is a separate, currently permissive gate). The UI shows each plugin's tier in the plugin list and the install dialog (the Hub card only marks `custom`), and every run's log starts with a reproducibility stamp such as `[env] pyodide-0.29.5 · standard`.
 
 **The standard environment, concretely:**
 
@@ -1523,7 +1561,7 @@ This file is for **Foldnano developers** working on the host side of the plugin 
 - **Don't share a single `PyodideWorkerBridge` across documents.** `PluginCoordinator` owns the worker; teardown happens with the editor session.
 - **Don't pass live `$state` proxies into the bridge.** Snapshot first (`$state.snapshot(...)`) — the postMessage path is structuredClone-only.
 - **Don't run plugins from inside a `tx`.** Plugin execution is async and the bridge resolves on a microtask; commands must be the only callers of `historyStack.tx`.
-- **Don't fetch plugin code or wheels from another origin.** `entrypointUrl` and wheel paths must pass `isSameOriginUrl()` (resolve, then compare origins; never match URL prefixes). The zip is fetched once at install time by `PluginInstaller`; `activate()` never fetches plugin code, and re-checks wheel URLs before fetching them.
+- **Don't fetch plugin code or wheels from another origin.** `entrypointUrl` and wheel paths must pass `isSameOriginUrl()` (resolve, then compare origins; never match URL prefixes). The only exception is `prepareCommunityInstall`, which fetches a URL from the shipped community listing and refuses bytes that don't match its pinned SHA-256; never fetch an unlisted URL there or skip the hash. The zip is fetched once at install time by `PluginInstaller`; `activate()` never fetches plugin code, and re-checks wheel URLs before fetching them.
 - **Don't run plugin code in a same-origin Worker, and never add `allow-same-origin` to the sandbox iframe.** Either hands plugins the user's GitHub token and local data. New worker features must work from an opaque origin.
 - **Don't make the worker fetch the app origin.** It can't; fetch same-origin assets (wheels, zips) on the main thread and send bytes, as `PluginCoordinator` does for wheels.
 - **Don't widen the sandbox CSP casually.** `connect-src` is the network permission boundary; `'unsafe-eval'` is not needed by Pyodide.

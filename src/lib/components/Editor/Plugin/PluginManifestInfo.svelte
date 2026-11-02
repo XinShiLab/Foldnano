@@ -2,9 +2,14 @@
 	import type { PluginManifest } from '$lib/plugin/types';
 	import { classifyEnv, requirementSources } from '$lib/plugin/envClassification';
 	import { ANY_HOST } from '$lib/plugin/networkPolicy';
-	import { PYODIDE_VERSION } from '$lib/plugin/worker/pyodideConfig';
+	import {
+		APPLY_STRATEGY_DESCRIPTIONS,
+		FORMAT_DESCRIPTIONS,
+		envTierDescription,
+	} from '$lib/plugin/manifestDescriptions';
 	import { Info, ShieldCheck } from '@lucide/svelte';
 	import PluginCitations from './PluginCitations.svelte';
+	import PluginCredits from './PluginCredits.svelte';
 
 	let { manifest }: { manifest: PluginManifest } = $props();
 
@@ -26,28 +31,6 @@
 		].filter((group) => group.names.length > 0)
 	);
 
-	const formatDescriptions: Record<string, string> = {
-		cadnano_json:
-			'Plugin receives your active Design Region as cadnano JSON. Lossy — only topology and colors are passed.',
-		foldnano_json: 'Plugin receives the entire Part as Foldnano JSON (lossless).',
-		foldnano_edit:
-			'Plugin uses the mutable Python API and emits a mutation log replayed against the Part under one undo step.',
-		live: 'Reserved (not currently installable).',
-	};
-
-	const strategyDescriptions: Record<string, string> = {
-		previewOnly: 'Read-only — shows a diff but never writes back to your design.',
-		replacePart: 'Replaces the entire Part with the plugin output. Annotations are dropped.',
-		replacePartKeepAnnotationsWhereMatched:
-			'Replaces the entire Part. Annotations are re-grafted where coordinates match — double-check after apply.',
-		replaceRegion: 'Replaces only the active region. Annotations in that region are dropped.',
-		replaceRegionKeepAnnotationsWhereMatched:
-			'Replaces only the active region. Annotations are re-grafted where coordinates match — double-check after apply.',
-		replayMutationLog:
-			'Replays a stream of mutation operations against the existing Part (whole-part scope).',
-		replayMutationLogInRegion: 'Replays mutation operations restricted to the active region.',
-	};
-
 	function accessLabel(strategy: string): string {
 		if (strategy === 'previewOnly') return 'PreviewOnly';
 		if (strategy.startsWith('replaceRegion') || strategy === 'replayMutationLogInRegion')
@@ -63,12 +46,13 @@
 	</div>
 
 	<div class="ml-5 flex flex-col gap-1.5">
+		<PluginCredits {manifest} />
 		<div>
 			<span class="rounded bg-background px-1.5 py-0.5 font-mono text-[10px]">
 				Type: {manifest.format}
 			</span>
 			<span class="text-muted-foreground">
-				{formatDescriptions[manifest.format] ?? ''}
+				{FORMAT_DESCRIPTIONS[manifest.format] ?? ''}
 			</span>
 		</div>
 
@@ -77,7 +61,7 @@
 				Apply: {manifest.applyStrategy}
 			</span>
 			<span class="text-muted-foreground">
-				{strategyDescriptions[manifest.applyStrategy] ?? ''}
+				{APPLY_STRATEGY_DESCRIPTIONS[manifest.applyStrategy] ?? ''}
 			</span>
 		</div>
 
@@ -111,9 +95,7 @@
 			<span class="font-semibold text-foreground">Environment:</span>
 			<span class="rounded bg-background px-1.5 py-0.5 font-mono text-[10px]">{envTier}</span>
 			<span class="text-muted-foreground">
-				{envTier === 'standard'
-					? `shared pyodide-${PYODIDE_VERSION} runtime — runs alongside other standard plugins`
-					: 'dedicated runtime — only one custom-environment plugin can be active at a time'}
+				{envTierDescription(envTier)}
 			</span>
 		</div>
 

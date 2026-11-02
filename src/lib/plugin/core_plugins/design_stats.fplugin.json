@@ -1,8 +1,9 @@
 {
-	"schemaVersion": 1,
+	"schemaVersion": 2,
 	"id": "design-stats",
 	"name": "Design Statistics",
-	"version": "1.0.1",
+	"version": "1.0.2",
+	"tags": ["Demo"],
 	"format": "cadnano_json",
 	"applyStrategy": "previewOnly",
 	"entrypointUrl": "/plugins/design_stats/design_stats.zip",

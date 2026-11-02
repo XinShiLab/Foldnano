@@ -1,8 +1,9 @@
 {
-	"schemaVersion": 1,
+	"schemaVersion": 2,
 	"id": "sequence-report",
 	"name": "Sequence Report",
-	"version": "1.0.1",
+	"version": "1.0.2",
+	"tags": ["Demo"],
 	"format": "foldnano_json",
 	"applyStrategy": "previewOnly",
 	"entrypointUrl": "/plugins/sequence_report/sequence_report.zip",

@@ -308,7 +308,9 @@
 							</p>
 						{/if}
 					{/if}
-					{@render pluginRow(plugin)}
+					<div class="px-3 pt-2">
+						{@render pluginRow(plugin)}
+					</div>
 				</div>
 			{/each}
 		{/if}

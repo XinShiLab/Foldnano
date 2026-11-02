@@ -124,7 +124,7 @@ When a script does what you want, click **Save as Plugin** to keep it as a plugi
 3. Click **Save plugin**. The packages your script imports (such as `numpy`) are recorded with it.
 4. Click **Open in editor** to keep working on it, or **Done**. Opening the editor resets Script Lab to its starter script, ready for the next idea.
 
-The plugin appears under **My Plugins** with a **Mine** badge. **Run** there always uses the last saved version, like any other plugin. It has no input form: to change a value, edit the script.
+The plugin appears under **My Plugins**, marked **Mine**. **Run** there always uses the last saved version, like any other plugin. It has no input form: to change a value, edit the script.
 
 ### Editing Your Plugin
 

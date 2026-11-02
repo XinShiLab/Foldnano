@@ -17,7 +17,7 @@ Foldnano plugins run in a browser Python runtime ([Pyodide](https://pyodide.org/
 
 ## Runtime Pipeline
 
-1. The user installs a plugin: either by importing a `.zip` locally, or from Foldnano's Hub, whose zips are served by Foldnano itself and fetched once at install time.
+1. The user installs a plugin: either by importing a `.zip` locally, or from Foldnano's Hub, whose zips are served by Foldnano itself (core plugins) or by the Foldnano plugins site (community plugins, checked against a fingerprint in the listing) and fetched once at install time.
 2. Foldnano validates the manifest inside the zip (format, apply strategy, entrypoint shape) and stores the whole zip in IndexedDB.
 3. When the plugin is activated, the plugin coordinator loads the cached zip from IndexedDB. Activation never re-fetches the plugin's code. (Script-Lab-like `sidePanel.codeEditor` plugins are the one exception: their source is the live editor buffer, not a stored zip.)
 4. Pyodide extracts the zip and loads `plugin.py`, plus any requirements: bundled wheels come from the zip; package names are installed from the Pyodide distribution or PyPI at this point.

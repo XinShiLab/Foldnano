@@ -127,6 +127,68 @@ describe('validateManifest', () => {
 		])('rejects citations with %s', (_label, citations, message) => {
 			expect(() => validateManifest({ ...base(), schemaVersion: 2, citations })).toThrow(message);
 		});
+		it('accepts "tags" at v2 and refuses it at v1', () => {
+			const tags = ['auto-staple', 'Demo', 'caDNAno'];
+			expect(validateManifest({ ...base(), schemaVersion: 2, tags }).tags).toEqual(tags);
+			expect(() => validateManifest({ ...base(), tags })).toThrow(
+				/"tags" needs "schemaVersion": 2/
+			);
+		});
+
+		it.each([
+			['not an array', 'export', /must be an array/],
+			['too many entries', Array.from({ length: 11 }, (_, i) => `t${i}`), /at most 10/],
+			['a number', [1], /letters and digits/],
+			['an empty tag', [''], /letters and digits/],
+			['spaces', ['auto staple'], /letters and digits/],
+			['an underscore', ['auto_staple'], /letters and digits/],
+			['a trailing hyphen', ['export-'], /letters and digits/],
+			['an overlong tag', ['x'.repeat(33)], /letters and digits/],
+			['a repeated tag', ['export', 'export'], /must not repeat/],
+			['a tag repeated in another case', ['Demo', 'demo'], /must not repeat/],
+		])('rejects tags with %s', (_label, tags, message) => {
+			expect(() => validateManifest({ ...base(), schemaVersion: 2, tags })).toThrow(message);
+		});
+
+		it('accepts the credit fields at v2 and refuses them at v1', () => {
+			const credits = {
+				authors: [{ name: 'Douglas Lab', url: 'https://bionano.ucsf.edu/' }],
+				maintainers: [{ name: 'Xin Shi' }],
+				license: 'MIT AND BSD-3-Clause',
+				repository: 'https://github.com/xinshi-kul/pyOrigamiBreak_mini',
+				upstream: 'https://github.com/douglaslab/pyOrigamiBreak',
+			};
+			expect(validateManifest({ ...base(), schemaVersion: 2, ...credits })).toMatchObject(credits);
+			for (const [field, value] of Object.entries(credits)) {
+				expect(() => validateManifest({ ...base(), [field]: value })).toThrow(
+					`"${field}" needs "schemaVersion": 2`
+				);
+			}
+		});
+
+		it.each([
+			['authors not an array', { authors: 'Douglas Lab' }, /must be an array/],
+			['too many people', { authors: Array(11).fill({ name: 'A' }) }, /at most 10/],
+			['a string person', { maintainers: ['Xin Shi'] }, /must be an object/],
+			['a blank name', { authors: [{ name: ' ' }] }, /non-empty string "name"/],
+			['an overlong name', { authors: [{ name: 'x'.repeat(101) }] }, /at most 100/],
+			[
+				'an unknown person field',
+				{ authors: [{ name: 'A', email: 'a@b.c' }] },
+				/Unknown field "email"/,
+			],
+			['a non-https person url', { authors: [{ name: 'A', url: 'http://a.org' }] }, /https:\/\//],
+			['a license with a stray character', { license: 'MIT; GPL' }, /SPDX/],
+			['an empty license', { license: '' }, /SPDX/],
+			[
+				'a non-https repository',
+				{ repository: 'git@github.com:a/b.git' },
+				/"repository" must start/,
+			],
+			['a javascript upstream', { upstream: 'javascript:alert(1)' }, /"upstream" must start/],
+		])('rejects credits with %s', (_label, credits, message) => {
+			expect(() => validateManifest({ ...base(), schemaVersion: 2, ...credits })).toThrow(message);
+		});
 	});
 
 	describe('citationLink', () => {
