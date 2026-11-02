@@ -3,6 +3,9 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import type { PluginInstallGate } from './PluginInstallGate.svelte';
 	import PluginManifestInfo from './PluginManifestInfo.svelte';
+	import PluginTile from './PluginTile.svelte';
+	import { readPluginIcon } from '$lib/plugin/pluginIcon';
+	import { compareVersions } from '$lib/plugin/pluginUpdates';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import { Switch } from '$lib/components/ui/switch/index.js';
 
@@ -25,6 +28,25 @@
 		const after = describeNetwork(pending.incoming.network);
 		return before === after ? null : { before, after };
 	});
+
+	const action = $derived.by(() => {
+		const pending = gate.pending;
+		if (!pending?.existing) return 'Install';
+		return compareVersions(pending.incoming.version, pending.existing.version) > 0
+			? 'Update'
+			: 'Replace';
+	});
+
+	// The installer already checked the icon; a failure here just falls back to the default tile.
+	const iconSvg = $derived.by(() => {
+		const pending = gate.pending;
+		if (!pending) return null;
+		try {
+			return readPluginIcon(pending.incoming, pending.files);
+		} catch {
+			return null;
+		}
+	});
 </script>
 
 {#if gate.pending}
@@ -35,19 +57,38 @@
 			if (!v) gate.cancelPending();
 		}}
 	>
-		<Dialog.Content class="sm:max-w-lg">
+		<!-- Long declarations scroll in the body so the header and actions stay on screen. -->
+		<Dialog.Content
+			class="max-h-[calc(100dvh-2rem)] grid-rows-[auto_minmax(0,1fr)_auto] sm:max-w-lg"
+		>
 			<Dialog.Header>
-				<Dialog.Title>
-					{existing ? 'Replace' : 'Install'} — {existing?.name ?? incoming.name}
-				</Dialog.Title>
+				<div class="flex items-center gap-2.5">
+					<PluginTile manifest={incoming} {iconSvg} />
+					<Dialog.Title class="text-base leading-snug">
+						{action} — {existing?.name ?? incoming.name}
+						<span class="ml-1 text-xs font-normal whitespace-nowrap text-muted-foreground"
+							>{incoming.version}</span
+						>
+					</Dialog.Title>
+				</div>
 			</Dialog.Header>
 
-			<div class="space-y-2 text-sm text-muted-foreground">
+			<div class="min-h-0 space-y-2 overflow-y-auto text-sm text-muted-foreground">
+				{#if incoming.description}
+					<p>{incoming.description}</p>
+				{/if}
 				{#if existing}
-					<p>
-						A plugin with ID "{incoming.id}" is already installed (v{existing.version}). Replacing
-						it with v{incoming.version} will overwrite the installed plugin.
-					</p>
+					{#if action === 'Update'}
+						<p>
+							Updates "{existing.name}" from v{existing.version} to v{incoming.version}. Check what
+							the new version declares below.
+						</p>
+					{:else}
+						<p>
+							A plugin with ID "{incoming.id}" is already installed (v{existing.version}). Replacing
+							it with v{incoming.version} will overwrite the installed plugin.
+						</p>
+					{/if}
 					{#if gate.pending.endsEditing}
 						<p
 							class="rounded border border-amber-200 bg-amber-50 p-1.5 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300"
@@ -89,7 +130,7 @@
 			<Dialog.Footer>
 				<Button variant="outline" onclick={() => gate.cancelPending()}>Cancel</Button>
 				<Button onclick={() => void gate.confirmPending({ asEditable: restoreAsEditable })}>
-					{existing ? 'Replace' : 'Install'}
+					{action}
 				</Button>
 			</Dialog.Footer>
 		</Dialog.Content>

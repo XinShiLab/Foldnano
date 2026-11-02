@@ -144,12 +144,10 @@ export class PluginRegistry {
 		return this.#getInstallBusyState(id);
 	}
 
-	#assertNotBusy(id: string): void {
+	#assertNotBusy(id: string, action = 'install or replace'): void {
 		const result = this.#getInstallBusyState(id);
 		if (result.busy) {
-			throw new Error(
-				`Cannot install or replace plugin "${id}": ${result.reason ?? 'currently busy'}.`
-			);
+			throw new Error(`Cannot ${action} plugin "${id}": ${result.reason ?? 'currently busy'}.`);
 		}
 	}
 
@@ -345,10 +343,12 @@ export class PluginRegistry {
 		plugin.authoring = authoring;
 	}
 
-	/** Remove a plugin by ID. */
+	/** Remove a plugin by ID. Refuses while it is busy: a result left behind would block other
+	 *  runs. Prefer `PluginCoordinator.remove()`, which also frees the plugin's worker. */
 	remove(id: string): boolean {
 		const plugin = this.plugins.get(id);
-		if (plugin?.origin === 'builtin') return false;
+		if (!plugin || plugin.origin === 'builtin') return false;
+		this.#assertNotBusy(id, 'remove');
 		const deleted = this.plugins.delete(id);
 		if (deleted) {
 			this.#deletePlugin(id);

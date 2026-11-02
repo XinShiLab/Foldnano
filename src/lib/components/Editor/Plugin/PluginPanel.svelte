@@ -14,6 +14,9 @@
 		FolderOpen,
 		FilePen,
 		Download,
+		Info,
+		LoaderCircle,
+		CircleArrowUp,
 	} from '@lucide/svelte';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
@@ -23,6 +26,11 @@
 	import { PluginActivationGate } from './PluginActivationGate.svelte';
 	import { classifyEnv } from '$lib/plugin/envClassification';
 	import { prepareLocalZipInstall, MAX_PLUGIN_ZIP_BYTES } from '$lib/plugin/PluginInstaller';
+	import {
+		availableUpdate,
+		listingVersion,
+		prepareListingInstall,
+	} from '$lib/plugin/pluginUpdates';
 	import { toast } from 'svelte-sonner';
 	import PluginHubPanel from './PluginHubPanel.svelte';
 	import PluginDevPanel from './PluginDevPanel.svelte';
@@ -32,6 +40,7 @@
 	import { Switch } from '$lib/components/ui/switch/index.js';
 	import PluginTile, { type PluginTileStatus } from './PluginTile.svelte';
 	import PluginRowDetails from './PluginRowDetails.svelte';
+	import PluginInfoDialog from './PluginInfoDialog.svelte';
 
 	const editorCtx = getEditorViewContext();
 	const registry = $derived(editorCtx.pluginRegistry);
@@ -42,6 +51,47 @@
 	let plugins = $derived(registry.all.filter((p) => p.origin !== 'linked'));
 
 	let pendingRunPlugin: PythonPlugin | null = $state(null);
+	let infoPluginId: string | null = $state(null);
+	const infoPlugin = $derived(infoPluginId ? registry.get(infoPluginId) : undefined);
+
+	// Read the plugin before closing: infoPlugin is derived from infoPluginId.
+	let updatingId: string | null = $state(null);
+
+	// Ends in the install dialog's Update review (the id is installed, so it prepares as a Replace).
+	async function updatePlugin(plugin: PythonPlugin) {
+		const ref = availableUpdate(plugin);
+		if (!ref) return;
+		const { id, name } = plugin.manifest;
+		updatingId = id;
+		try {
+			const outcome = await editorCtx.pluginInstallGate.requestInstall(
+				async () => {
+					const prepared = await prepareListingInstall(ref, registry);
+					updatingId = null;
+					return prepared;
+				},
+				{ review: true }
+			);
+			if (outcome.status === 'installed')
+				toast.success(`Updated "${name}" to v${outcome.manifest.version}.`);
+			else if (outcome.status === 'error')
+				toast.error('Cannot update plugin', { description: outcome.message });
+		} finally {
+			updatingId = null;
+		}
+	}
+
+	function updateFromInfo() {
+		const plugin = infoPlugin;
+		infoPluginId = null;
+		if (plugin) void updatePlugin(plugin);
+	}
+
+	function removeFromInfo() {
+		const plugin = infoPlugin;
+		infoPluginId = null;
+		if (plugin) removePlugin(plugin);
+	}
 	let activeTab: string = $state('mine');
 	const expandedPluginIds = new SvelteSet<string>();
 
@@ -111,21 +161,38 @@
 
 	let pendingRemove: PythonPlugin | null = $state(null);
 
+	function removeNow(plugin: PythonPlugin) {
+		try {
+			coordinator.remove(plugin.manifest.id);
+			editorCtx.closePluginEditor(plugin.manifest.id);
+		} catch (e) {
+			toast.error('Cannot remove plugin', {
+				description: e instanceof Error ? e.message : String(e),
+			});
+		}
+	}
+
 	function removePlugin(plugin: PythonPlugin) {
+		const busy = coordinator.isPluginBusyOrPending(plugin.manifest.id);
+		if (busy.busy) {
+			const reason = busy.reason ?? 'it is busy';
+			toast.error(`Cannot remove "${plugin.manifest.name}"`, {
+				description: `${reason[0].toUpperCase()}${reason.slice(1)}.`,
+			});
+			return;
+		}
 		// A plugin made here has no other copy unless the user exported it.
 		if (plugin.authoring) {
 			pendingRemove = plugin;
 			return;
 		}
-		registry.remove(plugin.manifest.id);
+		removeNow(plugin);
 	}
 
 	function confirmRemove() {
 		const plugin = pendingRemove;
 		pendingRemove = null;
-		if (!plugin) return;
-		editorCtx.closePluginEditor(plugin.manifest.id);
-		registry.remove(plugin.manifest.id);
+		if (plugin) removeNow(plugin);
 	}
 
 	async function exportPlugin(plugin: PythonPlugin) {
@@ -200,13 +267,14 @@
 	{@const isExpanded = expandedPluginIds.has(plugin.manifest.id)}
 	{@const isCustomEnv = plugin.origin !== 'linked' && classifyEnv(plugin.manifest) === 'custom'}
 	{@const backupDue = !!plugin.authoring && needsBackup(plugin)}
+	{@const update = availableUpdate(plugin)}
 	<!-- A collapsed card shows only what needs attention: output, errors, a running plugin's Stop. -->
 	{@const showOutput =
 		isExpanded ||
 		hasRunOutput(plugin) ||
 		plugin.status === 'error' ||
 		coordinator.pendingApply?.pluginId === plugin.manifest.id}
-	{@const showActions = isExpanded || plugin.status === 'running'}
+	{@const showActions = isExpanded || plugin.status === 'running' || plugin.status === 'activating'}
 	<div
 		class="mb-1.5 rounded-md border border-border bg-card p-2 transition-colors hover:border-foreground/20"
 		class:opacity-50={isDisabledBuiltin}
@@ -219,7 +287,7 @@
 				onclick={() => toggleExpanded(plugin.manifest.id)}
 				{@attach help({
 					title: 'Plugin details',
-					text: 'Click a plugin to show its details, any papers its author asks you to cite, and its Activate, Run and Edit buttons.',
+					text: 'Click a plugin to show its details and its Activate, Run, Edit and Info buttons.',
 					doc: 'plugins-for-users',
 				})}
 			>
@@ -236,6 +304,13 @@
 						{#if plugin.origin !== 'linked'}
 							<span class="ml-1.5 text-[10px] whitespace-nowrap text-muted-foreground"
 								>{plugin.manifest.version}</span
+							>
+						{/if}
+						{#if update}
+							<span
+								class="ml-1.5 text-[10px] whitespace-nowrap text-blue-700 dark:text-blue-300"
+								title="A newer version is listed in the Hub. Open the card to update."
+								>· {listingVersion(update)} available</span
 							>
 						{/if}
 						{#if plugin.authoring}
@@ -373,6 +448,12 @@
 						>
 							Activate
 						</Button>
+					{:else if plugin.status === 'activating' && !plugin.manifest.sidePanel}
+						<!-- Stays in place while loading, so the click visibly did something. -->
+						<Button variant="outline" size="sm" class="h-6 gap-1 px-2 text-xs" disabled>
+							<LoaderCircle size={11} class="animate-spin" />
+							Activating
+						</Button>
 					{:else if plugin.status === 'active'}
 						{#if !plugin.manifest.sidePanel}
 							{@const activeRegion = editorCtx.activeRegion}
@@ -457,6 +538,39 @@
 							Edit
 						</Button>
 					{/if}
+					{#if update}
+						<Button
+							variant="outline"
+							size="sm"
+							class="h-6 gap-1 border-blue-200 bg-blue-50 px-2 text-xs text-blue-700 hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300 dark:hover:bg-blue-900"
+							onclick={() => void updatePlugin(plugin)}
+							disabled={updatingId === plugin.manifest.id}
+							{@attach help({
+								title: 'Update',
+								text: 'Replace this plugin with the newer version listed in the Hub. You review the change first.',
+							})}
+						>
+							{#if updatingId === plugin.manifest.id}
+								<LoaderCircle size={11} class="animate-spin" />
+							{:else}
+								<CircleArrowUp size={11} />
+							{/if}
+							Update to {listingVersion(update)}
+						</Button>
+					{/if}
+					<Button
+						variant="outline"
+						size="sm"
+						class="h-6 gap-1 px-2 text-xs"
+						onclick={() => (infoPluginId = plugin.manifest.id)}
+						{@attach help({
+							title: 'Info',
+							text: 'Show everything this plugin declares: what it may change, network access, environment and Python packages.',
+						})}
+					>
+						<Info size={11} />
+						Info
+					</Button>
 				</div>
 			{/if}
 		{/if}
@@ -527,7 +641,7 @@
 		</Tabs.Content>
 
 		<Tabs.Content value="hub" class="mt-0 flex-1 overflow-hidden p-0">
-			<PluginHubPanel onInstalled={() => (activeTab = 'mine')} />
+			<PluginHubPanel onInstalled={() => (activeTab = 'mine')} onRemove={removePlugin} />
 		</Tabs.Content>
 
 		<Tabs.Content value="mine" class="mt-0 flex-1 overflow-hidden p-0">
@@ -558,6 +672,35 @@
 />
 
 <PluginActivationConfirmDialog gate={activationGate} />
+
+{#if infoPlugin}
+	<PluginInfoDialog
+		listing={infoPlugin.manifest}
+		manifest={infoPlugin.manifest}
+		iconSvg={infoPlugin.iconSvg}
+		onClose={() => (infoPluginId = null)}
+	>
+		{#snippet actions()}
+			{#if infoPlugin.origin === 'user'}
+				<Button
+					variant="destructive"
+					class="gap-1 sm:order-first sm:mr-auto"
+					onclick={removeFromInfo}
+				>
+					<Trash2 size={14} />
+					Remove
+				</Button>
+			{/if}
+			{@const infoUpdate = availableUpdate(infoPlugin)}
+			{#if infoUpdate}
+				<Button class="gap-1" onclick={updateFromInfo}>
+					<CircleArrowUp size={14} />
+					Update to {listingVersion(infoUpdate)}
+				</Button>
+			{/if}
+		{/snippet}
+	</PluginInfoDialog>
+{/if}
 
 {#if pendingRunPlugin}
 	<PluginRunDialog

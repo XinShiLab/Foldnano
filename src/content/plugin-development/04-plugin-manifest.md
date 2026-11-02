@@ -170,7 +170,7 @@ List the papers you would like people to cite when they use your plugin in their
 ]
 ```
 
-Users see citations when they review your plugin before installing it, and when they click its name in **My Plugins**.
+Users see citations when they review your plugin before installing it, and in its **Info** dialog after install.
 
 - `text` is required and shown as plain text, at most 500 characters. Format the reference however you like.
 - `doi` is a bare DOI such as `10.1073/pnas.2406769121`, without `https://doi.org/`. Foldnano builds the link.

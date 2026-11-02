@@ -32,9 +32,9 @@ Open it from the **Plugins** icon (blocks) in the icon rail on the left edge of 
 
 ### Hub
 
-The **Hub** tab lists the curated **Core Plugins** and the **Community Plugins**, each with its description and tags. A plugin that needs its own Python environment is also marked *custom env*. Click a tag at the top to show only plugins with that tag, or turn off **Show demos** to hide the example plugins tagged *Demo*. Click the **Install** button (download icon), review the plugin's details, including its format and apply strategy, then **Confirm** (or **✕** to cancel). Installed plugins show **Installed**, and the panel switches to **My Plugins**.
+The **Hub** tab lists the curated **Core Plugins** and the **Community Plugins**, each with its description and tags. A plugin that needs its own Python environment is also marked *custom env*. Click a tag at the top to show only plugins with that tag, or turn off **Show demos** to hide the example plugins tagged *Demo*. Click a card to see everything the plugin declares, installed or not. Click the **Install** button (download icon) to install: a dialog shows the plugin's details, including its format, apply strategy, network access and Python packages, and you click **Install** to confirm (or **Cancel**). Installed plugins show **Installed**, and the panel switches to **My Plugins**. When the Hub lists a newer version of a plugin you installed, its card shows **Update** instead; you review what the new version declares before it replaces yours.
 
-**Community Plugins** don't ship with Foldnano. Each card credits its authors and links to its source and license. Among them is **pyOrigamiBreak: Staple Auto-Break**, which optimizes staple break positions with thermodynamic scoring (Aksel et al., PNAS 2024) and changes the design; it was a core plugin before, and a copy you already installed keeps working. Clicking **Install** downloads the plugin from the Foldnano plugins site, checks that it is exactly the file that was listed, and shows its details for you to review before you click **Install** again.
+**Community Plugins** don't ship with Foldnano. Each card credits its authors and links to its source and license. Among them is **pyOrigamiBreak: Staple Auto-Break**, which optimizes staple break positions with thermodynamic scoring (Aksel et al., PNAS 2024) and changes the design; it was a core plugin before; a copy you already installed keeps working, and the Hub offers the newer version as an update. Clicking **Install** downloads the plugin from the Foldnano plugins site, checks that it is exactly the file that was listed, and then shows the same install dialog.
 
 ![Plugin panel Hub tab listing core plugins (Crossover Analyzer marked Installed; Design Statistics, GC Colorizer, Hello World and Mutation Test with Install buttons), each with its format, apply strategy and environment badges](/screenshots/guide/plugins-for-users/02-plugins-hub.webp)
 
@@ -54,7 +54,7 @@ The **Hub** tab lists the curated **Core Plugins** and the **Community Plugins**
 
 Each installed plugin is a card showing its icon, name, version, a one-line description, where it came from (**Mine** for plugins you made, **Core** for built-in ones), and *custom env* in amber when it needs its own Python runtime (only one custom-environment plugin can be active at a time). A dot on the icon shows its state (green when active and ready to run, red after an error). A card also shows a plugin's output after a run, and **Stop** while it runs.
 
-Click a plugin to open its card: its full description, labels for its **format** (`cadnano_json`, `foldnano_json`, `foldnano_edit`), **apply strategy** (what it may change in your design) and environment (hover a label for what it means), its tags, any papers its author asks you to cite (with a link and a copy button), and its buttons. If you use the plugin in published work, please cite the papers. Citations also appear when you review a plugin before installing it.
+Click a plugin to open its card: its full description, labels for its **format** (`cadnano_json`, `foldnano_json`, `foldnano_edit`), **apply strategy** (what it may change in your design) and environment (hover a label for what it means), its tags and credits, and its buttons. **Info** shows everything the plugin declares, including any papers its author asks you to cite (with a link and a copy button). If you use the plugin in published work, please cite the papers. Citations also appear when you review a plugin before installing it.
 
 | Button | What it does |
 | --- | --- |
@@ -62,6 +62,8 @@ Click a plugin to open its card: its full description, labels for its **format**
 | **Run** | Runs the plugin. A `cadnano_json` plugin shows which region it runs on (for example **on R1**), or *no active region* when none is active. If the plugin has parameters, a dialog asks for them first. |
 | **Stop** | Stops a running plugin |
 | **Reset** | Clears the run output and returns the plugin to ready |
+| **Update to …** | Appears when the Hub lists a newer version (the card also shows *· x.y.z available*). Shows what the new version declares, then replaces the installed one. |
+| **Info** | Shows everything the plugin declares, as in the install dialog: what it may change, network access, environment, Python packages, credits and citations. Installed plugins (except built-in ones) can be removed from there too. |
 | **Open panel** | For plugins with their own side panel, opens it |
 | **Edit** | For plugins you made with [Script Lab](/docs/guide/script-lab#saving-a-script-as-a-plugin) (marked **Mine**), opens the plugin in its own editor |
 
