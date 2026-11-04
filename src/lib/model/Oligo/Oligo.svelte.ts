@@ -461,27 +461,7 @@ export default class Oligo {
 		return { leftover: remaining, missing };
 	}
 
-	fillRandomSequence(gcContent: number = 0.5, onlyEmpty = false): string {
-		if (onlyEmpty) {
-			const start = this.fivePrimeEndSegment;
-			if (!start) return '';
-			let emptyCount = 0;
-			// eslint-disable-next-line svelte/prefer-svelte-reactivity
-			const visited = new Set<OligoSegment>();
-			let seg: OligoSegment | null = start;
-			while (seg && !visited.has(seg)) {
-				visited.add(seg);
-				emptyCount += seg.slots
-					.filter((s) => s.seq.length > 0 && /^N+$/.test(s.seq))
-					.reduce((a, s) => a + s.seq.length, 0);
-				seg = seg.threePrime.connectedSegment;
-			}
-			if (emptyCount === 0) return '';
-			const random = generateRandomDNA(emptyCount, gcContent);
-			const seq = random.primary5to3;
-			this.fillSequence(seq, false, true);
-			return seq;
-		}
+	fillRandomSequence(gcContent: number = 0.5): string {
 		const needed = this.length;
 		if (needed === 0) return '';
 		const random = generateRandomDNA(needed, gcContent);

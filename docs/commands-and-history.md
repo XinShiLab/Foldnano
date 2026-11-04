@@ -283,30 +283,31 @@ history verifier see the true pre-drag pose).
 
 **File:** `strands.ts`
 
-| Command                          | Description                                                                                                                                           |
-| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `drawStrandCmd`                  | Create one new segment on a VH                                                                                                                        |
-| `createCrossoverCmd`             | Join two oligos by connecting 3' to 5'                                                                                                                |
-| `makeCrossoverCmd`               | Break source as needed, then create crossover                                                                                                         |
-| `breakOligoCmd`                  | Split a segment at one base index                                                                                                                     |
-| `moveOligoEndCmd`                | Move one or more termini with collision-aware ordering; slides fully-selected segments as translates (carry sequence + skip/insert), resizes the rest |
-| `addSkipOrInsertionCmd`          | Add a skip or insertion at a slot                                                                                                                     |
-| `removeSkipOrInsertionCmd`       | Remove a skip or insertion                                                                                                                            |
-| `removeOligoCmd`                 | Delete an entire oligo                                                                                                                                |
-| `removeSegmentFromOligoCmd`      | Remove one segment from a multi-segment oligo                                                                                                         |
-| `fillEmptyVhCmd`                 | Fill one empty strand set on one or more VHs                                                                                                          |
-| `autoStapleCmd`                  | Lattice-only auto-staple                                                                                                                              |
-| `paintOligoCmd`                  | Recolor one or more oligos                                                                                                                            |
-| `toggleOligoAsScaffoldCmd`       | Toggle scaffold state                                                                                                                                 |
-| `renameOligoCmd`                 | Set or clear an oligo's optional name label (trimmed; no-op when unchanged; mirrors reject it)                                                        |
-| `setModificationCmd`             | Apply or clear end modifications                                                                                                                      |
-| `fillRandomSequenceToOligoCmd`   | Random sequence for an oligo; pass `onlyEmpty: true` to skip already-filled slots                                                                     |
-| `fillRandomSequenceToSegmentCmd` | Random sequence for one segment; `onlyEmpty` supported                                                                                                |
-| `fillSequenceToOligoCmd`         | Explicit sequence for an oligo; `onlyEmpty` skips non-N slots and compacts the input across empty positions                                           |
-| `fillSequenceToSegmentCmd`       | Explicit sequence for one segment; `onlyEmpty` supported                                                                                              |
-| `clearOligoSequenceCmd`          | Clear one oligo's sequence                                                                                                                            |
-| `clearSegmentSequenceCmd`        | Clear one segment's sequence                                                                                                                          |
-| `clearPartSequenceCmd`           | Clear all sequences in a part                                                                                                                         |
+| Command                          | Description                                                                                                                                                       |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `drawStrandCmd`                  | Create one new segment on a VH                                                                                                                                    |
+| `createCrossoverCmd`             | Join two oligos by connecting 3' to 5'                                                                                                                            |
+| `makeCrossoverCmd`               | Break source as needed, then create crossover                                                                                                                     |
+| `breakOligoCmd`                  | Split a segment at one base index                                                                                                                                 |
+| `moveOligoEndCmd`                | Move one or more termini with collision-aware ordering; slides fully-selected segments as translates (carry sequence + skip/insert), resizes the rest             |
+| `addSkipOrInsertionCmd`          | Add a skip or insertion at a slot                                                                                                                                 |
+| `removeSkipOrInsertionCmd`       | Remove a skip or insertion                                                                                                                                        |
+| `removeOligoCmd`                 | Delete an entire oligo                                                                                                                                            |
+| `removeSegmentFromOligoCmd`      | Remove one segment from a multi-segment oligo                                                                                                                     |
+| `fillEmptyVhCmd`                 | Fill one empty strand set on one or more VHs                                                                                                                      |
+| `autoStapleCmd`                  | Lattice-only auto-staple                                                                                                                                          |
+| `paintOligoCmd`                  | Recolor one or more oligos                                                                                                                                        |
+| `toggleOligoAsScaffoldCmd`       | Toggle scaffold state                                                                                                                                             |
+| `renameOligoCmd`                 | Set or clear an oligo's optional name label (trimmed; no-op when unchanged; mirrors reject it)                                                                    |
+| `setModificationCmd`             | Apply or clear end modifications                                                                                                                                  |
+| `fillRandomSequenceToOligoCmd`   | Random sequence for an oligo, overwriting every base                                                                                                              |
+| `fillRandomSequenceToSegmentCmd` | Random sequence for one segment, overwriting every base                                                                                                           |
+| `fillEmptySequenceCmd`           | Random-fill only the `N` bases of the given segments (`Part.fillEmptySequence`); returns filled cells (including mirror copies) and filled/copied/conflict counts |
+| `fillSequenceToOligoCmd`         | Explicit sequence for an oligo; `onlyEmpty` skips non-N slots and compacts the input across empty positions                                                       |
+| `fillSequenceToSegmentCmd`       | Explicit sequence for one segment; `onlyEmpty` supported                                                                                                          |
+| `clearOligoSequenceCmd`          | Clear one oligo's sequence                                                                                                                                        |
+| `clearSegmentSequenceCmd`        | Clear one segment's sequence                                                                                                                                      |
+| `clearPartSequenceCmd`           | Clear all sequences in a part                                                                                                                                     |
 
 ---
 

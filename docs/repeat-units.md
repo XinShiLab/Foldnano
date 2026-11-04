@@ -257,6 +257,14 @@ exist.
   into a mirror are reverted, never forwarded to its source.
 - Conflicts show as mismatches via the existing `OligoSegment.mismatchedBps()` +
   `StrandView/MismatchMarkers.svelte` (red rung, `warningContext.mismatch`).
+  Mirrors are ordinary segments in `part.oligos`, so a mirror opposite a real
+  strand is checked like any other pair.
+- **No sequence edit targets a mirror.** The Sequence tool refuses clicks on
+  mirrors with `MIRROR_EDIT_ERROR`: the sync would revert the mirror's bases
+  after their complement had already reached the real opposite strand.
+- The empty-only fill (`Part.fillEmptySequence`, `docs/dna-model.md`) pairs a
+  source's empty bases against the strands opposite all its copies, so the sync
+  can't turn its fill into a mismatch at a copy.
 
 ---
 

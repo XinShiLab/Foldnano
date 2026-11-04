@@ -239,6 +239,13 @@ const CASES: Record<string, Case> = {
 			strands.fillRandomSequenceToSegmentCmd({ segment: firstSegment(up0) }, history)
 		);
 	},
+	fillEmptySequenceCmd: () => {
+		const { doc, part, up0, down0, history } = latticeScene();
+		firstSegment(up0).slotForBp(0)!.seq = 'A';
+		expectUndoRoundTrip(doc, history, () =>
+			strands.fillEmptySequenceCmd({ part, segments: [firstSegment(down0)] }, history)
+		);
+	},
 	fillSequenceToOligoCmd: () => {
 		const { doc, up0, history } = latticeScene();
 		expectUndoRoundTrip(doc, history, () =>

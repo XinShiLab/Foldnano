@@ -155,6 +155,14 @@ After a fill, the panel reports how much of the input sequence was **left** over
 | Update the entire sequence | Overwrites all bases on the clicked oligo/segment, including already-filled ones |
 | Fill only the empty parts | Skips positions that already have a non-`N` base; the input sequence is compacted into the empty slots in 5′→3′ order |
 
+With **Random** and **Fill only the empty parts**, an empty base whose partner on the opposite strand already has a base gets that base's complement instead of a random one, so the fill never creates a mismatch. For a strand with linked copies (see [Duplicates and Repeat Groups](/docs/guide/duplicates-repeat-groups)), the strands opposite every copy count as partners too. If those partners disagree, the base stays empty and the panel reports it as a conflict. Assigned bases are never changed, on either strand. A random base is mirrored onto an empty opposite strand, but never onto the scaffold unless the scaffold is itself being filled.
+
+### Fill Empty Nucleotides
+
+Under **Random**, the **Fill … empty nt** button fills every empty base of the selected strands at once, using the same rules as above. Select strands first with the Select tool (`v`), then switch back here (`a`). With nothing selected it fills the whole design. The **SCAF** / **STAP** and **segment** / **oligo** toggles decide which strands count. Clicking a strand still fills only that strand. Linked copies can't be clicked; fill their original and the copies follow.
+
+The bases a fill assigned stay tinted in amber, and the panel shows how many were filled and how many were copied from the opposite strand. The tint clears on your next edit, undo, or redo, when you leave the Sequence tool, or with the **✕** next to the count.
+
 <Callout type="tip">
 
 "Fill only the empty parts" is the safe choice when you've hand-assigned part of a strand and want to complete the rest without disturbing it.

@@ -1,4 +1,5 @@
 import type { OligoSegment, SegmentEnd } from '../model/Oligo';
+import type { EmptyFillResult } from '../model/Part/fillEmptySequence';
 import type Oligo from '../model/Oligo';
 import type { Part } from '../model/Part';
 import type { CrossoverSite } from '../model/Part/Part.svelte';
@@ -726,7 +727,6 @@ export const removeCustomModificationCmd = (
 export type FillRandomSequenceToOligoParams = {
 	oligo: Oligo;
 	gcContent?: number; // optional GC content percentage (0-1), default to 0.5
-	onlyEmpty?: boolean;
 };
 export const fillRandomSequenceToOligoCmd = (
 	para: FillRandomSequenceToOligoParams | FillRandomSequenceToOligoParams[],
@@ -738,8 +738,8 @@ export const fillRandomSequenceToOligoCmd = (
 		const segments = uniqueSegments(oligos.flatMap((oligo) => Array.from(oligo.segments)));
 		const beforeSlots = captureSegmentAndComplementSlots(segments);
 		const beforeOligos = captureOligoFieldState(oligos);
-		for (const { oligo, gcContent, onlyEmpty } of params) {
-			oligo.fillRandomSequence(gcContent, onlyEmpty);
+		for (const { oligo, gcContent } of params) {
+			oligo.fillRandomSequence(gcContent);
 		}
 		recordSlotDiffs(rec, beforeSlots, captureSegmentAndComplementSlots(segments));
 		recordOligoFieldDiffs(rec, beforeOligos);
@@ -749,7 +749,6 @@ export const fillRandomSequenceToOligoCmd = (
 export type FillRandomSequenceToSegmentParams = {
 	segment: OligoSegment;
 	gcContent?: number; // optional GC content percentage (0-1), default to 0.5
-	onlyEmpty?: boolean;
 };
 
 export const fillRandomSequenceToSegmentCmd = (
@@ -761,12 +760,35 @@ export const fillRandomSequenceToSegmentCmd = (
 		const segments = uniqueSegments(params.map(({ segment }) => segment));
 		const beforeSlots = captureSegmentAndComplementSlots(segments);
 		const beforeOligos = captureOligoFieldState(segments.map((segment) => segment.oligo));
-		for (const { segment, gcContent, onlyEmpty } of params) {
-			segment.fillRandomSequence(gcContent, onlyEmpty);
+		for (const { segment, gcContent } of params) {
+			segment.fillRandomSequence(gcContent);
 		}
 		recordSlotDiffs(rec, beforeSlots, captureSegmentAndComplementSlots(segments));
 		recordOligoFieldDiffs(rec, beforeOligos);
 	});
+};
+
+export type FillEmptySequenceParams = {
+	part: Part;
+	segments: Iterable<OligoSegment>;
+	gcContent?: number;
+};
+
+/** Random-fills only the empty ('N') nucleotides of `segments`; see `Part.fillEmptySequence`. */
+export const fillEmptySequenceCmd = (
+	{ part, segments, gcContent }: FillEmptySequenceParams,
+	history: HistoryStack
+): EmptyFillResult => {
+	const targets = uniqueSegments(segments);
+	let result: EmptyFillResult = { cells: [], filled: 0, copied: 0, conflicts: 0 };
+	history.tx('Fill empty sequence', (rec) => {
+		const beforeSlots = captureSegmentAndComplementSlots(targets);
+		const beforeOligos = captureOligoFieldState(beforeSlots.map(({ segment }) => segment.oligo));
+		result = part.fillEmptySequence(targets, gcContent);
+		recordSlotDiffs(rec, beforeSlots, captureSegmentAndComplementSlots(targets));
+		recordOligoFieldDiffs(rec, beforeOligos);
+	});
+	return result;
 };
 
 export type FillSequenceToOligoParams = {

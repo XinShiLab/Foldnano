@@ -1,5 +1,6 @@
 import type { EditorMode } from '../../../canvasEditor/core/modes';
 import type { ModificationDef } from '../../../model/modifications';
+import type { EmptyFillResult } from '../../../model/Part/fillEmptySequence';
 
 import type { SelectedEndBoxProps } from '../StrandView/temporalLayer/SelectedEndBox.svelte';
 import type { MoveEndBoxProps } from '../StrandView/temporalLayer/MoveEndBox.svelte';
@@ -50,6 +51,12 @@ export type SequenceContext = {
 		leftover: string;
 		missing: number;
 	}[];
+};
+
+/** What the last empty-only fill assigned, highlighted until the next edit or leaving Sequence mode. */
+export type RecentSequenceFill = EmptyFillResult & {
+	/** `historyStack.revision` right after the fill; any later edit, undo or redo hides it. */
+	revision: number;
 };
 
 export type ContextMenuItem = {

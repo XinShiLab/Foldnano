@@ -15,6 +15,7 @@
 	import { help } from '$lib/components/help/help';
 	import type { Part } from '$lib/model/Part';
 	import { clearPartSequenceCmd } from '../../../commands/strands';
+	import { emptyFillTargets, fillEmptyAndHighlight } from '$lib/canvasEditor/tools/sequenceFill';
 
 	type Props = {
 		part: Part;
@@ -110,6 +111,16 @@
 	// console.log('testSeq:', await testSeq.text());
 
 	const strandCtx = $derived(ctx.strandViewContext);
+
+	const emptyFillScope = $derived(strandCtx.selected.ends.size > 0 ? 'selected' : 'design');
+	const emptyFillSegments = $derived(part ? emptyFillTargets(part, strandCtx) : []);
+	const emptyNtCount = $derived(
+		emptyFillSegments.reduce((sum, segment) => sum + segment.emptyNucleotideCount, 0)
+	);
+	const fillEmptyNts = () => {
+		if (!part) return;
+		fillEmptyAndHighlight(part, emptyFillSegments, strandCtx, ctx.historyStack);
+	};
 </script>
 
 <!-- Scaffold/Staple Filter -->
@@ -249,6 +260,53 @@
 				Click to fill. <br />
 				The complementary strand will be updated
 			</p>
+		</div>
+		<div class="mt-4 flex flex-col gap-1 border-t border-border pt-3">
+			<Button
+				size="sm"
+				variant="outline"
+				disabled={emptyNtCount === 0}
+				onclick={fillEmptyNts}
+				{@attach help({
+					title: 'Fill empty nucleotides',
+					text: 'Give every empty (N) nucleotide a random base, in the selected strands or, with nothing selected, the whole design. Assigned bases are never changed, and a base opposite an existing sequence takes its complement. The scaffold is only written when it is a target itself.',
+				})}
+			>
+				{#if emptyNtCount === 0}
+					No empty nucleotides
+				{:else}
+					Fill {emptyNtCount.toLocaleString()} empty nt in {emptyFillScope === 'selected'
+						? 'selection'
+						: 'design'}
+				{/if}
+			</Button>
+			{#if ctx.activeRecentFill}
+				{@const fill = ctx.activeRecentFill}
+				<div class="flex items-center justify-between text-xs text-muted-foreground">
+					<span>
+						<span class="mr-1 inline-block size-2.5 rounded-sm bg-amber-400/60 align-middle"></span>
+						Filled {fill.filled.toLocaleString()} nt{fill.copied > 0
+							? `, ${fill.copied.toLocaleString()} from the opposite strand`
+							: ''}
+						{#if fill.conflicts > 0}
+							<span
+								class="block text-amber-600"
+								title="Their pairing partners (here or at a linked copy) already carry bases that disagree."
+							>
+								{fill.conflicts.toLocaleString()} left empty: conflicting partners
+							</span>
+						{/if}
+					</span>
+					<button
+						type="button"
+						class="rounded p-0.5 hover:bg-muted"
+						aria-label="Clear fill highlight"
+						onclick={() => (strandCtx.recentFill = null)}
+					>
+						<X size={12} />
+					</button>
+				</div>
+			{/if}
 		</div>
 	{:else if selectedSeqType === 'preset'}
 		<Select.Root

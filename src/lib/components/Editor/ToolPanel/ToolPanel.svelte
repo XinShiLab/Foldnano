@@ -252,8 +252,9 @@
 					</button>
 				</div>
 
-				<!-- overflow-x-hidden: shadcn Switch's enlarged hit area (after:-inset-x-3) pokes past a flush-right edge. -->
-				<div class="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
+				<!-- overflow-x-hidden: shadcn Switch's enlarged hit area (after:-inset-x-3) pokes past a flush-right edge.
+				     pb-1: a pressed Button's active:translate-y-px would otherwise overflow a flush-bottom edge. -->
+				<div class="min-h-0 flex-1 overflow-x-hidden overflow-y-auto pb-1">
 					<PanelToRender {part} />
 				</div>
 			</div>

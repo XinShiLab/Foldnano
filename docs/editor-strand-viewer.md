@@ -22,6 +22,7 @@ src/lib/components/Editor/StrandView/
 ├── StrandViewer.svelte            # stage, camera, tool wiring
 ├── StrandRoutes.svelte            # static segment routes (sequence text)
 ├── MismatchMarkers.svelte         # sequence-mismatch warning rungs
+├── RecentFillMarkers.svelte       # transient tint on cells the last empty-only fill assigned
 ├── DesignIssueMarkers.svelte      # design-check issue frames (editorViewContext.designIssues)
 ├── DesignIssuesMenu.svelte        # toolbar popover: check toggles + issue list (jump-to)
 ├── Accessories.svelte             # region headers, VH tags, crossovers, skips, inserts
@@ -144,6 +145,13 @@ specifically so `MismatchMarkers` could be slotted in between grid and
 sequence text without either being buried under the other. `MismatchMarkers`
 is intentionally in the non-interactive world layer, not the overlay layer —
 it has no hover/click affordance, unlike `Skip`/`Insert` in `Accessories`.
+The fill result includes cells at linked mirror positions as well as real strands; its counts refer to real nucleotides, and conflicting targets remain empty.
+
+`RecentFillMarkers` sits between `MismatchMarkers` and `StrandRoutes` for the
+same reason: its amber cell tint must stay under the strand line and letters.
+It draws every cell from one `Shape` (a whole-design fill can touch tens of
+thousands) and shows only while `EditorViewContext.activeRecentFill` is set,
+which is purely transient view state, never persisted.
 
 ---
 
@@ -284,7 +292,14 @@ refactor:
   the top of the component — this is a structural, edit-driven condition, not
   a pan/zoom one, so it's exempt from the `visible`-only rule below) and culls
   per-segment via `getEffectiveDisplayRowForVh(...)`/`isCollapsed`, same as
-  `Accessories`. It does **not** further cull mismatched bps against the
+  `Accessories`. `mismatchedBps()` finds the opposite strand through the
+  non-reactive `SpatialIndexService`, so each segment's block also reads the
+  opposite `StrandSet.segmentIds` and those segments' end indices: a strand
+  placed or moved opposite an unchanged segment (a new mirror copy, a
+  translated partner) re-runs only the segments on that helix, instead of
+  staying stale until reload. Don't replace this with a design-wide rescan per
+  `historyStack.revision`; that measured about 2× the integrity check on every
+  edit. It does **not** further cull mismatched bps against the
   viewport rect — `OligoSegment.mismatchedBps()` does a per-base-pair
   complementary-strand lookup (not just the sparse skip/insert list), so if a
   design-wide live count is ever added on top of this, revisit that first;

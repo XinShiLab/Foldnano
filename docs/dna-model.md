@@ -557,6 +557,34 @@ complementary. It's consumed by the StrandView's mismatch-warning overlay
 `movingEndsOps.ts` — both are UI affordances for finding and fixing mismatches
 manually, not model-level enforcement.
 
+### Empty-only random fill
+
+`Part.fillEmptySequence(segments, gcContent)` (`Part/fillEmptySequence.ts`) is
+the safe "fill the gaps" path behind the Sequence tool's Random + "Fill only
+the empty parts". Unlike `fillSequence` it only ever writes `'N'` characters,
+so no assigned base changes on either strand, and it never creates a mismatch,
+**including at linked mirror copies**: the repeat-group sync copies a source's
+new bases into every mirror at the end of the `tx`, so each copy must still
+pair with whatever sits opposite it.
+
+So the fill works on pairing components, not single bps: from each empty
+target nucleotide it walks to the nucleotide opposite it and opposite each of
+its copies (`bp + instance.bpOffset`), resolving a mirror to the source
+nucleotide it copies, and repeats from there. The component is two-coloured
+(base / complement): an assigned base anywhere fixes it (counted as `copied`),
+otherwise one base is drawn from a GC-balanced pool. Disagreeing assigned
+bases, or an odd cycle, leave the component `'N'` (`conflicts`) rather than
+pick a side.
+
+Writes go only to real strands: target nucleotides, plus the `'N'` directly
+opposite a target. Never into a mirror, never through a mirror into its source,
+and never into a scaffold strand that is not in `segments` (a staple fill must
+not invent "scaffold" bases that are not the real scaffold). Insertion slots
+pair antiparallel (`i` ↔ `len-1-i`); a one-sided insertion (lengths differ) is
+filled unpaired. It walks `segments` directly, not the 5′→3′ chain, so
+circular oligos fill too. The returned `cells` include the mirror copies'
+positions so the strand-view highlight shows them.
+
 ### Oligo name
 
 `Oligo.name` is an **optional, free-form label** for the user's convenience and for
