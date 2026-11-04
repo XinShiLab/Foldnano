@@ -186,9 +186,9 @@ See `docs/routes-guide.md` § "Loading a Design from an External URL".
 
 ### Blank document guard
 
-Passive blank editor sessions (no user edits, no explicit `New Document` action) do not create IndexedDB entries. The `isPristineUnsavedBlankDocument()` check prevents housekeeping saves from persisting an untouched default blank document during file-switch flows.
+Blank documents with no user edits do not create IndexedDB entries. The `isPristineUnsavedBlankDocument()` check prevents housekeeping saves from persisting an untouched default blank document during file-switch flows.
 
-Explicit `New Document` actions call `createNewStandaloneDocument()`, which always forces a save, creating a proper TOC entry.
+`New Document` (local-only) calls `startBlankDocument()`, which saves the current document and swaps in a blank one without persisting it; the first edit's autosave creates its TOC entry. The toolbar shallow-routes to `/editor`, and `Editor.svelte` replaces that URL with `/editor/<id>` once `lastLocalPersistAt` is set, so a reload reopens the saved document.
 
 ## Public API Surface
 

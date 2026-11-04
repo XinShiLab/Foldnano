@@ -405,7 +405,7 @@ If the deleted document is the currently open document, the editor resets to a f
 - Document snapshots are plain objects in IndexedDB; no JSON strings in the working-copy path.
 - `StorageManager` has no fallback layer — it routes to one provider and surfaces errors.
 - `GitHubExplorerStateStore` and repo-context writes are fire-and-forget; `GitHubMetadataStore` file-metadata writes are awaitable and awaited in sync flows (see `GitHubMetadataStore`). In-memory state is always up to date.
-- Explicit `New Document` actions call `createNewStandaloneDocument()`, which always saves the new document. Passive blank editor sessions (no edits, no explicit create) do not create TOC entries.
+- Untouched blank documents are never saved, including one started with `New Document` (`startBlankDocument()`); a blank document gets a TOC entry on its first edit's autosave.
 - Multi-tab editing is coordinated by `TabSync` (BroadcastChannel-based, see `docs/multi-tab-protection.md`); only the owning tab is allowed to write.
 
 ## Boundaries / Don'ts

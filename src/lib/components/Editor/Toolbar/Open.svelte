@@ -26,6 +26,7 @@
 	import { githubExplorerStateStore } from '$lib/services/storage';
 	import { putFileContent } from '$lib/services/github/api';
 	import { stripDesignExtension } from '$lib/model/io/designFileName';
+	import { summarizeDesign } from '$lib/model/io/designSummary';
 
 	let { toggleDialog, initialFiles = [] }: { toggleDialog: () => void; initialFiles?: File[] } =
 		$props();
@@ -49,6 +50,9 @@
 		if (files.find((f) => f.name === file.name)) return;
 		const url = URL.createObjectURL(file);
 		const parsed = withLatticeChoice(file.name, (lattice) => parseDesignFile(file, { lattice }));
+		const storedAt = parsed.then((p) =>
+			p instanceof FoldnanoDocument ? session.storageManager.getLastModified(p.id) : null
+		);
 		files.push({
 			name: file.name,
 			type: file.type,
@@ -56,6 +60,7 @@
 			uploadedAt: Date.now(),
 			url,
 			parsed,
+			storedAt,
 			file,
 		});
 	};
@@ -67,6 +72,8 @@
 		uploadedAt: number;
 		url: string;
 		parsed: Promise<Part | FoldnanoDocument | LocalPluginZipFile>;
+		/** When this browser last saved a design with the same id, or null if it has none. */
+		storedAt: Promise<number | null>;
 		file: File;
 	};
 
@@ -108,8 +115,9 @@
 		}
 	}
 
-	// Load a .fn.json document (unchanged behaviour)
-	const onLoadClick = async (imported: FoldnanoDocument) => {
+	// Load a .fn.json document, named after its file as GitHub-backed designs are.
+	const onLoadClick = async (uploadedFile: UploadedFile, imported: FoldnanoDocument) => {
+		imported.name = stripDesignExtension(uploadedFile.name) || imported.name;
 		isLoading = true;
 		try {
 			await session.openImportedDocument(imported);
@@ -216,16 +224,17 @@
 				{:then parsed}
 					{#if parsed instanceof LocalPluginZipFile}
 						<div class="flex flex-col gap-2">
-							<div class="flex items-center gap-2">
-								<div
-									class="flex min-w-0 flex-1 items-center gap-1.5 rounded-md border border-green-200 bg-green-50 px-2 py-1 text-xs text-green-800"
+							<div
+								class="flex min-w-0 items-center gap-1.5 rounded-md border border-green-200 bg-green-50 px-2 py-1 text-xs text-green-800"
+							>
+								<Puzzle size={11} class="shrink-0" />
+								<span class="truncate font-medium"
+									>{parsed.manifest.name} v{parsed.manifest.version}</span
 								>
-									<Puzzle size={11} class="shrink-0" />
-									<span class="truncate font-medium"
-										>{parsed.manifest.name} v{parsed.manifest.version}</span
-									>
-									<span class="shrink-0 text-green-600">· Local plugin</span>
-								</div>
+								<span class="shrink-0 text-green-600">· Local plugin</span>
+							</div>
+							<PluginManifestInfo manifest={parsed.manifest} />
+							<div class="flex justify-end">
 								<Button
 									size="sm"
 									onclick={() =>
@@ -238,12 +247,11 @@
 									Install
 								</Button>
 							</div>
-							<PluginManifestInfo manifest={parsed.manifest} />
 						</div>
 					{:else if parsed instanceof Part}
-						<div class="flex items-start gap-2">
+						<div class="flex flex-col gap-2">
 							<div
-								class="flex min-w-0 flex-1 flex-col gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-800"
+								class="flex min-w-0 flex-col gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-800"
 							>
 								<p>
 									A new <code>.fn.json</code> doc will be created. Original <code>.json</code> won't be
@@ -260,22 +268,39 @@
 									</label>
 								{/if}
 							</div>
-							{#if isLoading}
-								<Button size="sm" disabled><LoaderCircle class="animate-spin" />Opening…</Button>
-							{:else}
-								<Button size="sm" onclick={() => onLoadCadnanoAsNewDoc(file, parsed)}>Open</Button>
-							{/if}
+							<div class="flex justify-end">
+								{#if isLoading}
+									<Button size="sm" disabled><LoaderCircle class="animate-spin" />Opening…</Button>
+								{:else}
+									<Button size="sm" onclick={() => onLoadCadnanoAsNewDoc(file, parsed)}>Open</Button
+									>
+								{/if}
+							</div>
 						</div>
 					{:else}
-						<div class="flex items-center gap-2">
-							<div class="min-w-0 flex-1 text-xs text-muted-foreground">
-								some information here later
+						<div class="flex flex-col gap-2">
+							<div class="flex min-w-0 flex-col gap-1 text-xs">
+								<p class="text-muted-foreground">{summarizeDesign(parsed)}</p>
+								{#await file.storedAt then storedAt}
+									{#if storedAt !== null}
+										<p
+											class="rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-amber-800"
+										>
+											This design is already in your browser (last saved {new Date(
+												storedAt
+											).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}).
+											Loading replaces that copy.
+										</p>
+									{/if}
+								{/await}
 							</div>
-							{#if isLoading}
-								<Button size="sm" disabled><LoaderCircle class="animate-spin" />Load</Button>
-							{:else}
-								<Button size="sm" onclick={() => onLoadClick(parsed)}>Load</Button>
-							{/if}
+							<div class="flex justify-end">
+								{#if isLoading}
+									<Button size="sm" disabled><LoaderCircle class="animate-spin" />Load</Button>
+								{:else}
+									<Button size="sm" onclick={() => onLoadClick(file, parsed)}>Load</Button>
+								{/if}
+							</div>
 						</div>
 					{/if}
 				{:catch error}

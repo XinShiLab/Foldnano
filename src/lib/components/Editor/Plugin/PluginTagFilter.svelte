@@ -8,7 +8,7 @@
 		selected,
 		onToggleTag,
 		hasDemos,
-		showDemos = $bindable(true),
+		showDemos = $bindable(false),
 	}: {
 		/** Chips to offer; the Demo tag has the switch instead, so it isn't listed here. */
 		tags: readonly TagCount[];
@@ -39,7 +39,7 @@
 			class="ml-auto flex cursor-pointer items-center gap-1.5 text-[11px] text-muted-foreground"
 			{@attach help({
 				title: 'Show demos',
-				text: 'Turn off to hide the example plugins tagged Demo.',
+				text: 'Turn on to show the example plugins tagged Demo. They are hidden by default.',
 			})}
 		>
 			<Switch bind:checked={showDemos} size="sm" />

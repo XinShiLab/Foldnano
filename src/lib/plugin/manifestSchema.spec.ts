@@ -206,7 +206,7 @@ describe('fplugin JSON Schema', () => {
 			authors: [{ name: 'Douglas Lab', url: 'https://bionano.ucsf.edu/' }],
 			maintainers: [{ name: 'Xin Shi' }],
 			license: 'MIT',
-			repository: 'https://github.com/xinshi-kul/pyOrigamiBreak_mini',
+			repository: 'https://github.com/xinshi-kul/pyOrigamiBreak-foldnano',
 			upstream: 'https://github.com/douglaslab/pyOrigamiBreak',
 		};
 		expect(schemaErrors(v2)).toEqual([]);

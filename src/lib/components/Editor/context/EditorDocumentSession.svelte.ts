@@ -797,24 +797,15 @@ export class EditorDocumentSession {
 		}
 	}
 
-	async createNewStandaloneDocument(name = 'Untitled Document'): Promise<string> {
+	/** Saves the current document and swaps in a blank one, which autosave stores on its first edit. */
+	async startBlankDocument(): Promise<void> {
 		await this.saveDocumentToLocalStorage({ skipPristineBlank: true });
-
-		const newDoc = new FoldnanoDocument();
-		newDoc.name = name;
-
-		await this.#adoptDocument(newDoc, {
+		await this.#adoptDocument(new FoldnanoDocument(), {
 			fileMetadata: null,
 			lastLocalPersistAt: null,
 			lastGitHubSyncAt: null,
 			loadPersistedContext: false,
 		});
-
-		const { persistedAt } = await this.persistCurrentDocumentSnapshot('new-standalone-document', {
-			force: true,
-		});
-		this.#lastLocalPersistAt = persistedAt;
-		return newDoc.id;
 	}
 
 	/** The stored snapshot exactly as saved, for downloading a document that won't open. */

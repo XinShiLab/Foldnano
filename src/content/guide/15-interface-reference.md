@@ -7,6 +7,7 @@ slug: interface-reference
 covers:
   - src/lib/components/Editor/Editor.svelte
   - src/lib/components/Editor/Toolbar/Toolbar.svelte
+  - src/lib/components/Editor/EmptyEditorState.svelte
   - src/lib/components/Editor/Toolbar/ActiveViewerToolbar.svelte
   - src/lib/components/Editor/Toolbar/AboutDialog.svelte
   - src/lib/components/Editor/Toolbar/utils.ts
@@ -27,12 +28,16 @@ Hover over any icon button in the app to see its name in a tooltip, and press `?
 
 ## Start Screen
 
-A new, empty document shows **Start a new design** with **Honeycomb**, **Square** and **Freeform** buttons. Each opens the **New Region** panel for that type, where you choose its base plane (see [Adding a region](#adding-a-region)). A greyed **Wireframe** card, marked **API preview**, is for plugin developers: it creates a wireframe region, and hovering it links to the [current status](/docs/guide/wireframe) of wireframe support.
+A new, empty document shows **Start a new design** with **Honeycomb**, **Square** and **Freeform** buttons. Each opens the **New Region** panel for that type, where you choose its base plane (see [Adding a region](#adding-a-region)). The **Wireframe** card, marked **Experimental**, starts a [wireframe region](/docs/guide/wireframe), and hovering it links to the current status of wireframe support.
 
-Below it, **or load an existing design** is a drop zone (click to browse). It accepts:
+Below it, **or load an existing design** lists the files you can drop anywhere on the start screen or pick with **Open file…**:
 
-- designs: `.fn.json`, cadnano `.json` / `.cadnano.json`
-- plugins: local plugin `.zip` files
+- a Foldnano design (`.fn.json`), which opens as it is
+- a cadnano design (`.json` / `.cadnano.json`), which opens as a region in a new design
+- an ASCII PLY mesh (`.ply`), which starts a [wireframe region](/docs/guide/wireframe#create-a-wireframe-region)
+- a plugin (`.zip`), which is offered for install
+
+Every file except a mesh opens the [Open dialog](#open-dialog) first. Drop one file at a time: dropping several opens none of them.
 
 ## Top Toolbar
 
@@ -42,7 +47,7 @@ On narrower screens (such as an iPad), the toolbar buttons show only their icons
 | --- | --- |
 | **Foldnano** (with *beta* badge) | Opens the **About** dialog: the version and build, **What's New** (the last 3 months of changes, some with a **Learn more** link to the guide, and **Show earlier updates** for older ones), the author, the MIT license, and third-party licenses. A small blue dot before the name means What's New has entries you haven't opened yet, and inside What's New those entries carry the same dot and darker text until you next reload; some major changes are also announced once in a card at the bottom right |
 | **New Document** | Creates a new, empty document. With a GitHub repository connected, it asks whether to create a **New File** in that repository or a **Local-Only Design** kept in this browser |
-| **Open** | Opens the **Load design files here** dialog (see [Open dialog](#open-dialog)) |
+| **Open** | Opens the **Open file** dialog (see [Open dialog](#open-dialog)) |
 | **Save** | Saves the working copy to browser storage now |
 | **⌄** next to Save | Save menu (see below) |
 | **Add Region** | Starts adding a **honeycomb** region (see [Adding a region](#adding-a-region)) |
@@ -92,17 +97,17 @@ The **ⓘ** next to it (*Storage info*) explains that designs are saved in this 
 2. Choose its **Base Plane**: **Top (XY)** (normal points up, Z), **Front (XZ)** (normal points forward, Y), or **Side (YZ)** (normal points right, X).
 3. Click **Create *type* Region Here**, or **Cancel**.
 
-With [Plugin dev mode](/docs/plugin-development/plugin-dev-mode) on, **Add Region** offers wireframe regions too, for developers of routing plugins. See [Wireframe Plugin APIs](/docs/plugin-development/wireframe-plugins).
+**Add Region** also offers **Add Wireframe Region** (experimental). See [Wireframe Designs](/docs/guide/wireframe).
 
 **Load Cadnano Design as a Region** opens a dialog where you drop a cadnano `.json` / `.cadnano.json`, choose the same **Base Plane** options, and click **Load**. The file becomes a new region in the current part.
 
 ### Open dialog
 
-**Open** accepts the same files as the start screen. Each dropped file is listed with an action:
+**Open** accepts the same files as the start screen, except a `.ply` mesh. Each dropped file is listed with an action:
 
-- **Foldnano `.fn.json`**: **Load** opens it.
+- **Foldnano `.fn.json`**: a one-line summary (regions, helices, scaffold length, staples), then **Load** opens it, named after the file. If this browser already has the same design (for example one you exported and kept editing), a note says when it was last saved: loading replaces that copy.
 - **cadnano `.json`**: **Open** creates a **new `.fn.json` document** from it; the original `.json` isn't changed. When a GitHub repository is connected, **Add original to current repo folder** also stores the original file there. If the file could be either lattice, you're asked whether it is honeycomb or square.
-- **Plugin manifest** or **local plugin `.zip`**: shows the plugin's details and an **Install** button (see [Plugins For Users](/docs/guide/plugins-for-users)).
+- **Local plugin `.zip`**: shows the plugin's details and an **Install** button (see [Plugins For Users](/docs/guide/plugins-for-users)). A plugin manifest on its own (`fplugin.json`) is refused; install the plugin's `.zip` instead.
 
 ### Loading from a URL
 
@@ -182,7 +187,7 @@ On the right, *press ? for help* is a reminder of the workspace help (shortcuts 
 | --- | --- |
 | **Reset camera to default 3D view** | Resets the 3D camera |
 | **3D Overlay** | Switches the tool panel between **3D View Inspector** and **3D Overlays** (see [3D Overlays](/docs/guide/3d-overlays)) |
-| **Mesh** | Wireframe regions only: switches the tool panel to **Reference Mesh** (see [Wireframe Plugin APIs](/docs/plugin-development/wireframe-plugins#manage-the-mesh)) |
+| **Mesh** | Wireframe regions only: switches the tool panel to **Reference Mesh** (see [Wireframe Designs](/docs/guide/wireframe#manage-the-mesh)) |
 | **Mode** | **Pan**, **Select**, **Draw** |
 | **View** toggles | **Helix grid** (`g`), **NT model** (`e`), **Cross-section cursor** (`c`, unavailable while the NT model is shown), **Coordinate axis**, **Base planes** (`f`) |
 | **Selection: show only selected strands** | Limits the 3D view to the strands selected in the strand viewer |

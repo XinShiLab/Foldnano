@@ -198,7 +198,7 @@ Opened via the GitHub button in the toolbar. Displays three tabs:
 - Disconnect button (unplug icon) clears the repo connection
 - After a pull/overwrite, dirty-path state is recomputed immediately so overwritten files disappear from the Changes tab instead of lingering as stale modified entries
 
-The toolbar's **New Document** becomes a menu when a repo is connected and the user is authenticated: **New File in {repo}** opens `NewFileDialog` (a tracked local-only entry, as with the Files tab's button), and **Local-Only Design** calls `createNewStandaloneDocument()`, which registers no explorer entry. That document has no GitHub path, so **Save to GitHub Repo** later opens `PublishToGitHubDialog`.
+The toolbar's **New Document** becomes a menu when a repo is connected and the user is authenticated: **New File in {repo}** opens the GitHub panel and `NewFileDialog` (the dialog is mounted by `GitHubExplorer`, so it can't show while another panel is active; it creates a tracked local-only entry, as with the Files tab's button), and **Local-Only Design** calls `startBlankDocument()`, which registers no explorer entry and saves nothing until the first edit. That document has no GitHub path, so **Save to GitHub Repo** later opens `PublishToGitHubDialog`.
 
 ### Changes Tab (`SourceControlPanel.svelte`)
 

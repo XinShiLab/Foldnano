@@ -6,7 +6,6 @@ order: 12
 slug: wireframe-plugins
 covers:
   - src/lib/plugin/python/foldnano/region.py
-  - src/lib/components/Editor/ToolPanel/ReferenceMesh*.svelte
 ---
 
 <script>
@@ -19,7 +18,7 @@ covers:
 
 **The API works and is tested, but it may change as more routing methods use it.** So far we have tried it only with a method that chooses crossovers on a fixed set of helices.
 
-**The examples here show how the API works. They are not routing methods.** They place helices, but not a scaffold path, crossovers or vertex design that would fold. No wireframe structure made this way has been simulated or tested in the lab yet.
+**The examples here show how the API works. They are not routing methods.** They place helices, but not a scaffold path, crossovers or vertex design that would fold. For a real routing plugin built on this API, see [pyDAEDALUS](https://github.com/xinshi-kul/pyDAEDALUS-foldnano/tree/foldnano_plugin).
 
 </Callout>
 
@@ -29,42 +28,7 @@ Your plugin decides how many helices an edge gets, their lengths and roll, the s
 
 ## Create A Wireframe Region
 
-The **Wireframe** card on the start screen, greyed and marked **API preview**, always creates a wireframe region. The other ways in need [Plugin dev mode](/docs/plugin-development/plugin-dev-mode): open the **Plugins** panel, switch to the **Dev** tab, and turn it on. **Add Wireframe Region** then appears under **Add Region**, and you can drop a `.ply` file on the empty editor.
-
-The switch only controls those entry points. With it off, a design that already has a wireframe region opens and edits as usual, and a plugin can still create one with `part.add_region`.
-
-The tool panel asks for:
-
-1. **Base plane.** The region's helices and its mesh are placed relative to this plane. Mesh x, y and z map to the plane's U, V and W.
-2. **Reference mesh.** Optional. Click the drop area or drop a `.ply` file on it.
-3. **Scale.** A PLY file has no unit, so you say how many nanometres one file unit stands for. The panel shows the resulting size and edge lengths, and the 3D view shows a live preview.
-
-Dropping one `.ply` file on the empty editor opens the same panel with the mesh filled in. Nothing is created until you confirm.
-
-### Mesh Files
-
-Foldnano reads **ASCII PLY** files: vertices, faces and edges. Other properties, such as colors and normals, are ignored. Binary PLY is refused, so re-export as ASCII from your modelling tool. A mesh can have up to 1,000 vertices, 2,000 faces and 3,000 listed edges. A routing plugin usually places at least one helix per edge, and the strand view slows down with thousands of helices.
-
-### Manage The Mesh
-
-Select a wireframe region and open the 3D view. The **Mesh** button in the 3D toolbar opens a panel where you can:
-
-- add a mesh, if the region has none
-- replace it, with a preview first
-- remove it
-- show or hide it in the 3D view
-
-Adding, replacing and removing are undoable and saved with the design. Showing or hiding is a view setting and is not saved.
-
-The mesh is drawn in the 3D view only, in orange, and it moves with the region's plane. It can't be clicked, and it doesn't appear in the plane or strand views.
-
-Faces are drawn simply, as a fan of triangles from each face's first vertex, so a concave polygon can fill outside its outline. Triangles and other convex faces are exact, and the edge lines are always right.
-
-### Helices In The Plane View
-
-Helices are placed as in a [freeform region](/docs/guide/creating-a-design), at any position and angle, and you edit strands as usual. The plane view does not offer the rotate handle or direction field, because those edits would flatten a helix into the plane.
-
-The plane view looks along +W, so depth shows as opacity: helices at more negative W are nearer and more solid, and helices at more positive W are fainter. Where helices overlap, the nearer one is on top and takes the click.
+Create a region and load a mesh as a user would: see [Create A Wireframe Region](/docs/guide/wireframe#create-a-wireframe-region) and [Mesh Files](/docs/guide/wireframe#mesh-files) in the user guide. A plugin can also create one itself with `part.add_region`.
 
 ## What A Wireframe Region Is
 

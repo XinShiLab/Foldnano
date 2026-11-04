@@ -14,7 +14,7 @@
 	},
 	"type": "module",
 	"scripts": {
-		"dev": "node scripts/build-plugins.mjs && vite dev",
+		"dev": "NODE_OPTIONS='--max-old-space-size=1536' node scripts/build-plugins.mjs && vite dev",
 		"build": "node scripts/build-plugins.mjs && vite build",
 		"build:plugins": "node scripts/build-plugins.mjs",
 		"gen:pyodide-packages": "node scripts/generate-pyodide-packages.mjs",

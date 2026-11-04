@@ -155,7 +155,7 @@ describe('validateManifest', () => {
 				authors: [{ name: 'Douglas Lab', url: 'https://bionano.ucsf.edu/' }],
 				maintainers: [{ name: 'Xin Shi' }],
 				license: 'MIT AND BSD-3-Clause',
-				repository: 'https://github.com/xinshi-kul/pyOrigamiBreak_mini',
+				repository: 'https://github.com/xinshi-kul/pyOrigamiBreak-foldnano',
 				upstream: 'https://github.com/douglaslab/pyOrigamiBreak',
 			};
 			expect(validateManifest({ ...base(), schemaVersion: 2, ...credits })).toMatchObject(credits);

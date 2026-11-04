@@ -68,7 +68,7 @@
 	import { exportBaseName } from '$lib/model/io/designFileName';
 	import { help } from '$lib/components/help/help';
 	import { modKeySymbol } from '$lib/utils/platform';
-	import { goto } from '$app/navigation';
+	import { goto, pushState, replaceState } from '$app/navigation';
 	import SaveStatusIndicator from '../SaveStatusIndicator.svelte';
 	import AgentRunIndicator from '../Plugin/AgentRunIndicator.svelte';
 	import { githubAuth, getAuthStatus, loginWithGitHub } from '$lib/services/github/auth.svelte';
@@ -307,9 +307,19 @@
 		editorViewContext.publishToGitHubDialogOpen = true;
 	};
 
+	// The dialog is mounted by the GitHub panel, so it only appears while that panel is shown.
+	const openNewGitHubFileDialog = () => {
+		editorViewContext.openSidePanel('GITHUB');
+		editorViewContext.newFileDialogOpen = true;
+	};
+
+	// Shallow-routed so the editor (and its plugin worker) isn't remounted; Editor.svelte moves the
+	// URL to /editor/<id> once the blank document is first saved.
 	const createLocalOnlyDocument = async () => {
-		const newDocId = await session.createNewStandaloneDocument();
-		goto(resolve(`/editor/${newDocId}`));
+		await session.startBlankDocument();
+		const editorPath = resolve('/editor');
+		if (window.location.pathname === editorPath) replaceState(editorPath, {});
+		else pushState(editorPath, {});
 	};
 </script>
 
@@ -381,7 +391,7 @@
 							</DropdownMenu.Trigger>
 							<DropdownMenu.Content align="start" class="min-w-60 [--radius:1rem]">
 								<DropdownMenu.Group>
-									<DropdownMenu.Item onclick={() => (editorViewContext.newFileDialogOpen = true)}>
+									<DropdownMenu.Item onclick={openNewGitHubFileDialog}>
 										<GitBranch />New File in {currentRepoCtx.repo}…
 									</DropdownMenu.Item>
 									<DropdownMenu.Item onclick={createLocalOnlyDocument}>
@@ -417,7 +427,7 @@
 						>
 						<Dialog.Content class="sm:max-w-2xl">
 							<Dialog.Header>
-								<Dialog.Title>Load design files here</Dialog.Title>
+								<Dialog.Title>Open file</Dialog.Title>
 								<Dialog.Description>
 									<p>
 										works for cadnano <code>.json</code>, <code>.cadnano.json</code>,
@@ -554,11 +564,9 @@
 								<DropdownMenu.Item onclick={() => startAddRegion('FREEFORM')}>
 									<LineSquiggle />Add Freeform Region
 								</DropdownMenu.Item>
-								{#if editorViewContext.pluginDevMode.enabled}
-									<DropdownMenu.Item onclick={() => startAddRegion('WIREFRAME')}>
-										<Pyramid />Add Wireframe Region
-									</DropdownMenu.Item>
-								{/if}
+								<DropdownMenu.Item onclick={() => startAddRegion('WIREFRAME')}>
+									<Pyramid />Add Wireframe Region
+								</DropdownMenu.Item>
 								<DropdownMenu.Separator />
 								<DropdownMenu.Item
 									onclick={() => {
