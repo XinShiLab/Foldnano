@@ -49,6 +49,7 @@ import type {
 	ColorContext,
 	ContextMenuInfo,
 	ModificationContext,
+	RecentSequenceFill,
 	SelectAllMode,
 	SelectionToggle,
 	SequenceContext,
@@ -224,6 +225,7 @@ class StrandViewContext {
 		fillType: 'ONLY_EMPTY',
 		fillResults: [],
 	});
+	recentFill: RecentSequenceFill | null = $state.raw(null);
 	modificationContext: ModificationContext = $state({
 		currentModification: null,
 		builtinModifications: [...BUILTIN_MODIFICATIONS],
@@ -471,6 +473,13 @@ export class EditorViewContext {
 		const region = this.activeRegion;
 		return untrack(() => collectDesignIssues(part, region, { integrity, simulation, cadnano }));
 	});
+
+	/** The last empty-only fill, while it is still the latest edit and Sequence mode is on. */
+	get activeRecentFill(): RecentSequenceFill | null {
+		const fill = this.strandViewContext.recentFill;
+		if (!fill || this.editorMode !== 'SEQUENCE') return null;
+		return fill.revision === this.historyStack.revision ? fill : null;
+	}
 
 	get activeRegion(): DesignRegion | null {
 		const part = this.currentDoc.parts[0];

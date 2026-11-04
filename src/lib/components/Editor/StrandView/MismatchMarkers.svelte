@@ -3,6 +3,7 @@
 	import type { Part } from '../../../model/Part';
 	import { getDimensionContext } from './drawingContext';
 	import { getEditorViewContext } from '../context/EditorViewContext.svelte';
+	import type OligoSegment from '../../../model/Oligo/OligoSegment.svelte';
 
 	interface Props {
 		part: Part;
@@ -16,6 +17,19 @@
 	const { sideLength, strokeWidth } = dimensions;
 
 	const MISMATCH_COLOR = 'red';
+
+	// mismatchedBps() finds the opposite strand through the non-reactive spatial index, so read
+	// that strand's occupancy and extents too: a strand placed or moved opposite an unchanged
+	// segment (e.g. a new mirror copy) then re-runs just the segments on that helix.
+	const trackedMismatchedBps = (segment: OligoSegment): number[] => {
+		const opposite = segment.inVirtualHelix.strandSets[1 - segment.inStrandIndex];
+		for (const id of opposite.segmentIds) {
+			const other = part.getSegmentById(id);
+			void other?.fivePrime.index;
+			void other?.threePrime.index;
+		}
+		return segment.mismatchedBps();
+	};
 </script>
 
 <!-- @component
@@ -35,15 +49,16 @@
 					{@const segmentResult = d.getEffectiveDisplayRowForVh(segment.inVirtualHelix.id)}
 					{#if segmentResult !== null && !segmentResult.isCollapsed}
 						{@const segmentRow = segmentResult.displayRow}
-						{#each segment.mismatchedBps() as bpIdx (`${segment.id}#mismatch#${bpIdx}`)}
+						{#each trackedMismatchedBps(segment) as bpIdx (`${segment.id}#mismatch#${bpIdx}`)}
 							{@const [c1, c2] = getBpCoordsByRowAndBpIdx(segmentRow, bpIdx)}
-							{@const x1 = c1[0] + sideLength / 2}
-							{@const y1 = c1[1] + sideLength / 2}
-							{@const x2 = c2[0] + sideLength / 2}
-							{@const y2 = c2[1] + sideLength / 2}
 							<Line
 								id={`MISMATCH#${segment.id}#at#${bpIdx}`}
-								points={[x1, y1, x2, y2]}
+								points={[
+									c1[0] + sideLength / 2,
+									c1[1] + sideLength / 2,
+									c2[0] + sideLength / 2,
+									c2[1] + sideLength / 2,
+								]}
 								stroke={MISMATCH_COLOR}
 								strokeWidth={strokeWidth * 2}
 								lineCap="round"

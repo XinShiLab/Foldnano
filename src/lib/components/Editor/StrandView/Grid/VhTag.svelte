@@ -19,6 +19,9 @@
 	const editorViewContext = getEditorViewContext();
 
 	let [x, y] = $derived([2 * radius, getRowYByRowIdx(displayRow)]);
+	const label = $derived(vh.index.toString().padStart(2, '0'));
+	// Shrink 3+ digit labels so they still fit inside the circle.
+	const fontSize = $derived(label.length <= 2 ? radius : (radius * 2) / label.length);
 	const selected = $derived(
 		!!vh.localFrame && editorViewContext.selectedFreeformVhIndices.has(vh.index)
 	);
@@ -37,10 +40,12 @@
 	/>
 	<Text
 		id="VH_TAG#{vh.index}"
-		x={x - radius / 2 - 1}
-		y={y - radius / 2}
-		text={vh.index.toString().padStart(2, '0')}
-		fontSize={radius}
+		x={x - radius}
+		y={y - radius}
+		width={2 * radius}
+		height={2 * radius}
+		text={label}
+		{fontSize}
 		fontStyle="bold"
 		fill={canvasTheme.colors.vhText}
 		align="center"

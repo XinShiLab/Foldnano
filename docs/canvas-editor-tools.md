@@ -211,6 +211,8 @@ Reads mode and fill settings from `ctx.strandCtx.sequenceContext` (`SequenceCont
 
 `fillType === 'ONLY_EMPTY'` causes the fill to skip any slot whose `seq` is already a non-`N` base, consuming sequence characters only for the empty (`N`) positions. The complement strand is updated only for the slots that were actually written.
 
+`RANDOM` + `ONLY_EMPTY` takes a separate path: `fillEmptyAndHighlight` (`tools/sequenceFill.ts`) → `fillEmptySequenceCmd` → `Part.fillEmptySequence`, which never changes an assigned base on either strand (see `docs/dna-model.md` § Empty-only random fill). The Sequence panel's **Fill empty** button uses the same helper over `emptyFillTargets` (segments owning selected ends, whole oligos with the OLIGO toggle, or every real oligo when nothing is selected; SCAF/STAP filters both). Mirror clicks are refused before any sequence mutation. Conflicting pairing constraints leave target bases empty and are reported in the panel. The result is stored as `strandCtx.recentFill` for `RecentFillMarkers`; `EditorViewContext.activeRecentFill` hides it once `historyStack.revision` moves on or the mode leaves `SEQUENCE`.
+
 ---
 
 ## DRAW Tool Deep-Dive

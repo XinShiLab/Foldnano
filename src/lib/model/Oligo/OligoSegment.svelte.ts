@@ -679,16 +679,15 @@ export default class OligoSegment {
 		}
 	}
 
-	fillRandomSequence(gcContent: number = 0.5, onlyEmpty = false): string | null {
-		if (onlyEmpty) {
-			const emptyCount = this.slots
-				.filter((s) => s.seq.length > 0 && /^N+$/.test(s.seq))
-				.reduce((a, s) => a + s.seq.length, 0);
-			if (emptyCount === 0) return '';
-			const randomSequence = generateRandomDNA(emptyCount, gcContent);
-			const { missing } = this.fillSequence(randomSequence.primary5to3, true);
-			return missing === 0 ? randomSequence.primary5to3 : null;
+	get emptyNucleotideCount(): number {
+		let count = 0;
+		for (const slot of this.slots) {
+			for (const ch of slot.seq) if (ch === 'N') count++;
 		}
+		return count;
+	}
+
+	fillRandomSequence(gcContent: number = 0.5): string | null {
 		const randomSequence = generateRandomDNA(this.totalNucleotides, gcContent);
 		const { missing } = this.fillSequence(randomSequence.primary5to3);
 		return missing === 0 ? randomSequence.primary5to3 : null;
@@ -812,7 +811,7 @@ export default class OligoSegment {
 
 	private _complementarySlotForBp(bpIndex: number): Slot | undefined {
 		const complementaryStrandIdx = (1 - this.inStrandIndex) as 0 | 1;
-		const { segment: compSeg } = this.inPart.getEntitiesAtVh(
+		const compSeg = this.inPart.getSegmentAtVh(
 			this.inVirtualHelix.id,
 			complementaryStrandIdx,
 			bpIndex
@@ -827,12 +826,11 @@ export default class OligoSegment {
 	mismatchedBps(): number[] {
 		const result: number[] = [];
 		for (const slot of this.slots) {
-			if (slot.seq.length !== 1 || slot.seq === 'N') continue;
-			const compSlot = this._complementarySlotForBp(slot.bpIndex);
-			if (!compSlot || compSlot.seq.length !== 1 || compSlot.seq === 'N') continue;
-			if (OligoSegment._complementBase(slot.seq) !== compSlot.seq) {
-				result.push(slot.bpIndex);
-			}
+			const seq = slot.seq;
+			if (seq.length !== 1 || seq === 'N') continue;
+			const compSeq = this._complementarySlotForBp(slot.bpIndex)?.seq;
+			if (!compSeq || compSeq.length !== 1 || compSeq === 'N') continue;
+			if (OligoSegment._complementBase(seq) !== compSeq) result.push(slot.bpIndex);
 		}
 		return result;
 	}
@@ -915,7 +913,15 @@ export default class OligoSegment {
 	}
 
 	slotForBp(bpIndex: number): Slot | undefined {
-		return this.slots.find((s) => s.bpIndex === bpIndex);
+		const slots = this.slots;
+		// Slots normally hold one entry per bp in 5'→3' order, so try the direct index first.
+		const first = slots[0];
+		if (first) {
+			const guess =
+				slots[this.inStrandIndex === 0 ? bpIndex - first.bpIndex : first.bpIndex - bpIndex];
+			if (guess?.bpIndex === bpIndex) return guess;
+		}
+		return slots.find((s) => s.bpIndex === bpIndex);
 	}
 
 	bpToSeqRange(bpIndex: number): [number, number] | null {
