@@ -3,11 +3,9 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { Button } from '$lib/components/ui/button';
-	import { buttonVariants } from '$lib/components/ui/button';
 	import {
 		FolderOpen,
 		FileJson2,
-		Puzzle,
 		UploadCloud,
 		Hexagon,
 		Square,
@@ -15,6 +13,7 @@
 		Pyramid,
 	} from '@lucide/svelte';
 	import { resolve } from '$app/paths';
+	import { toast } from 'svelte-sonner';
 	import Open from './Toolbar/Open.svelte';
 	import { getEditorViewContext } from './context/EditorViewContext.svelte';
 	import { help } from '$lib/components/help/help';
@@ -45,7 +44,6 @@
 		},
 	];
 
-	let wireframeEnabled = $derived(editorViewContext.pluginDevMode.enabled);
 	let isDialogOpen = $state(false);
 	let isDragOver = $state(false);
 
@@ -71,20 +69,31 @@
 		}
 	};
 
+	// Dropped and picked files take the same route: a mesh starts a region, anything else is previewed.
+	const openFiles = (picked: File[]) => {
+		if (picked.length > 1) {
+			toast.error('Drop one file at a time', {
+				description: `${picked.length} files were dropped. Nothing was opened.`,
+			});
+		} else if (picked.length === 1 && picked[0].name.toLowerCase().endsWith('.ply')) {
+			void editorViewContext.startWireframeRegionFromFile(picked[0]);
+		} else if (picked.length === 1) {
+			pendingFiles = picked;
+			isDialogOpen = true;
+		}
+	};
+
 	const handleDrop = (e: DragEvent) => {
 		e.preventDefault();
 		isDragOver = false;
-		const dropped = Array.from(e.dataTransfer?.files ?? []);
-		if (
-			wireframeEnabled &&
-			dropped.length === 1 &&
-			dropped[0].name.toLowerCase().endsWith('.ply')
-		) {
-			void editorViewContext.startWireframeRegionFromFile(dropped[0]);
-		} else if (dropped.length > 0) {
-			pendingFiles = dropped;
-			isDialogOpen = true;
-		}
+		openFiles(Array.from(e.dataTransfer?.files ?? []));
+	};
+
+	let fileInput = $state<HTMLInputElement | null>(null);
+	const handlePicked = (e: Event) => {
+		const input = e.currentTarget as HTMLInputElement;
+		openFiles(Array.from(input.files ?? []));
+		input.value = '';
 	};
 </script>
 
@@ -134,7 +143,7 @@
 					class="group relative"
 					{@attach help({
 						title: 'Wireframe region',
-						text: "Planned. No routing method is available yet, so you can't design a wireframe structure here. An early plugin API is available for developers.",
+						text: 'Experimental. One routing plugin, pyDAEDALUS, is available in the Hub, and more are in progress. No wireframe design has been tested in the lab yet.',
 						doc: 'wireframe',
 					})}
 				>
@@ -146,11 +155,11 @@
 							variant="outline"
 							class="absolute -top-2 left-1/2 h-4 -translate-x-1/2 bg-background px-1 text-[10px] font-normal text-muted-foreground"
 						>
-							API preview
+							Experimental
 						</Badge>
-						<Pyramid size={20} class="text-muted-foreground opacity-50" />
-						<span class="font-medium opacity-50">Wireframe</span>
-						<span class="text-muted-foreground opacity-50">Region</span>
+						<Pyramid size={20} class="text-orange-500" />
+						<span class="font-medium">Wireframe</span>
+						<span class="text-muted-foreground">Region</span>
 					</button>
 					<!-- pt-1 bridges the hover gap; touch has no hover, so the link stays visible there. -->
 					<div
@@ -183,7 +192,7 @@
 				area: true,
 				placement: 'left',
 				title: 'Open an existing design',
-				text: `Drop a Foldnano .fn.json or a cadnano .json here; a cadnano file opens as a new document.${wireframeEnabled ? ' A single .ply mesh starts a new wireframe region.' : ''} Plugin .zip files are offered for install.`,
+				text: 'Drop a file here or click Open file. A Foldnano design opens as it is; a cadnano design opens as a new design; an ASCII .ply mesh starts a wireframe region; a plugin .zip is offered for install.',
 				doc: 'creating-a-design',
 			})}
 		>
@@ -199,41 +208,41 @@
 					{isDragOver ? 'Drop to open' : 'No design open'}
 				</Empty.Title>
 				<Empty.Description>
-					Drop a <code>.json</code>, <code>.cadnano.json</code>, or <code>.fn.json</code> file here
-					to open it,
-					{#if wireframeEnabled}a <code>.ply</code> mesh to start a wireframe region,{/if}
-					or a plugin <code>.zip</code> to install it.
+					<p>Drop a file here, or open one:</p>
+					<ul class="mt-1 inline-block text-left">
+						<li>a Foldnano design (<code>.fn.json</code>)</li>
+						<li>a cadnano design (<code>.json</code>), as a region in a new design</li>
+						<li>an ASCII PLY mesh (<code>.ply</code>), to start a wireframe region</li>
+						<li>a plugin (<code>.zip</code>), to install it</li>
+					</ul>
 				</Empty.Description>
 			</Empty.Header>
 
 			<Empty.Content>
-				<div class="pointer-events-auto flex gap-2">
+				<div class="pointer-events-auto">
+					<input
+						bind:this={fileInput}
+						type="file"
+						class="hidden"
+						accept=".json,.ply,.zip,application/json,application/zip"
+						onchange={handlePicked}
+					/>
+					<Button onclick={() => fileInput?.click()}>
+						<FolderOpen />
+						Open file…
+					</Button>
 					<Dialog.Root bind:open={isDialogOpen}>
-						<Dialog.Trigger class={buttonVariants({ variant: 'default' })}>
-							<FolderOpen />
-							Open file…
-						</Dialog.Trigger>
 						<Dialog.Content class="sm:max-w-2xl">
 							<Dialog.Header>
-								<Dialog.Title>Load design files here</Dialog.Title>
+								<Dialog.Title>Open file</Dialog.Title>
 								<Dialog.Description>
-									Works for cadnano <code>.json</code>, <code>.cadnano.json</code>,
-									<code>.fn.json</code>, plugin manifests, and local plugin <code>.zip</code> files.
+									A Foldnano design opens as it is, a cadnano design opens as a new design, and a
+									plugin <code>.zip</code> is offered for install.
 								</Dialog.Description>
 							</Dialog.Header>
 							<Open {toggleDialog} initialFiles={pendingFiles} />
 						</Dialog.Content>
 					</Dialog.Root>
-					<Button
-						variant="outline"
-						onclick={() => {
-							pendingFiles = [];
-							isDialogOpen = true;
-						}}
-					>
-						<Puzzle />
-						Install plugin…
-					</Button>
 				</div>
 			</Empty.Content>
 		</Empty.Root>

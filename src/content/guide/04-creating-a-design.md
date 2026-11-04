@@ -7,6 +7,7 @@ slug: creating-a-design
 covers:
   - src/lib/components/Editor/ToolPanel/RegionCreationPanel.svelte
   - src/lib/components/Editor/Toolbar/Open.svelte
+  - src/lib/model/io/designSummary.ts
   - src/lib/components/Editor/Toolbar/LoadCadnanoAsRegionDialog.svelte
   - src/lib/components/Editor/Toolbar/parsers/**
   - src/lib/model/checks/shape/cadnanoJsonShape.ts
@@ -34,7 +35,7 @@ Every design has a **part** at the top, the container that owns your planes and 
 
 ## Add A Region
 
-Use **Add Region** in the top toolbar. The dropdown offers **Add Honeycomb Region**, **Add Square Region**, **Add Freeform Region**, and **Load Cadnano Design as a Region** (which imports an existing cadnano file into a new region). Wireframe design is planned; see [Wireframe Designs](/docs/guide/wireframe) for where it stands.
+Use **Add Region** in the top toolbar. The dropdown offers **Add Honeycomb Region**, **Add Square Region**, **Add Freeform Region**, **Add Wireframe Region** (experimental), and **Load Cadnano Design as a Region** (which imports an existing cadnano file into a new region). Wireframe regions are experimental; see [Wireframe Designs](/docs/guide/wireframe).
 
 | Choice | Use when |
 | --- | --- |

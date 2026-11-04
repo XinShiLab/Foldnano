@@ -330,9 +330,9 @@ It adds an optional `referenceGeometry` (input shape, region-local, in nm), set 
 `setRegionReferenceGeometryCmd`. It is reference only: helices are the source of truth and nothing syncs
 between them. It is replaced whole and never mutated, so copies such as `splitRegionCmd`'s may share it.
 
-Wireframe support is a developer preview: the start card is always clickable but greyed, and **Add Region**
-and `.ply` drop work only while `pluginDevMode.enabled` is on. That is a UI gate, not a model rule: saved
-wireframe regions still open and edit with it off, and plugins can still create them.
+Wireframe support is experimental and open to everyone: the start card (badged **Experimental**), **Add
+Region** and `.ply` drop. During the developer preview the last two were gated on `pluginDevMode.enabled`;
+that gate is gone. Routing comes only from plugins (the first is the community pyDAEDALUS plugin).
 
 ### DesignRegion creation
 

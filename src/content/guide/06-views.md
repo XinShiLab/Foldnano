@@ -110,7 +110,7 @@ The 3D toolbar controls what's shown and what runs:
 - **Export**: image (PNG), **GLB**, **oxDNA**, and **mrDNA**.
 - **Reset camera** and **performance stats**.
 - **3D Overlay**, which switches the tool panel to [3D Overlays](/docs/guide/3d-overlays) for loading mrDNA or PDB structures.
-- **Mesh**, shown for a wireframe region, which switches the tool panel to [Reference Mesh](/docs/plugin-development/wireframe-plugins#manage-the-mesh).
+- **Mesh**, shown for a wireframe region, which switches the tool panel to [Reference Mesh](/docs/guide/wireframe#manage-the-mesh).
 
 Every button is listed in the [Interface Reference](/docs/guide/interface-reference#3d-view-toolbar).
 

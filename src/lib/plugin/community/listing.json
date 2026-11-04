@@ -1,7 +1,7 @@
 {
 	"source": {
 		"repo": "XinShiLab/foldnano-plugins",
-		"commit": "7632950bb32eecfe53a2f443cd7aa8db4ac599a3"
+		"commit": "363a2bb01dca769abefe9933e5cb052620804e94"
 	},
 	"registryVersion": 1,
 	"plugins": [
@@ -50,6 +50,31 @@
 				"sha256": "766b81521f70efcff66a36f57a442973d437ad3cead1649ee1ec265e0a1a186e"
 			},
 			"listed": "2026-11-02"
+		},
+		{
+			"id": "pyDAEDALUS",
+			"version": "0.1.0",
+			"name": "pyDAEDALUS — DX Wireframe Routing",
+			"description": "Experimental: follows the original pyDAEDALUS routing, but no design made with this plugin has been folded yet. Check the result before ordering staples. Routes the active wireframe region's mesh with two-helix (DX) edges, B-form DNA and an M13 scaffold. Needs a closed mesh in an empty wireframe region, and rescales the mesh to the size of the design.",
+			"tags": ["Wireframe", "Experimental"],
+			"authors": [
+				{
+					"name": "Bathe BioNanoLab, MIT"
+				}
+			],
+			"maintainers": [
+				{
+					"name": "Xin Shi"
+				}
+			],
+			"license": "GPL-2.0-or-later",
+			"repository": "https://github.com/xinshi-kul/pyDAEDALUS-foldnano",
+			"upstream": "https://github.com/lcbb/pyDAEDALUS",
+			"zip": {
+				"url": "https://xinshilab.github.io/foldnano-plugins/plugins/pyDAEDALUS/0.1.0/pyDAEDALUS-0.1.0.zip",
+				"sha256": "431d083e4179c00a20efa5c02ff5ff06579b454841ba97b7245acdf3136c7fa5"
+			},
+			"listed": "2026-11-03"
 		}
 	]
 }

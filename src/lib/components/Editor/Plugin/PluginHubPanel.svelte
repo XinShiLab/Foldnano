@@ -32,7 +32,7 @@
 
 	// One filter for every Hub section.
 	const selectedTags = new SvelteSet<string>();
-	let showDemos = $state(true);
+	let showDemos = $state(false);
 	const allListings = [...hubPlugins, ...communityPlugins];
 	const filterTags = countTags(allListings).filter((t) => t.key !== tagKey(DEMO_TAG));
 	const hasDemos = allListings.some((m) => hasTag(m, DEMO_TAG));

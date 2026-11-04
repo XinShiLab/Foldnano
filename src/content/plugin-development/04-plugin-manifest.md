@@ -199,7 +199,7 @@ Say who made your plugin and where its source lives. This matters most when your
 "authors": [{ "name": "Douglas Lab", "url": "https://bionano.ucsf.edu/" }],
 "maintainers": [{ "name": "Xin Shi" }],
 "license": "MIT",
-"repository": "https://github.com/xinshi-kul/pyOrigamiBreak_mini",
+"repository": "https://github.com/xinshi-kul/pyOrigamiBreak-foldnano",
 "upstream": "https://github.com/douglaslab/pyOrigamiBreak"
 ```
 

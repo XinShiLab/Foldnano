@@ -53,7 +53,7 @@
 		deleteFreeformVirtualHelicesCmd,
 		deleteLatticeVirtualHelicesCmd,
 	} from '$lib/commands/virtualHelix';
-	import { goto } from '$app/navigation';
+	import { goto, replaceState } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { toast } from 'svelte-sonner';
 	import { parseDesignRaw, getParseWarnings, type FileMeta } from './Toolbar/parsers';
@@ -106,6 +106,13 @@
 				}
 			});
 		}
+	});
+
+	// A blank document opened at /editor gets its own URL once autosave first stores it.
+	$effect(() => {
+		if (session.lastLocalPersistAt === null) return;
+		const id = session.currentDoc.id;
+		if (window.location.pathname === resolve('/editor')) replaceState(resolve(`/editor/${id}`), {});
 	});
 
 	let urlLoadAttempted = false;
@@ -238,6 +245,12 @@
 			const urlDocId = match ? match[1] : null;
 			if (urlDocId && session.currentDoc?.id !== urlDocId) {
 				session.loadDocumentFromLocalStorage(urlDocId);
+			} else if (
+				window.location.pathname === resolve('/editor') &&
+				session.lastLocalPersistAt !== null
+			) {
+				// Forward again onto a New Document entry that was never edited.
+				session.startBlankDocument();
 			}
 		}
 		window.addEventListener('popstate', handlePopState);
