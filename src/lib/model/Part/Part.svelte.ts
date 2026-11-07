@@ -2,7 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import Oligo, { type SegmentEnd } from '../Oligo';
 import type OligoSegment from '../Oligo/OligoSegment.svelte';
 import { mirroredSkipInsertSeq } from '../Oligo/OligoSegment.svelte';
-import { fillEmptySequence, type EmptyFillResult } from './fillEmptySequence';
+import { fillEmptySequence, type DnaBase, type EmptyFillResult } from './fillEmptySequence';
 import { cloneOligoJsonWithOffset } from '../Oligo/cloneOligoJson';
 import type { VirtualHelixFrame } from '../geometry3d/dnaGeometry';
 import { InvalidOperationError, OperationNotSupportedError } from '../../errors';
@@ -1740,9 +1740,13 @@ export class Part {
 		}
 	}
 
-	/** Random-fills the 'N' nucleotides of `segments` without changing an assigned base or
-	 * creating a mismatch, linked mirror copies included; see `fillEmptySequence.ts`. */
-	fillEmptySequence(segments: Iterable<OligoSegment>, gcContent = 0.5): EmptyFillResult {
-		return fillEmptySequence(this, segments, gcContent);
+	/** Fills the 'N' nucleotides of `segments` (randomly, or with `base`) without changing an
+	 * assigned base or creating a mismatch, linked mirror copies included; see `fillEmptySequence.ts`. */
+	fillEmptySequence(
+		segments: Iterable<OligoSegment>,
+		gcContent = 0.5,
+		base: DnaBase | null = null
+	): EmptyFillResult {
+		return fillEmptySequence(this, segments, gcContent, base);
 	}
 }

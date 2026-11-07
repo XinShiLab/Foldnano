@@ -19,6 +19,7 @@
 		CirclePile,
 		Pyramid,
 		Shapes,
+		Film,
 		ChartBar,
 	} from '@lucide/svelte/icons';
 	import type { GizmoMode } from './transformGizmo';
@@ -37,7 +38,10 @@
 		type RbsDiagnostics,
 	} from './view3DToolbarState';
 	import { help } from '$lib/components/help/help';
-	import { getEditorViewContext } from '../context/EditorViewContext.svelte';
+	import {
+		getEditorViewContext,
+		type View3DToolPanelMode,
+	} from '../context/EditorViewContext.svelte';
 
 	const editorCtx = getEditorViewContext();
 	const hasMirrors = $derived(
@@ -60,7 +64,7 @@
 		solverParams: SolverParams;
 		showCoordinateAxis: boolean;
 		showPlanes: boolean;
-		toolPanelMode: 'inspector' | 'overlays' | 'mesh';
+		toolPanelMode: View3DToolPanelMode;
 		selectedPlaneId?: string | null;
 		gizmoMode: GizmoMode;
 		showStats: boolean;
@@ -171,6 +175,10 @@
 	function toggleMeshPanel() {
 		toolPanelMode = toolPanelMode === 'mesh' ? 'inspector' : 'mesh';
 	}
+
+	function toggleReplayPanel() {
+		toolPanelMode = toolPanelMode === 'replay' ? 'inspector' : 'replay';
+	}
 </script>
 
 <div class="flex h-8 min-w-0 flex-1 items-center overflow-hidden">
@@ -206,6 +214,20 @@
 			>
 				<Shapes />
 				<span>3D Overlay</span>
+			</Button>
+			<Button
+				variant={toolPanelMode === 'replay' ? 'default' : 'outline'}
+				size="sm"
+				title={toolPanelMode === 'replay' ? 'Leave oxDNA replay' : 'Replay an oxDNA trajectory'}
+				onclick={toggleReplayPanel}
+				{@attach help({
+					title: 'Replay oxDNA',
+					text: 'Play back an oxDNA trajectory simulated from this design’s oxDNA export, coloured like your strands. Switches the tool panel to oxDNA Replay.',
+					doc: 'simulation-export',
+				})}
+			>
+				<Film />
+				<span>Replay oxDNA</span>
 			</Button>
 			{#if editorCtx.activeRegion?.supportsReferenceGeometry}
 				<Button

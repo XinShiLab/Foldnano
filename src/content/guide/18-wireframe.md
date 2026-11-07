@@ -14,9 +14,9 @@ covers:
 
 # Wireframe Designs (Experimental)
 
-<Callout type="danger" title="Experimental: one routing method so far">
+<Callout type="warning" title="Experimental: one routing method so far">
 
-Wireframe routing runs as plugins, rather than being built into the main app. **One routing method is available so far, the pyDAEDALUS plugin (DX edges), and more are in progress.** The first design made with it, a tetrahedron, passed an oxDNA simulation. No wireframe design has been tested in the lab yet, so check any result carefully before ordering staples.
+Wireframe routing runs as plugins, rather than being built into the main app. **One routing method is available so far, the pyDAEDALUS plugin (DX edges), and more are in progress.** pyDAEDALUS runs the published DAEDALUS routing, but wireframe designs from Foldnano plugins have not been extensively tested in the lab yet, so simulate your design before ordering staples.
 
 </Callout>
 
@@ -26,7 +26,7 @@ A **wireframe region** holds a design built around a mesh: helices follow the ed
 
 Instead of building one router into the app, we host routing methods as plugins, on top of shared tools for reading meshes and placing helices. **Established, tested methods can run as plugins, and developers of new routing algorithms can build on the same API, so that a new method can be used in Foldnano as soon as its authors release it as a plugin.**
 
-For designs you plan to order, an established tool is still the safer choice.
+A plugin built on a published method keeps that method's routing. What Foldnano adds is turning that routing into its own helices and strands.
 
 ## Create A Wireframe Region
 

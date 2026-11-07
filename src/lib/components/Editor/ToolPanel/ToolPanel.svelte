@@ -8,6 +8,7 @@
 	import SkipInsertPanel from './SkipInsertPanel.svelte';
 	import View3DPanel from './View3DPanel.svelte';
 	import View3DOverlayPanel from './View3DOverlayPanel.svelte';
+	import OxDnaReplayPanel from './OxDnaReplayPanel.svelte';
 	import ReferenceMeshPanel from './ReferenceMeshPanel.svelte';
 	import RegionCreationPanel from './RegionCreationPanel.svelte';
 	import CircularScaffoldMapPanel from './CircularScaffoldMapPanel.svelte';
@@ -61,7 +62,9 @@
 					? ReferenceMeshPanel
 					: view3DToolPanelMode === 'overlays'
 						? View3DOverlayPanel
-						: View3DPanel
+						: view3DToolPanelMode === 'replay'
+							? OxDnaReplayPanel
+							: View3DPanel
 				: isScaffoldMapPanel
 					? CircularScaffoldMapPanel
 					: mapModeToPanel[editorViewContext.editorMode]) as import('svelte').Component<{
@@ -76,7 +79,9 @@
 					? 'Reference Mesh'
 					: view3DToolPanelMode === 'overlays'
 						? '3D Overlays'
-						: '3D View Inspector'
+						: view3DToolPanelMode === 'replay'
+							? 'oxDNA Replay'
+							: '3D View Inspector'
 				: isScaffoldMapPanel
 					? 'Circular Scaffold Map'
 					: mapModeToHeading[editorViewContext.editorMode]
@@ -120,6 +125,10 @@
 		'3D Overlays': {
 			text: 'Load an external structure (mrDNA .txt or PDB) to compare with your design in 3D.',
 			doc: '3d-overlays',
+		},
+		'oxDNA Replay': {
+			text: 'Drop a trajectory simulated from this design’s oxDNA export, with its .top, to watch each strand move in its own color.',
+			doc: 'simulation-export',
 		},
 		'Reference Mesh': {
 			text: "Add, replace or remove the active wireframe region's reference mesh, or hide it in the 3D view. The mesh never changes helices.",

@@ -30,10 +30,49 @@ export interface WhatsNewEntry {
  * Author date of the newest commit already considered for this list. `pnpm whats-new:draft`
  * only drafts commits authored after it (author dates survive rebases; hashes don't).
  */
-export const WHATS_NEW_REVIEWED_THROUGH = '2026-11-01T14:24:23+01:00';
+export const WHATS_NEW_REVIEWED_THROUGH = '2026-11-06T00:37:00+01:00';
 
 // Newest first. Edit freely; the draft script only inserts new entries at the top.
 export const WHATS_NEW: readonly WhatsNewEntry[] = [
+	{
+		date: '2026-11-06',
+		area: '3D view',
+		text: "Replay an oxDNA trajectory from your design's own export in the 3D view, drawn in its strand colours. Scrub or play the frames, show the mean structure, see each frame's step and real time, and hover or click a nucleotide to find it in the strand view. Trajectories from an interrupted run also load.",
+		link: 'simulation-export#replaying-an-oxdna-trajectory',
+	},
+	{
+		date: '2026-11-06',
+		area: 'Editing',
+		text: 'The Sequence tool can fill only the empty bases, in the selection or the whole design, with random bases or one base of your choice (Custom → One base). Assigned bases are never changed, the opposite strand is paired, and the filled bases are highlighted until your next edit.',
+		link: 'editing-tools#fill-empty-nucleotides',
+	},
+	{
+		date: '2026-11-04',
+		area: 'Wireframe',
+		text: 'Wireframe regions are open to everyone as an experimental feature: start one from the Wireframe card or by dropping a .ply mesh, then route it with the pyDAEDALUS plugin from the Hub. It is the first routing plugin, more are in progress, and it has not been extensively tested in the lab yet, so simulate before ordering staples.',
+		link: 'wireframe',
+	},
+	{
+		date: '2026-11-04',
+		area: 'Plugins',
+		text: 'The Hub lists community plugins with their authors, licenses and tags, and offers updates for plugins you installed. Click any card for everything a plugin declares, including papers to cite. Demo plugins are hidden unless you turn on Show demos.',
+		link: 'plugins-for-users',
+	},
+	{
+		date: '2026-11-04',
+		area: 'General',
+		text: 'The start screen has one Open file button for designs, cadnano files, PLY meshes and plugin zips. Before loading a design, the Open dialog summarizes it and warns if it would replace a copy already in this browser. A new local-only design is no longer saved until you edit it.',
+	},
+	{
+		date: '2026-11-04',
+		area: 'Editing',
+		text: 'Fixed: mismatch markers now appear when a strand is added opposite an existing one, sequence fills respect linked mirror strands, helix numbers of three or more digits fit their circle, and very large reference meshes no longer break the Mesh panel.',
+	},
+	{
+		date: '2026-11-02',
+		area: 'General',
+		text: 'The 3D view can hide regions one at a time (simulation exports still include the whole design), the strand view can hide only unconstrained crossovers, and sequence text is readable in dark mode.',
+	},
 	{
 		date: '2026-11-01',
 		area: 'Plugins',

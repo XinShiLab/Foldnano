@@ -1,5 +1,5 @@
 import type { OligoSegment, SegmentEnd } from '../model/Oligo';
-import type { EmptyFillResult } from '../model/Part/fillEmptySequence';
+import type { DnaBase, EmptyFillResult } from '../model/Part/fillEmptySequence';
 import type Oligo from '../model/Oligo';
 import type { Part } from '../model/Part';
 import type { CrossoverSite } from '../model/Part/Part.svelte';
@@ -772,19 +772,21 @@ export type FillEmptySequenceParams = {
 	part: Part;
 	segments: Iterable<OligoSegment>;
 	gcContent?: number;
+	/** Fill with this base instead of random ones; partners still take the complement. */
+	base?: DnaBase;
 };
 
-/** Random-fills only the empty ('N') nucleotides of `segments`; see `Part.fillEmptySequence`. */
+/** Fills only the empty ('N') nucleotides of `segments`; see `Part.fillEmptySequence`. */
 export const fillEmptySequenceCmd = (
-	{ part, segments, gcContent }: FillEmptySequenceParams,
+	{ part, segments, gcContent, base }: FillEmptySequenceParams,
 	history: HistoryStack
 ): EmptyFillResult => {
 	const targets = uniqueSegments(segments);
 	let result: EmptyFillResult = { cells: [], filled: 0, copied: 0, conflicts: 0 };
-	history.tx('Fill empty sequence', (rec) => {
+	history.tx(base ? `Fill empty with ${base}` : 'Fill empty sequence', (rec) => {
 		const beforeSlots = captureSegmentAndComplementSlots(targets);
 		const beforeOligos = captureOligoFieldState(beforeSlots.map(({ segment }) => segment.oligo));
-		result = part.fillEmptySequence(targets, gcContent);
+		result = part.fillEmptySequence(targets, gcContent, base ?? null);
 		recordSlotDiffs(rec, beforeSlots, captureSegmentAndComplementSlots(targets));
 		recordOligoFieldDiffs(rec, beforeOligos);
 	});

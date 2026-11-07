@@ -16,6 +16,7 @@
 	import type { Part } from '$lib/model/Part';
 	import { clearPartSequenceCmd } from '../../../commands/strands';
 	import { emptyFillTargets, fillEmptyAndHighlight } from '$lib/canvasEditor/tools/sequenceFill';
+	import { DNA_BASES, type DnaBase } from '$lib/model/Part/fillEmptySequence';
 
 	type Props = {
 		part: Part;
@@ -24,18 +25,38 @@
 
 	const ctx = getEditorViewContext();
 
-	let selectedSeqType = $state<'random' | 'preset' | 'custom' | 'remove'>('random');
+	type SeqTab = 'random' | 'preset' | 'custom' | 'remove';
+	type CustomKind = 'sequence' | 'base';
 
-	const setSelectedSeqType = (type: 'random' | 'preset' | 'custom' | 'remove') => {
+	// The click mode outlives this panel, so reopen on the tab that matches it.
+	const TAB_FOR_MODE = {
+		RANDOM: 'random',
+		BASE: 'custom',
+		SEQ: 'custom',
+		REMOVE: 'remove',
+	} as const;
+	let selectedSeqType = $state<SeqTab>(TAB_FOR_MODE[ctx.strandViewContext.sequenceContext.mode]);
+	let customKind = $state<CustomKind>(
+		ctx.strandViewContext.sequenceContext.mode === 'BASE' ? 'base' : 'sequence'
+	);
+
+	const setSelectedSeqType = (type: SeqTab) => {
 		ctx.strandViewContext.sequenceContext.fillResults = [];
 		selectedSeqType = type;
-		if (type === 'preset' || type === 'custom') {
+		if (type === 'custom') {
+			ctx.strandViewContext.sequenceContext.mode = customKind === 'base' ? 'BASE' : 'SEQ';
+		} else if (type === 'preset') {
 			ctx.strandViewContext.sequenceContext.mode = 'SEQ';
 		} else if (type === 'random') {
 			ctx.strandViewContext.sequenceContext.mode = 'RANDOM';
 		} else if (type === 'remove') {
 			ctx.strandViewContext.sequenceContext.mode = 'REMOVE';
 		}
+	};
+
+	const setCustomKind = (kind: CustomKind) => {
+		customKind = kind;
+		setSelectedSeqType('custom');
 	};
 
 	const isAllScaffoldSequenceLocked = $derived.by(() => {
@@ -76,7 +97,7 @@
 		presetSequences.find((f) => f.value === selectedPreset)?.label ?? 'Select a preset'
 	);
 
-	let customSequence = $state<string>('');
+	let customSequence = $state<string>(ctx.strandViewContext.sequenceContext.sequence);
 
 	const setCustomSequence = (seq: string) => {
 		customSequence = seq.replace(/[^ATCG]/gi, '').toUpperCase();
@@ -120,6 +141,19 @@
 	const fillEmptyNts = () => {
 		if (!part) return;
 		fillEmptyAndHighlight(part, emptyFillSegments, strandCtx, ctx.historyStack);
+	};
+
+	// One base is for staple overhangs and spacers, so the scaffold is never a target here.
+	const baseFillSegments = $derived(
+		part ? emptyFillTargets(part, strandCtx, { staplesOnly: true }) : []
+	);
+	const baseFillNtCount = $derived(
+		baseFillSegments.reduce((sum, segment) => sum + segment.emptyNucleotideCount, 0)
+	);
+	const fillEmptyWithBase = () => {
+		if (!part) return;
+		const { base } = strandCtx.sequenceContext;
+		fillEmptyAndHighlight(part, baseFillSegments, strandCtx, ctx.historyStack, base);
 	};
 </script>
 
@@ -195,37 +229,37 @@
 	{/if}
 </div>
 
-<RadioGroup.Root
-	bind:value={
-		() => (ctx.strandViewContext.sequenceContext.fillType === 'ONLY_EMPTY' ? 'empty' : 'all'),
-		(v) => {
-			ctx.strandViewContext.sequenceContext.fillType = v === 'empty' ? 'ONLY_EMPTY' : 'WHOLE';
+{#if ctx.strandViewContext.sequenceContext.mode !== 'BASE'}
+	<RadioGroup.Root
+		bind:value={
+			() => (ctx.strandViewContext.sequenceContext.fillType === 'ONLY_EMPTY' ? 'empty' : 'all'),
+			(v) => {
+				ctx.strandViewContext.sequenceContext.fillType = v === 'empty' ? 'ONLY_EMPTY' : 'WHOLE';
+			}
 		}
-	}
-	class="my-2 flex flex-col rounded-md border p-2"
->
-	<div class="flex items-center space-x-2">
-		<RadioGroup.Item value="all" id="r1" />
-		<Label for="r1" class="text-xs">Update the entire sequence</Label>
-	</div>
-	<div class="flex items-center space-x-2">
-		<RadioGroup.Item value="empty" id="r2" />
-		<Label for="r2" class="text-xs">Fill only the empty parts</Label>
-	</div>
-	<!-- <div class="flex items-center space-x-2">
+		class="my-2 flex flex-col rounded-md border p-2"
+	>
+		<div class="flex items-center space-x-2">
+			<RadioGroup.Item value="all" id="r1" />
+			<Label for="r1" class="text-xs">Update the entire sequence</Label>
+		</div>
+		<div class="flex items-center space-x-2">
+			<RadioGroup.Item value="empty" id="r2" />
+			<Label for="r2" class="text-xs">Fill only the empty parts</Label>
+		</div>
+		<!-- <div class="flex items-center space-x-2">
     <RadioGroup.Item value="compact" id="r3" />
     <Label for="r3">Compact</Label>
   </div> -->
-</RadioGroup.Root>
+	</RadioGroup.Root>
+{/if}
 
 <ToggleGroup.Root
 	size="sm"
 	variant="outline"
 	type="single"
 	class="w-full "
-	bind:value={
-		() => selectedSeqType, (v) => setSelectedSeqType(v as 'random' | 'preset' | 'custom' | 'remove')
-	}
+	bind:value={() => selectedSeqType, (v) => v && setSelectedSeqType(v as SeqTab)}
 >
 	<ToggleGroup.Item value="random" aria-label="Toggle bold" class="text-xs">
 		Random
@@ -280,33 +314,6 @@
 						: 'design'}
 				{/if}
 			</Button>
-			{#if ctx.activeRecentFill}
-				{@const fill = ctx.activeRecentFill}
-				<div class="flex items-center justify-between text-xs text-muted-foreground">
-					<span>
-						<span class="mr-1 inline-block size-2.5 rounded-sm bg-amber-400/60 align-middle"></span>
-						Filled {fill.filled.toLocaleString()} nt{fill.copied > 0
-							? `, ${fill.copied.toLocaleString()} from the opposite strand`
-							: ''}
-						{#if fill.conflicts > 0}
-							<span
-								class="block text-amber-600"
-								title="Their pairing partners (here or at a linked copy) already carry bases that disagree."
-							>
-								{fill.conflicts.toLocaleString()} left empty: conflicting partners
-							</span>
-						{/if}
-					</span>
-					<button
-						type="button"
-						class="rounded p-0.5 hover:bg-muted"
-						aria-label="Clear fill highlight"
-						onclick={() => (strandCtx.recentFill = null)}
-					>
-						<X size={12} />
-					</button>
-				</div>
-			{/if}
 		</div>
 	{:else if selectedSeqType === 'preset'}
 		<Select.Root
@@ -339,20 +346,81 @@
 			</p>
 		</div>
 	{:else if selectedSeqType === 'custom'}
-		<div class="flex w-full max-w-sm flex-col gap-1.5">
-			<Label for="custom-sequence" class="text-xs">Custom Sequence</Label>
-			<Textarea
-				class="max-h-60 overflow-y-auto text-xs!"
-				placeholder="Enter your custom sequence here"
-				bind:value={() => customSequence, (v) => setCustomSequence(v)}
-			/>
-		</div>
-		<div class="mt-4 text-xs text-muted-foreground">
-			<p>
-				Click to fill. <br />
-				The complementary strand will be updated
-			</p>
-		</div>
+		<ToggleGroup.Root
+			type="single"
+			variant="outline"
+			size="sm"
+			class="mb-2 w-full"
+			bind:value={() => customKind, (v) => v && setCustomKind(v as CustomKind)}
+		>
+			<ToggleGroup.Item value="sequence" class="text-xs">Sequence</ToggleGroup.Item>
+			<ToggleGroup.Item value="base" class="text-xs">One base</ToggleGroup.Item>
+		</ToggleGroup.Root>
+		{#if customKind === 'base'}
+			<div class="flex flex-col gap-1">
+				<Label class="text-xs">Base</Label>
+				<ToggleGroup.Root
+					type="single"
+					variant="outline"
+					size="sm"
+					class="w-full"
+					bind:value={
+						() => strandCtx.sequenceContext.base,
+						(v) => {
+							if (v) strandCtx.sequenceContext.base = v as DnaBase;
+						}
+					}
+				>
+					{#each DNA_BASES as base (base)}
+						<ToggleGroup.Item value={base} aria-label={`Fill with ${base}`} class="font-mono">
+							{base}
+						</ToggleGroup.Item>
+					{/each}
+				</ToggleGroup.Root>
+			</div>
+			<div class="mt-4 text-xs text-muted-foreground">
+				<p>
+					Click a staple to fill its empty bases with {strandCtx.sequenceContext.base}. <br />
+					Assigned bases are kept; the complementary strand will be updated. The scaffold is never written.
+				</p>
+			</div>
+			<div class="mt-4 flex flex-col gap-1 border-t border-border pt-3">
+				<Button
+					size="sm"
+					variant="outline"
+					disabled={baseFillNtCount === 0}
+					onclick={fillEmptyWithBase}
+					{@attach help({
+						title: 'Fill empty staple nucleotides with one base',
+						text: 'Give every empty (N) staple nucleotide the chosen base, in the selected strands or, with nothing selected, the whole design: for poly-T overhangs, spacers and the like. The scaffold is never written. Assigned bases are never changed; a base opposite an existing sequence takes its complement instead, and an empty opposite staple takes the complement of the chosen base.',
+					})}
+				>
+					{#if baseFillNtCount === 0}
+						No empty staple nucleotides
+					{:else}
+						Fill {baseFillNtCount.toLocaleString()} empty staple nt in {emptyFillScope ===
+						'selected'
+							? 'selection'
+							: 'design'}
+					{/if}
+				</Button>
+			</div>
+		{:else}
+			<div class="flex w-full max-w-sm flex-col gap-1.5">
+				<Label for="custom-sequence" class="text-xs">Custom Sequence</Label>
+				<Textarea
+					class="max-h-60 overflow-y-auto text-xs!"
+					placeholder="Enter your custom sequence here"
+					bind:value={() => customSequence, (v) => setCustomSequence(v)}
+				/>
+			</div>
+			<div class="mt-4 text-xs text-muted-foreground">
+				<p>
+					Click to fill. <br />
+					The complementary strand will be updated
+				</p>
+			</div>
+		{/if}
 	{:else if selectedSeqType === 'remove'}
 		<p class="text-xs text-muted-foreground">Click oligos to clear their sequences.</p>
 		<div class="mt-4 flex flex-row justify-end">
@@ -386,6 +454,33 @@
 		</div>
 	{/if}
 </div>
+{#if ctx.activeRecentFill}
+	{@const fill = ctx.activeRecentFill}
+	<div class="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+		<span>
+			<span class="mr-1 inline-block size-2.5 rounded-sm bg-amber-400/60 align-middle"></span>
+			Filled {fill.filled.toLocaleString()} nt{fill.copied > 0
+				? `, ${fill.copied.toLocaleString()} from the opposite strand`
+				: ''}
+			{#if fill.conflicts > 0}
+				<span
+					class="block text-amber-600"
+					title="Their pairing partners (here or at a linked copy) already carry bases that disagree."
+				>
+					{fill.conflicts.toLocaleString()} left empty: conflicting partners
+				</span>
+			{/if}
+		</span>
+		<button
+			type="button"
+			class="rounded p-0.5 hover:bg-muted"
+			aria-label="Clear fill highlight"
+			onclick={() => (strandCtx.recentFill = null)}
+		>
+			<X size={12} />
+		</button>
+	</div>
+{/if}
 {#if ctx.strandViewContext.sequenceContext.fillResults.length > 0}
 	<div class="mt-4 border-t border-border">
 		{#each ctx.strandViewContext.sequenceContext.fillResults as result, index (index)}

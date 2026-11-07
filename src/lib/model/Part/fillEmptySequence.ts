@@ -19,6 +19,10 @@ export interface EmptyFillResult {
 	conflicts: number;
 }
 
+export type DnaBase = 'A' | 'T' | 'C' | 'G';
+
+export const DNA_BASES: readonly DnaBase[] = ['A', 'T', 'C', 'G'];
+
 const COMPLEMENT: Readonly<Record<string, string>> = { A: 'T', T: 'A', G: 'C', C: 'G' };
 
 type Slot = OligoSegment['slots'][number];
@@ -81,13 +85,16 @@ function copyOffsets(part: Part, segment: OligoSegment): number[] {
  *
  * Nucleotides that must pair (directly, or through a copy) form a component: one free choice,
  * fixed by any assigned base in it. A component whose assigned bases disagree is left empty.
+ * The free choice is a random draw at `gcContent`, or `base` on the first target 'N' reached
+ * (its partners take the complement).
  * Writes go to target nucleotides and to the 'N' directly opposite a target, except on scaffold
  * strands outside `segments`; never through a mirror into its source.
  */
 export function fillEmptySequence(
 	part: Part,
 	segments: Iterable<OligoSegment>,
-	gcContent: number
+	gcContent: number,
+	base: DnaBase | null = null
 ): EmptyFillResult {
 	const targets = new Set([...segments].filter((segment) => !segment.oligo?.isMirror));
 	const result: EmptyFillResult = { cells: [], filled: 0, copied: 0, conflicts: 0 };
@@ -95,7 +102,7 @@ export function fillEmptySequence(
 	for (const segment of targets) emptyCount += segment.emptyNucleotideCount;
 	if (emptyCount === 0) return result;
 	// One draw per component that contains a target 'N', so the pool is never exhausted.
-	const pool = generateRandomDNA(emptyCount, gcContent).primary5to3;
+	const pool = base ? '' : generateRandomDNA(emptyCount, gcContent).primary5to3;
 	let drawn = 0;
 
 	const done = new Set<string>();
@@ -180,9 +187,9 @@ export function fillEmptySequence(
 					continue;
 				}
 				const copied = base0 !== null;
-				const base = base0 ?? pool[drawn++];
+				const chosen = base0 ?? base ?? pool[drawn++];
 				for (const nt of toWrite) {
-					const ch = parity.get(nt.key) === 0 ? base : COMPLEMENT[base];
+					const ch = parity.get(nt.key) === 0 ? chosen : COMPLEMENT[chosen];
 					const chars = nt.slot.seq.split('');
 					chars[nt.charIdx] = ch;
 					nt.slot.seq = chars.join('');

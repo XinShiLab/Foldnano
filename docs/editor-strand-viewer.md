@@ -22,7 +22,7 @@ src/lib/components/Editor/StrandView/
 ├── StrandViewer.svelte            # stage, camera, tool wiring
 ├── StrandRoutes.svelte            # static segment routes (sequence text)
 ├── MismatchMarkers.svelte         # sequence-mismatch warning rungs
-├── RecentFillMarkers.svelte       # transient tint on cells the last empty-only fill assigned
+├── RecentFillMarkers.svelte       # transient tint on cells the last Sequence-tool fill assigned
 ├── DesignIssueMarkers.svelte      # design-check issue frames (editorViewContext.designIssues)
 ├── DesignIssuesMenu.svelte        # toolbar popover: check toggles + issue list (jump-to)
 ├── Accessories.svelte             # region headers, VH tags, crossovers, skips, inserts
