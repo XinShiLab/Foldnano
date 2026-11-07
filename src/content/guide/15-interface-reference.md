@@ -187,6 +187,7 @@ On the right, *press ? for help* is a reminder of the workspace help (shortcuts 
 | --- | --- |
 | **Reset camera to default 3D view** | Resets the 3D camera |
 | **3D Overlay** | Switches the tool panel between **3D View Inspector** and **3D Overlays** (see [3D Overlays](/docs/guide/3d-overlays)) |
+| **Replay oxDNA** | Switches the tool panel to **oxDNA Replay**, which plays back a trajectory simulated from this design's oxDNA export (see [Simulation And Export](/docs/guide/simulation-export#replaying-an-oxdna-trajectory)) |
 | **Mesh** | Wireframe regions only: switches the tool panel to **Reference Mesh** (see [Wireframe Designs](/docs/guide/wireframe#manage-the-mesh)) |
 | **Mode** | **Pan**, **Select**, **Draw** |
 | **View** toggles | **Helix grid** (`g`), **NT model** (`e`), **Cross-section cursor** (`c`, unavailable while the NT model is shown), **Coordinate axis**, **Base planes** (`f`) |
@@ -208,7 +209,7 @@ See [Simulation And Export](/docs/guide/simulation-export) for the workflows.
 
 ## Tool Panel
 
-A floating panel on the right shows the options of the current tool or view. Its heading names it: **Selection Tool**, **Paint Tool**, **Modification Tool**, **Sequence Tool**, **Skip Tool**, **Insert Tool**, **New Region**, **Circular Scaffold Map**, **3D View Inspector**, **3D Overlays**, or **Reference Mesh**.
+A floating panel on the right shows the options of the current tool or view. Its heading names it: **Selection Tool**, **Paint Tool**, **Modification Tool**, **Sequence Tool**, **Skip Tool**, **Insert Tool**, **New Region**, **Circular Scaffold Map**, **3D View Inspector**, **3D Overlays**, **oxDNA Replay**, or **Reference Mesh**.
 
 - **Drag** the heading to move the panel between the top and bottom of the window, or **double-click** it to flip position.
 - The **›** button collapses it to a small tab; **‹** expands it again.

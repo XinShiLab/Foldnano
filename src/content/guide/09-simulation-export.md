@@ -6,6 +6,7 @@ order: 9
 slug: simulation-export
 covers:
   - src/lib/model/checks/simulation.ts
+  - src/lib/components/Editor/ToolPanel/OxDnaReplayPanel.svelte
   - src/lib/model/checks/cadnano.ts
 ---
 
@@ -90,6 +91,28 @@ Before exporting to oxDNA, confirm:
 ### Mirror copies
 
 If the design contains [linked mirror copies](/docs/guide/duplicates-repeat-groups#mirror-copies), check **Include mirror copies** in the **Export** menu to include them in oxDNA and mrDNA output, for example to simulate the assembled repeat structure. They're left out otherwise.
+
+## Replaying an oxDNA Trajectory
+
+After simulating an oxDNA export, you can play the trajectory back in the 3D view, drawn over your design in your oligo colors. That makes it easy to see which strand of the design is moving, bending or coming apart.
+
+1. In the 3D view, click **Replay oxDNA** in the toolbar. The tool panel switches to **oxDNA Replay**.
+2. Drop the trajectory (`.dat`) and the `.top` from the export onto the panel, together or one after the other.
+3. Use the timeline to play, pause, step through frames, or drag to any frame. Pick the playback speed and whether it loops.
+
+Under the timeline, **step** is the simulation step stored in each frame. The real time next to it is step × dt × 3.03 ps (one oxDNA time unit), so set **Time step (dt)** to the `dt` in your oxDNA input file; the trajectory does not record it, and the default is 0.003. Coarse-grained dynamics run faster than real DNA, so read it as a rough scale. It has no meaning for Monte Carlo runs.
+
+**Align to design** fits every frame onto the design so you see the shape change rather than the drift and tumbling of the whole structure. **Show design underneath** draws the design along with the trajectory.
+
+Click **Compute** under **Mean structure** to average all frames into one shape, then toggle **Show mean structure** to compare it with the design. Playback keeps working while it computes, and playing or stepping switches back to the frames.
+
+To find out which strand you are looking at, hover a nucleotide: the panel shows its strand, helix, base and position from the 5′ end. Click it to select that strand in the strand view, which scrolls to it. It works the other way too: strands you select in the strand view keep their color in the replay while the rest fade. To hide the rest instead, turn on **Show only selected strands** in the toolbar, and **Lock** it to keep that set while you select other strands.
+
+To save the replay as a video, use **Video** in the panel: pick the size, frame rate, the range of frames and every how many frames to take, and whether to print the step and time in a corner, then click **Export MP4**. Each frame is drawn on its own, so the video never drops frames, even when playback of a large design stutters. The video uses the camera and the look of the 3D view when you start: set up the view, the strand filter, fading and colors first. Exporting needs a browser that can encode video (current Chrome, Edge, Safari or Firefox).
+
+<Callout type="note">
+Replay only accepts trajectories from this design's own oxDNA export. Foldnano checks the .top against the design row by row and refuses a file from another design, or from this design after you changed its strands. Nothing is saved: drop the files again after reloading the page.
+</Callout>
 
 ## mrDNA Export
 

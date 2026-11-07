@@ -86,6 +86,7 @@ once to returning users as a bottom-right card (rarely; major changes only). See
 | Cadnano import/export                                             | `docs/cadnano-import.md`                                        |
 | Simulation NT model (format-agnostic nucleotide model)            | `docs/simulation-nt-model.md`                                   |
 | oxDNA export                                                      | `docs/oxdna-export.md`                                          |
+| oxDNA trajectory replay (3D, mapped back to strands)              | `docs/oxdna-replay.md`                                          |
 | mrDNA export                                                      | `docs/mrdna-export.md`                                          |
 | Sequence CSV export                                               | `docs/sequence-csv-export.md`                                   |
 | Script Lab (in-editor Python scripting)                           | `docs/script-lab.md`                                            |

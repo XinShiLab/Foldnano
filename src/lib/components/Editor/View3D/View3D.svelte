@@ -77,6 +77,18 @@
 		transformedBoundsBox,
 	} from './overlayTransform';
 	import type { OverlayInstance } from './overlayInstance';
+	import type { OxDnaReplay } from './replay/OxDnaReplay.svelte';
+	import {
+		buildReplayGeometry,
+		pickNucleotide,
+		type ReplayGeometry,
+	} from './replay/replayGeometry';
+	import {
+		evenSize,
+		fitVerticalFovDeg,
+		type ReplayFrameRenderer,
+		type VideoSize,
+	} from './replay/replayVideoExport';
 	import { setOverlayPlacementCmd } from '$lib/commands/overlays';
 
 	interface Props {
@@ -101,6 +113,7 @@
 		frameActivePlaneFn?: (() => void) | undefined;
 		clearRelaxedFn?: (() => void) | undefined;
 		downloadFn?: (() => void) | undefined;
+		replayFrameRendererFn?: ((size: VideoSize | null) => ReplayFrameRenderer | null) | undefined;
 		exportGlbFn?: (() => void) | undefined;
 		exportOxDnaFn?: ((opts?: { includeMirrors?: boolean }) => void) | undefined;
 		exportMrdnaFn?: ((opts?: { includeMirrors?: boolean }) => void) | undefined;
@@ -115,6 +128,9 @@
 		gizmoMode?: GizmoMode;
 		showStats?: boolean;
 		onNtModelError?: (message: string) => void;
+		replay?: OxDnaReplay | null;
+		/** The oxDNA replay panel is open: draw the trajectory instead of the design. */
+		replayActive?: boolean;
 	}
 	let {
 		part,
@@ -144,6 +160,7 @@
 		frameActivePlaneFn = $bindable(undefined),
 		clearRelaxedFn = $bindable(undefined),
 		downloadFn = $bindable(undefined),
+		replayFrameRendererFn = $bindable(undefined),
 		exportGlbFn = $bindable(undefined),
 		exportOxDnaFn = $bindable(undefined),
 		exportMrdnaFn = $bindable(undefined),
@@ -158,6 +175,8 @@
 		gizmoMode = $bindable<GizmoMode>('rotate'),
 		showStats = false,
 		onNtModelError,
+		replay = null,
+		replayActive = false,
 	}: Props = $props();
 
 	// ── Performance stats (showStats mode) ───────────────────────────────────
@@ -176,6 +195,7 @@
 	let _activeCamera: THREE.PerspectiveCamera | undefined;
 	let _controls: TrackballControls | undefined;
 	let currentGroup: THREE.Group | null = null;
+	let replayGeometry: ReplayGeometry | null = null;
 	// One THREE.Group per overlay instance, keyed by instance id. `ghost` is cached
 	// so the reconcile effect knows when a rebuild is needed.
 	// eslint-disable-next-line svelte/prefer-svelte-reactivity
@@ -433,6 +453,24 @@
 
 	// ── Unified pointer handlers ──────────────────────────────────────────────
 
+	function pickReplayRow(): number {
+		const backbone = replay?.displayPose?.backboneNm;
+		if (!replayShown || !backbone || !_activeCamera) return -1;
+		_raycaster.setFromCamera(_mouse, _activeCamera);
+		return pickNucleotide(_raycaster.ray, backbone, replayVisibleRows);
+	}
+
+	// Clicking a replayed nucleotide selects its oligo in the strand view and scrolls to it.
+	function selectReplayRow(row: number, additive: boolean): void {
+		const nt = replay?.mapping?.nucleotides[row];
+		const oligo = nt && part.segmentsLookup.get(nt.segmentId)?.oligo;
+		if (!nt || !oligo) return;
+		const selection = editorViewContext.strandViewContext.selected;
+		if (additive) selection.add([...oligo.allEnds]);
+		else selection.set([...oligo.allEnds]);
+		editorViewContext.strandToolbarController?.centerOn(nt.vhId, nt.bpIndex);
+	}
+
 	function handlePointerMove(e: PointerEvent) {
 		_updateMouseCoords(e);
 
@@ -440,6 +478,12 @@
 			dragController.update(_mouse, _activeCamera!);
 			_markDirty?.();
 			return;
+		}
+
+		if (replay && replayShown) {
+			const row = pickReplayRow();
+			const next = row >= 0 ? row : null;
+			if (replay.hoveredRow !== next) replay.hoveredRow = next;
 		}
 
 		// Gizmo handle hover (priority over plane quads)
@@ -508,6 +552,12 @@
 		const dx = e.clientX - _mouseDownPos.x;
 		const dy = e.clientY - _mouseDownPos.y;
 		if (dx * dx + dy * dy > 16) return; // camera drag
+
+		const replayRow = pickReplayRow();
+		if (replayRow >= 0) {
+			selectReplayRow(replayRow, e.shiftKey || e.metaKey || e.ctrlKey);
+			return;
+		}
 
 		// Axis plane click → create a new plane with that basis
 		if (showCoordinateAxis && axisObjects && _hoveredAxisPlane) {
@@ -792,7 +842,7 @@
 		// Use untrack to set initial visibility without tracking showVH/hideContext
 		// as rebuild dependencies — the dedicated effects below handle subsequent changes.
 		untrack(() => {
-			group.visible = showDesign;
+			group.visible = designVisible;
 			cylinders.visible = showVH;
 			labels.visible = showVH;
 			crossovers.visible = !hideContext.crossovers;
@@ -908,8 +958,94 @@
 	// Toggle all main design geometry without affecting overlays or scene helpers.
 	$effect(() => {
 		if (!threeRenderer) return;
-		if (currentGroup) currentGroup.visible = showDesign;
+		if (currentGroup) currentGroup.visible = designVisible;
 		_markDirty?.();
+	});
+
+	// ── oxDNA replay (transient, never persisted) ──────────────────────────────
+	let replayShown = $derived.by(() => {
+		if (!replayActive || !replay?.displayPose) return false;
+		void part.oligos.size;
+		void part.virtualHelices.length;
+		return !replay.isStale(part);
+	});
+	let designVisible = $derived(showDesign && (!replayShown || !!replay?.showDesign));
+	// "Show only selected strands" (and its lock) hides the other strands' nucleotides too.
+	let replayVisibleRows = $derived.by(() => {
+		const mapping = replay?.mapping;
+		const filter = filterSegments;
+		if (!mapping || !filter) return null;
+		const mask = new Uint8Array(mapping.nucleotides.length);
+		mapping.nucleotides.forEach((nt, row) => {
+			const segment = part.segmentsLookup.get(nt.segmentId);
+			mask[row] = segment && filter.has(segment) ? 1 : 0;
+		});
+		return mask;
+	});
+
+	// Build the replay mesh once per loaded trajectory; frames only rewrite its buffers.
+	$effect(() => {
+		if (!threeRenderer || !scene) return;
+		const mapping = replay?.mapping;
+		if (!mapping) return;
+		const geometry = buildReplayGeometry(mapping.nucleotides);
+		replayGeometry = geometry;
+		scene.add(geometry.group);
+		return () => {
+			scene?.remove(geometry.group);
+			disposeGroup(geometry.group);
+			if (replayGeometry === geometry) replayGeometry = null;
+			_markDirty?.();
+		};
+	});
+
+	// Oligo colours, re-read whenever any oligo is recoloured. A strand-view selection dims every
+	// other strand, so the selected ones stand out in the replay.
+	$effect(() => {
+		const mapping = replay?.mapping;
+		if (!threeRenderer || !mapping || !replayGeometry) return;
+		const fallback = new THREE.Color(0x9ca3af);
+		const dimTo = new THREE.Color(canvasTheme.isDark ? 0x3f3f46 : 0xe4e4e7);
+		const focus = focusedSegments;
+		const colors = mapping.nucleotides.map((nt) => {
+			const segment = part.segmentsLookup.get(nt.segmentId);
+			const hex = segment?.oligo?.color;
+			const color = hex ? new THREE.Color(hex) : fallback.clone();
+			return focus && segment && !focus.has(segment) ? color.lerp(dimTo, 0.85) : color;
+		});
+		replayGeometry.setColors(colors);
+		_markDirty?.();
+	});
+
+	$effect(() => {
+		const pose = replay?.displayPose;
+		if (!threeRenderer || !replayGeometry) return;
+		if (pose) replayGeometry.update(pose);
+		replayGeometry.group.visible = replayShown;
+		_markDirty?.();
+	});
+
+	$effect(() => {
+		const mask = replayVisibleRows;
+		if (!threeRenderer || !replayGeometry) return;
+		replayGeometry.setVisible(mask);
+		untrack(() => {
+			if (mask && replay?.hoveredRow != null && !mask[replay.hoveredRow]) replay.hoveredRow = null;
+		});
+		_markDirty?.();
+	});
+
+	$effect(() => {
+		const row =
+			replayShown && replay?.videoStatus !== 'exporting' ? (replay?.hoveredRow ?? null) : null;
+		if (!threeRenderer || !replayGeometry) return;
+		replayGeometry.setHovered(row);
+		_markDirty?.();
+	});
+
+	// Leaving the replay panel stops playback.
+	$effect(() => {
+		if (!replayActive) untrack(() => replay?.pause());
 	});
 
 	// Toggle crossover arc visibility
@@ -1016,6 +1152,53 @@
 		// ── Expose scene-dependent functions to parent ─────────────────────────
 		downloadFn = () => downloadScreenshot(renderer, localScene, camera, `${exportFileBase}.png`);
 
+		// Video export draws the replay offscreen at its own size, from the camera as it is now.
+		replayFrameRendererFn = (size) => {
+			const geometry = replayGeometry;
+			if (!geometry || !replayShown) return null;
+			const view = renderer.domElement;
+			const { width, height } = evenSize(size?.width ?? view.width, size?.height ?? view.height);
+			const canvas = document.createElement('canvas');
+			canvas.width = width;
+			canvas.height = height;
+			const offscreen = new THREE.WebGLRenderer({
+				canvas,
+				antialias: true,
+				preserveDrawingBuffer: true,
+			});
+			offscreen.setPixelRatio(1);
+			offscreen.setSize(width, height, false);
+			const clearColor = new THREE.Color();
+			renderer.getClearColor(clearColor);
+			offscreen.setClearColor(clearColor, 1);
+			const shot = camera.clone();
+			shot.fov = fitVerticalFovDeg(
+				camera.fov,
+				view.clientWidth / view.clientHeight,
+				width / height
+			);
+			shot.aspect = width / height;
+			shot.updateProjectionMatrix();
+			geometry.setHovered(null);
+			return {
+				canvas,
+				width,
+				height,
+				draw(pose) {
+					geometry.update(pose);
+					offscreen.render(localScene, shot);
+				},
+				dispose() {
+					offscreen.dispose();
+					offscreen.forceContextLoss();
+					const shown = replay?.displayPose;
+					if (shown) geometry.update(shown);
+					geometry.setHovered(replay?.hoveredRow ?? null);
+					_markDirty?.();
+				},
+			} satisfies ReplayFrameRenderer;
+		};
+
 		exportGlbFn = () => {
 			const exportGroup = buildExportScene(
 				part,
@@ -1103,6 +1286,7 @@
 			frameActivePlaneFn = undefined;
 			clearRelaxedFn = undefined;
 			downloadFn = undefined;
+			replayFrameRendererFn = undefined;
 			exportGlbFn = undefined;
 			exportOxDnaFn = undefined;
 			exportMrdnaFn = undefined;
@@ -1174,9 +1358,12 @@
 <div class="relative h-full w-full overflow-hidden">
 	<canvas
 		bind:this={canvas}
-		class="h-full w-full"
+		class={['h-full w-full', replayShown && replay?.hoveredRow != null && 'cursor-pointer']}
 		style="display:block;"
 		onpointermove={handlePointerMove}
+		onpointerleave={() => {
+			if (replay) replay.hoveredRow = null;
+		}}
 		onpointerdown={handlePointerDown}
 		onpointerup={handlePointerUp}
 		onpointercancel={handlePointerCancel}

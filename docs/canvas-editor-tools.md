@@ -201,17 +201,20 @@ interaction in the left-pane HelixView editors.
 
 Reads mode and fill settings from `ctx.strandCtx.sequenceContext` (`SequenceContext`):
 
-| Field         | Values                          | Meaning                                          |
-| ------------- | ------------------------------- | ------------------------------------------------ |
-| `mode`        | `'RANDOM' \| 'SEQ' \| 'REMOVE'` | What to apply on click                           |
-| `sequence`    | `string`                        | Explicit sequence for `SEQ` mode                 |
-| `gcContent`   | `number` (0–1)                  | GC fraction for `RANDOM` mode                    |
-| `fillType`    | `'WHOLE' \| 'ONLY_EMPTY'`       | Whether to overwrite existing bases or skip them |
-| `fillResults` | `{ leftover, missing }[]`       | Feedback written back after each fill            |
+| Field         | Values                                    | Meaning                                          |
+| ------------- | ----------------------------------------- | ------------------------------------------------ |
+| `mode`        | `'RANDOM' \| 'BASE' \| 'SEQ' \| 'REMOVE'` | What to apply on click                           |
+| `base`        | `DnaBase`                                 | The one base `BASE` mode writes                  |
+| `sequence`    | `string`                                  | Explicit sequence for `SEQ` mode                 |
+| `gcContent`   | `number` (0–1)                            | GC fraction for `RANDOM` mode                    |
+| `fillType`    | `'WHOLE' \| 'ONLY_EMPTY'`                 | Whether to overwrite existing bases or skip them |
+| `fillResults` | `{ leftover, missing }[]`                 | Feedback written back after each fill            |
 
 `fillType === 'ONLY_EMPTY'` causes the fill to skip any slot whose `seq` is already a non-`N` base, consuming sequence characters only for the empty (`N`) positions. The complement strand is updated only for the slots that were actually written.
 
-`RANDOM` + `ONLY_EMPTY` takes a separate path: `fillEmptyAndHighlight` (`tools/sequenceFill.ts`) → `fillEmptySequenceCmd` → `Part.fillEmptySequence`, which never changes an assigned base on either strand (see `docs/dna-model.md` § Empty-only random fill). The Sequence panel's **Fill empty** button uses the same helper over `emptyFillTargets` (segments owning selected ends, whole oligos with the OLIGO toggle, or every real oligo when nothing is selected; SCAF/STAP filters both). Mirror clicks are refused before any sequence mutation. Conflicting pairing constraints leave target bases empty and are reported in the panel. The result is stored as `strandCtx.recentFill` for `RecentFillMarkers`; `EditorViewContext.activeRecentFill` hides it once `historyStack.revision` moves on or the mode leaves `SEQUENCE`.
+`RANDOM` + `ONLY_EMPTY` takes a separate path: `fillEmptyAndHighlight` (`tools/sequenceFill.ts`) → `fillEmptySequenceCmd` → `Part.fillEmptySequence`, which never changes an assigned base on either strand (see `docs/dna-model.md` § Empty-only random fill). The Sequence panel's **Fill empty** button uses the same helper over `emptyFillTargets` (segments owning selected ends, whole oligos with the OLIGO toggle, or every real oligo when nothing is selected; SCAF/STAP filters both). `BASE` mode (the panel's **Custom** tab → **One base**) passes `sequenceContext.base` through the same helper: a click fills the clicked staple segment/oligo, and its button runs over `emptyFillTargets(..., { staplesOnly: true })`. One base is for staple overhangs and spacers, so the scaffold is never a target there whatever the SCAF toggle says (a click on it only toasts), and `fillType` does not apply: it always fills empty bases only. Mirror clicks are refused before any sequence mutation. Conflicting pairing constraints leave target bases empty and are reported in the panel. The result is stored as `strandCtx.recentFill` for `RecentFillMarkers`; `EditorViewContext.activeRecentFill` hides it once `historyStack.revision` moves on or the mode leaves `SEQUENCE` for anything but `PAN` (`keepsRecentFill`): panning to inspect a fill must not end it.
+
+Every other click fill (Random whole, Preset/Custom whole or empty-only) runs inside `withFillHighlight`, which snapshots every strand cell's bases before and after the command and stores the cells that gained a base (opposite strands and mirror copies included) as the same `recentFill`. Remove does not highlight.
 
 ---
 

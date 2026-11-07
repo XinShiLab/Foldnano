@@ -102,6 +102,7 @@
 		"fflate": "^0.8.3",
 		"github-slugger": "^2.0.0",
 		"konva": "^10.7.0",
+		"mediabunny": "^1.65.2",
 		"minisearch": "^7.2.0",
 		"prism-code-editor": "^5.4.0",
 		"svelte-konva": "^1.0.1",

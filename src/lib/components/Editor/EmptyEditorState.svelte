@@ -143,7 +143,7 @@
 					class="group relative"
 					{@attach help({
 						title: 'Wireframe region',
-						text: 'Experimental. One routing plugin, pyDAEDALUS, is available in the Hub, and more are in progress. No wireframe design has been tested in the lab yet.',
+						text: 'Experimental. One routing plugin, pyDAEDALUS, is available in the Hub, and more are in progress. It has not been extensively tested in the lab yet, so simulate before ordering staples.',
 						doc: 'wireframe',
 					})}
 				>

@@ -143,7 +143,7 @@ The panel also shows the scaffold sequence status (✓ or ✗ **Scaffold Sequenc
 | --- | --- |
 | **Random** | **GC Content** (0 to 1, default 0.5) for the generated bases |
 | **Preset** | **Preset Scaffold Sequence**: scaffold sequences of 4844, 7249, 7560, 8064, or 8634 bases |
-| **Custom** | A text box for your own sequence |
+| **Custom** | **Sequence**: a text box for your own sequence. **One base**: **A**, **T**, **C**, or **G** for the empty staple bases, see [below](#fill-empty-staple-bases-with-one-base) |
 | **Remove** | Click oligos to clear their sequences. **Clear All Sequences** clears the whole design (click **Click Again to Confirm**). |
 
 After a fill, the panel reports how much of the input sequence was **left** over and how many bases were **missing**, so you can tell whether a preset scaffold was long enough.
@@ -161,7 +161,11 @@ With **Random** and **Fill only the empty parts**, an empty base whose partner o
 
 Under **Random**, the **Fill … empty nt** button fills every empty base of the selected strands at once, using the same rules as above. Select strands first with the Select tool (`v`), then switch back here (`a`). With nothing selected it fills the whole design. The **SCAF** / **STAP** and **segment** / **oligo** toggles decide which strands count. Clicking a strand still fills only that strand. Linked copies can't be clicked; fill their original and the copies follow.
 
-The bases a fill assigned stay tinted in amber, and the panel shows how many were filled and how many were copied from the opposite strand. The tint clears on your next edit, undo, or redo, when you leave the Sequence tool, or with the **✕** next to the count.
+### Fill Empty Staple Bases with One Base
+
+**Custom** → **One base** fills empty bases with one base of your choice instead of random ones, for example a poly-T overhang or a spacer. Pick **A**, **T**, **C**, or **G**, then click a staple to fill its empty bases, or use the **Fill … empty staple nt** button to fill the selected strands (the whole design with nothing selected), chosen the same way as above. It only ever fills empty bases, so the fill-mode radio is hidden, and it only ever writes staples: the scaffold is left out even when **SCAF** is on. The same safety rules apply. An empty base opposite an assigned one takes its complement instead of your base, and an empty staple directly opposite gets the complement of your base, so no mismatch is created.
+
+The bases any fill assigned (Random, one base, Preset, or Custom) stay tinted in amber, and the panel shows how many were filled and how many were copied from the opposite strand. The tint stays while you pan (the Pan tool or holding the pan key) so you can inspect the result. It clears on your next edit, undo, or redo, when you switch to any other tool, or with the **✕** next to the count.
 
 <Callout type="tip">
 

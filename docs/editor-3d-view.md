@@ -230,6 +230,16 @@ parsers, geometry, ghost mode, gizmo placement, and remembered placement.
 
 ---
 
+## oxDNA Trajectory Replay
+
+The **Replay oxDNA** toolbar button switches the tool panel to `toolPanelMode === 'replay'`. In that
+mode the 3D view draws a trajectory from the design's own oxDNA export over the design (props
+`replay` / `replayActive`) and hides the design unless the panel's **Show design underneath** is on.
+**See `docs/oxdna-replay.md`** for mapping, worker, posing, geometry and video export
+(`replayFrameRendererFn`, an offscreen renderer of the same scene).
+
+---
+
 ## Reference Mesh
 
 A wireframe region's `referenceGeometry` mesh is drawn by `referenceMeshOverlay.ts`, in orange, through
@@ -343,4 +353,5 @@ change.
 - **Don't add a Tool to `canvasEditor/tools/*` for the 3D view.** This pane uses its own gizmo + Three.js raycasting; it is not part of the strand-view tool stack.
 - **Don't hide ghost helix cylinders by selection filter.** Filtering is segment-based and skipping cylinders breaks the orientation reference.
 - **Don't dispose the renderer before unmount.** `sceneSetup` registers the `ResizeObserver` and TrackballControls — they must be cleaned up in the cleanup callback.
+- **Don't persist oxDNA replay frames or poses.** See `docs/oxdna-replay.md`.
 - **Don't persist the external structure overlay's geometry.** The parsed nodes/chains are render-only — never feed them into `part`, history, or storage. The _only_ thing persisted is the lightweight PDB placement record (`Part.overlayPlacements`); the overlay file itself is re-dropped each session. Keep the data-vs-visibility `$effect` split so a Hide/Show toggle doesn't rebuild GPU buffers.

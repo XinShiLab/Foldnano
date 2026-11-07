@@ -8,7 +8,7 @@ import {
 	fillSequenceToOligoCmd,
 	fillSequenceToSegmentCmd,
 } from '../../commands/strands';
-import { fillEmptyAndHighlight } from './sequenceFill';
+import { fillEmptyAndHighlight, withFillHighlight } from './sequenceFill';
 import { toast } from 'svelte-sonner';
 import { MIRROR_EDIT_ERROR } from '$lib/model/Part/Part.svelte';
 
@@ -37,26 +37,48 @@ export function SequenceTool(): Tool {
 					const mode = ctx.strandCtx.sequenceContext.mode;
 					const onOligo = ctx.strandCtx.selectionFilter.has('OLIGO');
 					const onlyEmpty = ctx.strandCtx.sequenceContext.fillType === 'ONLY_EMPTY';
+					const highlight = <T>(run: () => T): T =>
+						withFillHighlight(ctx.part, ctx.strandCtx, ctx.history, run);
+
+					if (mode === 'BASE') {
+						// One base is for staple overhangs and spacers; the scaffold is never written here.
+						if (oligo.isScaffold) {
+							toast.info('One-base fill writes staples only, not the scaffold.');
+							return;
+						}
+						fillEmptyAndHighlight(
+							ctx.part,
+							onOligo ? oligo.segments : [segment],
+							ctx.strandCtx,
+							ctx.history,
+							ctx.strandCtx.sequenceContext.base
+						);
+						return;
+					}
 
 					if (!onOligo) {
 						if (mode === 'RANDOM' && onlyEmpty) {
 							fillEmptyAndHighlight(ctx.part, [segment], ctx.strandCtx, ctx.history);
 						} else if (mode === 'RANDOM') {
 							ctx.strandCtx.sequenceContext.fillResults = [];
-							fillRandomSequenceToSegmentCmd(
-								{ segment, gcContent: ctx.strandCtx.sequenceContext.gcContent },
-								ctx.history
+							highlight(() =>
+								fillRandomSequenceToSegmentCmd(
+									{ segment, gcContent: ctx.strandCtx.sequenceContext.gcContent },
+									ctx.history
+								)
 							);
 						} else if (mode === 'SEQ' && ctx.strandCtx.sequenceContext.sequence.length > 0) {
 							ctx.strandCtx.sequenceContext.fillResults = [];
-							const fillInfo = fillSequenceToSegmentCmd(
-								{
-									segment,
-									sequence: ctx.strandCtx.sequenceContext.sequence,
-									lockSequence: true,
-									onlyEmpty,
-								},
-								ctx.history
+							const fillInfo = highlight(() =>
+								fillSequenceToSegmentCmd(
+									{
+										segment,
+										sequence: ctx.strandCtx.sequenceContext.sequence,
+										lockSequence: true,
+										onlyEmpty,
+									},
+									ctx.history
+								)
 							);
 							ctx.strandCtx.sequenceContext.fillResults = fillInfo;
 						} else if (mode === 'REMOVE') {
@@ -73,21 +95,25 @@ export function SequenceTool(): Tool {
 					if (mode === 'RANDOM' && onlyEmpty) {
 						fillEmptyAndHighlight(ctx.part, oligo.segments, ctx.strandCtx, ctx.history);
 					} else if (mode === 'RANDOM') {
-						fillRandomSequenceToOligoCmd(
-							{ oligo, gcContent: ctx.strandCtx.sequenceContext.gcContent },
-							ctx.history
+						highlight(() =>
+							fillRandomSequenceToOligoCmd(
+								{ oligo, gcContent: ctx.strandCtx.sequenceContext.gcContent },
+								ctx.history
+							)
 						);
 					} else if (mode === 'SEQ' && ctx.strandCtx.sequenceContext.sequence.length > 0) {
 						ctx.strandCtx.sequenceContext.fillResults = [];
 
-						const fillInfo = fillSequenceToOligoCmd(
-							{
-								oligo: oligo,
-								sequence: ctx.strandCtx.sequenceContext.sequence,
-								lockSequence: true,
-								onlyEmpty,
-							},
-							ctx.history
+						const fillInfo = highlight(() =>
+							fillSequenceToOligoCmd(
+								{
+									oligo: oligo,
+									sequence: ctx.strandCtx.sequenceContext.sequence,
+									lockSequence: true,
+									onlyEmpty,
+								},
+								ctx.history
+							)
 						);
 						ctx.strandCtx.sequenceContext.fillResults = fillInfo;
 					} else if (mode === 'REMOVE') {

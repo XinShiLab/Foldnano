@@ -136,6 +136,49 @@ describe('Part.fillEmptySequence', () => {
 	});
 });
 
+describe('Part.fillEmptySequence with a fixed base', () => {
+	it('writes the base on the target and its complement on an empty opposite staple', () => {
+		const { part, vh } = scene();
+		const up = part.createOligo(vh, 0, 9);
+		const down = part.createOligo(vh, 9, 0);
+
+		const filled = part.fillEmptySequence(up.segments, 0.5, 'T');
+
+		expect(up.sequence).toBe('T'.repeat(10));
+		expect(down.sequence).toBe('A'.repeat(10));
+		expect(filled.filled).toBe(20);
+		expect(filled.copied).toBe(0);
+		expectPaired(part);
+	});
+
+	it('keeps assigned bases and pairs with an existing opposite sequence instead', () => {
+		const { part, vh } = scene();
+		const scaffold = part.createOligo(vh, 0, 9);
+		scaffold.isScaffold = true;
+		scaffold.fillSequence('ACGTA', true);
+		const staple = part.createOligo(vh, 9, 0);
+		setSeq(seg(staple), 9, 'G');
+
+		const filled = part.fillEmptySequence(staple.segments, 0.5, 'T');
+
+		expect(scaffold.sequence).toBe('ACGTANNNNN');
+		// 5'→3' runs bp 9→0: bp 9 kept as G, bps 8–5 opposite an empty scaffold get T,
+		// bps 4–0 pair with the scaffold's ACGTA.
+		expect(staple.sequence).toBe('GTTTTTACGT');
+		expect(filled.copied).toBe(5);
+		expectPaired(part);
+	});
+
+	it('leaves a single-stranded staple overhang all one base', () => {
+		const { part, vh } = scene();
+		const overhang = part.createOligo(vh, 0, 7);
+
+		part.fillEmptySequence(overhang.segments, 0.5, 'T');
+
+		expect(overhang.sequence).toBe('T'.repeat(8));
+	});
+});
+
 describe('fillEmptySequenceCmd', () => {
 	it('undoes the fill on both strands in one step', () => {
 		const { doc, part, vh } = scene();
@@ -145,6 +188,21 @@ describe('fillEmptySequenceCmd', () => {
 
 		fillEmptySequenceCmd({ part, segments: up.segments }, history);
 		expect(down.sequence).not.toContain('N');
+
+		history.undoOnce();
+		expect(up.sequence).toBe('N'.repeat(10));
+		expect(down.sequence).toBe('N'.repeat(10));
+	});
+
+	it('undoes a fixed-base fill in one step', () => {
+		const { doc, part, vh } = scene();
+		const up = part.createOligo(vh, 0, 9);
+		const down = part.createOligo(vh, 9, 0);
+		const history = createTestHistory(doc);
+
+		fillEmptySequenceCmd({ part, segments: up.segments, base: 'G' }, history);
+		expect(up.sequence).toBe('G'.repeat(10));
+		expect(down.sequence).toBe('C'.repeat(10));
 
 		history.undoOnce();
 		expect(up.sequence).toBe('N'.repeat(10));

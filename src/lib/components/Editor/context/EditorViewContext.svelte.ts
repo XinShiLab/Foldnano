@@ -37,6 +37,8 @@ import { Plane } from '$lib/model/Part/Plane.svelte';
 import type { SolverParams } from '$lib/model/rbs/rbsTypes';
 import type { GizmoMode } from '../View3D/transformGizmo';
 import type { OverlayInstance } from '../View3D/overlayInstance';
+import type { OxDnaReplay } from '../View3D/replay/OxDnaReplay.svelte';
+import type { ReplayFrameRenderer, VideoSize } from '../View3D/replay/replayVideoExport';
 import { addPlaneCmd, removePlaneCmd } from '$lib/commands/planes';
 import { addRegionAndPlaneCmd, setRegionReferenceGeometryCmd } from '$lib/commands/regions';
 import { BUILTIN_MODIFICATIONS } from '$lib/model/modifications';
@@ -99,6 +101,8 @@ export interface View3DToolbarDiagnostics {
 	constraintCount: number;
 }
 
+export type View3DToolPanelMode = 'inspector' | 'overlays' | 'mesh' | 'replay';
+
 export interface View3DToolbarController {
 	showVH: boolean;
 	showNtModel: boolean;
@@ -124,13 +128,17 @@ export interface View3DToolbarController {
 	planeSelectionMode: boolean;
 	pendingBasePlane: 'XY' | 'XZ' | 'YZ';
 	pendingRegionKind: RegionKind | null;
-	toolPanelMode: 'inspector' | 'overlays' | 'mesh';
+	toolPanelMode: View3DToolPanelMode;
+	/** Session-only oxDNA trajectory replay for the current part. */
+	replay: OxDnaReplay | null;
 	onToggleLock: () => void;
 	onResetCamera?: () => void;
 	onFrameActivePlane?: () => void;
 	onSimulate?: () => void;
 	onClearRelaxed?: () => void;
 	onDownload?: () => void;
+	/** Offscreen renderer of the shown replay for video export (null size = the 3D view's). */
+	onCreateReplayFrameRenderer?: (size: VideoSize | null) => ReplayFrameRenderer | null;
 	onExportGlb?: () => void;
 	onExportOxDna?: (opts?: { includeMirrors?: boolean }) => void;
 	onExportMrdna?: (opts?: { includeMirrors?: boolean }) => void;
@@ -221,6 +229,7 @@ class StrandViewContext {
 	sequenceContext: SequenceContext = $state({
 		mode: 'RANDOM',
 		gcContent: 0.5,
+		base: 'T',
 		sequence: '',
 		fillType: 'ONLY_EMPTY',
 		fillResults: [],
@@ -474,10 +483,15 @@ export class EditorViewContext {
 		return untrack(() => collectDesignIssues(part, region, { integrity, simulation, cadnano }));
 	});
 
-	/** The last empty-only fill, while it is still the latest edit and Sequence mode is on. */
+	/** Whether the fill highlight survives the current mode: Sequence, or panning to inspect it. */
+	get keepsRecentFill(): boolean {
+		return this.editorMode === 'SEQUENCE' || this.editorMode === 'PAN';
+	}
+
+	/** The last Sequence-tool fill, while it is still the latest edit and Sequence (or Pan) mode is on. */
 	get activeRecentFill(): RecentSequenceFill | null {
 		const fill = this.strandViewContext.recentFill;
-		if (!fill || this.editorMode !== 'SEQUENCE') return null;
+		if (!fill || !this.keepsRecentFill) return null;
 		return fill.revision === this.historyStack.revision ? fill : null;
 	}
 

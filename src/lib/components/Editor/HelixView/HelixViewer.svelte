@@ -22,6 +22,9 @@
 		overlayPlacementKey,
 	} from '../View3D/overlayTransform';
 	import type { OverlayInstance } from '../View3D/overlayInstance';
+	import { OxDnaReplay } from '../View3D/replay/OxDnaReplay.svelte';
+	import type { ReplayFrameRenderer, VideoSize } from '../View3D/replay/replayVideoExport';
+	import type { View3DToolPanelMode } from '../context/EditorViewContext.svelte';
 	import { clearOverlayPlacementCmd, setOverlayPlacementCmd } from '$lib/commands/overlays';
 	import { toast } from 'svelte-sonner';
 	import { help } from '$lib/components/help/help';
@@ -77,12 +80,15 @@
 		planeSelectionMode: false,
 		pendingBasePlane: 'XY' as 'XY' | 'XZ' | 'YZ',
 		pendingRegionKind: null as import('$lib/model/Part/DesignRegion').RegionKind | null,
-		toolPanelMode: 'inspector' as 'inspector' | 'overlays' | 'mesh',
+		toolPanelMode: 'inspector' as View3DToolPanelMode,
+		replay: null as OxDnaReplay | null,
 		onSimulate: undefined as (() => void) | undefined,
 		onResetCamera: undefined as (() => void) | undefined,
 		onFrameActivePlane: undefined as (() => void) | undefined,
 		onClearRelaxed: undefined as (() => void) | undefined,
 		onDownload: undefined as (() => void) | undefined,
+		onCreateReplayFrameRenderer: undefined as
+			((size: VideoSize | null) => ReplayFrameRenderer | null) | undefined,
 		onExportGlb: undefined as (() => void) | undefined,
 		onExportOxDna: undefined as ((opts?: { includeMirrors?: boolean }) => void) | undefined,
 		onExportMrdna: undefined as ((opts?: { includeMirrors?: boolean }) => void) | undefined,
@@ -101,6 +107,13 @@
 		onToggleCursor: toggleCursor,
 		onTogglePlanes: togglePlanes,
 		onToggleNtModel: toggleNtModel,
+	});
+
+	// A replay belongs to the part its files were matched against; a new part starts empty.
+	$effect(() => {
+		const replay = new OxDnaReplay(part);
+		untrack(() => (view3DToolbarController.replay = replay));
+		return () => replay.dispose();
 	});
 
 	function toggleShowVH() {
@@ -366,6 +379,7 @@
 		view3DToolbarController.onFrameActivePlane = view3DFrameActivePlaneFn;
 		view3DToolbarController.onClearRelaxed = view3DClearRelaxedFn;
 		view3DToolbarController.onDownload = view3DDownloadFn;
+		view3DToolbarController.onCreateReplayFrameRenderer = view3DReplayFrameRendererFn;
 		view3DToolbarController.onExportGlb = view3DExportGlbFn;
 		view3DToolbarController.onExportOxDna = view3DExportOxDnaFn;
 		view3DToolbarController.onExportMrdna = view3DExportMrdnaFn;
@@ -385,6 +399,9 @@
 	let view3DFrameActivePlaneFn = $state<(() => void) | undefined>(undefined);
 	let view3DClearRelaxedFn = $state<(() => void) | undefined>(undefined);
 	let view3DDownloadFn = $state<(() => void) | undefined>(undefined);
+	let view3DReplayFrameRendererFn = $state<
+		((size: VideoSize | null) => ReplayFrameRenderer | null) | undefined
+	>(undefined);
 	let view3DExportGlbFn = $state<(() => void) | undefined>(undefined);
 	let view3DExportOxDnaFn = $state<((opts?: { includeMirrors?: boolean }) => void) | undefined>(
 		undefined
@@ -443,6 +460,7 @@
 				bind:frameActivePlaneFn={view3DFrameActivePlaneFn}
 				bind:clearRelaxedFn={view3DClearRelaxedFn}
 				bind:downloadFn={view3DDownloadFn}
+				bind:replayFrameRendererFn={view3DReplayFrameRendererFn}
 				bind:exportGlbFn={view3DExportGlbFn}
 				bind:exportOxDnaFn={view3DExportOxDnaFn}
 				bind:exportMrdnaFn={view3DExportMrdnaFn}
@@ -456,6 +474,8 @@
 				bind:selectedPlaneId={view3DToolbarController.selectedPlaneId}
 				bind:gizmoMode={view3DToolbarController.gizmoMode}
 				showStats={view3DToolbarController.showStats}
+				replay={view3DToolbarController.replay}
+				replayActive={view3DToolbarController.toolPanelMode === 'replay'}
 			/>
 		</div>
 	{/if}

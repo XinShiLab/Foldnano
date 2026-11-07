@@ -557,11 +557,11 @@ complementary. It's consumed by the StrandView's mismatch-warning overlay
 `movingEndsOps.ts` — both are UI affordances for finding and fixing mismatches
 manually, not model-level enforcement.
 
-### Empty-only random fill
+### Empty-only fill (random or one base)
 
-`Part.fillEmptySequence(segments, gcContent)` (`Part/fillEmptySequence.ts`) is
+`Part.fillEmptySequence(segments, gcContent, base?)` (`Part/fillEmptySequence.ts`) is
 the safe "fill the gaps" path behind the Sequence tool's Random + "Fill only
-the empty parts". Unlike `fillSequence` it only ever writes `'N'` characters,
+the empty parts" and its Base tab (one fixed base). Unlike `fillSequence` it only ever writes `'N'` characters,
 so no assigned base changes on either strand, and it never creates a mismatch,
 **including at linked mirror copies**: the repeat-group sync copies a source's
 new bases into every mirror at the end of the `tx`, so each copy must still
@@ -572,7 +572,9 @@ target nucleotide it walks to the nucleotide opposite it and opposite each of
 its copies (`bp + instance.bpOffset`), resolving a mirror to the source
 nucleotide it copies, and repeats from there. The component is two-coloured
 (base / complement): an assigned base anywhere fixes it (counted as `copied`),
-otherwise one base is drawn from a GC-balanced pool. Disagreeing assigned
+otherwise the free choice is drawn from a GC-balanced pool, or is `base` on the
+first target `'N'` reached (its partners take the complement, so two paired
+targets cannot both get `base`). Disagreeing assigned
 bases, or an odd cycle, leave the component `'N'` (`conflicts`) rather than
 pick a side.
 

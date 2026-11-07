@@ -1,6 +1,6 @@
 import type { EditorMode } from '../../../canvasEditor/core/modes';
 import type { ModificationDef } from '../../../model/modifications';
-import type { EmptyFillResult } from '../../../model/Part/fillEmptySequence';
+import type { DnaBase, EmptyFillResult } from '../../../model/Part/fillEmptySequence';
 
 import type { SelectedEndBoxProps } from '../StrandView/temporalLayer/SelectedEndBox.svelte';
 import type { MoveEndBoxProps } from '../StrandView/temporalLayer/MoveEndBox.svelte';
@@ -43,8 +43,10 @@ export type ColorContext = {
 };
 
 export type SequenceContext = {
-	mode: 'RANDOM' | 'SEQ' | 'REMOVE';
+	mode: 'RANDOM' | 'BASE' | 'SEQ' | 'REMOVE';
 	gcContent: number;
+	/** The one base `BASE` mode writes into empty staple nucleotides. */
+	base: DnaBase;
 	sequence: string;
 	fillType: 'WHOLE' | 'ONLY_EMPTY';
 	fillResults: {
@@ -53,7 +55,7 @@ export type SequenceContext = {
 	}[];
 };
 
-/** What the last empty-only fill assigned, highlighted until the next edit or leaving Sequence mode. */
+/** What the last Sequence-tool fill assigned, highlighted until the next edit or leaving Sequence mode. */
 export type RecentSequenceFill = EmptyFillResult & {
 	/** `historyStack.revision` right after the fill; any later edit, undo or redo hides it. */
 	revision: number;

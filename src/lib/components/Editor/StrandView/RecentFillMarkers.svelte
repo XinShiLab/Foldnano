@@ -10,12 +10,9 @@
 
 	const FILL_COLOR = 'rgba(251, 191, 36, 0.45)';
 
-	// Leaving Sequence mode ends the highlight for good, not just while away.
+	// Switching to any tool but Pan ends the highlight for good, not just while away.
 	$effect(() => {
-		if (
-			editorViewContext.editorMode !== 'SEQUENCE' &&
-			editorViewContext.strandViewContext.recentFill
-		) {
+		if (!editorViewContext.keepsRecentFill && editorViewContext.strandViewContext.recentFill) {
 			editorViewContext.strandViewContext.recentFill = null;
 		}
 	});
@@ -40,9 +37,10 @@
 
 <!-- @component
   RecentFillMarkers
-  Tints the grid cells whose nucleotides the last Sequence-tool "fill empty" assigned, on the
-  filled strands and on opposite strands that received the complement. Shown until the next
-  edit, undo or redo, or leaving Sequence mode (`EditorViewContext.activeRecentFill`). One Shape
+  Tints the grid cells whose nucleotides the last Sequence-tool fill assigned (any fill: random,
+  one base, preset or custom), on the filled strands, on opposite strands that received the
+  complement, and on linked mirror copies. Shown until the next
+  edit, undo or redo, or switching to a tool other than Pan (`EditorViewContext.activeRecentFill`). One Shape
   draws every cell because a whole-design fill can touch tens of thousands of them.
 -->
 
