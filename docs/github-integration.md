@@ -198,6 +198,17 @@ Opened via the GitHub button in the toolbar. Displays three tabs:
 - Disconnect button (unplug icon) clears the repo connection
 - After a pull/overwrite, dirty-path state is recomputed immediately so overwritten files disappear from the Changes tab instead of lingering as stale modified entries
 
+### File names and renames
+
+A `.fn.json` file can be renamed from the Files tab (`GitHubExplorerState.renameFile`) or by editing the document name in the toolbar (`session.checkRename`, then `renameDocument`). Both follow the same rules:
+
+- the new name must pass `validateDesignName` (`docs/dna-model.md` § Names);
+- a committed file with uncommitted changes can't be renamed, so a rename never commits pending edits;
+- a name already used in the same folder blocks the rename, ignoring case and counting local-only files (and, in the explorer, pending deletes); a case-only rename of the file itself is allowed;
+- another saved design with the same name (anywhere in this browser) only warns; the toolbar asks **Rename Anyway**.
+
+The toolbar check lists the repo tree itself (`findRepoPathClash`) because the explorer state only exists while the GitHub panel is mounted; offline it falls back to local-only entries. `NewFileDialog` checks its folder the same way.
+
 The toolbar's **New Document** becomes a menu when a repo is connected and the user is authenticated: **New File in {repo}** opens the GitHub panel and `NewFileDialog` (the dialog is mounted by `GitHubExplorer`, so it can't show while another panel is active; it creates a tracked local-only entry, as with the Files tab's button), and **Local-Only Design** calls `startBlankDocument()`, which registers no explorer entry and saves nothing until the first edit. That document has no GitHub path, so **Save to GitHub Repo** later opens `PublishToGitHubDialog`.
 
 ### Changes Tab (`SourceControlPanel.svelte`)
@@ -251,6 +262,8 @@ Detection is content-based via `cadnanoParser.canParse(raw, meta)` in `src/lib/c
 
 Opening a `.fn.json` from the same dialog is unchanged — it loads the document directly into the editor.
 
+Both paths name the new document after the file, adding ` (2)`, ` (3)`, … with a warning toast when the name is taken (`session.uniqueImportName`): by a saved design, or with the repo checkbox, by a `.fn.json` in that folder.
+
 ### Load Cadnano JSON as a Part
 
 **Toolbar → Add New Part dropdown → Load Cadnano Design as a Part**
@@ -261,7 +274,7 @@ Opening a `.fn.json` from the same dialog is unchanged — it loads the document
 
 **GitHub Explorer → Files tab → click a `.json` / `.cadnano.json`**
 
-1. **Collision check**: if a matching `.fn.json` already exists in the same folder (in the repo tree or as a local-only file), a warning toast is shown and no action is taken. The user must rename one of the two files first.
+1. **Collision check**: if a matching `.fn.json` already exists in the same folder (in the repo tree or as a local-only file, ignoring case), a warning toast is shown and no action is taken. The user must rename one of the two files first.
 2. Otherwise, a confirmation dialog is shown: "Open as Foldnano document? A new `{name}.fn.json` will be created in the same folder."
 3. On confirm: the cadnano file is fetched from GitHub, validated with `cadnanoParser.canParse`, parsed to a `Part`, and `createDocumentFromImportedPart` is called. The resulting document is registered as a local-only entry in `githubExplorerStateStore` and immediately appears in the Files tree and Changes tab.
 4. The editor updates reactively in place (no page navigation) — `session.createDocumentFromImportedPart` swaps the session's `currentDoc` (proxied by `editorViewContext.currentDoc`), which Svelte 5 reactivity propagates to the canvas.
@@ -286,11 +299,12 @@ This button handles three cases:
 - **Folder**: dropdown populated from the repo file tree. Pre-filled from the existing local-only entry's folder path (if the doc was previously imported from GitHub), otherwise from the currently selected folder in the Explorer.
 - **Commit message**: editable, pre-filled as `Add {docName}`
 - On **Publish**:
-  1. Registers GitHub metadata (`path`, `sha: ''`, owner/repo/branch) so `commitCurrentDocToGitHub` knows the target
-  2. Calls `session.commitCurrentDocToGitHub(message)`
-  3. Removes the path from `localOnlyEntries` (if it was tracked)
-  4. Refreshes the repo file tree and switches to the Changes tab
-  5. On error: rolls back the metadata registration so the doc stays as a local-only file
+  1. Refuses a document name that fails `validateDesignName`, and a path that already exists in the repo (`session.findRepoPathClash`, fresh tree, ignoring case), with an "already exists" message instead of the SHA-conflict flow
+  2. Registers GitHub metadata (`path`, `sha: ''`, owner/repo/branch) so `commitCurrentDocToGitHub` knows the target
+  3. Calls `session.commitCurrentDocToGitHub(message)`
+  4. Removes the path from `localOnlyEntries` (if it was tracked)
+  5. Refreshes the repo file tree and switches to the Changes tab
+  6. On error: rolls back the metadata registration so the doc stays as a local-only file
 - After publishing, `currentFileMetadata` is populated and the toolbar Commit button becomes active for future edits
 
 ## Commit Workflow (Phase 3 + 4.5a)
@@ -307,15 +321,17 @@ First-time setup: pick a repository from the user's list, select a branch, click
 
 ## Status Bar
 
-The editor status bar (bottom of screen) shows:
+**`src/lib/components/Editor/StatusBar.svelte`** (bottom of the editor). Left, where the design lives:
 
-- **Branch icon + branch name** — bold, when a GitHub file is open
-- **Amber dot + "unsaved to GitHub"** — when local edits exist that haven't been committed
-- **↓ remote ahead** — when GitHub has newer changes
-- **? GitHub not checked** — the check for newer changes failed; click to retry
-- **Backups** — opens the Backups dialog (the design's backup timeline; also in the Save menu for every design)
-- **`owner/repo · path/to/file.json`** — full path (tooltip shows absolute path)
-- **Canvas hover footnote** — right-aligned; shows oligo/segment info on hover
+- **GitHub file** — branch, `owner/repo › path`, `@sha`, then the sync state:
+  - **Amber dot + "Saved in browser · not committed"** — `hasUncommittedGitHubChanges`; reads "Not committed" while `hasUnsavedLocalChanges` (autosave pending), so it never claims a browser save that hasn't happened
+  - **↓ Newer version on GitHub** — `remoteAheadOfLocal`
+  - **? GitHub not checked** — the check for newer changes failed; click to retry
+- **Any other design** — "Saved in this browser" (an opened disk file is a browser copy; no disk link is kept)
+- **Backups N** — opens the Backups dialog; N is `session.countBackups()` (an index count, no snapshots loaded), recounted after each save and when the dialog closes
+- **Connected repo, dimmed, "(not in repo)"** — repo context set but the design has no GitHub file metadata
+
+Right: the active region (`name · maxBase bp`), then the canvas hover footnote (VH · BP · Oligo).
 
 ## Git Graph (Phase 4)
 
@@ -477,5 +493,6 @@ See `.env.example`. Never commit `.env` — it is in `.gitignore`.
 - **Don't pull without persisting first.** `pullCurrentDocFromGitHub()` calls `persistCurrentDocumentSnapshot()` before the overwrite so unsaved edits land in the backup the overwrite keeps — keep that order if you fork the flow, and always pass a backup reason to the overwriting write.
 - **Await SHA / `lastSyncAt` writes in sync flows.** Commit, pull, open and discard fail loudly if their bookkeeping can't be stored; don't turn those awaits back into fire-and-forget.
 - **Don't persist fetched JSON before validating it.** `loadDocumentFromGitHub()` and `GitHubStorageProvider.pullDocument()` run `migrateDocumentJson()` before writing the working copy, so a file from a newer Foldnano (`DocumentFormatError`, reason `too-new`) is refused without overwriting local work. See `dna-model.md` § Document format version.
+- **Don't add a rename or create path that skips the shared name checks.** Use `validateDesignName` and a case-insensitive clash check (`findPathClash`); an exact-match check lets `Foo.fn.json` and `foo.fn.json` coexist, which breaks macOS and Windows clones.
 - **Don't allow branch switching with uncommitted changes.** The hard-block (toast + cancel) is intentional; bypassing it can lose work that hasn't reached the remote.
 - **All snapshots cross the boundary as `JSON.stringify(snapshot, null, 2)`.** Don't change the formatting — diffs and SHA stability depend on it.

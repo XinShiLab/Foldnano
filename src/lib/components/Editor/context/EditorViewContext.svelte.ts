@@ -218,7 +218,7 @@ class StrandViewContext {
 	selected: EndSelection = $state(new EndSelection());
 	selectAllMode: SelectAllMode = $state('NONE');
 	tempParts: TemporalPartInfo[] = $state([]);
-	footnote: string = $state('nothing');
+	footnote: string = $state('');
 	hoverOligo: Oligo | null = $state(null);
 	hoverSegment: OligoSegment | null = $state(null);
 

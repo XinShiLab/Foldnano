@@ -31,6 +31,10 @@ class FakeIndexedDbBackend implements IndexedDbPersistenceBackend {
 		return [];
 	}
 
+	async countLocalBackups(): Promise<number> {
+		return 0;
+	}
+
 	async getLastModified(docId: string): Promise<number | null> {
 		return this.metadata.get(docId)?.lastModified ?? null;
 	}

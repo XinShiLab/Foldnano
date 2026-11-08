@@ -25,7 +25,7 @@ This page is the end-to-end workflow, from an empty document to a routed, scaffo
 
 ## Start From A New Document
 
-Click **New Document** in the top toolbar. A design starts empty; you then add a region and place virtual helices into it.
+Click **New Document** in the top toolbar. A design starts empty; you then add a region and place virtual helices into it. When you add the first region, Foldnano asks you to name the design; it is saved in this browser from then on (see [Saving And GitHub](/docs/guide/saving-github)).
 
 Every design has a **part** at the top, the container that owns your planes and regions. Starting a design (as honeycomb, square or freeform) creates that part together with a default **plane** and a default **design region**, and you can **Add Region** for more later. See [Mental Model](/docs/guide/mental-model) for what those terms mean.
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fileStem, isRenamableFile, validateFileStem } from './fileNaming';
+import { fileStem, isRenamableFile } from './fileNaming';
 import type { FileNode } from './types';
 
 function file(name: string, type: FileNode['type'] = 'file'): FileNode {
@@ -24,21 +24,5 @@ describe('fileStem', () => {
 		expect(fileStem('origami.fn.json')).toBe('origami');
 		expect(fileStem('v1.2.fn.json')).toBe('v1.2');
 		expect(fileStem('plain')).toBe('plain');
-	});
-});
-
-describe('validateFileStem', () => {
-	it('accepts letters, digits, hyphens, underscores, dots and spaces', () => {
-		expect(validateFileStem('My design_v2-final')).toBeNull();
-	});
-
-	it('rejects empty names', () => {
-		expect(validateFileStem('')).toBe('File name is required.');
-	});
-
-	it('rejects path separators and other characters', () => {
-		expect(validateFileStem('a/b')).not.toBeNull();
-		expect(validateFileStem('a\\b')).not.toBeNull();
-		expect(validateFileStem('a:b')).not.toBeNull();
 	});
 });

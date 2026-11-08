@@ -122,6 +122,15 @@
 					<p class="text-sm text-muted-foreground">
 						{rows.length} oligo{rows.length === 1 ? '' : 's'} from
 						<span class="font-medium text-foreground">{doc.name}</span>
+						·
+						<a
+							href="{resolve('/docs/[...slug]', {
+								slug: 'guide/oligo-report',
+							})}#oligokey-and-oligo-id"
+							target="_blank"
+							rel="noopener"
+							class="underline underline-offset-2 hover:text-foreground">OligoKey vs oligo ID</a
+						>
 					</p>
 					{#if rows.some((row) => row.isCircular)}
 						<p class="text-xs text-amber-700">

@@ -23,12 +23,14 @@ const {
 	getFileContentMock,
 	listCommitsMock,
 	checkRemoteStateMock,
+	getRepoTreeMock,
 } = vi.hoisted(() => ({
 	listBranchesMock: vi.fn(),
 	createBranchMock: vi.fn(),
 	getFileContentMock: vi.fn(),
 	listCommitsMock: vi.fn(),
 	checkRemoteStateMock: vi.fn(),
+	getRepoTreeMock: vi.fn(),
 }));
 
 vi.mock('$lib/services/github/api', async (importOriginal) => ({
@@ -37,6 +39,7 @@ vi.mock('$lib/services/github/api', async (importOriginal) => ({
 	createBranch: createBranchMock,
 	getFileContent: getFileContentMock,
 	listCommits: listCommitsMock,
+	getRepoTree: getRepoTreeMock,
 	putFileContent: vi.fn(),
 	deleteFileContent: vi.fn(),
 }));
@@ -132,6 +135,7 @@ describe('EditorDocumentSession', () => {
 		githubExplorerStateStore.saveLocalOnlyEntries('alice', 'designs', []);
 		githubExplorerStateStore.saveLocalFolderPaths('alice', 'designs', []);
 		checkRemoteStateMock.mockResolvedValue('clean');
+		getRepoTreeMock.mockResolvedValue({ sha: 't', url: '', tree: [], truncated: false });
 	});
 
 	it('adopts an imported document and persists it locally', async () => {
@@ -146,6 +150,78 @@ describe('EditorDocumentSession', () => {
 		expect(provider.docs.has('imported-doc')).toBe(true);
 		expect(hooks.resetEphemeralEditorState).toHaveBeenCalled();
 		expect(hooks.savePersistedContext).toHaveBeenCalled();
+	});
+
+	it('imports a file whose id is already saved locally as a copy, leaving the saved design', async () => {
+		const { session } = makeSession();
+		const { storage, provider } = makeStorage();
+		session.replaceStorageManagerForTesting(storage);
+		const saved = new FoldnanoDocument('doc-taken', 'Saved');
+		saved.addNewPart('HONEYCOMB');
+		await provider.saveDocument('doc-taken', saved.toJSON());
+
+		await session.openImportedDocument(new FoldnanoDocument('doc-taken', 'Re-imported'));
+
+		expect(session.currentDoc.id).not.toBe('doc-taken');
+		expect(session.currentDoc.name).toBe('Re-imported');
+		expect(provider.docs.has(session.currentDoc.id)).toBe(true);
+		const stillSaved = provider.docs.get('doc-taken') as { name: string; parts: unknown[] };
+		expect(stillSaved.name).toBe('Saved');
+		expect(stillSaved.parts).toHaveLength(1);
+	});
+
+	it('replaces the saved design on request, keeping a backup and its GitHub link', async () => {
+		const { session } = makeSession();
+		const { storage, provider } = makeStorage();
+		session.replaceStorageManagerForTesting(storage);
+		await provider.saveDocument('doc-replace', new FoldnanoDocument('doc-replace', 'Old').toJSON());
+		const meta = {
+			path: 'designs/old.fn.json',
+			sha: 'sha-old',
+			owner: 'alice',
+			repo: 'designs',
+			branch: 'main',
+			lastSyncAt: 1,
+		};
+		githubMetadataStore.setFileMetadata('doc-replace', meta);
+		const save = vi.spyOn(storage, 'saveDocument');
+		try {
+			const imported = new FoldnanoDocument('doc-replace', 'From file');
+			imported.addNewPart('HONEYCOMB');
+			await session.openImportedDocument(imported, 'replace');
+
+			expect(session.currentDoc.id).toBe('doc-replace');
+			expect(session.currentFileMetadata).toEqual(meta);
+			expect(save).toHaveBeenCalledWith('doc-replace', expect.anything(), {
+				backup: { reason: 'before_import' },
+			});
+			expect((provider.docs.get('doc-replace') as { parts: unknown[] }).parts).toHaveLength(1);
+		} finally {
+			githubMetadataStore.clearFileMetadata('doc-replace');
+		}
+	});
+
+	it('imports as a copy when the id still has GitHub metadata', async () => {
+		const { session } = makeSession();
+		const { storage, provider } = makeStorage();
+		session.replaceStorageManagerForTesting(storage);
+		githubMetadataStore.setFileMetadata('doc-linked', {
+			path: 'designs/linked.fn.json',
+			sha: 'sha-linked',
+			owner: 'alice',
+			repo: 'designs',
+			branch: 'main',
+			lastSyncAt: 1,
+		});
+		try {
+			await session.openImportedDocument(new FoldnanoDocument('doc-linked', 'Linked'));
+
+			expect(session.currentDoc.id).not.toBe('doc-linked');
+			expect(provider.docs.has('doc-linked')).toBe(false);
+			expect(session.currentFileMetadata).toBeNull();
+		} finally {
+			githubMetadataStore.clearFileMetadata('doc-linked');
+		}
 	});
 
 	it('blocks history-driven snapshot persistence when the tab is not the owner', async () => {
@@ -914,5 +990,150 @@ describe('EditorDocumentSession GitHub dirty detection', () => {
 		session.destroy();
 		githubMetadataStore.clearFileMetadata(doc.id);
 		await foldnanoIndexedDb.deleteDocument(doc.id);
+	});
+});
+
+describe('EditorDocumentSession design names', () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		githubMetadataStore.clearRepoContext();
+		githubExplorerStateStore.saveLocalOnlyEntries('alice', 'designs', []);
+		githubExplorerStateStore.saveLocalFolderPaths('alice', 'designs', []);
+		getRepoTreeMock.mockResolvedValue({ sha: 't', url: '', tree: [], truncated: false });
+	});
+
+	function setup(doc: FoldnanoDocument) {
+		const { session } = makeSession();
+		const { storage, provider } = makeStorage();
+		session.replaceStorageManagerForTesting(storage);
+		session.replaceCurrentDocumentForTesting(doc);
+		return { session, provider };
+	}
+
+	it('never saves a design under the reserved blank-workspace name, and saves once named', async () => {
+		const { session, provider } = setup(new FoldnanoDocument('doc-untitled'));
+		session.historyStack.tx(() => {
+			session.currentDoc.addNewPart('HONEYCOMB');
+		});
+		expect(session.needsName).toBe(true);
+
+		expect(await session.historyStack.saveNow()).toEqual({ success: false, savedAt: null });
+		await session.saveDocumentToLocalStorage({ force: true });
+		await session.persistCurrentDocumentSnapshot('before-switch', { force: true });
+		expect(provider.docs.has('doc-untitled')).toBe(false);
+
+		await session.renameDocument('Box');
+		expect(session.needsName).toBe(false);
+		expect((provider.docs.get('doc-untitled') as { name: string }).name).toBe('Box');
+	});
+
+	it('does not ask for a name while the workspace is empty', () => {
+		const { session } = setup(new FoldnanoDocument('doc-empty'));
+		expect(session.needsName).toBe(false);
+	});
+
+	it('refuses invalid and reserved names in checkRename and renameDocument', async () => {
+		const { session } = setup(new FoldnanoDocument('doc-a', 'A'));
+		expect(await session.checkRename('a/b')).toMatchObject({ kind: 'blocked' });
+		expect(await session.checkRename('untitled document')).toMatchObject({ kind: 'blocked' });
+		expect(await session.checkRename(' A ')).toEqual({ kind: 'unchanged' });
+		await expect(session.renameDocument('a:b')).rejects.toThrow();
+		expect(session.currentDoc.name).toBe('A');
+		await session.renameDocument('Tile.fn.json');
+		expect(session.currentDoc.name).toBe('Tile');
+	});
+
+	it('warns about another saved design with the same name, ignoring case', async () => {
+		const { session, provider } = setup(new FoldnanoDocument('doc-a', 'A'));
+		await provider.saveDocument('doc-b', new FoldnanoDocument('doc-b', 'Box').toJSON());
+
+		expect(await session.checkRename('box')).toEqual({
+			kind: 'ok',
+			name: 'box',
+			nameClash: 'Box',
+			commitsToGitHub: false,
+		});
+		// A typed extension is dropped, so `box.fn.json` is the same name as `box`.
+		expect(await session.checkRename('box.fn.json')).toMatchObject({
+			kind: 'ok',
+			name: 'box',
+			nameClash: 'Box',
+		});
+		expect(await session.checkRename('box.fn')).toMatchObject({ kind: 'blocked' });
+		expect(await session.checkRename('Tile')).toMatchObject({ kind: 'ok', nameClash: null });
+	});
+
+	it('blocks a rename onto a file in the same repo folder, ignoring case, but allows a case-only rename', async () => {
+		const { session } = setup(new FoldnanoDocument('doc-local', 'Before'));
+		githubMetadataStore.setRepoContext({ owner: 'alice', repo: 'designs', branch: 'main' });
+		session.refreshGitHubStateFromStore();
+		githubExplorerStateStore.saveLocalOnlyEntries('alice', 'designs', [
+			{ docId: 'doc-local', path: 'folder/Before.fn.json', name: 'Before.fn.json' },
+		]);
+		getRepoTreeMock.mockResolvedValue({
+			sha: 't',
+			url: '',
+			truncated: false,
+			tree: [{ path: 'folder/Taken.fn.json', mode: '100644', type: 'blob', sha: 's', url: '' }],
+		});
+
+		expect(await session.checkRename('taken')).toEqual({
+			kind: 'blocked',
+			message: '"Taken.fn.json" already exists in this folder.',
+		});
+		expect(await session.checkRename('before')).toMatchObject({ kind: 'ok' });
+	});
+
+	it('blocks renaming a committed file with uncommitted changes', async () => {
+		const { session } = setup(new FoldnanoDocument('doc-committed', 'Committed'));
+		session.bindCurrentDocumentToGitHubFile({
+			path: 'Committed.fn.json',
+			sha: 'sha-1',
+			owner: 'alice',
+			repo: 'designs',
+			branch: 'main',
+			lastSyncAt: Date.now(),
+		});
+		expect(await session.checkRename('Renamed')).toMatchObject({
+			kind: 'ok',
+			commitsToGitHub: true,
+		});
+
+		session.historyStack.tx(() => {
+			session.currentDoc.addNewPart('HONEYCOMB');
+		});
+		expect(await session.checkRename('Renamed')).toMatchObject({ kind: 'blocked' });
+		githubMetadataStore.clearFileMetadata('doc-committed');
+	});
+
+	it('numbers an opened file whose name a saved design already uses', async () => {
+		const { session, provider } = setup(new FoldnanoDocument('doc-open'));
+		await provider.saveDocument('doc-box', new FoldnanoDocument('doc-box', 'Box').toJSON());
+
+		await session.openImportedDocument(new FoldnanoDocument('doc-new', 'box'));
+		expect(session.currentDoc.name).toBe('box (2)');
+
+		// A copy of a saved design gets a numbered name too.
+		await session.openImportedDocument(new FoldnanoDocument('doc-box', 'Box'));
+		expect(session.currentDoc.id).not.toBe('doc-box');
+		expect(session.currentDoc.name).toBe('Box (3)');
+	});
+
+	it('numbers an imported design against design files in the target repo folder', async () => {
+		const { session } = setup(new FoldnanoDocument('doc-x'));
+		githubMetadataStore.setRepoContext({ owner: 'alice', repo: 'designs', branch: 'main' });
+		session.refreshGitHubStateFromStore();
+		getRepoTreeMock.mockResolvedValue({
+			sha: 't',
+			url: '',
+			truncated: false,
+			tree: [
+				{ path: 'folder/Hilbert.fn.json', mode: '100644', type: 'blob', sha: 's', url: '' },
+				{ path: 'other/Tile.fn.json', mode: '100644', type: 'blob', sha: 's', url: '' },
+			],
+		});
+
+		expect(await session.uniqueImportName('hilbert', 'folder')).toBe('hilbert (2)');
+		expect(await session.uniqueImportName('Tile', 'folder')).toBe('Tile');
 	});
 });

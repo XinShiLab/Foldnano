@@ -124,6 +124,18 @@ export class StorageManager {
 		}
 	}
 
+	/** How many backups a document has, without loading their snapshots. */
+	async countLocalBackups(docId: string): Promise<number> {
+		const provider = this.providers.get(this.primaryProvider);
+		if (!provider?.countLocalBackups) return 0;
+		try {
+			return await provider.countLocalBackups(docId);
+		} catch (e) {
+			reportError(e, 'storage:count-backups', { notify: false });
+			return 0;
+		}
+	}
+
 	/**
 	 * Load document from primary provider
 	 */

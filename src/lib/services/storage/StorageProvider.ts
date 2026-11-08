@@ -65,6 +65,9 @@ export interface StorageProvider {
 	 */
 	getLocalBackups?(docId: string): Promise<LocalBackup[]>;
 
+	/** How many backups a document has, without loading their snapshots (optional) */
+	countLocalBackups?(docId: string): Promise<number>;
+
 	/**
 	 * Get storage usage information (optional, may not apply to all providers)
 	 */

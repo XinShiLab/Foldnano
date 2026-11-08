@@ -56,6 +56,15 @@ export class IndexedDbStorageProvider implements StorageProvider {
 		}
 	}
 
+	async countLocalBackups(docId: string): Promise<number> {
+		try {
+			return await this.backend.countLocalBackups(docId);
+		} catch (e) {
+			reportError(e, 'storage:indexeddb:count-backups', { notify: false });
+			return 0;
+		}
+	}
+
 	async deleteDocument(docId: string): Promise<boolean> {
 		try {
 			await this.backend.deleteDocument(docId);

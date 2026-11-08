@@ -22,6 +22,15 @@ gate titles, a use-with-caution note); drop the "beta" badge at 1.0.
 
 ## After the beta
 
+- [ ] **Design file-name safeguards: check in the browser** (landed 2026-11-08 on
+      `dev/wireframe`; unit-tested, not yet tried in the UI). One name rule for every entry point
+      (`validateDesignName`), case-insensitive folder clashes that block (toolbar rename, Files
+      tab rename, New File, Publish), a warning for a name another saved design uses, no
+      toolbar rename of a committed file with uncommitted changes, `Name (2)` for opened files
+      whose name is taken, and "Untitled Document" reserved for the empty workspace with a
+      required name prompt once a Part appears (`docs/autosave.md` § Reserved blank name). Try:
+      add a region in a blank workspace, open an old "Untitled Document" design, rename onto a
+      taken name (same folder and elsewhere), publish onto an existing path.
 - Plugin dev mode follow-ups. Linking, the dev worker, the Dev tab, log streaming and folder
   paths in tracebacks landed 2026-10-23 on `feat/plugin_devMode`
   (`docs/python-plugin-system.md` § Plugin dev mode). (1) Done: tested in Chrome

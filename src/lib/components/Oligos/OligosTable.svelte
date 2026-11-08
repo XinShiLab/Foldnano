@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { ArrowDown, ArrowUp, ArrowUpDown } from '@lucide/svelte';
+	import { ArrowDown, ArrowUp, ArrowUpDown, CircleHelp } from '@lucide/svelte';
+	import { resolve } from '$app/paths';
 	import type { OligoReportColumn, OligoReportRow } from '$lib/model/io/oligoReport';
 
 	interface Props {
@@ -102,24 +103,40 @@
 				<tr>
 					{#each columns as column (column.key)}
 						<th class="border-b border-border px-3 py-2 font-medium">
-							<button
-								class="flex w-full items-center gap-1 {column.align === 'right'
-									? 'justify-end'
-									: 'justify-start'}"
-								onclick={() => toggleSort(column.key)}
-								aria-label={`Sort by ${column.label}`}
-							>
-								<span>{column.label}</span>
-								{#if sortColumn === column.key}
-									{#if sortDirection === 'asc'}
-										<ArrowUp class="size-3" />
+							<div class="flex items-center gap-1">
+								<button
+									class="flex w-full items-center gap-1 {column.align === 'right'
+										? 'justify-end'
+										: 'justify-start'}"
+									onclick={() => toggleSort(column.key)}
+									aria-label={`Sort by ${column.label}`}
+								>
+									<span>{column.label}</span>
+									{#if sortColumn === column.key}
+										{#if sortDirection === 'asc'}
+											<ArrowUp class="size-3" />
+										{:else}
+											<ArrowDown class="size-3" />
+										{/if}
 									{:else}
-										<ArrowDown class="size-3" />
+										<ArrowUpDown class="size-3 opacity-40" />
 									{/if}
-								{:else}
-									<ArrowUpDown class="size-3 opacity-40" />
+								</button>
+								{#if column.key === 'oligoKey'}
+									<a
+										href="{resolve('/docs/[...slug]', {
+											slug: 'guide/oligo-report',
+										})}#oligokey-and-oligo-id"
+										target="_blank"
+										rel="noopener"
+										class="shrink-0 hover:text-foreground"
+										title="OligoKey vs oligo ID"
+										aria-label="What is the OligoKey, and how is it different from the oligo ID?"
+									>
+										<CircleHelp class="size-3" />
+									</a>
 								{/if}
-							</button>
+							</div>
 						</th>
 					{/each}
 				</tr>

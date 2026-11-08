@@ -5,7 +5,19 @@ import FoldnanoDocument, { type DocSnapshot } from '$lib/model/document.svelte';
 import { DocumentFormatError, migrateDocumentJson } from '$lib/model/documentFormat';
 import { repairDocumentJson } from '$lib/model/documentRepair';
 import { checkDocumentIntegrity } from '$lib/model/checks/integrity';
-import { designNameFromPath, splitDesignExtension } from '$lib/model/io/designFileName';
+import {
+	FN_JSON_EXT,
+	UNTITLED_DOCUMENT_NAME,
+	designNameFromPath,
+	designNameKey,
+	findPathClash,
+	isReservedDesignName,
+	normalizeDesignName,
+	splitDesignExtension,
+	stripDesignExtension,
+	uniqueDesignName,
+	validateDesignName,
+} from '$lib/model/io/designFileName';
 import { HistoryStack } from '$lib/commands/history.svelte';
 import {
 	StorageManager,
@@ -24,6 +36,7 @@ import {
 	createBranch,
 	deleteFileContent,
 	getFileContent,
+	getRepoTree,
 	listBranches,
 	listCommits,
 	putFileContent,
@@ -80,11 +93,26 @@ export interface GitHubBindingSnapshot {
 	remoteAheadOfLocal: boolean;
 }
 
+/** What opening a design file does when its id is already saved in this browser. */
+export type ImportedIdChoice = 'copy' | 'replace';
+
 export type RenameDocumentResult =
 	| { kind: 'unchanged' }
 	| { kind: 'doc-only-renamed' }
 	| { kind: 'local-only-file-renamed'; oldPath: string; newPath: string; filename: string }
 	| { kind: 'repo-file-renamed'; oldPath: string; newPath: string; filename: string };
+
+/** Whether a rename may go ahead; `nameClash` is another saved design's name, worth a warning. */
+export type RenameCheck =
+	| { kind: 'unchanged' }
+	| { kind: 'blocked'; message: string }
+	| { kind: 'ok'; name: string; nameClash: string | null; commitsToGitHub: boolean };
+
+interface RenameTarget {
+	oldPath: string;
+	newPath: string;
+	committed: boolean;
+}
 
 export class EditorDocumentSession {
 	#currentDoc: FoldnanoDocument = $state(new FoldnanoDocument());
@@ -229,7 +257,7 @@ export class EditorDocumentSession {
 				this.hooks.clearStaleSelectionsAfterReplay();
 				this.hooks.repairActiveRegion();
 			},
-			() => this.isTabOwner,
+			() => this.isTabOwner && this.hasSavableName,
 			() => this.#afterSave()
 		);
 	}
@@ -390,12 +418,22 @@ export class EditorDocumentSession {
 		await this.saveDocumentToLocalStorage({ force: true });
 	}
 
+	/** The blank-workspace name is never saved; the editor asks for a name once a Part appears. */
+	get hasSavableName(): boolean {
+		return !isReservedDesignName(this.#currentDoc.name);
+	}
+
+	/** A design with content but no name yet: its edits are held until it is named. */
+	get needsName(): boolean {
+		return !this.hasSavableName && this.#currentDoc.parts.length > 0;
+	}
+
 	private isPristineUnsavedBlankDocument(): boolean {
 		return (
 			this.#currentFileMetadata === null &&
 			this.#lastLocalPersistAt === null &&
 			!this.hasUnsavedLocalChanges &&
-			this.#currentDoc.name === 'Untitled Document' &&
+			isReservedDesignName(this.#currentDoc.name) &&
 			this.#currentDoc.parts.length === 0
 		);
 	}
@@ -472,6 +510,7 @@ export class EditorDocumentSession {
 			if (options?.skipPristineBlank && this.isPristineUnsavedBlankDocument()) {
 				return true;
 			}
+			if (!this.hasSavableName) return true;
 			await this.persistCurrentDocumentSnapshot('manual-save', { force: options?.force });
 			return await this.hooks.savePersistedContext();
 		} catch (e) {
@@ -480,9 +519,120 @@ export class EditorDocumentSession {
 		}
 	}
 
-	async renameDocument(newName: string): Promise<RenameDocumentResult> {
-		const trimmed = newName.trim();
+	/** Another saved design named `name` (ignoring case), other than `exceptDocId`. */
+	async findSavedNameClash(
+		name: string,
+		exceptDocId = this.#currentDoc.id
+	): Promise<string | null> {
+		const key = designNameKey(name);
+		const docs = await this.#storageManager.getDocumentList();
+		const clash = docs.find(
+			(d) => d.id !== exceptDocId && designNameKey(d.name || UNTITLED_DOCUMENT_NAME) === key
+		);
+		return clash ? clash.name : null;
+	}
+
+	/**
+	 * A file or folder at `path` in the current repo, committed or local-only and ignoring case,
+	 * other than `ownPath`. Without the GitHub tree (offline) only local-only entries are checked.
+	 */
+	async findRepoPathClash(path: string, ownPath?: string): Promise<string | null> {
+		return findPathClash(await this.#repoPaths(), path, ownPath);
+	}
+
+	async #repoPaths(): Promise<string[]> {
+		const repoCtx = this.#currentRepoContext;
+		if (!repoCtx) return [];
+		const paths = [
+			...loadLocalOnlyEntries(repoCtx).map((e) => e.path),
+			...loadLocalFolderPaths(repoCtx),
+		];
+		try {
+			const tree = await getRepoTree(repoCtx.owner, repoCtx.repo, repoCtx.branch, true);
+			for (const item of tree.tree) paths.push(item.path);
+		} catch (e) {
+			console.warn('[EditorDocumentSession] Could not list the repo to check names:', e);
+		}
+		return paths;
+	}
+
+	/**
+	 * Name for a design opened from a file: `base`, or `base (2)`, ... when it is taken. Taken means
+	 * by a saved design, or with `repoFolder`, by a design file in that folder of the current repo.
+	 */
+	async uniqueImportName(base: string, repoFolder: string | null = null): Promise<string> {
+		if (isReservedDesignName(base)) return base;
+		let taken: string[];
+		if (repoFolder === null) {
+			taken = (await this.#storageManager.getDocumentList()).map((d) => d.name);
+		} else {
+			const prefix = (repoFolder ? `${repoFolder}/` : '').toLowerCase();
+			taken = (await this.#repoPaths())
+				.filter((p) => {
+					const lower = p.toLowerCase();
+					return (
+						lower.startsWith(prefix) &&
+						!lower.slice(prefix.length).includes('/') &&
+						lower.endsWith(FN_JSON_EXT)
+					);
+				})
+				.map((p) => stripDesignExtension(p.slice(prefix.length)));
+		}
+		return uniqueDesignName(base, taken);
+	}
+
+	/** The repo file a rename to `name` moves, or null when only the document name changes. */
+	#renameTarget(name: string): RenameTarget | null {
+		const repoCtx = this.#currentRepoContext;
+		if (!repoCtx) return null;
+		const entry = loadLocalOnlyEntries(repoCtx).find((e) => e.docId === this.#currentDoc.id);
+		if (entry) {
+			return { oldPath: entry.path, newPath: deriveNewPath(entry.path, name), committed: false };
+		}
+		const meta = this.#currentFileMetadata;
+		if (meta?.sha) {
+			return { oldPath: meta.path, newPath: deriveNewPath(meta.path, name), committed: true };
+		}
+		return null;
+	}
+
+	/** Same rules as the explorer's rename, so both entry points refuse the same names. */
+	async checkRename(newName: string): Promise<RenameCheck> {
+		const trimmed = normalizeDesignName(newName);
 		if (!trimmed || trimmed === this.#currentDoc.name) return { kind: 'unchanged' };
+		const invalid = validateDesignName(trimmed);
+		if (invalid) return { kind: 'blocked', message: invalid };
+
+		const target = this.#renameTarget(trimmed);
+		if (target?.committed && this.hasUncommittedGitHubChanges) {
+			const file = target.oldPath.split('/').pop();
+			return {
+				kind: 'blocked',
+				message: `"${file}" has uncommitted changes. Commit or discard them before renaming.`,
+			};
+		}
+		if (target) {
+			const clash = await this.findRepoPathClash(target.newPath, target.oldPath);
+			if (clash) {
+				return {
+					kind: 'blocked',
+					message: `"${clash.split('/').pop()}" already exists in this folder.`,
+				};
+			}
+		}
+		return {
+			kind: 'ok',
+			name: trimmed,
+			nameClash: await this.findSavedNameClash(trimmed),
+			commitsToGitHub: !!target?.committed,
+		};
+	}
+
+	async renameDocument(newName: string): Promise<RenameDocumentResult> {
+		const trimmed = normalizeDesignName(newName);
+		if (!trimmed || trimmed === this.#currentDoc.name) return { kind: 'unchanged' };
+		const invalid = validateDesignName(trimmed);
+		if (invalid) throw new Error(invalid);
 
 		const repoCtx = this.#currentRepoContext;
 		const meta = this.#currentFileMetadata;
@@ -566,9 +716,33 @@ export class EditorDocumentSession {
 		return { kind: 'doc-only-renamed' };
 	}
 
-	async openImportedDocument(imported: FoldnanoDocument): Promise<void> {
+	/**
+	 * Opens a design file. When its id is already saved here, `ifSaved` picks between a copy under a
+	 * new id and replacing the saved design (kept as a backup, GitHub link kept).
+	 */
+	async openImportedDocument(
+		imported: FoldnanoDocument,
+		ifSaved: ImportedIdChoice = 'copy'
+	): Promise<void> {
 		this.#isLoading = true;
 		try {
+			const savedMeta = githubMetadataStore.getFileMetadata(imported.id);
+			const savedLocally = (await this.#storageManager.loadDocument(imported.id)) !== null;
+			if (savedLocally && ifSaved === 'replace') {
+				await this.#replaceSavedWithImport(imported, savedMeta);
+				return;
+			}
+			// A plain save under a taken id would replace that design with no backup and take its GitHub link.
+			if (savedLocally || savedMeta) {
+				imported = FoldnanoDocument.fromJSON({ ...imported.toJSON(), id: uuidv4() });
+			}
+			const name = await this.uniqueImportName(imported.name);
+			if (name !== imported.name) {
+				toast.warning(`Opened as "${name}"`, {
+					description: `A saved design is already named "${imported.name}".`,
+				});
+				imported.name = name;
+			}
 			await this.#adoptDocument(imported, {
 				fileMetadata: null,
 				lastLocalPersistAt: null,
@@ -579,6 +753,35 @@ export class EditorDocumentSession {
 		} finally {
 			this.#isLoading = false;
 		}
+	}
+
+	async #replaceSavedWithImport(
+		imported: FoldnanoDocument,
+		savedMeta: GitHubFileMetadata | null
+	): Promise<void> {
+		if (savedMeta?.path) syncNameWithPath(imported, savedMeta.path);
+		// Adopt first: it takes the document over from any other tab before the write.
+		await this.#adoptDocument(imported, {
+			fileMetadata: savedMeta,
+			lastGitHubSyncAt: savedMeta?.lastSyncAt ?? null,
+			loadPersistedContext: false,
+		});
+		if (!this.isTabOwner) return;
+		const ok = await this.#storageManager.saveDocument(imported.id, $state.snapshot(imported), {
+			backup: { reason: 'before_import' },
+		});
+		if (!ok) {
+			toast.error("Couldn't save the opened file in this browser");
+			return;
+		}
+		const persistedAt = await this.#storedSaveTime(imported.id);
+		this.#lastLocalPersistAt = persistedAt;
+		this.#historyStack.markSaved(persistedAt);
+		await this.hooks.savePersistedContext();
+		toast.success('Replaced the saved design', {
+			description: 'The previous version is in Backups.',
+		});
+		if (savedMeta) this.#checkRemoteAheadInBackground(imported.id);
 	}
 
 	async loadDocumentFromGitHub(
@@ -817,6 +1020,10 @@ export class EditorDocumentSession {
 		return toBackupEntries(await this.#storageManager.getLocalBackups(docId));
 	}
 
+	async countBackups(docId: string): Promise<number> {
+		return this.#storageManager.countLocalBackups(docId);
+	}
+
 	/**
 	 * Replaces a document's stored copy with a backup and opens it. The replaced copy, including
 	 * unsaved edits when the document is open, is kept as a backup first.
@@ -887,7 +1094,7 @@ export class EditorDocumentSession {
 		options?: { force?: boolean }
 	): Promise<PersistResult> {
 		const snapshot = $state.snapshot(this.#currentDoc);
-		if (this.#pendingUrlSave && !options?.force) {
+		if ((this.#pendingUrlSave && !options?.force) || !this.hasSavableName) {
 			return { snapshot, persistedAt: 0 };
 		}
 		if (!options?.force && !this.hasUnsavedLocalChanges && this.#lastLocalPersistAt !== null) {

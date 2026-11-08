@@ -4,7 +4,13 @@
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { getEditorDocumentSession } from '../context/EditorDocumentSession.svelte';
 	import type { FileNode } from './types';
-	import { validateFileStem } from './fileNaming';
+	import {
+		FN_JSON_EXT,
+		findPathClash,
+		normalizeDesignName,
+		validateDesignName,
+	} from '$lib/model/io/designFileName';
+	import { collectPaths } from './treeUtils';
 
 	interface Props {
 		open: boolean;
@@ -49,10 +55,19 @@
 	const folderOptions = $derived(collectFolderPaths(fileTree));
 
 	async function handleCreate() {
-		const trimmed = fileName.trim();
-		const invalid = validateFileStem(trimmed);
+		const trimmed = normalizeDesignName(fileName);
+		const invalid = validateDesignName(trimmed);
 		if (invalid) {
 			validationError = invalid;
+			return;
+		}
+		const newName = trimmed + FN_JSON_EXT;
+		const clash = findPathClash(
+			collectPaths(fileTree),
+			chosenFolder ? `${chosenFolder}/${newName}` : newName
+		);
+		if (clash) {
+			validationError = `"${clash.split('/').pop()}" already exists in this folder.`;
 			return;
 		}
 		creating = true;
@@ -60,7 +75,7 @@
 		try {
 			const path = await session.createNewLocalDocument(trimmed, chosenFolder);
 			const node: FileNode = {
-				name: trimmed + '.fn.json',
+				name: newName,
 				path,
 				type: 'file',
 				sha: '',

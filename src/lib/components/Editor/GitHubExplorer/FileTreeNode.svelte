@@ -11,7 +11,8 @@
 	import { toast } from 'svelte-sonner';
 	import type { FileNode } from './types';
 	import FileTreeNode from './FileTreeNode.svelte';
-	import { fileStem, isRenamableFile, validateFileStem } from './fileNaming';
+	import { fileStem, isRenamableFile } from './fileNaming';
+	import { normalizeDesignName, validateDesignName } from '$lib/model/io/designFileName';
 
 	interface Props {
 		node: FileNode;
@@ -97,12 +98,12 @@
 
 	async function confirmRename(fromBlur = false) {
 		if (!renaming) return; // Enter removes the input, which then blurs
-		const newStem = renameValue.trim();
+		const newStem = normalizeDesignName(renameValue);
 		if (!newStem || newStem === fileStem(node.name) || !onRename) {
 			cancelRename();
 			return;
 		}
-		const invalid = validateFileStem(newStem);
+		const invalid = validateDesignName(newStem);
 		if (invalid) {
 			// Enter keeps the input open so the name can be fixed; a blur just abandons the edit.
 			if (fromBlur) cancelRename();

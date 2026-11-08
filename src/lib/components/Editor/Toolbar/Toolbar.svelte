@@ -143,14 +143,11 @@
 		}
 	});
 
-	// Whether the currently open file is a committed GitHub file (requires confirm + commit to rename).
-	const isGitHubCommitted = $derived(
-		!!session.currentRepoContext && !!session.currentFileMetadata?.sha
-	);
-
-	// Rename confirm dialog state
+	// Rename confirm dialog state: shown to commit a GitHub rename or to warn about a taken name.
 	let renameDialogOpen: boolean = $state(false);
 	let pendingNewName: string = $state('');
+	let pendingNameClash: string | null = $state(null);
+	let pendingCommitsToGitHub: boolean = $state(false);
 	let isRenaming: boolean = $state(false);
 
 	function handleRenameResult(result: RenameDocumentResult): void {
@@ -164,21 +161,40 @@
 		}
 	}
 
-	function handleNameBlur() {
-		isEditingName = false;
+	async function handleNameBlur() {
 		const trimmed = docNameInput.trim();
-		if (!trimmed || trimmed === foldnanoDoc.name) {
-			// No real change — snap back to current model name
-			docNameInput = foldnanoDoc.name;
-			return;
+		isRenaming = true;
+		try {
+			const check = await session.checkRename(trimmed);
+			if (check.kind === 'unchanged') {
+				docNameInput = foldnanoDoc.name;
+				return;
+			}
+			if (check.kind === 'blocked') {
+				toast.error(check.message);
+				docNameInput = foldnanoDoc.name;
+				return;
+			}
+			if (check.commitsToGitHub || check.nameClash) {
+				pendingNewName = check.name;
+				pendingNameClash = check.nameClash;
+				pendingCommitsToGitHub = check.commitsToGitHub;
+				renameDialogOpen = true;
+				return;
+			}
+			await runRename(check.name);
+		} finally {
+			isRenaming = false;
+			isEditingName = false;
 		}
-		if (isGitHubCommitted) {
-			// For committed GitHub files, ask for confirmation before committing
-			pendingNewName = trimmed;
-			renameDialogOpen = true;
-		} else {
-			// Cases 1 & 2: local rename — just do it immediately
-			session.renameDocument(trimmed).then((result) => handleRenameResult(result));
+	}
+
+	async function runRename(name: string) {
+		try {
+			handleRenameResult(await session.renameDocument(name));
+		} catch (e) {
+			toast.error(`Couldn't rename "${foldnanoDoc.name}"`, { description: (e as Error).message });
+			docNameInput = foldnanoDoc.name;
 		}
 	}
 
@@ -186,8 +202,7 @@
 		renameDialogOpen = false;
 		isRenaming = true;
 		try {
-			const result = await session.renameDocument(pendingNewName);
-			handleRenameResult(result);
+			await runRename(pendingNewName);
 		} finally {
 			isRenaming = false;
 		}
@@ -801,7 +816,7 @@
 
 <AboutDialog bind:open={editorViewContext.aboutDialogOpen} />
 
-<!-- Rename & commit confirmation dialog (GitHub committed files only) -->
+<!-- Rename confirmation: committing a GitHub rename, or a name another saved design uses -->
 <Dialog.Root
 	bind:open={renameDialogOpen}
 	onOpenChange={(open) => {
@@ -810,18 +825,25 @@
 >
 	<Dialog.Content class="sm:max-w-md">
 		<Dialog.Header>
-			<Dialog.Title>Rename and Commit</Dialog.Title>
+			<Dialog.Title>{pendingCommitsToGitHub ? 'Rename and Commit' : 'Rename Design'}</Dialog.Title>
 			<Dialog.Description>
 				Rename <span class="font-medium text-foreground">"{foldnanoDoc.name}"</span> to
 				<span class="font-medium text-foreground">"{pendingNewName}"</span>?
-				{#if session.hasUncommittedGitHubChanges}
-					<br /><br />This will also commit all unsaved local changes to GitHub.
+				{#if pendingNameClash}
+					<br /><br />Another saved design is already named
+					<span class="font-medium text-foreground">"{pendingNameClash}"</span>. Both will keep
+					their own content, but they will be hard to tell apart.
+				{/if}
+				{#if pendingCommitsToGitHub}
+					<br /><br />The renamed file is committed to GitHub right away.
 				{/if}
 			</Dialog.Description>
 		</Dialog.Header>
 		<Dialog.Footer>
 			<Button variant="outline" onclick={cancelRename}>Cancel</Button>
-			<Button onclick={confirmRename}>Rename &amp; Commit</Button>
+			<Button onclick={confirmRename}
+				>{pendingCommitsToGitHub ? 'Rename & Commit' : 'Rename Anyway'}</Button
+			>
 		</Dialog.Footer>
 	</Dialog.Content>
 </Dialog.Root>

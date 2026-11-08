@@ -239,6 +239,24 @@ When a document is loaded from IndexedDB, `EditorDocumentSession`:
 5. restores the last local persist timestamp from the `documents` table
 6. triggers a non-blocking GitHub conflict check if file metadata exists
 
+### Importing a `.fn.json` file
+
+`openImportedDocument(doc, ifSaved)` (Open dialog) saves the file as a local design under the
+file's own document id when nothing uses it. Re-opening a file exported from this browser is the
+common way to hit a taken id; the dialog then shows when the saved design was last saved and
+offers two buttons, passed as `ImportedIdChoice`:
+
+- **Open as copy** (`copy`, the default): the import gets a new id; the saved design is untouched.
+  An id that only has leftover `githubFiles` metadata also gets a copy, silently, so the import
+  never takes over a GitHub link.
+- **Replace** (`replace`): adopts the import under the saved id (taking the document over from
+  any other tab first), then writes it with a `before_import` backup, so the saved version stays
+  restorable. The GitHub link is kept, so a linked design shows the import as a local change to
+  commit or discard.
+
+A plain save under a taken id would replace the design with no backup, so don't add an import
+path that skips this choice.
+
 If the snapshot exists but `FoldnanoDocument.fromJSON()` throws (damaged data, or a
 `DocumentFormatError` for a file from a newer app), nothing is adopted or written. The session
 sets `loadFailure` (`DocumentLoadFailure` in `context/documentRecovery.ts`: doc id, name, friendly
@@ -367,8 +385,12 @@ transaction as the write that replaces the copy:
 - **overwrite reasons** (`SaveDocumentOptions.backup`): always, when a write replaces the user's
   copy: `before_pull`, `before_accept_remote`, `before_branch_reload`, `before_conflict_resolve`
   (diff dialog _Apply resolved JSON_, `applyResolvedConflict()`), `before_discard`,
-  `before_restore`, `before_repair` (load-time repair, see § Repair on load). Because the newest backup's time restarts the 10-minute clock, an overwrite
+  `before_restore`, `before_repair` (load-time repair, see § Repair on load), `before_import`
+  (Open dialog _Replace_, see § Importing a `.fn.json` file). Because the newest backup's time restarts the 10-minute clock, an overwrite
   also delays the next periodic backup
+
+`countLocalBackups()` counts a timeline from the `[docId+createdAt]` index without reading
+snapshots (the status bar's Backups count).
 
 `createdAt` is when the backup was taken (the moment that version was replaced) and is strictly
 increasing per document, so two backups in one millisecond keep their order. Reads go through
@@ -399,6 +421,25 @@ When a document is deleted from `/toc`:
 Both cleanup paths run on every delete (not conditioned on whether the doc was GitHub-backed) to handle documents that transitioned from local-only to GitHub-backed without fully cleaning up.
 
 If the deleted document is the currently open document, the editor resets to a fresh blank document.
+
+## Exporting All Designs
+
+`/toc` **Download All** calls `exportAllDesigns()` (`src/lib/services/storage/designArchive.ts`),
+which zips every listed design with `fflate`:
+
+- one `<name>.fn.json` per design, the **stored snapshot as is** (no migrate, no repair), so a
+  design that can't be opened still gets out. Names go through `exportBaseName()`; repeats get
+  ` (2)`, ` (3)` in oldest-first order, compared case-insensitively because unzipping on macOS or
+  Windows would merge them.
+- `manifest.json` (`DesignArchiveManifest`, `format: 'foldnano-design-archive'`, `version: 1`):
+  per file the document id, name, last-modified time and, for linked designs, the GitHub
+  owner/repo/branch/path. A future import keys on these ids; the GitHub fields are a record, not a
+  link to restore (the SHA would be stale).
+- a listed design whose snapshot can't be read is reported in `skipped`, not silently dropped.
+
+Backups, view context, plugins and error logs are left out. The export reads IndexedDB only, so
+edits an open editor tab hasn't autosaved yet aren't included. `zipSync` runs on the main thread,
+which is fine at typical library sizes.
 
 ## Current Design Notes
 

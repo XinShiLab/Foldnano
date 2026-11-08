@@ -10,6 +10,8 @@
 	import GitHubSessionExpiredBanner from './GitHubSessionExpiredBanner.svelte';
 	import { githubAuth } from '$lib/services/github/auth.svelte';
 	import DocumentRecoveryScreen from './DocumentRecoveryScreen.svelte';
+	import NameDesignDialog from './NameDesignDialog.svelte';
+	import StatusBar from './StatusBar.svelte';
 	// import {
 	// setCSCursorContext,
 	// 	setDocContext,
@@ -696,6 +698,7 @@
 	{#if session.loadFailure}
 		<DocumentRecoveryScreen failure={session.loadFailure} />
 	{/if}
+	<NameDesignDialog />
 	<Toolbar />
 	<!-- <Button onclick={()=> history.undoOnce()}>Undo</Button> <Button onclick={()=> testNewVhWithUndo()}>Add VH with Undo</Button> -->
 	<div class="relative flex min-h-0 flex-1 border-t border-border bg-background">
@@ -746,87 +749,7 @@
 		<ToolPanel part={foldnanoDoc.parts[0]} />
 	{/if}
 
-	<!-- Status bar -->
-	{#snippet statusBar()}
-		{@const fileMeta = session.currentFileMetadata}
-		{@const repoCtx = session.currentRepoContext}
-		{@const hasUncommitted = fileMeta !== null && session.hasUncommittedGitHubChanges}
-		{@const remoteAhead = session.remoteAheadOfLocal}
-		<div
-			class="flex h-7 shrink-0 items-center justify-between border-t border-border bg-muted px-3 text-sm text-muted-foreground"
-		>
-			<!-- Left: GitHub / file context -->
-			<div class="flex items-center gap-2 overflow-hidden">
-				{#if fileMeta && repoCtx}
-					<!-- Branch -->
-					<span class="flex items-center gap-1 font-semibold text-foreground">
-						<svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor" class="shrink-0">
-							<path
-								d="M5 3.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0zm0 2.122a2.25 2.25 0 1 0-1.5 0v.878A2.25 2.25 0 0 0 5.75 8.5h1.5v2.128a2.251 2.251 0 1 0 1.5 0V8.5h1.5a2.25 2.25 0 0 0 2.25-2.25v-.878a2.25 2.25 0 1 0-1.5 0v.878a.75.75 0 0 1-.75.75h-4.5A.75.75 0 0 1 5 6.25v-.878zm3.75 7.378a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0zm3-8.75a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0z"
-							/>
-						</svg>
-						{repoCtx.branch}
-					</span>
-					<!-- Uncommitted dot -->
-					{#if hasUncommitted}
-						<span
-							class="flex items-center gap-0.5 text-amber-600 dark:text-amber-400"
-							title="Uncommitted local changes"
-						>
-							<span class="inline-block h-1.5 w-1.5 rounded-full bg-amber-500"></span>
-							unsaved to GitHub
-						</span>
-					{:else if remoteAhead}
-						<span
-							class="flex items-center gap-0.5 text-blue-600 dark:text-blue-400"
-							title="GitHub has newer changes"
-						>
-							↓ remote ahead
-						</span>
-					{/if}
-					{#if session.remoteCheckFailed}
-						<button
-							class="flex items-center gap-0.5 text-amber-600 hover:underline dark:text-amber-400"
-							title="Couldn't check GitHub for newer changes. Committing still checks and warns if the file changed. Click to try again."
-							onclick={() => session.recheckRemote()}
-						>
-							? GitHub not checked
-						</button>
-					{/if}
-					<!-- File path -->
-					<span
-						class="truncate text-muted-foreground"
-						title="{fileMeta.owner}/{fileMeta.repo}/{fileMeta.path}"
-					>
-						{fileMeta.owner}/{fileMeta.repo} · {fileMeta.path}
-					</span>
-					<!-- Current commit SHA -->
-					{#if fileMeta.commitSha}
-						<span
-							class="shrink-0 font-mono text-xs text-muted-foreground"
-							title="Current commit: {fileMeta.commitSha}">{fileMeta.commitSha.slice(0, 7)}</span
-						>
-					{/if}
-					<button
-						class="shrink-0 rounded border border-border bg-background px-1.5 py-0.5 text-xs text-muted-foreground hover:bg-muted"
-						title="Earlier versions of this design kept in this browser"
-						onclick={() => (editorViewContext.showBackups = true)}
-					>
-						Backups
-					</button>
-				{:else if repoCtx}
-					<span class="text-muted-foreground"
-						>{repoCtx.owner}/{repoCtx.repo} · {repoCtx.branch} · no file open</span
-					>
-				{/if}
-			</div>
-			<!-- Right: canvas hover info -->
-			<span class="shrink-0 text-muted-foreground"
-				>{editorViewContext.strandViewContext.footnote}</span
-			>
-		</div>
-	{/snippet}
-	{@render statusBar()}
+	<StatusBar />
 	{#if editorViewContext.showShortcuts}
 		<WorkspaceHelp
 			root={editorRoot}

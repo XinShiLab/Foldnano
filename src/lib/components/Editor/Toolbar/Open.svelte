@@ -7,7 +7,7 @@
 		MEGABYTE,
 		type FileDropZoneProps,
 	} from '$lib/components/ui/file-drop-zone';
-	import { onDestroy } from 'svelte';
+	import { onDestroy, untrack } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import { SvelteDate } from 'svelte/reactivity';
 	import { FileJson2, LoaderCircle, XIcon } from '@lucide/svelte';
@@ -18,7 +18,10 @@
 
 	import { Part } from '../../../model/Part';
 	import { getEditorViewContext } from '../context/EditorViewContext.svelte';
-	import { getEditorDocumentSession } from '../context/EditorDocumentSession.svelte';
+	import {
+		getEditorDocumentSession,
+		type ImportedIdChoice,
+	} from '../context/EditorDocumentSession.svelte';
 	import FoldnanoDocument from '../../../model/document.svelte';
 	import { Puzzle } from '@lucide/svelte';
 	import { goto } from '$app/navigation';
@@ -82,9 +85,9 @@
 
 	// If the caller pre-populated files (e.g. dropped on the empty-state canvas), queue them.
 	$effect(() => {
-		if (initialFiles.length > 0) {
-			onUpload(initialFiles);
-		}
+		const queued = initialFiles;
+		// Untracked: uploading reads `files`, and removing a card must not re-add the queued file.
+		if (queued.length > 0) untrack(() => onUpload(queued));
 	});
 
 	onDestroy(async () => {
@@ -116,11 +119,15 @@
 	}
 
 	// Load a .fn.json document, named after its file as GitHub-backed designs are.
-	const onLoadClick = async (uploadedFile: UploadedFile, imported: FoldnanoDocument) => {
+	const onLoadClick = async (
+		uploadedFile: UploadedFile,
+		imported: FoldnanoDocument,
+		ifSaved: ImportedIdChoice
+	) => {
 		imported.name = stripDesignExtension(uploadedFile.name) || imported.name;
 		isLoading = true;
 		try {
-			await session.openImportedDocument(imported);
+			await session.openImportedDocument(imported, ifSaved);
 			toggleDialog();
 		} finally {
 			isLoading = false;
@@ -134,13 +141,22 @@
 		}
 		isLoading = true;
 		try {
-			const baseName = stripDesignExtension(uploadedFile.name);
+			const fileBaseName = stripDesignExtension(uploadedFile.name);
 			const repoCtx = session.currentRepoContext;
 
 			let folderPath = '';
 			if (addToRepoFolder && repoCtx && session.currentFileMetadata?.path) {
 				const parts = session.currentFileMetadata.path.split('/');
 				folderPath = parts.length > 1 ? parts.slice(0, -1).join('/') : '';
+			}
+			const inRepo = addToRepoFolder && !!repoCtx;
+			const baseName = await session.uniqueImportName(fileBaseName, inRepo ? folderPath : null);
+			if (baseName !== fileBaseName) {
+				toast.warning(`Opened as "${baseName}"`, {
+					description: inRepo
+						? `"${fileBaseName}.fn.json" already exists in this folder.`
+						: `A saved design is already named "${fileBaseName}".`,
+				});
 			}
 
 			const { docId, path: fnPath } = await session.createDocumentFromImportedPart(
@@ -278,10 +294,10 @@
 							</div>
 						</div>
 					{:else}
-						<div class="flex flex-col gap-2">
-							<div class="flex min-w-0 flex-col gap-1 text-xs">
-								<p class="text-muted-foreground">{summarizeDesign(parsed)}</p>
-								{#await file.storedAt then storedAt}
+						{#await file.storedAt then storedAt}
+							<div class="flex flex-col gap-2">
+								<div class="flex min-w-0 flex-col gap-1 text-xs">
+									<p class="text-muted-foreground">{summarizeDesign(parsed)}</p>
 									{#if storedAt !== null}
 										<p
 											class="rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-amber-800"
@@ -289,19 +305,31 @@
 											This design is already in your browser (last saved {new Date(
 												storedAt
 											).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}).
-											Loading replaces that copy.
+											Open the file as a separate copy, or replace the saved design with it (the
+											saved version stays in Backups).
 										</p>
 									{/if}
-								{/await}
+								</div>
+								<div class="flex justify-end gap-2">
+									{#if storedAt !== null}
+										<Button
+											size="sm"
+											variant="outline"
+											disabled={isLoading}
+											onclick={() => onLoadClick(file, parsed, 'replace')}>Replace</Button
+										>
+									{/if}
+									<Button
+										size="sm"
+										disabled={isLoading}
+										onclick={() => onLoadClick(file, parsed, 'copy')}
+									>
+										{#if isLoading}<LoaderCircle class="animate-spin" />{/if}
+										{storedAt !== null ? 'Open as copy' : 'Load'}
+									</Button>
+								</div>
 							</div>
-							<div class="flex justify-end">
-								{#if isLoading}
-									<Button size="sm" disabled><LoaderCircle class="animate-spin" />Load</Button>
-								{:else}
-									<Button size="sm" onclick={() => onLoadClick(file, parsed)}>Load</Button>
-								{/if}
-							</div>
-						</div>
+						{/await}
 					{/if}
 				{:catch error}
 					<div class="text-xs text-red-500">Error: {error.message}</div>

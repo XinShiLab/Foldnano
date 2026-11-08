@@ -30,7 +30,7 @@
 	};
 	const hoverOutHandler = () => {
 		if (!bpEl) return;
-		editorViewContext.strandViewContext.footnote = 'nothing';
+		editorViewContext.strandViewContext.footnote = '';
 	};
 </script>
 

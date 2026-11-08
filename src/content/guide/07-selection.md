@@ -80,9 +80,29 @@ The **Select:** dropdown in the panel turns a click into a "select all similar" 
 | **Same Length** | Every oligo with the clicked oligo's length | oligos |
 | **Same Modification** | Every end carrying the clicked end's modification | ends |
 
-### Oligo info
+### Selection info
 
-Below the filters, the panel shows details for the oligo or segment you last clicked: its name, its 5′ → 3′ span (`helix[base] -> helix[base]`, or *(circular)*), length, color, whether it's the scaffold, whether its sequence is locked, and its modifications. For a clicked segment, the panel also shows the oligo it belongs to.
+Below the filters, the panel shows what is selected. The first line counts it by kind, for example **2 oligos · 3 segments · 1 crossover**:
+
+- an **oligo** counts when every one of its ends is selected,
+- otherwise a **segment** counts when both of its ends are selected, and a **crossover** when the ends on both sides of it are,
+- any other selected **end** counts on its own.
+
+These are the same rules **Delete** uses to decide what to remove. The **✕** next to the count clears the selection, like `Escape`.
+
+With **one** item selected, the panel shows its details: its 5′ → 3′ span (`helix[base] -> helix[base]`, or *(circular)* for an oligo), length, and for an end whether it is free and its modification. The oligo it belongs to is listed with its name, length, color, whether it's the scaffold, whether its sequence is locked, and its modifications.
+
+With **several** items selected, it shows what they have in common: how many oligos the selection touches (and how many are scaffold), their total length, their colors, and the modifications on the selected ends.
+
+Buttons under the info apply to the whole selection:
+
+| Button | Effect |
+| --- | --- |
+| **Paint** | Switches to the Paint tool and keeps the selection; your next click on the canvas paints every touched oligo with the active color |
+| **Modify ends** | Switches to the Modification tool and keeps the selection; your next click applies the active modification to every selected free end |
+| **Set scaffold** / **Set staple** | Marks every touched oligo as scaffold or as staple, in one undo step |
+
+Delete and Duplicate for the selection are in the strand-view toolbar's **Edit** group.
 
 #### Naming an oligo
 
