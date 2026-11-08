@@ -32,6 +32,7 @@ export interface IndexedDbPersistenceBackend {
 	): Promise<DocumentMetadata>;
 	loadDocument(docId: string): Promise<object | null>;
 	getLocalBackups(docId: string): Promise<LocalBackup[]>;
+	countLocalBackups(docId: string): Promise<number>;
 	getLastModified(docId: string): Promise<number | null>;
 	deleteDocument(docId: string): Promise<void>;
 	saveContext(docId: string, context: object): Promise<void>;
@@ -251,6 +252,10 @@ export class FoldnanoIndexedDb extends Dexie implements IndexedDbPersistenceBack
 		const backups = await this.#backupsOf(docId).toArray();
 		// Rows written by the unreleased version 5 schema may lack a reason.
 		return backups.reverse().map((b) => ({ ...b, reason: b.reason ?? 'periodic' }));
+	}
+
+	async countLocalBackups(docId: string): Promise<number> {
+		return this.#backupsOf(docId).count();
 	}
 
 	async loadDocument(docId: string): Promise<object | null> {

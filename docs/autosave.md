@@ -5,6 +5,7 @@ covers:
   - src/lib/components/Editor/SaveStatusIndicator.svelte
   - src/lib/components/Editor/SaveFailedBanner.svelte
   - src/lib/components/Editor/SaveFromUrlDialog.svelte
+  - src/lib/components/Editor/NameDesignDialog.svelte
 ---
 
 # Autosave And Local Persistence
@@ -188,7 +189,13 @@ See `docs/routes-guide.md` § "Loading a Design from an External URL".
 
 Blank documents with no user edits do not create IndexedDB entries. The `isPristineUnsavedBlankDocument()` check prevents housekeeping saves from persisting an untouched default blank document during file-switch flows.
 
-`New Document` (local-only) calls `startBlankDocument()`, which saves the current document and swaps in a blank one without persisting it; the first edit's autosave creates its TOC entry. The toolbar shallow-routes to `/editor`, and `Editor.svelte` replaces that URL with `/editor/<id>` once `lastLocalPersistAt` is set, so a reload reopens the saved document.
+`New Document` (local-only) calls `startBlankDocument()`, which saves the current document and swaps in a blank one without persisting it. The toolbar shallow-routes to `/editor`, and `Editor.svelte` replaces that URL with `/editor/<id>` once `lastLocalPersistAt` is set, so a reload reopens the saved document.
+
+### Reserved blank name
+
+`"Untitled Document"` (`UNTITLED_DOCUMENT_NAME`, compared ignoring case) names the blank workspace only; no snapshot is ever written under it. `EditorDocumentSession.hasSavableName` gates every write path: the `HistoryStack` persist callback (autosave, `saveNow`), `persistCurrentDocumentSnapshot` (even with `force`), and `saveDocumentToLocalStorage`. The blank workspace stays a place to drop files or plugin zips without leaving an entry behind.
+
+Once the design has a Part and still has the reserved name (`session.needsName`), `NameDesignDialog.svelte` asks for a name. The dialog is required: it has no close button and ignores Escape and outside clicks. That covers a first region, a cadnano file loaded as a region, a plugin creating a Part, and a design stored under that name before it was reserved (that wording differs). Naming goes through `checkRename` / `renameDocument`, which saves. Until then edits stay unsaved, so the close-tab guard still warns. Designs created by name (New File dialog, typing a name in the toolbar) are saved right away, even with no Part.
 
 ## Public API Surface
 
@@ -221,6 +228,7 @@ Auto-save trigger labels reported in logs: `'edit-count' | 'timer' | 'manual'`.
 - **Don't replace the snapshot path with stringification.** Working-copy saves are plain objects in IndexedDB. JSON-string round-trips happen only at GitHub and export boundaries.
 - **Don't autosave from a non-owner tab.** Saves must be gated on `EditorDocumentSession.isTabOwner`.
 - **Don't autosave a pristine blank document.** `isPristineUnsavedBlankDocument()` is the guard — preserving it keeps the TOC clean of untouched defaults.
+- **Don't add a snapshot write that skips `hasSavableName`.** A design saved as `"Untitled Document"` is what the name prompt exists to prevent.
 - **Don't add a write path that can fail without `markSaveFailed()`.** The banner, close-tab guard and status dot all key off `autoSaveStatus.error`.
 - **Don't request persistent storage on page load.** Firefox can prompt; ask after the first successful save (`#requestPersistenceAfterSave`).
 - **Don't swallow a save failure with only `console.error`.** Route it through `reportError()` (see `src/lib/errorReporting.ts`) so it lands in the local diagnostic log and (on first occurrence) surfaces to the user — a failed save must never be silent.

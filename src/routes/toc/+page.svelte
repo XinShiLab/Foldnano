@@ -14,14 +14,23 @@
 	} from '$lib/services/storage';
 	import { githubMetadataStore, type GitHubFileMetadata } from '$lib/services/storage';
 	import {
+		designArchiveFileName,
+		downloadDesignArchive,
+		exportAllDesigns,
+	} from '$lib/services/storage/designArchive';
+	import { reportError } from '$lib/errorReporting';
+	import {
+		Download,
 		FilePlus,
 		FileSpreadsheet,
 		LayoutList,
+		LoaderCircle,
 		Rows3,
 		SquareArrowOutUpRight,
 		Trash2,
 	} from '@lucide/svelte';
 	import { onMount } from 'svelte';
+	import { toast } from 'svelte-sonner';
 
 	const SORT_OPTIONS = {
 		'modified-desc': 'Last modified (newest)',
@@ -117,6 +126,37 @@
 		}
 	}
 
+	let isExporting = $state(false);
+
+	async function handleDownloadAll() {
+		isExporting = true;
+		try {
+			const exportedAt = new Date();
+			const { zip, manifest, skipped } = await exportAllDesigns(
+				storageManager,
+				(docId) => githubMetadataStore.getFileMetadata(docId),
+				exportedAt
+			);
+			downloadDesignArchive(zip, exportedAt);
+			const count = manifest.designs.length;
+			const summary = `${count} design${count === 1 ? '' : 's'} in ${designArchiveFileName(exportedAt)}`;
+			if (skipped.length > 0) {
+				toast.warning(`Downloaded ${summary}`, {
+					description: `Couldn't read ${skipped.map((d) => `"${d.name || UNTITLED}"`).join(', ')}, so ${skipped.length === 1 ? 'it is' : 'they are'} not included.`,
+				});
+			} else {
+				toast.success(`Downloaded ${summary}`);
+			}
+		} catch (e) {
+			reportError(e, 'storage:export-all', { notify: false });
+			toast.error("Couldn't download your designs", {
+				description: e instanceof Error ? e.message : undefined,
+			});
+		} finally {
+			isExporting = false;
+		}
+	}
+
 	function formatDate(timestamp: number): string {
 		return new Date(timestamp).toLocaleString();
 	}
@@ -154,6 +194,21 @@
 				<h1 class="text-2xl font-semibold">Saved Documents</h1>
 			</div>
 			<div class="flex gap-2">
+				{#if documents.length > 0}
+					<Button
+						variant="outline"
+						disabled={isExporting}
+						title="Download every design saved in this browser as one .zip of .fn.json files"
+						onclick={handleDownloadAll}
+					>
+						{#if isExporting}
+							<LoaderCircle class="size-4 animate-spin" />
+						{:else}
+							<Download class="size-4" />
+						{/if}
+						Download All
+					</Button>
+				{/if}
 				<Button onclick={() => goto(resolve('/editor'))}>
 					<FilePlus class="size-4" />
 					New Document

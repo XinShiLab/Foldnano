@@ -6,6 +6,7 @@ order: 15
 slug: interface-reference
 covers:
   - src/lib/components/Editor/Editor.svelte
+  - src/lib/components/Editor/StatusBar.svelte
   - src/lib/components/Editor/Toolbar/Toolbar.svelte
   - src/lib/components/Editor/EmptyEditorState.svelte
   - src/lib/components/Editor/Toolbar/ActiveViewerToolbar.svelte
@@ -53,7 +54,7 @@ On narrower screens (such as an iPad), the toolbar buttons show only their icons
 | **Add Region** | Starts adding a **honeycomb** region (see [Adding a region](#adding-a-region)) |
 | **⌄** next to Add Region | **Add Honeycomb Region**, **Add Square Region**, **Add Freeform Region**, **Load Cadnano Design as a Region** |
 | `Auto Staple — [region]` | Generates staples for the active lattice region. Shown only when the active region is a lattice region. See [Creating A Design](/docs/guide/creating-a-design#auto-staple). |
-| Document name | Click to rename; `Enter` confirms, `Escape` cancels. For a file already committed to GitHub, a **Rename and Commit** dialog asks for confirmation and also commits any uncommitted local changes. |
+| Document name | Click to rename; `Enter` confirms, `Escape` cancels. A name already used in the same folder is refused; one used by another saved design asks **Rename Anyway**. For a file already committed to GitHub, a **Rename and Commit** dialog asks for confirmation; commit or discard pending changes first. |
 | Save status | See [Save status](#save-status) |
 | Agent runs badge | Shown while a coding agent may run Python from a linked plugin folder: which folder is connected to which design, the running script, or why runs are paused. **×** stops agent runs. See [Agent Runs](/docs/plugin-development/agent-runs). |
 | **Undo** / **Redo** arrows | Same as `Ctrl/Cmd + Z` / `Ctrl/Cmd + Shift + Z` |
@@ -105,7 +106,7 @@ The **ⓘ** next to it (*Storage info*) explains that designs are saved in this 
 
 **Open** accepts the same files as the start screen, except a `.ply` mesh. Each dropped file is listed with an action:
 
-- **Foldnano `.fn.json`**: a one-line summary (regions, helices, scaffold length, staples), then **Load** opens it, named after the file. If this browser already has the same design (for example one you exported and kept editing), a note says when it was last saved: loading replaces that copy.
+- **Foldnano `.fn.json`**: a one-line summary (regions, helices, scaffold length, staples), then **Load** opens it, named after the file. If this browser already has the same design (for example one you exported and kept editing), a note says when it was last saved and you choose: **Open as copy** opens the file as a separate design and leaves the saved one as it is; **Replace** puts the file's content in the saved design, and the replaced version stays in **Backups**.
 - **cadnano `.json`**: **Open** creates a **new `.fn.json` document** from it; the original `.json` isn't changed. When a GitHub repository is connected, **Add original to current repo folder** also stores the original file there. If the file could be either lattice, you're asked whether it is honeycomb or square.
 - **Local plugin `.zip`**: shows the plugin's details and an **Install** button (see [Plugins For Users](/docs/guide/plugins-for-users)). A plugin manifest on its own (`fplugin.json`) is refused; install the plugin's `.zip` instead.
 
@@ -147,7 +148,7 @@ The toolbar row below the top toolbar belongs to whichever viewer you last worke
 | **PNG** | Downloads the strand view as a PNG image |
 | **SVG** | Downloads the strand view as an SVG, including sequences |
 
-**Edit** (all act on the current strand selection):
+**Edit**. The first group acts on the current strand selection:
 
 | Control | What it does |
 | --- | --- |
@@ -160,7 +161,7 @@ The toolbar row below the top toolbar belongs to whichever viewer you last worke
 
 The align buttons work in the **Select** tool and move **free ends only** (never ends joined to a crossover). They're enabled only when the move is possible for every selected end at once, and the whole alignment is one undo step. See [Aligning ends](/docs/guide/selection#aligning-ends) for which ends move and a worked example.
 
-**Length** (labeled with the active region's name):
+The second **Edit** group sets the helix length of the active region (its name shows in each button's tooltip):
 
 | Control | What it does |
 | --- | --- |
@@ -269,15 +270,17 @@ The **Properties** item, and the **Paste** and **Export as SVG** items on empty 
 
 ## Status Bar
 
-The strip along the bottom of the editor shows, for a GitHub file:
+The strip along the bottom of the editor. On the left, where the design is kept and how it stands:
 
-- the **branch** name,
-- *unsaved to GitHub* (amber dot) when there are uncommitted changes, or *↓ remote ahead* when GitHub has newer commits,
-- *? GitHub not checked* when Foldnano couldn't check GitHub for newer changes (for example while offline); it checks again by itself when you're back online or return to the tab, or click it to try now. Committing still checks, and shows the conflict options if the file changed,
-- the **repository and file path**, and the short **commit SHA**,
-- **Backups**; click it to open the design's backups (see [Saving And GitHub](/docs/guide/saving-github#backups)).
+- For a GitHub file: the **branch**, the **repository and file path**, and the short **commit ID**. Then its sync state:
+  - *Saved in browser · not committed* (amber dot): your changes are safe in this browser but not on GitHub yet. Commit to save them there. While a browser save is still pending it reads *Not committed*.
+  - *↓ Newer version on GitHub*: GitHub has commits newer than your copy.
+  - *? GitHub not checked*: Foldnano couldn't check GitHub for newer changes (for example while offline). It checks again by itself when you're back online or return to the tab, or click it to try now. Committing still checks, and shows the conflict options if the file changed.
+- For any other design (made here or opened from a file): *Saved in this browser*.
+- **Backups**, with how many this design has. Click it to open them (see [Saving And GitHub](/docs/guide/saving-github#backups)).
+- With a repository connected and a design that isn't in it, the repository and branch, dimmed, marked *(not in repo)*.
 
-With a repository connected but no file open it shows *owner/repo · branch · no file open*.
+On the right, the **active region** with its length, then what is under the pointer in the strand view (helix, base pair, oligo).
 
 ## Read-Only Tabs
 

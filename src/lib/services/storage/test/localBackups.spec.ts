@@ -123,6 +123,8 @@ describe('rotating local backups', () => {
 			`v${MAX_LOCAL_BACKUPS_PER_DOC + 1}`
 		);
 		await expect(db.getLocalBackups('doc-2')).resolves.toEqual([]);
+		await expect(db.countLocalBackups('doc-1')).resolves.toBe(MAX_LOCAL_BACKUPS_PER_DOC);
+		await expect(db.countLocalBackups('doc-2')).resolves.toBe(0);
 	});
 
 	it('removes backups when the document is deleted', async () => {

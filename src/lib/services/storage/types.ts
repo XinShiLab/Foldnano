@@ -18,7 +18,8 @@ export type BackupReason =
 	| 'before_conflict_resolve'
 	| 'before_discard'
 	| 'before_restore'
-	| 'before_repair';
+	| 'before_repair'
+	| 'before_import';
 
 export type OverwriteBackupReason = Exclude<BackupReason, 'periodic'>;
 

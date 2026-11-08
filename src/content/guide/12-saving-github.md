@@ -39,9 +39,11 @@ Local documents are stored in **IndexedDB** (not `localStorage`). This is what m
 
 Backups for important work:
 
-- download a **`.fn.json`** (Save menu → *Export as Foldnano JSON*),
+- download a **`.fn.json`** (Save menu → *Export as Foldnano JSON*), or every saved design at once with **Download All** on the Saved Documents page,
 - connect GitHub and commit the file,
 - keep a copy of any exported simulation files you'll need.
+
+Opening a `.fn.json` that is already saved in this browser (for example one you downloaded earlier) lets you choose **Open as copy** or **Replace**. Replace keeps the saved version in **Backups**. If the name of an opened file is already taken, the design opens as `Name (2)` and a message says so.
 
 ![Save menu with 'View Saved Documents' highlighted](/screenshots/guide/saving-and-github/01-where-is-saved-documents.webp)
 
@@ -51,9 +53,11 @@ Backups for important work:
 
 *Saved Documents panel listing local IndexedDB documents.*
 
-A design has a single name: the document name in the toolbar. For a design saved as a file (on GitHub or as a local-only file in a repository), it is the file name without `.fn.json`, and renaming one renames the other. Every export is named after it too, for example `My design.cadnano.json`, `My design_route.svg`, or the oxDNA and CSV files.
+A design has a single name: the document name in the toolbar. For a design saved as a file (on GitHub or as a local-only file in a repository), it is the file name without `.fn.json`, and renaming one renames the other. A name can use letters, numbers, spaces, hyphens, underscores, dots, and parentheses, up to 100 characters. Leave out the extension: typing `box.fn.json` gives the name `box`, and a name ending in `.fn` is refused, since the file would be saved as `box.fn.fn.json`. Two files in one folder can't share a name, even with different capitals, and Foldnano tells you when another saved design already has the name you picked.
 
-The **Saved Documents** page (`/toc`) lists every document in this browser. Each card has **Open**, **View Oligos** (the [Oligo Report](/docs/guide/oligo-report)), and **Delete**; **New Document** starts a fresh one. Above the list you can sort by last modified or by name, show only **Local** or **GitHub** documents, and switch to a compact table view. Your choice is saved in the page address, so it survives a reload or a bookmark. The editor's save status next to the document name shows whether the latest edits are stored (see [Interface Reference](/docs/guide/interface-reference#save-status)).
+**Untitled Document** is the name of the empty workspace that **New Document** gives you, so you can drop in a design file or a plugin there without saving anything. Once you start building (add a region, load a cadnano file as a region, or run a plugin that creates one), Foldnano asks you to name the design, and saves it from then on. A design saved as **Untitled Document** by an older version asks for a name when you open it. Every export is named after it too, for example `My design.cadnano.json`, `My design_route.svg`, or the oxDNA and CSV files.
+
+The **Saved Documents** page (`/toc`) lists every document in this browser. Each card has **Open**, **View Oligos** (the [Oligo Report](/docs/guide/oligo-report)), and **Delete**; **New Document** starts a fresh one. **Download All** saves every design in this browser as one `.zip` with a `.fn.json` file per design, which you can unzip and open one at a time. It holds what is saved, so give an open editor tab a moment to save its latest edits first. Above the list you can sort by last modified or by name, show only **Local** or **GitHub** documents, and switch to a compact table view. Your choice is saved in the page address, so it survives a reload or a bookmark. The editor's save status next to the document name shows whether the latest edits are stored (see [Interface Reference](/docs/guide/interface-reference#save-status)).
 
 ## Autosave
 
@@ -147,7 +151,7 @@ Save menu → **Save to GitHub Repo** opens **Save to GitHub** for a design that
 
 With a repository connected, **New Document** in the top toolbar offers two choices. **New File in** *your repository* opens the **New Design File** dialog described above. **Local-Only Design** creates a design that stays out of the repository's Files and Changes tabs and is listed on the Saved Documents page. You can still publish it later with **Save to GitHub Repo**.
 
-Renaming a GitHub file with the document name field asks you to confirm **Rename & Commit**, since the rename is committed together with any pending local changes.
+Renaming a GitHub file with the document name field asks you to confirm **Rename & Commit**, since the rename is committed right away. Commit or discard pending changes first; a file with uncommitted changes can't be renamed, from the toolbar or the Files tab.
 
 ### Changes tab
 
@@ -225,7 +229,7 @@ If a saved design is damaged, or was saved by a newer version of Foldnano, the e
 - **Reload page** appears when the design is from a newer Foldnano: reloading gets the latest version of the app.
 - **Open another design** goes to your saved designs.
 
-For GitHub files, the status bar at the bottom of the editor also shows the current **branch**, *unsaved to GitHub* or *↓ remote ahead*, the repository and file path, and the short commit ID.
+For GitHub files, the status bar at the bottom of the editor also shows the current **branch**, the repository and file path, the short commit ID, and *Saved in browser · not committed* or *↓ Newer version on GitHub* (see [Status Bar](/docs/guide/interface-reference#status-bar)).
 
 ## Multi-Tab Protection
 

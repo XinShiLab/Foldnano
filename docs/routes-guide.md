@@ -124,7 +124,7 @@ Lattice detection). An unrecognised value, or one the file's crossovers contradi
 
 ## Saved Documents (`/toc`)
 
-Lists every IndexedDB working copy. Sort, source filter (All / Local / GitHub; "GitHub" means the doc has `GitHubFileMetadata`) and layout (cards / compact table) live in the URL query (`sort`, `source`, `view`), not in component state, because runtime `localStorage` is off-limits and this keeps a chosen view across reloads and bookmarks. Defaults are omitted from the URL. Changes use `goto(..., { replaceState: true })` so toggling doesn't pile up history entries. Sorting/filtering is client-side over the metadata already loaded; `getDocumentList()` returns rows in primary-key (UUID) order, so the page must always sort.
+Lists every IndexedDB working copy. Sort, source filter (All / Local / GitHub; "GitHub" means the doc has `GitHubFileMetadata`) and layout (cards / compact table) live in the URL query (`sort`, `source`, `view`), not in component state, because runtime `localStorage` is off-limits and this keeps a chosen view across reloads and bookmarks. Defaults are omitted from the URL. Changes use `goto(..., { replaceState: true })` so toggling doesn't pile up history entries. Sorting/filtering is client-side over the metadata already loaded; `getDocumentList()` returns rows in primary-key (UUID) order, so the page must always sort. **Download All** zips every saved design (see `storage-architecture.md` § Exporting All Designs).
 
 ## Multi-Tab Coordination
 

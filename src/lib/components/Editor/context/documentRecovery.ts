@@ -71,6 +71,7 @@ export const BACKUP_REASON_LABELS: Record<BackupReason, string> = {
 	before_discard: 'Before discarding local changes',
 	before_restore: 'Before restoring a backup',
 	before_repair: 'Before repairing on load',
+	before_import: 'Before replacing with an opened file',
 };
 
 export function describeLoadFailure(

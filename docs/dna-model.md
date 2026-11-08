@@ -94,6 +94,18 @@ internal while a document holds one Part:
   file is often a stale file name such as `Hilbert_FinalHC.json`);
 - `addNewPart` names parts `Part 1`, `Part 2`, ….
 
+Names typed by the user (toolbar, explorer rename, New File, the name prompt) pass
+`validateDesignName`: letters of any script, digits, spaces, `-`, `_`, `.`, and
+parentheses; no dot-only names, no ending that looks like part of a design
+extension (`.fn`, `.cadnano`, `.cweb`; a full typed extension is dropped first
+by `normalizeDesignName`), no leading or trailing space or dot, no Windows
+device names, at most `DESIGN_NAME_MAX_LENGTH` characters, and not the reserved
+`UNTITLED_DOCUMENT_NAME` (see `docs/autosave.md` § Reserved blank name). Names
+and paths are compared ignoring case (`designNameKey`, `findPathClash`), because
+a macOS or Windows clone can't hold two files that differ only by case. Names
+from opened files are not validated; a taken one gets a ` (2)` suffix
+(`uniqueDesignName`).
+
 Every export is named from the document through `exportBaseName(doc.name,
 suffix)` in `src/lib/model/io/designFileName.ts`, never from `Part.name`.
 Exported cadnano JSON stores its own file name in `"name"`, as cadnano2 does.

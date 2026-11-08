@@ -90,6 +90,7 @@
 	}
 
 	const activeRegion = $derived(ctx.activeRegion);
+	const regionSuffix = $derived(activeRegion ? ` (${activeRegion.name})` : '');
 
 	function reduceUnusedVhLength() {
 		const region = activeRegion;
@@ -450,48 +451,45 @@
 					<Layers2 />
 				</Button>
 			</ButtonGroup.Root>
-		</div>
-
-		<Separator.Root orientation="vertical" class="h-5 shrink-0 self-center" />
-
-		<!-- Virtual Helix Length Controls — operates on the ACTIVE region -->
-		<div class="flex shrink-0 items-center gap-1">
-			<span class="px-1 text-[9px] font-medium tracking-[0.14em] text-muted-foreground uppercase">
-				Length{activeRegion ? ` — ${activeRegion.name}` : ''}
-			</span>
+			<!-- Helix length of the ACTIVE region -->
 			<ButtonGroup.Root class="overflow-hidden">
 				<Button
 					variant="outline"
-					size="xs"
-					title="Trim unused length"
+					size="icon-sm"
+					title={`Trim unused length${regionSuffix}`}
 					disabled={isReadOnly || !activeRegion}
 					onclick={reduceUnusedVhLength}
 					{@attach help({
+						title: `Trim helix length${regionSuffix}`,
 						text: 'Shorten every helix of the active region to the smallest length that still fits its strands, in lattice steps.',
 					})}
 				>
-					<ArrowLeftFromLine size={12} />
+					<ArrowLeftFromLine />
 				</Button>
 				<Input
-					class="h-6 w-12 px-1 text-xs"
+					class="h-7 w-12 px-1 text-xs"
 					disabled={isReadOnly || !activeRegion}
 					bind:value={increaseLengthBy}
 					type="number"
 					min={0}
 					step={activeRegion?.step ?? 21}
 					placeholder="# bps"
+					title={`Base pairs to add${regionSuffix}`}
 					{@attach help({
-						title: 'Base pairs to add',
+						title: `Base pairs to add${regionSuffix}`,
 						text: 'Steps by the lattice step: 21 bp for honeycomb, 32 bp for square.',
 					})}
 				/>
 				<Button
 					variant="outline"
-					size="xs"
-					title="Extend region length"
+					size="icon-sm"
+					title={`Extend region length${regionSuffix}`}
 					disabled={isReadOnly || !activeRegion}
 					onclick={() => increaseActiveRegionLengthBy(increaseLengthBy)}
-					{@attach help({ text: 'Add that many base pairs to every helix of the active region.' })}
+					{@attach help({
+						title: `Extend helix length${regionSuffix}`,
+						text: 'Add that many base pairs to every helix of the active region.',
+					})}
 				>
 					<ArrowRightFromLine />
 				</Button>

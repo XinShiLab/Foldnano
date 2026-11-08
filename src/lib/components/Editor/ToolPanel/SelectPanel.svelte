@@ -1,6 +1,15 @@
 <script lang="ts">
 	import { FILTER_TOGGLE_CLASS, SCAF_TOGGLE_CLASS, STAP_TOGGLE_CLASS } from './filterToggleClasses';
-	import { TextAlignJustify } from '@lucide/svelte/icons';
+	import { Paintbrush, Tag, TextAlignJustify, X } from '@lucide/svelte/icons';
+	import { Button } from '$lib/components/ui/button/index.js';
+	import { toggleOligoAsScaffoldCmd } from '$lib/commands/strands';
+	import type { OligoSegment, SegmentEnd } from '$lib/model/Oligo';
+	import {
+		countModifications,
+		formatSelectionCounts,
+		selectionItemCount,
+		summarizeEndSelection,
+	} from '$lib/canvasEditor/tools/select/selectionSummary';
 	import EndsIcon from '$lib/components/icons/EndsIcon.svelte';
 	import CrossoverIcon from '$lib/components/icons/CrossoverIcon.svelte';
 	import OligoIcon from '$lib/components/icons/OligoIcon.svelte';
@@ -63,6 +72,43 @@
 	const triggerContent = $derived(
 		quickSelect.find((f) => f.value === strandCtx.selectAllMode)?.label ?? 'what you click'
 	);
+
+	const summary = $derived(summarizeEndSelection(strandCtx.selected.ends));
+	const itemCount = $derived(selectionItemCount(summary));
+	const touched = $derived(summary.touchedOligos);
+	const touchedLength = $derived(touched.reduce((sum, oligo) => sum + oligo.length, 0));
+	const touchedColors = $derived([...new Set(touched.map((oligo) => oligo.color))]);
+	const scaffoldCount = $derived(touched.filter((oligo) => oligo.isScaffold).length);
+	const freeSelectedEnds = $derived([...strandCtx.selected.ends].filter((end) => end.isFree));
+	const selectedModifications = $derived(
+		countModifications(strandCtx.selected.ends).map((m) => ({
+			...m,
+			color: getModificationColor(m.name, ctx.currentDoc?.parts[0]?.customModifications ?? []),
+		}))
+	);
+	const isReadOnly = $derived(!ctx.isTabOwner);
+	const MAX_SWATCHES = 12;
+
+	const at = (end: SegmentEnd | null | undefined) =>
+		end ? `${end.inVirtualHelix.index}[${end.index}]` : '?';
+	const span = (from: SegmentEnd | null | undefined, to: SegmentEnd | null | undefined) =>
+		`${at(from)} -> ${at(to)}`;
+
+	/** Paint and Modification apply to the whole selection on the next canvas click; switching
+	 * tools keeps the selection. */
+	function handOffTo(mode: 'PAINT' | 'MODIFICATION') {
+		ctx.editorMode = mode;
+	}
+
+	function setTouchedAsScaffold(isScaffold: boolean) {
+		const oligos = touched.filter((oligo) => oligo.isScaffold !== isScaffold);
+		if (oligos.length > 0) {
+			toggleOligoAsScaffoldCmd(
+				oligos.map((oligo) => ({ oligo })),
+				ctx.historyStack
+			);
+		}
+	}
 </script>
 
 <div class="flex flex-row gap-2">
@@ -208,7 +254,7 @@
 	{/if}
 {/snippet}
 
-{#snippet oligoInfo(oligo: Oligo, heading: string)}
+{#snippet oligoDetail(oligo: Oligo, heading: string)}
 	<div class="mt-2 border-t border-border pt-2">
 		<p>{heading}</p>
 		<div class="flex items-center gap-1">
@@ -218,10 +264,7 @@
 		{#if oligo.isCircular}
 			<p>(circular)</p>
 		{:else}
-			<p>
-				{oligo.fivePrime?.inVirtualHelix.index}[{oligo.fivePrime?.index}] -> {oligo.threePrime
-					?.inVirtualHelix.index}[{oligo.threePrime?.index}]
-			</p>
+			<p>{span(oligo.fivePrime, oligo.threePrime)}</p>
 		{/if}
 		<p>Length: {oligo.length}</p>
 		<p>Color: <span>{@render color(oligo.color)}</span></p>
@@ -231,30 +274,152 @@
 	</div>
 {/snippet}
 
+{#snippet segmentDetail(segment: OligoSegment)}
+	<p>Segment: {span(segment.fivePrime, segment.threePrime)}</p>
+	<p>Length: {segment.length}</p>
+	{#if segment.oligo}{@render oligoDetail(segment.oligo, 'Belongs to oligo:')}{/if}
+{/snippet}
+
+{#snippet endDetail(end: SegmentEnd)}
+	<p>{end.isThreePrime ? "3'" : "5'"} end: {at(end)}</p>
+	<p>
+		{#if end.isFree}
+			Free end
+		{:else}
+			Connected to {at(end.connectedEnd)}
+		{/if}
+	</p>
+	<p>Modification: {end.modification ?? 'none'}</p>
+	{#if end.segment.oligo}{@render oligoDetail(end.segment.oligo, 'Belongs to oligo:')}{/if}
+{/snippet}
+
 <div
 	class="mt-2 flex-grow rounded-md border border-border p-2 font-mono text-xs text-muted-foreground"
+	{@attach help({
+		title: 'Selection',
+		text: 'What is selected, counted as whole oligos, segments, crossovers and loose ends. One item shows its details; several show what they have in common.',
+		doc: 'selection',
+	})}
 >
-	{#if strandCtx.hoverOligo}
-		{@render oligoInfo(strandCtx.hoverOligo, 'Selected Oligo:')}
-	{/if}
-	{#if strandCtx.hoverSegment}
-		<p>Selected Segment:</p>
-		<p>
-			{strandCtx.hoverSegment.fivePrime?.inVirtualHelix.index}[{strandCtx.hoverSegment.fivePrime
-				?.index}] -> {strandCtx.hoverSegment.threePrime?.inVirtualHelix.index}[{strandCtx
-				.hoverSegment.threePrime?.index}]
-		</p>
-		<p>Length: {strandCtx.hoverSegment.length}</p>
+	{#if itemCount === 0}
+		<p>Nothing selected. Click or drag on the strands to select.</p>
+	{:else}
+		<div class="flex items-start justify-between gap-2">
+			<p class="font-medium text-foreground">{formatSelectionCounts(summary)}</p>
+			<Button
+				variant="ghost"
+				size="icon-xs"
+				title="Clear selection (Esc)"
+				onclick={() => strandCtx.selected.clear()}
+			>
+				<X />
+			</Button>
+		</div>
 
-		{#if strandCtx.hoverSegment.oligo}
-			{@render oligoInfo(strandCtx.hoverSegment.oligo, 'Belongs to Oligo:')}
+		{#if itemCount === 1}
+			<div class="mt-1">
+				{#if summary.oligos.length === 1}
+					{@render oligoDetail(summary.oligos[0], 'Oligo:')}
+				{:else if summary.segments.length === 1}
+					{@render segmentDetail(summary.segments[0])}
+				{:else if summary.crossovers.length === 1}
+					{@const xover = summary.crossovers[0]}
+					<p>Crossover: {span(xover.from, xover.to)}</p>
+					{#if xover.from.segment.oligo}
+						{@render oligoDetail(xover.from.segment.oligo, 'Belongs to oligo:')}
+					{/if}
+				{:else if summary.ends.length === 1}
+					{@render endDetail(summary.ends[0])}
+				{/if}
+			</div>
+		{:else}
+			<div class="mt-2 border-t border-border pt-2">
+				<p>
+					Oligos touched: {touched.length}
+					{#if scaffoldCount > 0}({scaffoldCount} scaffold){/if}
+				</p>
+				<p>Total length: {touchedLength} nt</p>
+				<p class="flex flex-wrap items-center gap-1">
+					Colors:
+					{#each touchedColors.slice(0, MAX_SWATCHES) as c (c)}
+						<span title={c}>{@render color(c)}</span>
+					{/each}
+					{#if touchedColors.length > MAX_SWATCHES}
+						<span>+{touchedColors.length - MAX_SWATCHES}</span>
+					{/if}
+				</p>
+				<p>
+					Modifications:
+					{#if selectedModifications.length === 0}
+						none
+					{:else}
+						{#each selectedModifications as m, i (m.name)}
+							{#if i > 0}<span>, </span>{/if}<span
+								class="inline-block h-2.5 w-2.5 rounded-full align-middle"
+								style="background-color: {m.color};"
+							></span>
+							{m.count}× {m.name}
+						{/each}
+					{/if}
+				</p>
+			</div>
 		{/if}
+
+		<div class="mt-2 flex flex-wrap gap-1 border-t border-border pt-2 font-sans">
+			<Button
+				variant="outline"
+				size="xs"
+				disabled={isReadOnly}
+				onclick={() => handOffTo('PAINT')}
+				{@attach help({
+					title: 'Paint selection',
+					text: 'Switch to the Paint tool with this selection kept; your next click on the canvas paints every touched oligo.',
+					doc: 'editing-tools',
+				})}
+			>
+				<Paintbrush /> Paint
+			</Button>
+			<Button
+				variant="outline"
+				size="xs"
+				disabled={isReadOnly || freeSelectedEnds.length === 0}
+				onclick={() => handOffTo('MODIFICATION')}
+				{@attach help({
+					title: 'Modify selected ends',
+					text: "Switch to the Modification tool with this selection kept; your next click on the canvas applies the active modification to every selected free 5' or 3' end.",
+					doc: 'editing-tools',
+				})}
+			>
+				<Tag /> Modify ends
+			</Button>
+			<Button
+				variant="outline"
+				size="xs"
+				disabled={isReadOnly || scaffoldCount === touched.length}
+				onclick={() => setTouchedAsScaffold(true)}
+				{@attach help({
+					title: 'Set as scaffold',
+					text: 'Mark every touched oligo as scaffold, in one undo step.',
+					doc: 'selection',
+				})}
+			>
+				Set scaffold
+			</Button>
+			<Button
+				variant="outline"
+				size="xs"
+				disabled={isReadOnly || scaffoldCount === 0}
+				onclick={() => setTouchedAsScaffold(false)}
+				{@attach help({
+					title: 'Set as staple',
+					text: 'Mark every touched oligo as staple, in one undo step.',
+					doc: 'selection',
+				})}
+			>
+				Set staple
+			</Button>
+		</div>
 	{/if}
-	<!-- <p>Segment: 2[23] -> 2[33]</p>
-  <p>End: 2[23]</p>
-  <p>Modification: none</p>
-  <p>Sequence: AATTCCAATTGGGAATT... </p>
-  <p>Color: {@render color("#FF2233")}</p> -->
 </div>
 <FreeformVhPanel />
 <RepeatGroupPanel />

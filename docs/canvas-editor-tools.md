@@ -34,6 +34,7 @@ src/lib/canvasEditor/
     ├── types.ts             # PointerEvt, HandlerInstance
     ├── select/              # most complex tool (split into sub-handlers)
     │   ├── select.ts
+    │   ├── selectionSummary.ts  # selection -> oligos/segments/crossovers/ends (Select panel)
     │   └── handlers/
     │       ├── onEnd.ts
     │       ├── onSegment.ts

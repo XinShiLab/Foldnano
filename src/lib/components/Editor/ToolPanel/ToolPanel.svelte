@@ -100,7 +100,7 @@
 			newVsCadnano: true,
 		},
 		'Selection Tool': {
-			text: 'Filters decide what a click picks up. Hover a strand to see its details below.',
+			text: 'Filters decide what a click picks up. Below, a count of what is selected, its details, and actions for all of it.',
 			doc: 'selection',
 		},
 		'Paint Tool': {

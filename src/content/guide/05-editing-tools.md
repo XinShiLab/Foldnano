@@ -99,7 +99,7 @@ The numbered loop marks an insert of one extra base, which lengthens the strand 
 Paint recolors oligos with the panel's **Active** color. Clicking a color in the panel only makes it the active color; the paint is applied when you click in the strand view. There are two ways to use it:
 
 - **One oligo at a time.** Switch to Paint (`p`), pick a color, then click an oligo. Keep clicking to paint more oligos with the same color.
-- **Many oligos at once.** In Select mode (`v`), select the oligos first (click, `Shift` + click, or drag a marquee). Then switch to Paint (`p`), pick a color, and click anywhere in the strand view. Every selected oligo takes the color in one undoable step, and the selection is cleared. The panel shows how many oligos are selected.
+- **Many oligos at once.** In Select mode (`v`), select the oligos first (click, `Shift` + click, or drag a marquee). Then switch to Paint (`p`), pick a color, and click anywhere in the strand view. Every selected oligo takes the color in one undoable step, and the selection is cleared. The panel shows how many oligos are selected. The Select panel's **Paint** button does the switch for you, keeping the selection.
 
 Painting is purely cosmetic: it changes how the oligo is drawn in the strand and 3D views and does not affect topology or sequence.
 

@@ -12,9 +12,14 @@ import {
 } from '$lib/services/github/api';
 import type { EditorDocumentSession } from '../context/EditorDocumentSession.svelte';
 import type { FileNode, ChangeEntry } from './types';
-import { buildTree, mergeLocalOnly, treeHasPath, collectPaths } from './treeUtils';
-import { FN_JSON_EXT, fileStem, isRenamableFile, validateFileStem } from './fileNaming';
-import { fnJsonPathFor } from '$lib/model/io/designFileName';
+import { buildTree, mergeLocalOnly, collectPaths } from './treeUtils';
+import { FN_JSON_EXT, fileStem, isRenamableFile } from './fileNaming';
+import {
+	findPathClash,
+	fnJsonPathFor,
+	normalizeDesignName,
+	validateDesignName,
+} from '$lib/model/io/designFileName';
 import { summarizeCommitAll, type CommitAllResult, type CommitSummary } from './commitSummary';
 import {
 	loadLocalOnlyEntries,
@@ -308,11 +313,9 @@ export class GitHubExplorerState {
 
 			// Legacy cadnano JSON: check for fn.json conflict, then signal import dialog.
 			const fnPath = fnJsonPathFor(node.path);
-			const fnName = fnPath.split('/').pop()!;
-			if (
-				treeHasPath(this.fileTree, fnPath) ||
-				this.localOnlyNodes.some((n) => n.path === fnPath)
-			) {
+			const fnClash = this.findPathClash(fnPath);
+			if (fnClash) {
+				const fnName = fnClash.split('/').pop()!;
 				toast.warning(
 					`"${node.name}" cannot be opened: "${fnName}" already exists in the same folder. Please rename one of the two files first.`
 				);
@@ -375,6 +378,13 @@ export class GitHubExplorerState {
 		return null;
 	}
 
+	/** A file or folder in the tree (or pending deletion) at `path`, ignoring case, other than `ownPath`. */
+	findPathClash(path: string, ownPath?: string): string | null {
+		const paths = collectPaths(this.fileTree);
+		for (const p of this.pendingDeletedNodes.keys()) paths.add(p);
+		return findPathClash(paths, path, ownPath);
+	}
+
 	requestRename(node: FileNode): void {
 		const blocked = this.renameBlockReason(node);
 		if (blocked) {
@@ -395,8 +405,8 @@ export class GitHubExplorerState {
 			return;
 		}
 
-		const stem = newStem.trim();
-		const invalid = validateFileStem(stem);
+		const stem = normalizeDesignName(newStem);
+		const invalid = validateDesignName(stem);
 		if (invalid) {
 			toast.error(invalid);
 			return;
@@ -406,8 +416,9 @@ export class GitHubExplorerState {
 		if (newName === node.name) return;
 		const newPath = node.path.slice(0, node.path.length - node.name.length) + newName;
 
-		if (treeHasPath(this.fileTree, newPath) || this.pendingDeletedNodes.has(newPath)) {
-			toast.error(`"${newName}" already exists in this folder.`);
+		const clash = this.findPathClash(newPath, node.path);
+		if (clash) {
+			toast.error(`"${clash.split('/').pop()}" already exists in this folder.`);
 			return;
 		}
 

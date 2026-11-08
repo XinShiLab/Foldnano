@@ -148,6 +148,23 @@ can mean:
 
 depending on the enabled toggles.
 
+### Selection summary
+
+`summarizeEndSelection(ends)` in `selectionSummary.ts` reads an end selection
+as whole oligos, segments, crossovers and loose ends, for the Select tool
+panel's count and detail. Its rules match the ones `removeSelection` and
+`SelectionOverlay` already use, so the count names what Delete would remove
+and what the highlight draws:
+
+- an oligo with every end selected is one whole oligo (its parts aren't
+  counted again)
+- otherwise a segment with both ends selected, and a connection with both ends
+  selected (oriented 3' -> 5')
+- remaining ends count on their own
+
+It is pure and recomputed from the `SvelteSet` in a `$derived`; it never
+mutates the selection.
+
 ---
 
 ## 5. Moving Selected Ends
@@ -292,4 +309,5 @@ Selections are therefore treated as editor UI state, not durable model state.
 - **Constrained ends move with the batch, but only to valid crossover sites.** `canBatchMoveByDelta` rejects a delta that would land a constrained end on a non-site or break its partner; the whole move is all-or-nothing per delta, which preserves the relative shape of the routing fragment. Don't special-case constrained ends out of the move path.
 - **Don't drive selection state from inside a render.** Mutate `EndSelection` only from tool handlers (`down`/`move`/`up`). Reading inside derived expressions is fine.
 - **Don't share selection between viewers.** Strand-view, lattice plane, and freeform plane each own their own selection store; cross-pollinating breaks lifecycle assumptions.
+- **Keep the summary rules in step with Delete.** If `removeSelection`'s whole-oligo / segment / crossover classification changes, change `summarizeEndSelection` with it, or the panel's count stops describing what Delete removes.
 - **Selections aren't part of the document.** Don't serialize them to IndexedDB or GitHub. They are UI state and must clear on undo/redo (already handled by the `HistoryStack` mutation callback).

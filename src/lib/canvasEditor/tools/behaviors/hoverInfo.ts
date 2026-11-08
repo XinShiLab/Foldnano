@@ -2,6 +2,14 @@ import type { ToolBehavior, PointerEvt } from '../index';
 import type { EditorMode } from '$lib/canvasEditor/core/modes';
 import type { ViewContext } from '$lib/canvasEditor/core/views';
 
+// Plugin-made oligos all start with `py-oligo-`; the uuid after it is what tells them apart.
+const PLUGIN_OLIGO_PREFIX = 'py-oligo-';
+
+export function shortOligoId(id: string): string {
+	const start = id.startsWith(PLUGIN_OLIGO_PREFIX) ? PLUGIN_OLIGO_PREFIX.length : 0;
+	return id.slice(start, start + 6);
+}
+
 export function createHoverInfoBehavior(modes: Set<EditorMode>): ToolBehavior {
 	return {
 		name: 'HoverInfoBehavior',
@@ -21,14 +29,14 @@ export function createHoverInfoBehavior(modes: Set<EditorMode>): ToolBehavior {
 				const targets = ctx.part.getEntitiesAtVh(vh.id, hitRsp.strandIdx, hitRsp.bpIdx);
 				const vhIdx = targets.vh?.index ?? null;
 				if (vhIdx !== null) {
-					ctx.strandCtx.footnote = `VH ${vhIdx} - BP ${hitRsp.bpIdx}`;
+					ctx.strandCtx.footnote = `VH ${vhIdx} · BP ${hitRsp.bpIdx}`;
 				}
 				if (targets.oligo) {
-					ctx.strandCtx.footnote += ` | Oligo ${targets.oligo.id.slice(0, 6)}`;
+					ctx.strandCtx.footnote += ` · Oligo ${shortOligoId(targets.oligo.id)}`;
 				}
 				const slotSeq = targets.segment?.slotForBp(hitRsp.bpIdx)?.seq;
 				if (slotSeq && slotSeq.length > 2 && !/^N+$/.test(slotSeq)) {
-					ctx.strandCtx.footnote += ` | Insert sequence ${slotSeq}`;
+					ctx.strandCtx.footnote += ` · Insert ${slotSeq}`;
 				}
 				return;
 			}

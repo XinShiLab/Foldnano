@@ -108,7 +108,7 @@ export function createEmptyHandler(): HandlerInstance {
 
 		move(evt, ctx) {
 			const rsp = ctx.hit.hitRsp(ctx.camera.toWorld(evt.clientX, evt.clientY));
-			if (!rsp) ctx.strandCtx.footnote = 'nothing';
+			if (!rsp) ctx.strandCtx.footnote = '';
 			if (!downWorld) return true;
 			const curWorld = ctx.camera.toWorld(evt.clientX, evt.clientY);
 			const w = Math.abs(curWorld.x - downWorld.x);

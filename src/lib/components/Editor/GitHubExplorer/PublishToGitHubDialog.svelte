@@ -6,6 +6,7 @@
 	import { getEditorDocumentSession } from '../context/EditorDocumentSession.svelte';
 	import { githubExplorerStateStore } from '$lib/services/storage';
 	import type { FileNode } from './types';
+	import { validateDesignName } from '$lib/model/io/designFileName';
 
 	interface Props {
 		open: boolean;
@@ -68,11 +69,25 @@
 		if (!repoCtx) return;
 
 		const path = chosenFolder ? `${chosenFolder}/${fileName}` : fileName;
+		const invalid = validateDesignName(session.currentDoc.name);
+		if (invalid) {
+			error = `Rename the design first. ${invalid}`;
+			return;
+		}
 		const previousBinding = session.captureGitHubBindingSnapshot();
 		publishing = true;
 		error = '';
 
 		try {
+			const ownEntry = githubExplorerStateStore
+				.getLocalOnlyEntries(repoCtx.owner, repoCtx.repo)
+				.find((e) => e.docId === session.currentDoc.id);
+			const clash = await session.findRepoPathClash(path, ownEntry?.path);
+			if (clash) {
+				error = `"${clash.split('/').pop()}" already exists in this folder. Pick another folder or rename the design.`;
+				return;
+			}
+
 			// Register GitHub metadata so commitCurrentDocToGitHub knows where to push (sha: '' = new file)
 			session.bindCurrentDocumentToGitHubFile({
 				path,
