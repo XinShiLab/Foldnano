@@ -157,5 +157,7 @@ understand them, check that they work, and be ready to explain them in review.
 
 ## License
 
-By contributing, you agree that your contributions are licensed under the project's
-[MIT License](LICENSE).
+By contributing, you agree that your code contributions are licensed under the project's
+[MIT License](LICENSE), and your documentation contributions (text and images of the doc site,
+see the README's License section) under [CC BY 4.0](LICENSES/CC-BY-4.0.txt). Code samples inside
+the documentation stay MIT.

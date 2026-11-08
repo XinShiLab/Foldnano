@@ -1,6 +1,6 @@
 import GithubSlugger from 'github-slugger';
 
-import type { DocCategory, DocSearchSection } from './doc-search';
+import { DOCS_LICENSE_NOTICE, type DocCategory, type DocSearchSection } from './doc-search';
 
 const CALLOUT_LABELS: Record<string, string> = {
 	tip: 'Tip',
@@ -85,7 +85,7 @@ export function toAgentMarkdown(raw: string, origin: string, page: DocPageRef): 
 		.join('\n')
 		.replace(/\n{3,}/g, '\n\n')
 		.trim();
-	return `<!-- Source: ${origin}${docHref(page)} -->\n\n${body}\n`;
+	return `<!-- Source: ${origin}${docHref(page)} -->\n<!-- License: ${DOCS_LICENSE_NOTICE} -->\n\n${body}\n`;
 }
 
 /** Rewrites markdown links and images that point at site paths (`](/...)`) to absolute URLs. */

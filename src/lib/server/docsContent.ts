@@ -1,5 +1,5 @@
 import { toAgentMarkdown, type DocPageRef } from '$lib/docs/doc-markdown';
-import type { DocCategory } from '$lib/docs/doc-search';
+import { DOCS_LICENSE_NOTICE, type DocCategory } from '$lib/docs/doc-search';
 
 const rawModules = import.meta.glob('/src/content/**/*.md', {
 	eager: true,
@@ -58,5 +58,5 @@ export const TEXT_RESPONSE_HEADERS = {
 /** One plain-text file holding several pages as agent markdown, for the `llms*.txt` routes. */
 export function renderDocBundle(title: string, pages: readonly DocPage[], origin: string): string {
 	const rule = `\n\n${'─'.repeat(60)}\n\n`;
-	return `# ${title}${rule}${pages.map((p) => toAgentMarkdown(p.raw, origin, p)).join(rule)}`;
+	return `# ${title}\n\n> ${DOCS_LICENSE_NOTICE}${rule}${pages.map((p) => toAgentMarkdown(p.raw, origin, p)).join(rule)}`;
 }
