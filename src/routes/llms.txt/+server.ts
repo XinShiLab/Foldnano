@@ -1,7 +1,7 @@
 import type { RequestHandler } from './$types';
 import { error } from '@sveltejs/kit';
 import { docHref } from '$lib/docs/doc-markdown';
-import { DOC_CATEGORY_LABELS, type DocCategory } from '$lib/docs/doc-search';
+import { DOC_CATEGORY_LABELS, DOCS_LICENSE_NOTICE, type DocCategory } from '$lib/docs/doc-search';
 import { hasAlphaAccess } from '$lib/server/alphaAccess';
 import { listDocPages, TEXT_RESPONSE_HEADERS } from '$lib/server/docsContent';
 
@@ -25,6 +25,8 @@ export const GET: RequestHandler = ({ cookies, url }) => {
 		'> Foldnano is a browser-based DNA nanostructure editor for designing DNA origami and staple routing structures.',
 		'',
 		'Each link below is the page as plain markdown. Human-readable pages live at the same URL without `.md`.',
+		'',
+		DOCS_LICENSE_NOTICE,
 		'',
 		...categories.flatMap((category) => [
 			`## ${DOC_CATEGORY_LABELS[category]}`,

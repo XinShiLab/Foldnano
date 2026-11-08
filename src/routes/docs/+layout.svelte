@@ -197,5 +197,17 @@
 				{@render children()}
 			</main>
 		</div>
+
+		<footer class="border-t border-border">
+			<p class="mx-auto max-w-7xl px-4 py-4 text-xs text-muted-foreground print:px-0">
+				Documentation © Xin Shi and Foldnano contributors, licensed under
+				<a
+					href="https://creativecommons.org/licenses/by/4.0/"
+					target="_blank"
+					rel="license noopener noreferrer"
+					class="underline hover:text-foreground">CC BY 4.0</a
+				>. Code samples are MIT.
+			</p>
+		</footer>
 	</div>
 </AlphaAccessGate>

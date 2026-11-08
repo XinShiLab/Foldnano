@@ -30,6 +30,17 @@ in `src/lib/server/docsContent.ts`, the one place that globs `src/content`.
 `pageLinks` snippet rendered in two places: the sticky sidebar (md+) and the menu-button panel
 under the header (below lg it carries the category tabs; below md also the page list). The panel
 closes on `afterNavigate`. Wide prose tables scroll horizontally below md (`src/app.css`).
+The footer carries the documentation license line (see § License).
+
+## License
+
+The doc site's text and images (`src/content/**`, `static/screenshots/`) are CC BY 4.0; code
+samples in them are MIT, like the codebase. The README's License section is the authoritative
+statement and the suggested credit line; `LICENSES/CC-BY-4.0.txt` is the legal text. Every
+surface that can be copied carries the terms. The layout footer links the license; the text
+outputs use `DOCS_LICENSE_NOTICE` (`src/lib/docs/doc-search.ts`): a `<!-- License: … -->`
+comment under the `<!-- Source: … -->` line of every `toAgentMarkdown` page, and a visible line
+at the top of `/llms.txt` and every bundle (`renderDocBundle`). The About dialog's License tab says the same.
 
 ## Search
 
@@ -80,5 +91,7 @@ the user-facing guide page `src/content/guide/02-ai-assistants.md`.
   the markdown outputs; keep the information in plain markdown next to the component.
 - **Don't import `doc-markdown.ts` from client code** without need: it pulls in github-slugger.
   Client code uses `doc-search.ts`.
+- **New copyable outputs carry the license notice.** A new text route or export of doc content
+  uses `toAgentMarkdown` / `renderDocBundle` (which add it) or adds `DOCS_LICENSE_NOTICE` itself.
 - New doc text routes go through `hasAlphaAccess` like the existing ones (`routes-guide.md`
   § Access gate).

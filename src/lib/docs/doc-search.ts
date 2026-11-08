@@ -8,6 +8,11 @@ export const DOC_CATEGORY_LABELS: Record<DocCategory, string> = {
 	contributors: 'Contributors',
 };
 
+const DOCS_LICENSE_URL = 'https://creativecommons.org/licenses/by/4.0/';
+
+/** Terms every plain-text copy of the docs carries, since `.md` and `llms*.txt` exist to be copied. */
+export const DOCS_LICENSE_NOTICE = `Foldnano documentation © Xin Shi and Foldnano contributors. Text and images: CC BY 4.0 (${DOCS_LICENSE_URL}). Code samples: MIT.`;
+
 export interface DocSearchSection {
 	/** Unique id: the section's href. */
 	id: string;

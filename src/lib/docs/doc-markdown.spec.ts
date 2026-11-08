@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { absolutizeLinks, splitDocSections, toAgentMarkdown } from './doc-markdown';
+import { DOCS_LICENSE_NOTICE } from './doc-search';
 
 const PAGE = { category: 'guide', slug: 'demo', title: 'Demo Page' } as const;
 
@@ -49,9 +50,18 @@ describe('toAgentMarkdown', () => {
 	it('drops front matter and the script block and names the source page', () => {
 		expect(md).not.toContain('order: 1');
 		expect(md).not.toContain('import Callout');
-		expect(md.startsWith('<!-- Source: https://fn.test/docs/guide/demo -->\n\n# Demo Page')).toBe(
-			true
+		expect(
+			md.startsWith(
+				`<!-- Source: https://fn.test/docs/guide/demo -->\n<!-- License: ${DOCS_LICENSE_NOTICE} -->\n\n# Demo Page`
+			)
+		).toBe(true);
+	});
+
+	it('names the docs license (CC BY 4.0) and the code-sample license (MIT)', () => {
+		expect(DOCS_LICENSE_NOTICE).toContain(
+			'CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)'
 		);
+		expect(DOCS_LICENSE_NOTICE).toContain('Code samples: MIT');
 	});
 
 	it('turns callouts into blockquotes, keeping fenced code inside them intact', () => {

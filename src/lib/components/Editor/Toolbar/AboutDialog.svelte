@@ -171,6 +171,10 @@
 								Foldnano is open-source software released under the MIT License. Copyright ©
 								2025–2026 Xin Shi and Foldnano contributors.
 							</p>
+							<p class="mt-1 text-muted-foreground">
+								The documentation (text and images) is licensed under CC BY 4.0; code samples in it
+								are MIT.
+							</p>
 						</section>
 
 						<section>

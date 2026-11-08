@@ -48,5 +48,21 @@ before this repository's history begins.
 
 ## License
 
-Foldnano is released under the [MIT License](LICENSE). Third-party components and their licenses
-are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+- **Code** is released under the [MIT License](LICENSE).
+- **Documentation**: the text and images of the documentation site (`src/content/guide/`,
+  `src/content/plugin-development/`, `src/content/contributors/` and `static/screenshots/`) are
+  © 2025–2026 Xin Shi and Foldnano contributors, licensed under
+  [CC BY 4.0](LICENSES/CC-BY-4.0.txt).
+- **Code samples and example plugins** in the documentation are MIT, so you can copy them into
+  your own code.
+- **The Foldnano name and logo** are not licensed under either. A fork or derived site should use
+  its own name; saying it is "based on Foldnano" is welcome.
+
+If you reuse the documentation, please credit it like this:
+
+> Based on the [Foldnano documentation](https://fold.xinshilab.com/docs) by Xin Shi and Foldnano
+> contributors, licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+> Changes were made. (Keep the last sentence only if you changed it.)
+
+Third-party components and their licenses are listed in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
