@@ -19,7 +19,7 @@ from pathlib import Path
 import pytest
 
 from foldnano.edit import MutablePart, load_part
-from foldnano.edit.topology import slot_kind
+from foldnano.edit.topology import segment_sequence, slot_kind
 
 FIXTURES = Path(__file__).parent / "fixtures"
 GOLDEN_PATH = FIXTURES / "foldnano_edit_replay.golden.json"
@@ -28,7 +28,8 @@ UPDATING = os.environ.get("UPDATE_FOLDNANO_EDIT_REPLAY") == "1"
 
 def summary(raw: dict) -> dict:
     """What the replay spec compares: ids, topology, colors, modifications, skips/insertions,
-    VH lengths and region bounds. Mirrored by ``summary()`` in the spec."""
+    bases, the sequence-lock flag, VH lengths and region bounds. Mirrored by ``summary()`` in
+    the spec."""
     oligos = []
     for o in sorted(raw["oligos"], key=lambda o: o["id"]):
         segs = []
@@ -49,9 +50,12 @@ def summary(raw: dict) -> dict:
                     s["fivePrime"].get("modification"),
                     s["threePrime"].get("modification"),
                     mods,
+                    segment_sequence(s),
                 ]
             )
-        oligos.append([o["id"], o["color"], bool(o.get("isScaffold")), segs])
+        oligos.append(
+            [o["id"], o["color"], bool(o.get("isScaffold")), bool(o.get("isSequenceLocked")), segs]
+        )
     return {
         "oligos": oligos,
         "vhs": sorted([vh["index"], vh["length"]] for vh in raw["virtualHelices"]),
@@ -158,6 +162,14 @@ def scenario(part: MutablePart) -> None:
     part.remove_oligo(opened)
     region.reduce_unused_length()
     assert region.max_base == length
+
+    # Whole-oligo and whole-segment sequence writes; the opposite strands keep their bases.
+    by_id = sorted(part.oligos, key=lambda o: o.id)
+    target = max((o for o in by_id if not o.is_circular), key=lambda o: o.nucleotide_count)
+    n = target.nucleotide_count
+    target.fill_sequence(("ACGT" * n)[:n])
+    seg = next(o for o in by_id if o != target).segments[0]
+    seg.fill_sequence("g" * seg.nucleotide_count)
 
 
 @pytest.fixture

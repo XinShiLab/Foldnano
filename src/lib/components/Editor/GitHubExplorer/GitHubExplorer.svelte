@@ -2,7 +2,7 @@
 	import { help } from '$lib/components/help/help';
 	import { onDestroy, onMount } from 'svelte';
 	import { LoaderCircle, RefreshCw, GitBranch, Unplug, CloudDownload } from '@lucide/svelte';
-	import { toast } from 'svelte-sonner';
+	import { notify } from '$lib/notifications/notify.svelte';
 	import { githubAuth, getAuthStatus, loginWithGitHub } from '$lib/services/github/auth.svelte';
 	import { githubMetadataStore, githubExplorerStateStore } from '$lib/services/storage';
 	import { getFileContent } from '$lib/services/github/api';
@@ -118,7 +118,7 @@
 				type: 'application/json',
 			};
 			if (!cadnanoParser.canParse(raw, meta)) {
-				toast.error(`"${node.name}" is not a valid cadnano JSON file.`);
+				notify.error(`"${node.name}" is not a valid cadnano JSON file.`);
 				return;
 			}
 			const part = await withLatticeChoice(
@@ -126,7 +126,7 @@
 				(lattice) => cadnanoParser.parse(raw, meta, { lattice }) as Part
 			);
 			for (const w of cadnanoParser.getLastWarnings()) {
-				toast.warning('Cadnano import warning', { description: w });
+				notify.warning('Cadnano import warning', { description: w });
 			}
 			const baseName = designNameFromPath(fnPath);
 			const { docId } = await session.createDocumentFromImportedPart(part, baseName, folderPath);
@@ -137,7 +137,7 @@
 				{ name: fnName, path: fnPath, type: 'file', sha: '', localOnly: true },
 			];
 		} catch (e) {
-			toast.error(`Failed to import "${node.name}": ${(e as Error).message}`);
+			notify.error(`Failed to import "${node.name}": ${(e as Error).message}`);
 		} finally {
 			explorerState.endLoadingFile(node.path);
 		}

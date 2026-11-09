@@ -18,9 +18,11 @@ import type {
 	IndexedDbSettingRecord,
 } from '../indexedDbTypes';
 import {
+	ERROR_LOG_MAX_AGE_MS,
 	FOLDNANO_INDEXED_DB_NAME,
 	FOLDNANO_INDEXED_DB_VERSION,
 	LOCAL_BACKUP_INTERVAL_MS,
+	MAX_ERROR_LOG_ENTRIES,
 	MAX_LOCAL_BACKUPS_PER_DOC,
 } from '../indexedDbTypes';
 
@@ -49,6 +51,7 @@ export interface IndexedDbPersistenceBackend {
 	loadPluginFiles(id: string): Promise<IndexedDbPluginFilesRecord | null>;
 	deletePluginFiles(id: string): Promise<void>;
 	addErrorLog(record: ErrorLogRecord): Promise<void>;
+	bumpErrorLog(id: string, by: number, lastSeenAt: number): Promise<boolean>;
 	getRecentErrorLogs(limit?: number): Promise<ErrorLogRecord[]>;
 	clearErrorLogs(): Promise<void>;
 }
@@ -410,20 +413,41 @@ export class FoldnanoIndexedDb extends Dexie implements IndexedDbPersistenceBack
 	}
 
 	async addErrorLog(record: ErrorLogRecord): Promise<void> {
-		const cap = 50;
 		await this.errorLogs.put(record);
+		await this._pruneErrorLogs();
+	}
+
+	/** Adds repeats to an existing entry; false when it is gone (cleared or pruned). */
+	async bumpErrorLog(id: string, by: number, lastSeenAt: number): Promise<boolean> {
+		const updated = await this.errorLogs
+			.where('id')
+			.equals(id)
+			.modify((record) => {
+				record.count = (record.count ?? 1) + by;
+				record.lastSeenAt = lastSeenAt;
+			});
+		return updated > 0;
+	}
+
+	async getRecentErrorLogs(limit = MAX_ERROR_LOG_ENTRIES): Promise<ErrorLogRecord[]> {
+		// Pruned on read too, so stale entries age out even when no new error arrives.
+		await this._pruneErrorLogs();
+		return this.errorLogs.orderBy('timestamp').reverse().limit(limit).toArray();
+	}
+
+	private async _pruneErrorLogs(): Promise<void> {
+		await this.errorLogs
+			.where('timestamp')
+			.below(Date.now() - ERROR_LOG_MAX_AGE_MS)
+			.delete();
 		const count = await this.errorLogs.count();
-		if (count > cap) {
+		if (count > MAX_ERROR_LOG_ENTRIES) {
 			const oldestIds = await this.errorLogs
 				.orderBy('timestamp')
-				.limit(count - cap)
+				.limit(count - MAX_ERROR_LOG_ENTRIES)
 				.primaryKeys();
 			await this.errorLogs.bulkDelete(oldestIds);
 		}
-	}
-
-	async getRecentErrorLogs(limit = 50): Promise<ErrorLogRecord[]> {
-		return this.errorLogs.orderBy('timestamp').reverse().limit(limit).toArray();
 	}
 
 	async clearErrorLogs(): Promise<void> {

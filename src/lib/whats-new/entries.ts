@@ -30,14 +30,26 @@ export interface WhatsNewEntry {
  * Author date of the newest commit already considered for this list. `pnpm whats-new:draft`
  * only drafts commits authored after it (author dates survive rebases; hashes don't).
  */
-export const WHATS_NEW_REVIEWED_THROUGH = '2026-11-06T00:37:00+01:00';
+export const WHATS_NEW_REVIEWED_THROUGH = '2026-11-09T11:48:50+01:00';
 
 // Newest first. Edit freely; the draft script only inserts new entries at the top.
 export const WHATS_NEW: readonly WhatsNewEntry[] = [
 	{
+		date: '2026-11-09',
+		area: 'General',
+		text: 'Interface updates: a notifications bell in the status bar, an Error Log that records unexpected errors and can be cleared (opened from the bell or the Help menu), a clearer status bar, a Select panel that summarizes multi-selections, and mouse-wheel scrolling for crowded toolbars.',
+		link: 'interface-reference#status-bar',
+	},
+	{
+		date: '2026-11-08',
+		area: 'Saving',
+		text: 'Design names follow one rule everywhere: a name already used in the same folder is refused, one used by another saved design asks first, and a new design asks for a name once it has content. Opening a .fn.json that is already saved in this browser offers Open as copy or Replace (the replaced version is kept as a backup), and Saved Documents can download every design as one zip.',
+		link: 'saving-github#browser-storage',
+	},
+	{
 		date: '2026-11-06',
 		area: '3D view',
-		text: "Replay an oxDNA trajectory from your design's own export in the 3D view, drawn in its strand colours. Scrub or play the frames, show the mean structure, see each frame's step and real time, and hover or click a nucleotide to find it in the strand view. Trajectories from an interrupted run also load.",
+		text: "Replay an oxDNA trajectory from your design's own export in the 3D view, drawn in its strand colours. Scrub or play the frames, show the mean structure, see each frame's step and real time, and hover or click a nucleotide to find it in the strand view. Trajectories from an interrupted run also load, and the replay can be exported as an MP4 video.",
 		link: 'simulation-export#replaying-an-oxdna-trajectory',
 	},
 	{

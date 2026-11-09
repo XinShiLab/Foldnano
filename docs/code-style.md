@@ -6,6 +6,7 @@ covers:
   - components.json
   - jsrepo.json
   - src/lib/components/ui/**
+  - src/lib/components/scroll-strip/**
 ---
 
 # Code Style Guide
@@ -224,6 +225,10 @@ pnpm shadcn-svelte add <component>
 - Compose app-specific widgets from these components elsewhere under `src/lib/components/`; keep
   `ui/` close to upstream so later updates stay easy.
 - Credit any new upstream source in `THIRD_PARTY_NOTICES.md` and the About dialog.
+- A horizontally scrolling strip with a hidden scrollbar (toolbars, tab rows) gets
+  `{@attach scrollStrip}` (`src/lib/components/scroll-strip/`): browsers don't turn a plain
+  vertical wheel into sideways scroll, so without it mouse-only users can't reach clipped buttons;
+  it also fades the edges that hide content. Don't hand-roll `onwheel` handlers for this.
 
 ## Comments
 

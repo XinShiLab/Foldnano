@@ -2,7 +2,7 @@
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { LoaderCircle } from '@lucide/svelte';
-	import { toast } from 'svelte-sonner';
+	import { notify } from '$lib/notifications/notify.svelte';
 	import { getEditorDocumentSession } from '../context/EditorDocumentSession.svelte';
 	import { githubExplorerStateStore } from '$lib/services/storage';
 	import type { FileNode } from './types';
@@ -98,7 +98,7 @@
 			});
 
 			await session.commitCurrentDocToGitHub(commitMessage.trim() || `Add ${fileName}`);
-			toast.success(`Published "${fileName}"`, { description: path });
+			notify.success(`Published "${fileName}"`, { history: true, description: path });
 			onPublished(path);
 			open = false;
 		} catch (e) {

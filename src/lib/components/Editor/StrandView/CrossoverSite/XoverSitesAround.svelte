@@ -8,7 +8,7 @@
 	import { makeCrossoverCmd } from '$lib/commands/strands';
 	import { getEditorViewContext } from '../../context/EditorViewContext.svelte';
 	import { onMount } from 'svelte';
-	import { toast } from 'svelte-sonner';
+	import { notify } from '$lib/notifications/notify.svelte';
 
 	interface Props {
 		part: Part;
@@ -117,7 +117,7 @@
 			history
 		);
 		if (result.droppedModifications.length > 0) {
-			toast.warning(
+			notify.warning(
 				`Crossover dropped modification${result.droppedModifications.length === 1 ? '' : 's'}: ${result.droppedModifications.join(', ')}`
 			);
 		}

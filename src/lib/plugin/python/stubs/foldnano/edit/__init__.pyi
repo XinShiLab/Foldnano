@@ -723,7 +723,12 @@ class OligoView(_ReadOnly):
     def is_scaffold(self) -> bool: ...
 
     @property
-    def is_sequence_locked(self) -> bool: ...
+    def is_sequence_locked(self) -> bool:
+        """
+        Set when a sequence was applied deliberately in the editor. A reminder, not a
+        lock: any change to the bases (a plugin's included) clears it, and plugins can't set
+        it.
+        """
 
     @property
     def is_circular(self) -> bool:
@@ -741,6 +746,17 @@ class OligoView(_ReadOnly):
         """The oligo's free 3′ end, or ``None`` for a circular oligo."""
 
     def get_segment(self, segment_id: str) -> SegmentView | None: ...
+
+    @property
+    def sequence(self) -> str:
+        """
+        Its bases 5'→3' from the free 5' end (a circular oligo from the segment with the
+        lowest 5' end, as ``fill_sequence`` writes it); ``N`` for a base never assigned.
+        """
+
+    @property
+    def nucleotide_count(self) -> int:
+        """Bases it holds, skips and insertions counted."""
 
     @property
     def five_modification(self) -> str | None:
@@ -785,6 +801,15 @@ class MutableOligo(OligoView):
 
     @OligoView.three_modification.setter
     def three_modification(self, value: str | None) -> None: ...
+
+    def fill_sequence(self, sequence: str, start: 'SegmentView | None'=None) -> None:
+        """
+        Write the oligo's bases 5'→3'. ``len(sequence)`` must equal ``nucleotide_count``.
+        A linear oligo starts at its free 5' end. A circular one starts at the 5' end of
+        ``start`` (one of its segments), by default the segment with the lowest 5' end (helix
+        index, then bp), as the app's oligo report reads it. Only this oligo changes: the
+        opposite strand is never filled, so a disagreement shows as a mismatch in the editor.
+        """
 
     def remove(self) -> None:
         """Same as ``part.remove_oligo(oligo)``."""
@@ -865,6 +890,14 @@ class SegmentView(_ReadOnly):
     def slot_at(self, bp_index: int) -> SlotView:
         """Return a proxy for the slot at ``bp_index`` (created on first write)."""
 
+    @property
+    def sequence(self) -> str:
+        """Its bases 5'→3'; ``N`` for a base never assigned."""
+
+    @property
+    def nucleotide_count(self) -> int:
+        """Bases it holds: one per position, none for a skip, n for an insertion."""
+
 
 class MutableSegment(SegmentView):
     """A stretch of one strand of one VH, part of an oligo."""
@@ -907,6 +940,13 @@ class MutableSegment(SegmentView):
 
     def slot_at(self, bp_index: int) -> MutableSlot:
         """Return a proxy for the slot at ``bp_index`` (created on first write)."""
+
+    def fill_sequence(self, sequence: str) -> None:
+        """
+        Write this segment's bases 5'→3'. ``len(sequence)`` must equal
+        ``nucleotide_count``. Only this strand changes: the opposite strand is never filled,
+        so a disagreement shows as a mismatch in the editor.
+        """
 
 
 class SegmentEndView(_ReadOnly):

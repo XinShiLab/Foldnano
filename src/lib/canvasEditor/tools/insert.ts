@@ -6,7 +6,7 @@ import type { AddSkipOrInsertionParams } from '$lib/commands/strands';
 import type { RspCoord } from '$lib/model/Part/Part.svelte';
 import { createDoubleClickDetector } from './doubleClick';
 import { resolveTargetBpIdx, collectRegionSegmentsAtBp } from './skipInsertUtils';
-import { toast } from 'svelte-sonner';
+import { notify } from '$lib/notifications/notify.svelte';
 import { InvalidOperationError } from '$lib/errors';
 
 export function InsertTool(): Tool {
@@ -32,7 +32,7 @@ export function InsertTool(): Tool {
 				params.push({ segment, atIndex, count: 1 });
 			}
 			if (blocked > 0) {
-				toast.warning(
+				notify.warning(
 					`${blocked} position${blocked > 1 ? 's' : ''} skipped — constrained crossover site`
 				);
 			}
@@ -43,7 +43,7 @@ export function InsertTool(): Tool {
 			if (!oligoSegment) return;
 			const targetBpIdx = resolveTargetBpIdx(ctx.part, oligoSegment.segment, rsp.bpIdx);
 			if (targetBpIdx === null) {
-				toast.warning('Cannot place insert — constrained crossover site');
+				notify.warning('Cannot place insert — constrained crossover site');
 				return;
 			}
 			addSkipOrInsertionCmd(

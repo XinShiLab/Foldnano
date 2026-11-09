@@ -19,7 +19,7 @@
 	import type { GitHubExplorerState } from './GitHubExplorerState.svelte';
 	import { loadLocalOnlyEntries } from './localPersistence';
 	import { isRenamableFile } from './fileNaming';
-	import { toast } from 'svelte-sonner';
+	import { notify } from '$lib/notifications/notify.svelte';
 	import * as ContextMenu from '$lib/components/ui/context-menu/index.js';
 
 	interface Props {
@@ -76,7 +76,7 @@
 		} else if (type === 'copy-path' && node && repoCtx) {
 			const fullPath = `${repoCtx.owner}/${repoCtx.repo}/${repoCtx.branch}/${node.path}`;
 			await navigator.clipboard.writeText(fullPath);
-			toast.success('Path copied to clipboard');
+			notify.success('Path copied to clipboard');
 		} else if (type === 'download' && node?.type === 'file') {
 			await explorerState.downloadFile(node);
 		} else if (type === 'new-design') {

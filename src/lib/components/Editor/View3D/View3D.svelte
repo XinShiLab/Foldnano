@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
-	import { toast } from 'svelte-sonner';
+	import { notify } from '$lib/notifications/notify.svelte';
 	import type { Part } from '$lib/model/Part';
 	import { setupScene } from './sceneSetup';
 	import {
@@ -819,7 +819,7 @@
 			if (!showNtModel) throw err;
 			const message = err instanceof Error ? err.message : String(err);
 			console.error('NT model build failed:', err);
-			toast.error('Cannot show NT model', { description: message });
+			notify.error('Cannot show NT model', { description: message });
 			onNtModelError?.(message);
 			built = buildScene(
 				part,

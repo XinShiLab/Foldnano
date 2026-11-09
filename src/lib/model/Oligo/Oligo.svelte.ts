@@ -8,6 +8,11 @@ import type { Part } from '../Part';
 import type { SegmentEnd } from './SegmentEnd.svelte';
 import { generateRandomOKLCHColor } from '../colorGenerator';
 import { generateRandomDNA } from '../sequences/sequences'; // added
+import { InvalidOperationError } from '../../errors';
+
+/** A whole-oligo fill runs 5'→3' from the free 5' end, which a ring doesn't have. */
+export const CIRCULAR_FILL_ERROR =
+	"A circular strand has no 5' end to start a sequence from. Break it first, or fill it one segment at a time.";
 
 // export const CONNECT_OLIGOS = Symbol('CONNECT_OLIGOS')
 
@@ -464,6 +469,7 @@ export default class Oligo {
 	fillRandomSequence(gcContent: number = 0.5): string {
 		const needed = this.length;
 		if (needed === 0) return '';
+		if (this.isCircular) throw new InvalidOperationError(CIRCULAR_FILL_ERROR);
 		const random = generateRandomDNA(needed, gcContent);
 		const seq = random.primary5to3;
 		const { leftover, missing } = this.fillSequence(seq);

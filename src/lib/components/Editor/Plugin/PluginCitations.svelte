@@ -3,7 +3,7 @@
 	import type { PluginCitation } from '$lib/plugin/types';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Copy, ExternalLink } from '@lucide/svelte';
-	import { toast } from 'svelte-sonner';
+	import { notify } from '$lib/notifications/notify.svelte';
 
 	let { citations }: { citations: PluginCitation[] } = $props();
 
@@ -11,9 +11,9 @@
 		const link = citationLink(citation);
 		try {
 			await navigator.clipboard.writeText(link ? `${citation.text} ${link.href}` : citation.text);
-			toast.success('Citation copied');
+			notify.success('Citation copied');
 		} catch {
-			toast.error('Could not copy the citation');
+			notify.error('Could not copy the citation');
 		}
 	}
 </script>

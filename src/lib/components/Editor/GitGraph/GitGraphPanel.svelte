@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { help } from '$lib/components/help/help';
 	import { LoaderCircle, RefreshCw, GitBranch, Plus } from '@lucide/svelte';
-	import { toast } from 'svelte-sonner';
+	import { notify } from '$lib/notifications/notify.svelte';
 	import * as Select from '$lib/components/ui/select/index.js';
 	import { listBranches, listCommits, createBranch, getRepo } from '$lib/services/github/api';
 	import { getEditorDocumentSession } from '../context/EditorDocumentSession.svelte';
@@ -132,7 +132,7 @@
 			}
 
 			if (newCount === 0) {
-				toast.info('No more commits to load');
+				notify.info('No more commits to load');
 			} else {
 				allCommits = merged;
 				rebuildLayout(merged, branches);
@@ -171,15 +171,17 @@
 		try {
 			const result = await session.switchToBranch(targetBranch);
 			if (result.fileMissing) {
-				toast.success(`Switched to ${targetBranch}`, {
+				notify.success(`Switched to ${targetBranch}`, {
+					history: true,
 					description: 'File not found on this branch',
 				});
 			} else if (result.reloaded && currentFileMeta) {
-				toast.success(`Switched to ${targetBranch}`, {
+				notify.success(`Switched to ${targetBranch}`, {
+					history: true,
 					description: `${currentFileMeta.path} reloaded`,
 				});
 			} else {
-				toast.success(`Switched to ${targetBranch}`);
+				notify.success(`Switched to ${targetBranch}`, { history: true });
 			}
 
 			// Rebuild layout so current-branch highlight updates
@@ -188,7 +190,7 @@
 		} catch (e) {
 			const message = (e as Error).message || 'Failed to switch branch';
 			if (message.startsWith('Commit or discard changes first:')) {
-				toast.error('Cannot switch branch', { description: message });
+				notify.error('Cannot switch branch', { description: message });
 			} else {
 				error = message;
 			}

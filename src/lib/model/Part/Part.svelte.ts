@@ -4,6 +4,7 @@ import type OligoSegment from '../Oligo/OligoSegment.svelte';
 import { mirroredSkipInsertSeq } from '../Oligo/OligoSegment.svelte';
 import { fillEmptySequence, type DnaBase, type EmptyFillResult } from './fillEmptySequence';
 import { cloneOligoJsonWithOffset } from '../Oligo/cloneOligoJson';
+import { circularStartSegment } from '../Oligo/oligoKey';
 import type { VirtualHelixFrame } from '../geometry3d/dnaGeometry';
 import { InvalidOperationError, OperationNotSupportedError } from '../../errors';
 
@@ -1423,7 +1424,9 @@ export class Part {
 		// it can be a crossover from an oligo to itself (hairpin crossover), but not the same segment
 		const fromSegment = fromOligo.threePrimeEndSegment;
 		if (fromOligo === toOligo && fromSegment === toSegment) {
-			throw new Error('Cannot create crossover on the same segment of the same oligo.');
+			throw new InvalidOperationError(
+				'Cannot create crossover on the same segment of the same oligo.'
+			);
 		}
 
 		// first make sure both oligos are in this part
@@ -1440,7 +1443,7 @@ export class Part {
 			toSegment === toOligo.threePrimeEndSegment &&
 			atIndexTarget === toOligo.threePrime?.index
 		) {
-			throw new Error('Cannot create crossover to a three prime end.');
+			throw new InvalidOperationError('Cannot create crossover to a three prime end.');
 		}
 
 		// if atIndexTarget is 1nt to five prime end on the 5'-segment of toOligo, reject since it will create a one-nt segment
@@ -1452,7 +1455,9 @@ export class Part {
 					? atIndexTarget === fivePrimeIndex + 1
 					: atIndexTarget === fivePrimeIndex - 1;
 			if (isOneNtSegment) {
-				throw new Error('Cannot create crossover that results in a one-nucleotide segment.');
+				throw new InvalidOperationError(
+					'Cannot create crossover that results in a one-nucleotide segment.'
+				);
 			}
 		}
 
@@ -1749,4 +1754,75 @@ export class Part {
 	): EmptyFillResult {
 		return fillEmptySequence(this, segments, gcContent, base);
 	}
+
+	/**
+	 * Writes `sequence` over the oligo 5'→3': one base per plain slot, n per insertion, none per
+	 * skip. A linear oligo starts at its free 5' end; a circular one at `start`'s 5' end, by
+	 * default the segment with the lowest 5' end (as the OligoKey reads it). Only this oligo
+	 * changes: the opposite strand is never filled, so a disagreement shows as a mismatch. A
+	 * changed base clears `isSequenceLocked`.
+	 */
+	setOligoSequence(oligo: Oligo, sequence: string, start: OligoSegment | null = null): void {
+		this._assertNotMirrorEdit(oligo);
+		if (start && !oligo.segments.has(start)) {
+			throw new InvalidOperationError('The start segment is not part of this oligo.');
+		}
+		const fivePrime = oligo.fivePrimeEndSegment;
+		if (fivePrime && start && start !== fivePrime) {
+			throw new InvalidOperationError(
+				"A linear oligo starts at its free 5' end; only a circular oligo takes a start segment."
+			);
+		}
+		const first = fivePrime ?? start ?? circularStartSegment(oligo);
+		const bases = normalizeSequence(sequence);
+		if (bases.length !== oligo.length) {
+			throw new InvalidOperationError(
+				`The oligo holds ${oligo.length} bases; the sequence has ${bases.length}.`
+			);
+		}
+		let cursor = 0;
+		let seg: OligoSegment | null = first;
+		do {
+			if (!seg) break;
+			const need = seg.totalNucleotides;
+			seg.sequence = bases.slice(cursor, cursor + need);
+			cursor += need;
+			seg = seg.threePrime.connectedSegment;
+		} while (seg !== first);
+	}
+
+	/** Base pairs whose two assigned bases aren't complementary (the strand view's red marks). */
+	countMismatchedBasePairs(): number {
+		let count = 0;
+		for (const oligo of this.oligos) {
+			for (const seg of oligo.segments) {
+				// Each pair is seen from both strands; count it once.
+				if (seg.inStrandIndex === 0) count += seg.mismatchedBps().length;
+			}
+		}
+		return count;
+	}
+
+	/** {@link setOligoSequence} for one segment, 5'→3'. */
+	setSegmentSequence(segment: OligoSegment, sequence: string): void {
+		const oligo = segment.oligo;
+		if (oligo) this._assertNotMirrorEdit(oligo);
+		const bases = normalizeSequence(sequence);
+		if (bases.length !== segment.totalNucleotides) {
+			throw new InvalidOperationError(
+				`The segment holds ${segment.totalNucleotides} bases; the sequence has ${bases.length}.`
+			);
+		}
+		segment.sequence = bases;
+	}
+}
+
+const SEQUENCE_LETTERS = /^[ACGTN]*$/;
+
+function normalizeSequence(sequence: string): string {
+	const bases = sequence.toUpperCase();
+	if (!SEQUENCE_LETTERS.test(bases)) {
+		throw new InvalidOperationError('A sequence may only contain A, C, G, T and N.');
+	}
+	return bases;
 }

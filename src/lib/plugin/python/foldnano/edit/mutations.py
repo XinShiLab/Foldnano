@@ -28,6 +28,8 @@ OP_SET_OLIGO_NAME = "set_oligo_name"
 OP_SET_OLIGO_IS_SCAFFOLD = "set_oligo_is_scaffold"
 OP_SET_SEGMENT_MODIFICATION = "set_segment_modification"
 OP_SET_SLOT_SEQUENCE = "set_slot_sequence"
+OP_SET_OLIGO_SEQUENCE = "set_oligo_sequence"
+OP_SET_SEGMENT_SEQUENCE = "set_segment_sequence"
 OP_SET_SLOT_SKIP = "set_slot_skip"
 OP_SET_SLOT_INSERTION = "set_slot_insertion"
 OP_ADD_SKIP_OR_INSERTION = "add_skip_or_insertion"
@@ -62,6 +64,8 @@ KNOWN_OPS: frozenset[str] = frozenset(
         OP_SET_OLIGO_IS_SCAFFOLD,
         OP_SET_SEGMENT_MODIFICATION,
         OP_SET_SLOT_SEQUENCE,
+        OP_SET_OLIGO_SEQUENCE,
+        OP_SET_SEGMENT_SEQUENCE,
         OP_SET_SLOT_SKIP,
         OP_SET_SLOT_INSERTION,
         OP_ADD_SKIP_OR_INSERTION,

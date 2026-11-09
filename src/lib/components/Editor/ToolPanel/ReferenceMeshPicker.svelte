@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Upload } from '@lucide/svelte';
-	import { toast } from 'svelte-sonner';
+	import { notify } from '$lib/notifications/notify.svelte';
 	import { FileDropZone } from '$lib/components/ui/file-drop-zone';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { help } from '$lib/components/help/help';
@@ -66,7 +66,7 @@
 		class="h-24 rounded-md border border-border p-3"
 		{onUpload}
 		onFileRejected={({ reason, file }) => {
-			toast.error('File rejected', { description: `${file.name}: ${reason}` });
+			notify.error('File rejected', { description: `${file.name}: ${reason}` });
 		}}
 	>
 		<div class="flex flex-col items-center justify-center gap-2 text-center text-muted-foreground">

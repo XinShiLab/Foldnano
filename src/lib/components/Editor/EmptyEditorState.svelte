@@ -13,7 +13,7 @@
 		Pyramid,
 	} from '@lucide/svelte';
 	import { resolve } from '$app/paths';
-	import { toast } from 'svelte-sonner';
+	import { notify } from '$lib/notifications/notify.svelte';
 	import Open from './Toolbar/Open.svelte';
 	import { getEditorViewContext } from './context/EditorViewContext.svelte';
 	import { help } from '$lib/components/help/help';
@@ -72,7 +72,7 @@
 	// Dropped and picked files take the same route: a mesh starts a region, anything else is previewed.
 	const openFiles = (picked: File[]) => {
 		if (picked.length > 1) {
-			toast.error('Drop one file at a time', {
+			notify.error('Drop one file at a time', {
 				description: `${picked.length} files were dropped. Nothing was opened.`,
 			});
 		} else if (picked.length === 1 && picked[0].name.toLowerCase().endsWith('.ply')) {

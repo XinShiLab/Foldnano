@@ -2,10 +2,11 @@
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Bug, Copy, LoaderCircle } from '@lucide/svelte';
-	import { toast } from 'svelte-sonner';
+	import { notify } from '$lib/notifications/notify.svelte';
 	import { errorLogPanelState } from '$lib/errorLogPanel.svelte';
 	import { foldnanoIndexedDb } from '$lib/services/storage/indexeddb/FoldnanoIndexedDb';
 	import type { ErrorLogRecord } from '$lib/services/storage/indexedDbTypes';
+	import { formatRelativeTime } from '$lib/relativeTime';
 
 	let entries = $state<ErrorLogRecord[]>([]);
 	let loading = $state(false);
@@ -41,31 +42,18 @@
 
 	async function copyEntry(entry: ErrorLogRecord) {
 		await navigator.clipboard.writeText(JSON.stringify(entry, null, 2));
-		toast.success('Copied to clipboard');
+		notify.success('Copied to clipboard');
 	}
 
 	async function copyAll() {
 		await navigator.clipboard.writeText(JSON.stringify(entries, null, 2));
-		toast.success('Copied to clipboard');
+		notify.success('Copied to clipboard');
 	}
 
-	function formatDate(ts: number): string {
-		const d = new Date(ts);
-		const diff = Date.now() - ts;
-		const mins = Math.floor(diff / 60000);
-		const hours = Math.floor(diff / 3600000);
-		const days = Math.floor(diff / 86400000);
-		if (mins < 1) return 'just now';
-		if (mins < 60) return `${mins}m ago`;
-		if (hours < 24) return `${hours}h ago`;
-		if (days === 1)
-			return `yesterday ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-		return d.toLocaleString([], {
-			month: 'short',
-			day: 'numeric',
-			hour: '2-digit',
-			minute: '2-digit',
-		});
+	async function clearAll() {
+		await foldnanoIndexedDb.clearErrorLogs();
+		entries = [];
+		expandedId = null;
 	}
 </script>
 
@@ -77,7 +65,7 @@
 				Error Log
 			</Dialog.Title>
 			<Dialog.Description class="text-xs">
-				Recent errors from this browser, kept locally for troubleshooting.
+				Errors from this browser in the last 30 days (up to 50), kept locally for troubleshooting.
 			</Dialog.Description>
 		</Dialog.Header>
 
@@ -111,9 +99,17 @@
 								<span class="flex items-center gap-2 text-xs font-medium text-foreground">
 									<span class="rounded bg-muted px-1 font-mono text-[10px]">{entry.context}</span>
 									<span class="text-[11px] font-normal text-muted-foreground"
-										>{formatDate(entry.timestamp)}</span
+										>{formatRelativeTime(entry.timestamp)}</span
 									>
 									<span class="font-mono text-[10px] text-muted-foreground">#{entry.id}</span>
+									{#if (entry.count ?? 1) > 1}
+										<span
+											class="rounded bg-muted px-1 text-[10px] text-muted-foreground"
+											title={entry.lastSeenAt
+												? `Last seen ${formatRelativeTime(entry.lastSeenAt)}`
+												: undefined}>×{entry.count}</span
+										>
+									{/if}
 								</span>
 								<span class="mt-0.5 block truncate text-xs text-foreground">{entry.message}</span>
 							</span>
@@ -143,9 +139,14 @@
 		</div>
 
 		<Dialog.Footer class="flex items-center justify-between border-t border-border px-4 py-3">
-			<Button size="sm" variant="outline" onclick={copyAll} disabled={entries.length === 0}>
-				Copy all as JSON
-			</Button>
+			<div class="flex items-center gap-2">
+				<Button size="sm" variant="outline" onclick={copyAll} disabled={entries.length === 0}>
+					Copy all as JSON
+				</Button>
+				<Button size="sm" variant="ghost" onclick={clearAll} disabled={entries.length === 0}>
+					Clear
+				</Button>
+			</div>
 			<Button size="sm" onclick={() => (errorLogPanelState.open = false)}>Close</Button>
 		</Dialog.Footer>
 	</Dialog.Content>

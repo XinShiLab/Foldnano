@@ -1,4 +1,4 @@
-import { toast } from 'svelte-sonner';
+import { notify } from '$lib/notifications/notify.svelte';
 import { moveOligoEndCmd, segmentHasContentUnsafeForResize } from '$lib/commands/strands';
 import type { TemporalPartInfo } from '$lib/components/Editor/context/types';
 import type { MoveEndBoxProps } from '$lib/components/Editor/StrandView/temporalLayer/MoveEndBox.svelte';
@@ -261,7 +261,7 @@ export function commitMovingEnds(ctx: ViewContext, movingEnds: MoveEndState) {
 			0
 		);
 		if (mismatchCount > 0) {
-			toast.warning(
+			notify.warning(
 				`This move kept the original sequence, which no longer matches its complementary strand at ${mismatchCount} position${mismatchCount === 1 ? '' : 's'}. Turn on Warnings → sequence mismatch to see where.`
 			);
 		}

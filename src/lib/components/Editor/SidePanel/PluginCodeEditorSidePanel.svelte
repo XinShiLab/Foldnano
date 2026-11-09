@@ -11,7 +11,7 @@
 	import PluginActivationConfirmDialog from '../Plugin/PluginActivationConfirmDialog.svelte';
 	import { PluginActivationGate } from '../Plugin/PluginActivationGate.svelte';
 	import { getEditorViewContext } from '../context/EditorViewContext.svelte';
-	import { toast } from 'svelte-sonner';
+	import { notify } from '$lib/notifications/notify.svelte';
 	import {
 		SCRIPT_LAB_ANALYSIS_TEMPLATE,
 		SCRIPT_LAB_BLANK_TEMPLATE,
@@ -106,7 +106,7 @@
 			// Run errors show in the output section; pre-run guard failures
 			// (no design, empty editor, unapplied result, …) would otherwise be silent.
 			if (plugin.status !== 'error') {
-				toast.error('Plugin run failed', {
+				notify.error('Plugin run failed', {
 					description: e instanceof Error ? e.message : String(e),
 				});
 			}

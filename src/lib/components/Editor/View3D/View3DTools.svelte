@@ -38,6 +38,7 @@
 		type RbsDiagnostics,
 	} from './view3DToolbarState';
 	import { help } from '$lib/components/help/help';
+	import { scrollStrip } from '$lib/components/scroll-strip/scroll-strip';
 	import {
 		getEditorViewContext,
 		type View3DToolPanelMode,
@@ -184,6 +185,7 @@
 <div class="flex h-8 min-w-0 flex-1 items-center overflow-hidden">
 	<div
 		class="flex min-w-0 flex-1 scrollbar-none items-center gap-x-1 overflow-x-auto overflow-y-hidden px-2 [&::-webkit-scrollbar]:hidden"
+		{@attach scrollStrip}
 	>
 		<ButtonGroup.Root class="shrink-0">
 			<Button

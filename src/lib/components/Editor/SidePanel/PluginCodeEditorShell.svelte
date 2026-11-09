@@ -16,7 +16,7 @@
 		SquareArrowOutUpRight,
 		SquareTerminal,
 	} from '@lucide/svelte';
-	import { toast } from 'svelte-sonner';
+	import { notify } from '$lib/notifications/notify.svelte';
 	import type { Component } from 'svelte';
 	import type { PrismEditor } from 'prism-code-editor';
 	import { basicEditor } from 'prism-code-editor/setups';
@@ -34,6 +34,7 @@
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import * as Resizable from '$lib/components/ui/resizable/index.js';
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
+	import { scrollStrip } from '$lib/components/scroll-strip/scroll-strip';
 
 	type ExecutionState = 'ready' | 'running' | 'stopped';
 
@@ -114,7 +115,6 @@
 	let editorFontSize = $state(12);
 	let popOutWindow: PopOutWindow | null = $state(null);
 	let editor: PrismEditor<{ theme: EditorTheme }> | null = null;
-	let toolbarScrollEl: HTMLDivElement | null = null;
 
 	const MIN_EDITOR_FONT_SIZE = 10;
 	const MAX_EDITOR_FONT_SIZE = 16;
@@ -168,15 +168,6 @@
 			MIN_EDITOR_FONT_SIZE,
 			Math.min(MAX_EDITOR_FONT_SIZE, editorFontSize + delta)
 		);
-	}
-
-	function handleToolbarWheel(event: WheelEvent): void {
-		if (!toolbarScrollEl) return;
-		if (toolbarScrollEl.scrollWidth <= toolbarScrollEl.clientWidth) return;
-		if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
-
-		event.preventDefault();
-		toolbarScrollEl.scrollLeft += event.deltaY;
 	}
 
 	// An attachment rather than onMount: the editor is rebuilt in whichever window hosts it.
@@ -242,7 +233,7 @@
 
 	function handlePopOutBlocked(): void {
 		poppedOut = false;
-		toast.error("Couldn't open a separate window", {
+		notify.error("Couldn't open a separate window", {
 			description: 'Allow pop-ups for this site, then try again.',
 		});
 	}
@@ -369,9 +360,8 @@
 		</div>
 
 		<div
-			bind:this={toolbarScrollEl}
 			class="scrollbar-none overflow-x-auto overflow-y-hidden border-b border-border [&::-webkit-scrollbar]:hidden"
-			onwheel={handleToolbarWheel}
+			{@attach scrollStrip}
 		>
 			<div class="flex w-max min-w-full items-center gap-1.5 px-2.5 py-1.5 whitespace-nowrap">
 				<Button

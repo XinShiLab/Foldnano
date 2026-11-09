@@ -19,6 +19,7 @@ import { LatticedDesignRegion, type DesignRegion } from '$lib/model/Part/DesignR
 import { foldnanoIndexedDb } from '$lib/services/storage/indexeddb/FoldnanoIndexedDb';
 import type { IndexedDbPluginFilesRecord } from '$lib/services/storage/indexedDbTypes';
 import { reportError } from '$lib/errorReporting';
+import { notify } from '$lib/notifications/notify.svelte';
 import { PluginApplyError, PluginValidationError } from './plugin-result-errors';
 import { validateResultShape as validateCadnanoResultShape } from './result-format-validation-cadnano-json';
 import { validateResultShape as validateFoldnanoResultShape } from './result-format-validation-foldnano-json';
@@ -1054,6 +1055,7 @@ export class PluginCoordinator {
 			this.#clearPending('failed');
 			return 'failed';
 		}
+		const mismatchesBefore = doc.parts[0]?.countMismatchedBasePairs() ?? 0;
 		try {
 			applyResult({
 				manifest,
@@ -1084,6 +1086,11 @@ export class PluginCoordinator {
 			return 'failed';
 		}
 		this.#clearPending('applied');
+		warnNewMismatches(
+			manifest.name,
+			mismatchesBefore,
+			doc.parts[0]?.countMismatchedBasePairs() ?? 0
+		);
 		return 'applied';
 	}
 
@@ -1302,6 +1309,18 @@ export function linkedFolderPaths(text: string, folderName: string): string {
 // ---------------------------------------------------------------------------
 // Summary builder
 // ---------------------------------------------------------------------------
+
+/** Plugins write sequences without filling the opposite strand, so say when that left pairs unmatched. */
+function warnNewMismatches(pluginName: string, before: number, after: number): void {
+	const added = after - before;
+	if (added <= 0) return;
+	notify.warning(
+		`${added} base pair${added === 1 ? " doesn't" : "s don't"} match the opposite strand`,
+		{
+			description: `After applying "${pluginName}". They are marked in red in the strand view.`,
+		}
+	);
+}
 
 function buildApplySummary(
 	manifest: PluginManifest,

@@ -1,4 +1,4 @@
-import { toast } from 'svelte-sonner';
+import { notify } from '$lib/notifications/notify.svelte';
 import type { ActivationImpact, PluginCoordinator } from '$lib/plugin/PluginCoordinator.svelte';
 import type { PluginRegistry } from '$lib/plugin/PluginRegistry.svelte';
 
@@ -81,8 +81,9 @@ export class PluginActivationGate {
 		const evictedNames = impact.evictedPluginIds.map((id) => this.#pluginName(id) ?? id);
 		await this.getCoordinator().activate(pluginId);
 		if (evictedNames.length > 0 && !impact.requiresConfirmation) {
-			toast.info(
-				`${evictedNames.join(', ')} was deactivated to give "${pluginName}" a clean environment.`
+			notify.info(
+				`${evictedNames.join(', ')} was deactivated to give "${pluginName}" a clean environment.`,
+				{ history: true }
 			);
 		}
 	}

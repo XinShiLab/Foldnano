@@ -208,7 +208,7 @@ The strand-viewer toolbar includes **highlight** and **hide** menus. Highlights 
 | Highlight | Emphasizes |
 | --- | --- |
 | scaffold | oligos marked as scaffold |
-| circular strand | closed-loop oligos (these block CSV export, see [Simulation And Export](/docs/guide/simulation-export#other-export-paths)) |
+| circular strand | closed-loop oligos (these block CSV export, see [Simulation And Export](/docs/guide/simulation-export#other-export-paths), and whole-strand [sequence fills](/docs/guide/editing-tools#sequence)) |
 | with modifications | oligos carrying a terminal modification |
 | longer than 90 | oligos over 90 nt |
 | shorter than 15 | oligos under 15 nt |

@@ -141,6 +141,103 @@ describe('opDispatch', () => {
 		});
 	});
 
+	describe('sequence ops', () => {
+		it('set_oligo_sequence writes 5→3 and leaves the opposite strand alone', () => {
+			const [top, bottom] = [...part.oligos];
+			bottom.fillSequence('C'.repeat(11));
+			runLog(part, [{ op: 'set_oligo_sequence', oligoId: top.id, sequence: 'ACGTACGTACG' }]);
+			expect(top.sequence).toBe('ACGTACGTACG');
+			expect(bottom.sequence).toBe('C'.repeat(11));
+		});
+
+		it('set_segment_sequence writes one segment', () => {
+			const oligo = [...part.oligos][0];
+			const seg = [...oligo.segments][0];
+			runLog(part, [
+				{
+					op: 'set_segment_sequence',
+					oligoId: oligo.id,
+					segmentId: seg.id,
+					sequence: 'g'.repeat(11),
+				},
+			]);
+			expect(seg.sequence).toBe('G'.repeat(11));
+		});
+
+		it('a changed base clears the sequence lock; an unchanged write keeps it', () => {
+			const oligo = [...part.oligos][0];
+			oligo.isSequenceLocked = true;
+			runLog(part, [{ op: 'set_oligo_sequence', oligoId: oligo.id, sequence: 'N'.repeat(11) }]);
+			expect(oligo.isSequenceLocked).toBe(true);
+			runLog(part, [{ op: 'set_oligo_sequence', oligoId: oligo.id, sequence: 'A'.repeat(11) }]);
+			expect(oligo.isSequenceLocked).toBe(false);
+		});
+
+		/** One ring over two new helices: `low` (5' end at bp 0, lower VH index) and `high` (bp 3). */
+		function ring() {
+			const vh0 = addLatticeVh(part, 0, 1);
+			const vh1 = addLatticeVh(part, 1, 1);
+			// Built from the VH 1 strand so storage order can't decide the default start.
+			const ringOligo = part.createOligo(vh1, 3, 0, '#00ff00');
+			const other = part.createOligo(vh0, 0, 3, '#ff0000');
+			const [high] = [...ringOligo.segments];
+			const [low] = [...other.segments];
+			high.threePrime.connectTo(low.fivePrime);
+			ringOligo.addSegment(low);
+			part.oligos.delete(other);
+			low.threePrime.connectTo(high.fivePrime);
+			expect(ringOligo.isCircular).toBe(true);
+			return { ringOligo, low, high };
+		}
+
+		it('set_oligo_sequence starts a ring at the lowest 5-prime end by default', () => {
+			const { ringOligo, low, high } = ring();
+			runLog(part, [{ op: 'set_oligo_sequence', oligoId: ringOligo.id, sequence: 'AAAACCCC' }]);
+			expect(low.sequence).toBe('AAAA');
+			expect(high.sequence).toBe('CCCC');
+		});
+
+		it('set_oligo_sequence starts a ring at startSegmentId', () => {
+			const { ringOligo, low, high } = ring();
+			runLog(part, [
+				{
+					op: 'set_oligo_sequence',
+					oligoId: ringOligo.id,
+					sequence: 'GGGGTTTT',
+					startSegmentId: high.id,
+				},
+			]);
+			expect(high.sequence).toBe('GGGG');
+			expect(low.sequence).toBe('TTTT');
+		});
+
+		it('refuses a start segment on a linear oligo other than its 5-prime segment', () => {
+			const oligo = [...part.oligos][0];
+			const elsewhere = [...[...part.oligos][1].segments][0];
+			expect(() =>
+				runLog(part, [
+					{
+						op: 'set_oligo_sequence',
+						oligoId: oligo.id,
+						sequence: 'A'.repeat(11),
+						startSegmentId: elsewhere.id,
+					},
+				])
+			).toThrow(/not part of this oligo/);
+		});
+
+		it('refuses a length that does not match, or non-DNA letters', () => {
+			const oligo = [...part.oligos][0];
+			expect(() =>
+				runLog(part, [{ op: 'set_oligo_sequence', oligoId: oligo.id, sequence: 'A'.repeat(10) }])
+			).toThrow(/holds 11 bases/);
+			expect(() =>
+				runLog(part, [{ op: 'set_oligo_sequence', oligoId: oligo.id, sequence: 'U'.repeat(11) }])
+			).toThrow(/A, C, G, T and N/);
+			expect(oligo.sequence).toBe('N'.repeat(11));
+		});
+	});
+
 	describe('slot-level ops', () => {
 		it('set_slot_sequence assigns a base to a specific bp', () => {
 			const oligo = [...part.oligos][0];

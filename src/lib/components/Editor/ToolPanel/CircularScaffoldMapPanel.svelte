@@ -3,7 +3,7 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { SvelteSet } from 'svelte/reactivity';
-	import { toast } from 'svelte-sonner';
+	import { notify } from '$lib/notifications/notify.svelte';
 	import { getEditorViewContext } from '../context/EditorViewContext.svelte';
 	import { exportBaseName } from '$lib/model/io/designFileName';
 	import type { Part } from '$lib/model/Part';
@@ -120,7 +120,7 @@
 			}
 		}
 		await navigator.clipboard.writeText(lines.join('\n'));
-		toast.success('Histogram data copied to clipboard');
+		notify.success('Histogram data copied to clipboard');
 	}
 
 	// Per-scaffold circular overrides: linear scaffolds the user wants to treat as circular.

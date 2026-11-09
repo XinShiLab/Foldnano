@@ -16,6 +16,7 @@
 		moveFreeformVirtualHelicesCmd,
 	} from '$lib/commands/virtualHelix';
 	import { planRadialDistribute } from './radialDistribute';
+	import { scrollStrip } from '$lib/components/scroll-strip/scroll-strip';
 	import type VirtualHelix from '$lib/model/VirtualHelix/VirtualHelix.svelte';
 
 	interface Props {
@@ -84,6 +85,7 @@
 
 <div
 	class="flex h-8 min-w-0 flex-1 scrollbar-none items-center gap-2 overflow-x-auto overflow-y-hidden px-2 [&::-webkit-scrollbar]:hidden"
+	{@attach scrollStrip}
 >
 	<Button
 		variant="ghost"

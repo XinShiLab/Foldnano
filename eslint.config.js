@@ -35,7 +35,24 @@ export default defineConfig(
 					destructuredArrayIgnorePattern: '^_',
 				},
 			],
+			'no-restricted-imports': [
+				'error',
+				{
+					paths: [
+						{
+							name: 'svelte-sonner',
+							importNames: ['toast'],
+							message:
+								"Use notify from '$lib/notifications/notify.svelte' so the toast reaches the notification list.",
+						},
+					],
+				},
+			],
 		},
+	},
+	{
+		files: ['src/lib/notifications/notify.svelte.ts'],
+		rules: { 'no-restricted-imports': 'off' },
 	},
 	{
 		files: ['**/*.svelte', '**/*.svelte.ts', '**/*.svelte.js'],

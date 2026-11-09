@@ -38,11 +38,18 @@ function summary(json: PartJson) {
 			.filter((slot) => slotKind(slot.seq) !== null)
 			.map((slot) => [slot.bpIndex, slotKind(slot.seq), slot.seq.length])
 			.sort((a, b) => Number(a[0]) - Number(b[0])),
+		s.slots.map((slot) => slot.seq).join(''),
 	];
 	return {
 		oligos: [...json.oligos]
 			.sort(byId)
-			.map((o) => [o.id, o.color, o.isScaffold, [...o.segments].sort(byId).map(segment)]),
+			.map((o) => [
+				o.id,
+				o.color,
+				o.isScaffold,
+				o.isSequenceLocked,
+				[...o.segments].sort(byId).map(segment),
+			]),
 		vhs: json.virtualHelices.map((vh) => [vh.index, vh.length]).sort((a, b) => a[0] - b[0]),
 		regions: json.regions
 			.map((r) => [r.id, r.maxBase])

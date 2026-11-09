@@ -1,5 +1,5 @@
 import { pushState } from '$app/navigation';
-import { toast } from 'svelte-sonner';
+import { notify } from '$lib/notifications/notify.svelte';
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import { githubMetadataStore } from '$lib/services/storage';
 import { githubStorageProvider } from '$lib/services/storage/providers/GitHubStorageProvider';
@@ -316,7 +316,7 @@ export class GitHubExplorerState {
 			const fnClash = this.findPathClash(fnPath);
 			if (fnClash) {
 				const fnName = fnClash.split('/').pop()!;
-				toast.warning(
+				notify.warning(
 					`"${node.name}" cannot be opened: "${fnName}" already exists in the same folder. Please rename one of the two files first.`
 				);
 				return;
@@ -388,7 +388,7 @@ export class GitHubExplorerState {
 	requestRename(node: FileNode): void {
 		const blocked = this.renameBlockReason(node);
 		if (blocked) {
-			toast.error(blocked);
+			notify.error(blocked);
 			return;
 		}
 		this.renamingPath = node.path;
@@ -401,14 +401,14 @@ export class GitHubExplorerState {
 
 		const blocked = this.renameBlockReason(node);
 		if (blocked) {
-			toast.error(blocked);
+			notify.error(blocked);
 			return;
 		}
 
 		const stem = normalizeDesignName(newStem);
 		const invalid = validateDesignName(stem);
 		if (invalid) {
-			toast.error(invalid);
+			notify.error(invalid);
 			return;
 		}
 
@@ -418,7 +418,7 @@ export class GitHubExplorerState {
 
 		const clash = this.findPathClash(newPath, node.path);
 		if (clash) {
-			toast.error(`"${clash.split('/').pop()}" already exists in this folder.`);
+			notify.error(`"${clash.split('/').pop()}" already exists in this folder.`);
 			return;
 		}
 
@@ -430,7 +430,7 @@ export class GitHubExplorerState {
 				await this.fetchTree();
 			}
 		} catch (e) {
-			toast.error(`Failed to rename "${node.name}": ${(e as Error).message}`);
+			notify.error(`Failed to rename "${node.name}": ${(e as Error).message}`);
 			await this.fetchTree();
 		}
 	}
@@ -491,7 +491,7 @@ export class GitHubExplorerState {
 		if (session.currentFileMetadata?.path === node.path) {
 			session.applyExternalCurrentFileRename(node.path, newPath, { clearSha: true });
 		}
-		toast.success(`Renamed to ${newPath.split('/').pop()}`);
+		notify.success(`Renamed to ${newPath.split('/').pop()}`, { history: true });
 	}
 
 	// --- Delete ---
@@ -521,7 +521,7 @@ export class GitHubExplorerState {
 			githubMetadataStore.getFileMetadata(docId)?.sha ??
 			(docId === session.currentDoc.id ? session.currentFileMetadata?.sha : null) ??
 			node.sha;
-		toast.success(`Committed "${node.name}" before deletion`);
+		notify.success(`Committed "${node.name}" before deletion`, { history: true });
 		return updatedSha;
 	}
 
@@ -584,7 +584,7 @@ export class GitHubExplorerState {
 				try {
 					deleteSha = await this.commitFileBeforeDelete(node);
 				} catch {
-					toast.error(`Failed to commit "${node.name}" — deletion cancelled`);
+					notify.error(`Failed to commit "${node.name}" — deletion cancelled`);
 					return;
 				}
 			}
@@ -612,7 +612,9 @@ export class GitHubExplorerState {
 		}
 
 		this.uiState.activeGitHubTab = 'changes';
-		toast.info(`"${node.name}" staged for deletion — commit to delete from GitHub`);
+		notify.info(`"${node.name}" staged for deletion — commit to delete from GitHub`, {
+			history: true,
+		});
 	}
 
 	// --- Download ---
@@ -652,7 +654,8 @@ export class GitHubExplorerState {
 
 	async handleCreateBranch(branchName: string): Promise<void> {
 		await this.session.createAndSwitchBranch(branchName);
-		toast.success(`Switched to new branch "${branchName}"`, {
+		notify.success(`Switched to new branch "${branchName}"`, {
+			history: true,
 			description: 'You can now commit to this branch.',
 		});
 	}
@@ -753,9 +756,9 @@ export class GitHubExplorerState {
 
 		const summary = summarizeCommitAll(result);
 		if (summary.kind === 'success') {
-			toast.success(summary.title, { description: message });
+			notify.success(summary.title, { history: true, description: message });
 		} else {
-			const show = summary.kind === 'partial' ? toast.warning : toast.error;
+			const show = summary.kind === 'partial' ? notify.warning : notify.error;
 			show(summary.title, { description: summary.details.join('\n') });
 		}
 		return summary;
@@ -779,12 +782,14 @@ export class GitHubExplorerState {
 					repoCtx!.repo
 				);
 				if (reason === 'before_discard') {
-					toast.success(`Discarded local changes to "${currentFileMeta.path}"`, {
+					notify.success(`Discarded local changes to "${currentFileMeta.path}"`, {
+						history: true,
 						description:
 							'Your version is kept in Backups (last 5 only). Download it there if you need it.',
 					});
 				} else {
-					toast.success('Pulled latest version', {
+					notify.success('Pulled latest version', {
+						history: true,
 						description: `${currentFileMeta.path} updated from ${currentFileMeta.branch}`,
 					});
 				}
@@ -817,7 +822,7 @@ export class GitHubExplorerState {
 		if (entry.kind === 'deleted') {
 			this.pendingDeletedNodes.delete(entry.path);
 			await this.fetchTree();
-			toast.success(`Deletion of "${entry.name}" cancelled`);
+			notify.success(`Deletion of "${entry.name}" cancelled`, { history: true });
 			return;
 		}
 
@@ -834,7 +839,7 @@ export class GitHubExplorerState {
 					session.resetToBlankDocument();
 				}
 			}
-			toast.success(`Discarded "${entry.name}"`);
+			notify.success(`Discarded "${entry.name}"`, { history: true });
 			return;
 		}
 
@@ -853,7 +858,8 @@ export class GitHubExplorerState {
 				repoCtx!.owner,
 				repoCtx!.repo
 			);
-			toast.success(`Discarded local changes to "${entry.name}"`, {
+			notify.success(`Discarded local changes to "${entry.name}"`, {
+				history: true,
 				description:
 					'Your version is kept in Backups (last 5 only). Download it there if you need it.',
 			});

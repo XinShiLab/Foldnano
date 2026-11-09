@@ -4,7 +4,7 @@ import { createCrossoverCmd } from '$lib/commands/strands';
 import type { RspCoord } from '$lib/model/Part/Part.svelte';
 import type { ViewContext } from '$lib/canvasEditor/core/views';
 import { parseRspString } from '../utils';
-import { toast } from 'svelte-sonner';
+import { notify } from '$lib/notifications/notify.svelte';
 
 // Helpers
 type ConnectingTemp = { type: 'Connecting'; props: ConnectionInProgressProps };
@@ -125,12 +125,12 @@ export const connectingEnd = (
 
 	const targetSlot = to.segment.slotForBp(rsp.bpIdx);
 	if (targetSlot !== undefined && targetSlot.seq.length === 0) {
-		toast.warning('Cannot connect to a skip position');
+		notify.warning('Cannot connect to a skip position');
 		cleanupConnecting(ctx, temp, drawingStatus);
 		return;
 	}
 	if (targetSlot !== undefined && targetSlot.seq.length > 1) {
-		toast.warning('Cannot connect to an insert position');
+		notify.warning('Cannot connect to an insert position');
 		cleanupConnecting(ctx, temp, drawingStatus);
 		return;
 	}
@@ -147,7 +147,7 @@ export const connectingEnd = (
 			ctx.history
 		);
 		if (result.droppedModifications.length > 0) {
-			toast.warning(
+			notify.warning(
 				`Crossover dropped modification${result.droppedModifications.length === 1 ? '' : 's'}: ${result.droppedModifications.join(', ')}`
 			);
 		}

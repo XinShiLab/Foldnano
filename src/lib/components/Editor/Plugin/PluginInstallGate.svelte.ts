@@ -52,7 +52,7 @@ export class PluginInstallGate {
 	): Promise<InstallOutcome> {
 		if (this.#inFlight) {
 			const message = 'Another plugin install is already in progress.';
-			reportError(new Error(message), ERROR_CONTEXT, { notify: false });
+			reportError(new InvalidOperationError(message), ERROR_CONTEXT, { notify: false });
 			return { status: 'error', message };
 		}
 		// Set before the first await so a concurrent call is refused during prepare().

@@ -213,7 +213,7 @@ Reads mode and fill settings from `ctx.strandCtx.sequenceContext` (`SequenceCont
 
 `fillType === 'ONLY_EMPTY'` causes the fill to skip any slot whose `seq` is already a non-`N` base, consuming sequence characters only for the empty (`N`) positions. The complement strand is updated only for the slots that were actually written.
 
-`RANDOM` + `ONLY_EMPTY` takes a separate path: `fillEmptyAndHighlight` (`tools/sequenceFill.ts`) → `fillEmptySequenceCmd` → `Part.fillEmptySequence`, which never changes an assigned base on either strand (see `docs/dna-model.md` § Empty-only random fill). The Sequence panel's **Fill empty** button uses the same helper over `emptyFillTargets` (segments owning selected ends, whole oligos with the OLIGO toggle, or every real oligo when nothing is selected; SCAF/STAP filters both). `BASE` mode (the panel's **Custom** tab → **One base**) passes `sequenceContext.base` through the same helper: a click fills the clicked staple segment/oligo, and its button runs over `emptyFillTargets(..., { staplesOnly: true })`. One base is for staple overhangs and spacers, so the scaffold is never a target there whatever the SCAF toggle says (a click on it only toasts), and `fillType` does not apply: it always fills empty bases only. Mirror clicks are refused before any sequence mutation. Conflicting pairing constraints leave target bases empty and are reported in the panel. The result is stored as `strandCtx.recentFill` for `RecentFillMarkers`; `EditorViewContext.activeRecentFill` hides it once `historyStack.revision` moves on or the mode leaves `SEQUENCE` for anything but `PAN` (`keepsRecentFill`): panning to inspect a fill must not end it.
+`RANDOM` + `ONLY_EMPTY` takes a separate path: `fillEmptyAndHighlight` (`tools/sequenceFill.ts`) → `fillEmptySequenceCmd` → `Part.fillEmptySequence`, which never changes an assigned base on either strand (see `docs/dna-model.md` § Empty-only random fill). The Sequence panel's **Fill empty** button uses the same helper over `emptyFillTargets` (segments owning selected ends, whole oligos with the OLIGO toggle, or every real oligo when nothing is selected; SCAF/STAP filters both). `BASE` mode (the panel's **Custom** tab → **One base**) passes `sequenceContext.base` through the same helper: a click fills the clicked staple segment/oligo, and its button runs over `emptyFillTargets(..., { staplesOnly: true })`. One base is for staple overhangs and spacers, so the scaffold is never a target there whatever the SCAF toggle says (a click on it only toasts), and `fillType` does not apply: it always fills empty bases only. Mirror clicks are refused before any sequence mutation, and so are whole-oligo `SEQ` and `RANDOM` (not `ONLY_EMPTY`) clicks on a circular oligo: those fills start at the free 5' end, so the tool toasts `CIRCULAR_FILL_ERROR` instead (segment fills, empty-only random, `BASE` and `REMOVE` work base by base and stay allowed). Conflicting pairing constraints leave target bases empty and are reported in the panel. The result is stored as `strandCtx.recentFill` for `RecentFillMarkers`; `EditorViewContext.activeRecentFill` hides it once `historyStack.revision` moves on or the mode leaves `SEQUENCE` for anything but `PAN` (`keepsRecentFill`): panning to inspect a fill must not end it.
 
 Every other click fill (Random whole, Preset/Custom whole or empty-only) runs inside `withFillHighlight`, which snapshots every strand cell's bases before and after the command and stores the cells that gained a base (opposite strands and mirror copies included) as the same `recentFill`. Remove does not highlight.
 
@@ -237,15 +237,15 @@ The DRAW tool supports two gestures:
 
 `connectingEnd` and `Part.createCrossover` each enforce a set of invariants. The table below lists every rejection, where it is enforced, and the user-visible outcome.
 
-| Condition                                                           | Enforced in            | Outcome                               |
-| ------------------------------------------------------------------- | ---------------------- | ------------------------------------- |
-| Target bp is a **skip** (`slot.seq.length === 0`)                   | `connectingEnd`        | `toast.warning` + operation cancelled |
-| Target bp is an **insert** (`slot.seq.length > 1`)                  | `connectingEnd`        | `toast.warning` + operation cancelled |
-| Source oligo has no free 3′ end                                     | `Part.createCrossover` | throws `Error`                        |
-| Source and target are the **same segment** of the same oligo        | `Part.createCrossover` | throws `Error`                        |
-| Either oligo does not belong to this `Part`                         | `Part.createCrossover` | throws `Error`                        |
-| Target position is the oligo's own **3′ end**                       | `Part.createCrossover` | throws `Error`                        |
-| Connection would produce a **one-nucleotide segment** at the 5′ end | `Part.createCrossover` | throws `Error`                        |
+| Condition                                                           | Enforced in            | Outcome                                |
+| ------------------------------------------------------------------- | ---------------------- | -------------------------------------- |
+| Target bp is a **skip** (`slot.seq.length === 0`)                   | `connectingEnd`        | `notify.warning` + operation cancelled |
+| Target bp is an **insert** (`slot.seq.length > 1`)                  | `connectingEnd`        | `notify.warning` + operation cancelled |
+| Source oligo has no free 3′ end                                     | `Part.createCrossover` | throws `Error`                         |
+| Source and target are the **same segment** of the same oligo        | `Part.createCrossover` | throws `Error`                         |
+| Either oligo does not belong to this `Part`                         | `Part.createCrossover` | throws `Error`                         |
+| Target position is the oligo's own **3′ end**                       | `Part.createCrossover` | throws `Error`                         |
+| Connection would produce a **one-nucleotide segment** at the 5′ end | `Part.createCrossover` | throws `Error`                         |
 
 Rejections thrown by `Part.createCrossover` are caught by `connectingEnd`'s `try/finally` block, which always calls `cleanupConnecting` to remove the preview regardless of outcome.
 
@@ -296,7 +296,7 @@ sequence mismatch against its complementary strand via
 `OligoSegment.mismatchedBps()` — a translate carries sequence along rather
 than blanking it (`docs/dna-model.md` § Sequence mismatch detection), so this
 is possible even though the move itself succeeded. If so, it shows one
-`toast.warning(...)` for the whole batch pointing at the StrandView's
+`notify.warning(...)` for the whole batch pointing at the StrandView's
 "Warnings → sequence mismatch" toggle (`docs/editor-strand-viewer.md`), rather
 than throwing — this is advisory, not a validation failure.
 

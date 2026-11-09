@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { toast } from 'svelte-sonner';
+	import { notify } from '$lib/notifications/notify.svelte';
 	import { getEditorDocumentSession } from './context/EditorDocumentSession.svelte';
 	import { downloadFoldnanoJson } from './Toolbar/utils';
 
@@ -11,8 +11,8 @@
 		retrying = true;
 		try {
 			const ok = await session.saveDocumentToLocalStorage({ force: true });
-			if (ok) toast.success('Saved in this browser');
-			else toast.error("Still can't save. Download a copy to keep your work.");
+			if (ok) notify.success('Saved in this browser');
+			else notify.error("Still can't save. Download a copy to keep your work.");
 		} finally {
 			retrying = false;
 		}

@@ -156,6 +156,17 @@ def test_attribute_writes_follow_to_mirrors(part: MutablePart) -> None:
         assert mirror.segments[0].slot_at(5 + offset).seq == "G"
 
 
+def test_sequence_fills_follow_to_mirrors(part: MutablePart) -> None:
+    a, group = make_group(part)
+    group.add_instance(2 * STEP)
+    a.fill_sequence("ACGTACGTACG")
+    assert [m.sequence for m in group.mirrors] == ["ACGTACGTACG"] * 2
+    a.segments[0].fill_sequence("GGGGGCCCCCT")
+    assert [m.sequence for m in group.mirrors] == ["GGGGGCCCCCT"] * 2
+    assert not hasattr(group.mirrors[0], "fill_sequence")
+    assert not hasattr(group.mirrors[0].segments[0], "fill_sequence")
+
+
 def test_an_edit_whose_mirror_cannot_fit_is_refused_and_not_applied(part: MutablePart) -> None:
     a, group = make_group(part)
     part.create_oligo([(2, 36, 38)])  # sits where the copy would grow to

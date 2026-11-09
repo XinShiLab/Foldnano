@@ -331,7 +331,7 @@ First-time setup: pick a repository from the user's list, select a branch, click
 - **Backups N** — opens the Backups dialog; N is `session.countBackups()` (an index count, no snapshots loaded), recounted after each save and when the dialog closes
 - **Connected repo, dimmed, "(not in repo)"** — repo context set but the design has no GitHub file metadata
 
-Right: the active region (`name · maxBase bp`), then the canvas hover footnote (VH · BP · Oligo).
+Right: the active region (`name (active)`, labelled because it follows clicks while the rest of the right side follows the pointer), then the canvas hover footnote (VH · BP · Oligo).
 
 ## Git Graph (Phase 4)
 

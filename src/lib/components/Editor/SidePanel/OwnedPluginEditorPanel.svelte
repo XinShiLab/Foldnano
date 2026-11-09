@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
-	import { toast } from 'svelte-sonner';
+	import { notify } from '$lib/notifications/notify.svelte';
 	import { Download, Image, Save, Undo2, X } from '@lucide/svelte';
 	import PluginCodeEditorShell from './PluginCodeEditorShell.svelte';
 	import PluginRunOutput, { hasRunOutput } from '../Plugin/PluginRunOutput.svelte';
@@ -90,7 +90,7 @@
 			await editorCtx.pluginCoordinator.runWithOptions(pluginId, { draftCode: draft });
 		} catch (e) {
 			if (plugin.status !== 'error') {
-				toast.error('Plugin run failed', {
+				notify.error('Plugin run failed', {
 					description: e instanceof Error ? e.message : String(e),
 				});
 			}
@@ -114,9 +114,9 @@
 			);
 			loadedFor = saved;
 			savedCode = draft;
-			toast.success(`Saved ${saved.manifest.name} v${saved.manifest.version}`);
+			notify.success(`Saved ${saved.manifest.name} v${saved.manifest.version}`, { history: true });
 		} catch (e) {
-			toast.error("Couldn't save the plugin", {
+			notify.error("Couldn't save the plugin", {
 				description: e instanceof Error ? e.message : String(e),
 			});
 		} finally {
@@ -149,9 +149,11 @@
 				iconChoice
 			);
 			loadedFor = saved;
-			toast.success(`Saved ${saved.manifest.name} v${saved.manifest.version} with the new icon`);
+			notify.success(`Saved ${saved.manifest.name} v${saved.manifest.version} with the new icon`, {
+				history: true,
+			});
 		} catch (e) {
-			toast.error("Couldn't change the icon", {
+			notify.error("Couldn't change the icon", {
 				description: e instanceof Error ? e.message : String(e),
 			});
 		} finally {
@@ -163,7 +165,7 @@
 		try {
 			await exportOwnedPlugin(editorCtx.pluginRegistry, pluginId);
 		} catch (e) {
-			toast.error("Couldn't export the plugin", {
+			notify.error("Couldn't export the plugin", {
 				description: e instanceof Error ? e.message : String(e),
 			});
 		}

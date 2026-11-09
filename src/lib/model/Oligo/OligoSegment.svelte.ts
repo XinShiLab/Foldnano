@@ -4,6 +4,7 @@ import { ThreePrimeEnd, FivePrimeEnd } from './SegmentEnd.svelte';
 import type Oligo from './Oligo.svelte';
 import type { Part } from '../Part';
 import { generateComplementaryDNA, generateRandomDNA } from '../sequences/sequences';
+import { InvalidOperationError } from '../../errors';
 export const SET_OWNER = Symbol('SET_OWNER');
 
 /** The slot content a complementary strand must take to mirror a skip (`seqLen` 0) or an
@@ -319,21 +320,27 @@ export default class OligoSegment {
 		this._assertCanModifySkipOrInsertionAt(atIndex);
 		const compSlot = this._complementarySlotForBp(atIndex);
 		if (!compSlot) {
-			throw new Error(`Cannot add insert/skip at bp ${atIndex}: complementary slot is missing`);
+			throw new InvalidOperationError(
+				`Cannot add insert/skip at bp ${atIndex}: complementary slot is missing`
+			);
 		}
 		if (count < 0) {
 			// skip: slots must be in normal state
 			if (slot.seq.length !== 1) {
-				throw new Error(`Cannot add skip at bp ${atIndex}: slot is already modified`);
+				throw new InvalidOperationError(
+					`Cannot add skip at bp ${atIndex}: slot is already modified`
+				);
 			}
 			if (compSlot.seq.length !== 1) {
-				throw new Error(`Cannot add skip at bp ${atIndex}: complementary slot is modified`);
+				throw new InvalidOperationError(
+					`Cannot add skip at bp ${atIndex}: complementary slot is modified`
+				);
 			}
 			slot.seq = '';
 			compSlot.seq = '';
 		} else if (count > 0) {
 			if (slot.seq.length === 0) {
-				throw new Error(`Cannot insert on a skip at bp ${atIndex}`);
+				throw new InvalidOperationError(`Cannot insert on a skip at bp ${atIndex}`);
 			}
 			if (slot.seq.length !== compSlot.seq.length) {
 				throw new Error(`Slot mismatch at bp ${atIndex}: strands out of sync`);
@@ -350,7 +357,9 @@ export default class OligoSegment {
 		if (!slot) return;
 		const compSlot = this._complementarySlotForBp(atIndex);
 		if (!compSlot) {
-			throw new Error(`Cannot remove insert/skip at bp ${atIndex}: complementary slot is missing`);
+			throw new InvalidOperationError(
+				`Cannot remove insert/skip at bp ${atIndex}: complementary slot is missing`
+			);
 		}
 		if (slot.seq.length === 0) {
 			// remove skip -> restore single backbone nt placeholder
@@ -845,7 +854,9 @@ export default class OligoSegment {
 
 	private _assertCanModifySkipOrInsertionAt(bpIndex: number): void {
 		if (this._hasConstrainedEndAt(bpIndex)) {
-			throw new Error(`Cannot add insert/skip at constrained crossover site bp ${bpIndex}`);
+			throw new InvalidOperationError(
+				`Cannot add insert/skip at constrained crossover site bp ${bpIndex}`
+			);
 		}
 	}
 
