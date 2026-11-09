@@ -114,7 +114,10 @@ Each edit check above also refuses an edit to a mirror oligo, and an edit to a r
 | `oligo.color` | **settable** | Hex color `'#rrggbb'`. **Records** `set_oligo_color`. |
 | `oligo.name` | **settable** | Optional free-form label, or `None`. Not unique and never used for identity (use `oligo.id`); it shows in the editor, the oligo report and the CSV `Name` column. **Records** `set_oligo_name`. |
 | `oligo.is_scaffold` | **settable** | Scaffold flag. **Records** `set_oligo_is_scaffold`. |
-| `oligo.is_sequence_locked` | read‑only | Whether the sequence is locked (read-only). |
+| `oligo.is_sequence_locked` | read‑only | Set when a sequence was applied deliberately in the editor. It is a reminder, not a lock: any change to the bases, a plugin's included, clears it, and plugins can't set it. |
+| `oligo.sequence` | read‑only | Its bases 5' to 3' from the free 5' end; a circular oligo is read from the same default start as `fill_sequence`. `N` for a base never assigned. |
+| `oligo.nucleotide_count` | read‑only | How many bases it holds: one per position, none for a skip, n for an insertion. |
+| `oligo.fill_sequence(sequence, start=None)` | **edit** | Write all its bases 5' to 3', following its connections. A linear oligo starts at its free 5' end. A circular oligo starts at the 5' end of `start`, one of its segments; by default the segment whose 5' end has the lowest helix index, then the lowest base (the same start the oligo report uses). `start` on a linear oligo is refused unless it is the oligo's 5' segment. `len(sequence)` must equal `oligo.nucleotide_count`; letters `A`, `C`, `G`, `T`, `N` only (lowercase is accepted and stored uppercase). **Only this oligo changes**: the opposite strand is never filled in, so if the two disagree the editor shows a mismatch. Write the other strand yourself when you want them to pair. **Records** `set_oligo_sequence`, one op for the whole oligo. |
 | `oligo.segments` | read‑only | Its segments. |
 | `oligo.get_segment(segment_id)` | query | One of its segments by id, or `None`. |
 | `oligo.is_circular` | read‑only | True when it has no free ends. |
@@ -141,6 +144,8 @@ Each edit check above also refuses an edit to a mirror oligo, and an edit to a r
 | `seg.connected_from_segment_id`, `seg.connected_to_segment_id` | read‑only | Id of the segment joined to its 5' / 3' end, or `None`. |
 | `seg.slots` | read‑only | Its stored slots: one per base for a segment loaded from the app, only the written ones for a segment made in this run. |
 | `seg.slot_at(bp)` | query | The slot at a base of this segment (created on first write). |
+| `seg.sequence`, `seg.nucleotide_count` | read‑only | Its bases 5' to 3' (`N` where never assigned), and how many it holds. |
+| `seg.fill_sequence(sequence)` | **edit** | `oligo.fill_sequence` for one segment, 5' to 3'. The opposite strand is never filled. **Records** `set_segment_sequence`. |
 | `seg.move_five_prime_to(bp)`, `seg.move_three_prime_to(bp)` | **edit** | Same as setting `seg.five_prime.index` / `seg.three_prime.index`. |
 | `seg.remove()` | **edit** | Same as `part.remove_segment(seg)`. |
 
@@ -163,7 +168,7 @@ Each edit check above also refuses an edit to a mirror oligo, and an edit to a r
 | API | Kind | Behaviour |
 | --- | --- | --- |
 | `slot.bp_index` | read‑only | Its base. |
-| `slot.seq` | **settable** | Its sequence: one base normally, empty for a skip, longer for an insertion. Settable with the **same length** only, so it can't make the two strands differ; change the length with `part.add_insert_at` / `add_skip_at` / `remove_skip_or_insertion_at`. **Records** `set_slot_sequence`. |
+| `slot.seq` | **settable** | Its sequence: one base normally, empty for a skip, longer for an insertion. Settable with the **same length** only, so it can't make the two strands differ; change the length with `part.add_insert_at` / `add_skip_at` / `remove_skip_or_insertion_at`. To write a whole strand, use `oligo.fill_sequence` (one op instead of one per base). **Records** `set_slot_sequence`. |
 | `slot.skip` | read‑only | True when it is a skip. |
 | `slot.set_skip(True)` | **edit** | Make it a skip on both strands (same as `part.add_skip_at`, through this slot). **Records** `set_slot_skip`. Check: `slot.can_set_skip()`. |
 | `slot.set_insertion(sequence)` | **edit** | Replace the whole slot with `sequence` (e.g. `'AT'` is one inserted base); the complementary slot becomes that many `N`s, losing its base. Prefer `part.add_insert_at`, which works like the editor. **Records** `set_slot_insertion`. Check: `slot.can_set_insertion()`. |

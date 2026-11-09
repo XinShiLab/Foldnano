@@ -9,7 +9,7 @@
 		type FileDropZoneProps,
 	} from '$lib/components/ui/file-drop-zone';
 	import { onDestroy } from 'svelte';
-	import { toast } from 'svelte-sonner';
+	import { notify } from '$lib/notifications/notify.svelte';
 	import { SvelteDate } from 'svelte/reactivity';
 	import { FileJson2, LoaderCircle, XIcon } from '@lucide/svelte';
 	import { CadnanoJSON } from '$lib/model/io/cadnanoJSON';
@@ -73,7 +73,7 @@
 	};
 
 	const onFileRejected: FileDropZoneProps['onFileRejected'] = async ({ reason, file }) => {
-		toast.error(`${file.name} failed to upload!`, { description: reason });
+		notify.error(`${file.name} failed to upload!`, { description: reason });
 	};
 
 	const uploadFile = async (file: File) => {
@@ -101,7 +101,7 @@
 			editorViewContext.loadCadnanoAsRegion(cadnano, selectedPlane, lattice);
 			await session.saveDocumentToLocalStorage();
 		} catch (err) {
-			toast.error('Failed to load cadnano file as region', {
+			notify.error('Failed to load cadnano file as region', {
 				description: (err as Error).message,
 			});
 			return;

@@ -23,6 +23,10 @@ export const LOCAL_BACKUP_INTERVAL_MS = 10 * 60 * 1000;
 /** One timeline per document across all backup reasons. Meant to become a user setting. */
 export const MAX_LOCAL_BACKUPS_PER_DOC = 5;
 
+/** The error log keeps at most this many entries, and none older than `ERROR_LOG_MAX_AGE_MS`. */
+export const MAX_ERROR_LOG_ENTRIES = 50;
+export const ERROR_LOG_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+
 export interface IndexedDbDocumentRecord extends DocumentMetadata {
 	documentUpdatedAt: number;
 	lastLocalPersistAt: number;
@@ -103,6 +107,10 @@ export interface ErrorLogRecord {
 	severity: 'warning' | 'error';
 	appVersion: string;
 	commitHash: string;
+	/** Times this error was reported in the session that logged it; absent means once. */
+	count?: number;
+	/** Timestamp of the latest repeat, when `count` > 1. */
+	lastSeenAt?: number;
 }
 
 export interface IndexedDbPluginRecord {

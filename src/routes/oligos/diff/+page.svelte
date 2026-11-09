@@ -20,7 +20,7 @@
 		type DocumentMetadata,
 	} from '$lib/services/storage';
 	import { ArrowRightLeft, Download, FileSpreadsheet } from '@lucide/svelte';
-	import { toast } from 'svelte-sonner';
+	import { notify } from '$lib/notifications/notify.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -95,7 +95,7 @@
 		try {
 			exportPartSequencesToCSV(part, doc.name);
 		} catch (e) {
-			toast.error('Cannot export oligo CSV', {
+			notify.error('Cannot export oligo CSV', {
 				description: e instanceof Error ? e.message : 'The design cannot be exported.',
 			});
 		}

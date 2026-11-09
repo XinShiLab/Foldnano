@@ -2,7 +2,7 @@ import FoldnanoDocument from '$lib/model/document.svelte';
 import { exportBaseName } from '$lib/model/io/designFileName';
 import { DocumentFormatError } from '$lib/model/documentFormat';
 import type { BackupReason, LocalBackup } from '$lib/services/storage';
-import { toast } from 'svelte-sonner';
+import { notify } from '$lib/notifications/notify.svelte';
 import type { DesignIssue } from '$lib/model/checks/designIssue';
 
 const MAX_LISTED_ISSUES = 5;
@@ -24,7 +24,7 @@ export interface DocumentLoadFailure {
 export function notifyDocumentRepairs(repairs: string[]): void {
 	if (repairs.length === 0) return;
 	console.warn('[documentRepair] Repaired the document on load:', repairs);
-	toast.warning('This design had inconsistencies from an earlier bug and was repaired.', {
+	notify.warning('This design had inconsistencies from an earlier bug and was repaired.', {
 		description: repairs.join('\n'),
 	});
 }
@@ -41,7 +41,7 @@ export function notifyDesignIssues(docId: string, issues: readonly DesignIssue[]
 	const lines = shown.slice(0, MAX_LISTED_ISSUES).map((issue) => issue.message);
 	if (shown.length > MAX_LISTED_ISSUES)
 		lines.push(`…and ${shown.length - MAX_LISTED_ISSUES} more.`);
-	toast.warning("This design contains things the editor wouldn't create itself.", {
+	notify.warning("This design contains things the editor wouldn't create itself.", {
 		description: lines.join('\n'),
 	});
 }

@@ -7,7 +7,7 @@
 	import ExternalLink from '@lucide/svelte/icons/external-link';
 	import FileText from '@lucide/svelte/icons/file-text';
 	import Info from '@lucide/svelte/icons/info';
-	import { toast } from 'svelte-sonner';
+	import { notify } from '$lib/notifications/notify.svelte';
 
 	import { Button } from '$lib/components/ui/button';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
@@ -37,9 +37,9 @@
 			} else {
 				await navigator.clipboard.writeText(await fetchMarkdown());
 			}
-			toast.success('Page copied as Markdown');
+			notify.success('Page copied as Markdown');
 		} catch (err) {
-			toast.error(`Could not copy page: ${err instanceof Error ? err.message : String(err)}`);
+			notify.error(`Could not copy page: ${err instanceof Error ? err.message : String(err)}`);
 		}
 	}
 </script>

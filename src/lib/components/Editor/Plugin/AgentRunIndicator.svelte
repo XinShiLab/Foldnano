@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Bot, LoaderCircle, X } from '@lucide/svelte';
-	import { toast } from 'svelte-sonner';
+	import { notify } from '$lib/notifications/notify.svelte';
 	import { help } from '$lib/components/help/help';
 	import type { AgentRunRecord } from '$lib/plugin/agentRuns';
 	import { getEditorViewContext } from '../context/EditorViewContext.svelte';
@@ -21,7 +21,8 @@
 		toasted = run;
 		const what = run.script ?? 'plugin.py';
 		if (run.status === 'done' && run.applyOutcome !== 'stale') {
-			toast.info(`Agent ran ${what}`, {
+			notify.info(`Agent ran ${what}`, {
+				history: true,
 				description:
 					run.applyOutcome === 'applied'
 						? `Applied${run.summary ? ` (${run.summary})` : ''}. Undo reverts it.`
@@ -38,7 +39,7 @@
 						: run.status === 'cancelled'
 							? 'cancelled'
 							: 'failed';
-			toast.warning(`Agent run of ${what} ${verb}`, { description: run.error ?? undefined });
+			notify.warning(`Agent run of ${what} ${verb}`, { description: run.error ?? undefined });
 		}
 	});
 

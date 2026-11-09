@@ -240,3 +240,60 @@ def slot_kind(raw_segment: dict[str, Any], bp: int) -> str | None:
     if len(seq) > 1:
         return "insertion"
     return None
+
+
+def segment_slot_lengths(raw_segment: dict[str, Any]) -> list[tuple[int, int]]:
+    """``(bp, bases)`` for each position of a segment, 5'→3' (0 bases for a skip)."""
+    five = int(raw_segment["fivePrime"]["index"])
+    three = int(raw_segment["threePrime"]["index"])
+    step = 1 if three >= five else -1
+    return [(bp, slot_length(raw_segment, bp)) for bp in range(five, three + step, step)]
+
+
+def segment_sequence(raw_segment: dict[str, Any]) -> str:
+    """A segment's bases 5'→3'; ``N`` where none is stored."""
+    out = []
+    for bp, n in segment_slot_lengths(raw_segment):
+        if n == 0:
+            continue
+        slot = find_slot(raw_segment, bp)
+        seq = (slot.get("seq") or "") if slot else ""
+        out.append(seq if len(seq) == n else "N" * n)
+    return "".join(out)
+
+
+def circular_start_segment(raw_oligo: dict[str, Any]) -> dict[str, Any] | None:
+    """Where a circular oligo is read from, as the host's ``circularStartSegment``: the segment
+    with the lowest 5' end (helix index, then bp), ties by 3' end, then id."""
+    segs = raw_oligo.get("segments", [])
+    if not segs:
+        return None
+    return min(
+        segs,
+        key=lambda s: (
+            int(s["inVirtualHelixIndex"]),
+            int(s["fivePrime"]["index"]),
+            int(s["threePrime"]["index"]),
+            s["id"],
+        ),
+    )
+
+
+def oligo_segments_5to3(
+    raw_oligo: dict[str, Any], start_id: str | None = None
+) -> list[dict[str, Any]]:
+    """An oligo's segments in 5'→3' order: from its free 5' end, or for a circular oligo from
+    ``start_id`` (default ``circular_start_segment``)."""
+    segs = raw_oligo.get("segments", [])
+    by_id = {s["id"]: s for s in segs}
+    start = next((s for s in segs if s["fivePrime"].get("connectedSegmentId") not in by_id), None)
+    if start is None:
+        start = by_id.get(start_id) if start_id else circular_start_segment(raw_oligo)
+    ordered: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    seg = start
+    while seg is not None and seg["id"] not in seen:
+        ordered.append(seg)
+        seen.add(seg["id"])
+        seg = by_id.get(seg["threePrime"].get("connectedSegmentId") or "")
+    return ordered

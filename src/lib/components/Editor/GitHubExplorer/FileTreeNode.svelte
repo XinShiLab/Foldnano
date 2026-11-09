@@ -8,7 +8,7 @@
 		Trash2,
 		LoaderCircle,
 	} from '@lucide/svelte';
-	import { toast } from 'svelte-sonner';
+	import { notify } from '$lib/notifications/notify.svelte';
 	import type { FileNode } from './types';
 	import FileTreeNode from './FileTreeNode.svelte';
 	import { fileStem, isRenamableFile } from './fileNaming';
@@ -107,7 +107,7 @@
 		if (invalid) {
 			// Enter keeps the input open so the name can be fixed; a blur just abandons the edit.
 			if (fromBlur) cancelRename();
-			else toast.error(invalid);
+			else notify.error(invalid);
 			return;
 		}
 		renaming = false;

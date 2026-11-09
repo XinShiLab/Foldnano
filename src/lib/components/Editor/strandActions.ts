@@ -5,7 +5,7 @@ import type { EndSelection } from './context/EditorViewContext.svelte';
 import type { OligoSegment } from '$lib/model/Oligo';
 import type { SelectionToggle } from './context/types';
 import type { EditorViewContext } from './context/EditorViewContext.svelte';
-import { toast } from 'svelte-sonner';
+import { notify } from '$lib/notifications/notify.svelte';
 import { duplicateSnapStep, findNextValidDuplicateDelta } from '$lib/model/Part/duplicateOffsets';
 
 /** Oligos to copy from the selection: those passing the SCAF/STAP toggles, which must be
@@ -27,7 +27,7 @@ function wholeSelectedOligos(editorCtx: EditorViewContext): Oligo[] | null {
 
 	const oligos = [...touched];
 	if (oligos.some((o) => !selected.includesAll([...o.allEnds]))) {
-		toast.error('Duplicate needs whole oligos. Select every strand of each oligo to copy.');
+		notify.error('Duplicate needs whole oligos. Select every strand of each oligo to copy.');
 		return null;
 	}
 	return oligos;
@@ -44,10 +44,10 @@ function targetGroupFor(part: Part, oligos: Oligo[]): string | null | undefined 
 		const originals = part.realOligos.filter((o) => o.repeatGroupId === groupId);
 		if (originals.length === oligos.length) return groupId;
 		const name = part.getRepeatGroup(groupId)?.name ?? 'the repeat group';
-		toast.error(`Select all originals of ${name} to add another mirror copy.`);
+		notify.error(`Select all originals of ${name} to add another mirror copy.`);
 		return undefined;
 	}
-	toast.error(
+	notify.error(
 		'Mirror copies need either oligos outside any repeat group, or all originals of one group.'
 	);
 	return undefined;
@@ -82,7 +82,7 @@ export function startDuplicate(
 	const snapStep = duplicateSnapStep(part, oligos);
 	const delta = findNextValidDuplicateDelta(part, oligos, 0, 1, snapStep);
 	if (delta === null) {
-		toast.error('No free position to place a copy to the right.');
+		notify.error('No free position to place a copy to the right.');
 		return;
 	}
 

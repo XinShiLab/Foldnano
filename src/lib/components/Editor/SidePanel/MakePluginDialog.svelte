@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
-	import { toast } from 'svelte-sonner';
+	import { notify } from '$lib/notifications/notify.svelte';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
@@ -59,7 +59,7 @@
 			created = result;
 			if (downloadBackup) await download(result);
 		} catch (e) {
-			toast.error("Couldn't make the plugin", {
+			notify.error("Couldn't make the plugin", {
 				description: e instanceof Error ? e.message : String(e),
 			});
 		} finally {

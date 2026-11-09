@@ -9,8 +9,9 @@ import {
 	fillSequenceToSegmentCmd,
 } from '../../commands/strands';
 import { fillEmptyAndHighlight, withFillHighlight } from './sequenceFill';
-import { toast } from 'svelte-sonner';
+import { notify } from '$lib/notifications/notify.svelte';
 import { MIRROR_EDIT_ERROR } from '$lib/model/Part/Part.svelte';
+import { CIRCULAR_FILL_ERROR } from '$lib/model/Oligo/Oligo.svelte';
 
 export function SequenceTool(): Tool {
 	return {
@@ -31,7 +32,7 @@ export function SequenceTool(): Tool {
 					// The sync reverts a mirror's own bases, after their complement already reached
 					// a real opposite strand, so sequence edits on mirrors are refused outright.
 					if (oligo.isMirror) {
-						toast.warning(MIRROR_EDIT_ERROR);
+						notify.warning(MIRROR_EDIT_ERROR);
 						return;
 					}
 					const mode = ctx.strandCtx.sequenceContext.mode;
@@ -40,10 +41,18 @@ export function SequenceTool(): Tool {
 					const highlight = <T>(run: () => T): T =>
 						withFillHighlight(ctx.part, ctx.strandCtx, ctx.history, run);
 
+					// Random (whole) and Custom/Preset fills run from the free 5' end; empty-only random
+					// fills, one-base fills and Remove work base by base and are fine on a ring.
+					const fillsFromFivePrime = mode === 'SEQ' || (mode === 'RANDOM' && !onlyEmpty);
+					if (onOligo && oligo.isCircular && fillsFromFivePrime) {
+						notify.warning(CIRCULAR_FILL_ERROR);
+						return;
+					}
+
 					if (mode === 'BASE') {
 						// One base is for staple overhangs and spacers; the scaffold is never written here.
 						if (oligo.isScaffold) {
-							toast.info('One-base fill writes staples only, not the scaffold.');
+							notify.info('One-base fill writes staples only, not the scaffold.');
 							return;
 						}
 						fillEmptyAndHighlight(

@@ -57,7 +57,7 @@
 	} from '$lib/commands/virtualHelix';
 	import { goto, replaceState } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { toast } from 'svelte-sonner';
+	import { notify } from '$lib/notifications/notify.svelte';
 	import { parseDesignRaw, getParseWarnings, type FileMeta } from './Toolbar/parsers';
 	import LatticeChoiceDialog from './Toolbar/LatticeChoiceDialog.svelte';
 	import DesignCheckDialog from './DesignCheckDialog.svelte';
@@ -133,16 +133,16 @@
 			try {
 				parsed = new URL(rawUrl);
 			} catch {
-				toast.error('Invalid URL in ?url= parameter');
+				notify.error('Invalid URL in ?url= parameter');
 				return;
 			}
 			if (!['http:', 'https:'].includes(parsed.protocol)) {
-				toast.error('Only http:// and https:// URLs are supported');
+				notify.error('Only http:// and https:// URLs are supported');
 				return;
 			}
 			const lattice = parseLatticeParam(searchParams.get('lattice'));
 			if (lattice === null) {
-				toast.error('Invalid ?lattice= parameter', { description: 'Use honeycomb or square.' });
+				notify.error('Invalid ?lattice= parameter', { description: 'Use honeycomb or square.' });
 				return;
 			}
 
@@ -152,7 +152,7 @@
 				if (!resp.ok) throw new Error(`HTTP ${resp.status} ${resp.statusText}`);
 				raw = await resp.json();
 			} catch (e) {
-				toast.error(`Could not load from URL: ${(e as Error).message}`);
+				notify.error(`Could not load from URL: ${(e as Error).message}`);
 				return;
 			}
 
@@ -174,10 +174,10 @@
 					lattice
 				);
 				for (const w of getParseWarnings()) {
-					toast.warning('Cadnano import warning', { description: w });
+					notify.warning('Cadnano import warning', { description: w });
 				}
 			} catch (e) {
-				toast.error(`Unrecognised file format: ${(e as Error).message}`);
+				notify.error(`Unrecognised file format: ${(e as Error).message}`);
 				return;
 			}
 
@@ -196,7 +196,7 @@
 			await session.loadTransientDocument(doc, rawUrl);
 		})()
 			.catch((e) => {
-				toast.error(`Failed to load from URL: ${(e as Error).message}`);
+				notify.error(`Failed to load from URL: ${(e as Error).message}`);
 			})
 			.finally(() => {
 				urlLoading = false;

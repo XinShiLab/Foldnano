@@ -2101,6 +2101,13 @@
 					"settable": true
 				},
 				{
+					"name": "fill_sequence",
+					"kind": "method",
+					"signature": "(sequence: str, start: 'SegmentView | None'=None)",
+					"returns": "None",
+					"doc": "Write the oligo's bases 5'\u21923'. ``len(sequence)`` must equal ``nucleotide_count``. A linear oligo starts at its free 5' end. A circular one starts at the 5' end of ``start`` (one of its segments), by default the segment with the lowest 5' end (helix index, then bp), as the app's oligo report reads it. Only this oligo changes: the opposite strand is never filled, so a disagreement shows as a mismatch in the editor."
+				},
+				{
 					"name": "remove",
 					"kind": "method",
 					"signature": "()",
@@ -2138,13 +2145,26 @@
 				{
 					"name": "is_sequence_locked",
 					"kind": "property",
-					"type": "bool"
+					"type": "bool",
+					"doc": "Set when a sequence was applied deliberately in the editor. A reminder, not a lock: any change to the bases (a plugin's included) clears it, and plugins can't set it."
 				},
 				{
 					"name": "is_circular",
 					"kind": "property",
 					"type": "bool",
 					"doc": "True if every segment's 3\u2032 end is connected to another segment in this oligo."
+				},
+				{
+					"name": "sequence",
+					"kind": "property",
+					"type": "str",
+					"doc": "Its bases 5'\u21923' from the free 5' end (a circular oligo from the segment with the lowest 5' end, as ``fill_sequence`` writes it); ``N`` for a base never assigned."
+				},
+				{
+					"name": "nucleotide_count",
+					"kind": "property",
+					"type": "int",
+					"doc": "Bases it holds, skips and insertions counted."
 				},
 				{
 					"name": "touches_regions",
@@ -2238,6 +2258,13 @@
 					"doc": "Return a proxy for the slot at ``bp_index`` (created on first write)."
 				},
 				{
+					"name": "fill_sequence",
+					"kind": "method",
+					"signature": "(sequence: str)",
+					"returns": "None",
+					"doc": "Write this segment's bases 5'\u21923'. ``len(sequence)`` must equal ``nucleotide_count``. Only this strand changes: the opposite strand is never filled, so a disagreement shows as a mismatch in the editor."
+				},
+				{
 					"name": "id",
 					"kind": "property",
 					"type": "str"
@@ -2297,6 +2324,18 @@
 					"name": "connected_to_segment_id",
 					"kind": "property",
 					"type": "str | None"
+				},
+				{
+					"name": "sequence",
+					"kind": "property",
+					"type": "str",
+					"doc": "Its bases 5'\u21923'; ``N`` for a base never assigned."
+				},
+				{
+					"name": "nucleotide_count",
+					"kind": "property",
+					"type": "int",
+					"doc": "Bases it holds: one per position, none for a skip, n for an insertion."
 				}
 			]
 		},
@@ -2462,7 +2501,8 @@
 				{
 					"name": "is_sequence_locked",
 					"kind": "property",
-					"type": "bool"
+					"type": "bool",
+					"doc": "Set when a sequence was applied deliberately in the editor. A reminder, not a lock: any change to the bases (a plugin's included) clears it, and plugins can't set it."
 				},
 				{
 					"name": "is_circular",
@@ -2492,6 +2532,18 @@
 					"kind": "method",
 					"signature": "(segment_id: str)",
 					"returns": "SegmentView | None"
+				},
+				{
+					"name": "sequence",
+					"kind": "property",
+					"type": "str",
+					"doc": "Its bases 5'\u21923' from the free 5' end (a circular oligo from the segment with the lowest 5' end, as ``fill_sequence`` writes it); ``N`` for a base never assigned."
+				},
+				{
+					"name": "nucleotide_count",
+					"kind": "property",
+					"type": "int",
+					"doc": "Bases it holds, skips and insertions counted."
 				},
 				{
 					"name": "five_modification",
@@ -2559,7 +2611,8 @@
 				{
 					"name": "is_sequence_locked",
 					"kind": "property",
-					"type": "bool"
+					"type": "bool",
+					"doc": "Set when a sequence was applied deliberately in the editor. A reminder, not a lock: any change to the bases (a plugin's included) clears it, and plugins can't set it."
 				},
 				{
 					"name": "is_circular",
@@ -2589,6 +2642,18 @@
 					"kind": "method",
 					"signature": "(segment_id: str)",
 					"returns": "SegmentView | None"
+				},
+				{
+					"name": "sequence",
+					"kind": "property",
+					"type": "str",
+					"doc": "Its bases 5'\u21923' from the free 5' end (a circular oligo from the segment with the lowest 5' end, as ``fill_sequence`` writes it); ``N`` for a base never assigned."
+				},
+				{
+					"name": "nucleotide_count",
+					"kind": "property",
+					"type": "int",
+					"doc": "Bases it holds, skips and insertions counted."
 				},
 				{
 					"name": "five_modification",
@@ -2730,6 +2795,18 @@
 					"signature": "(bp_index: int)",
 					"returns": "SlotView",
 					"doc": "Return a proxy for the slot at ``bp_index`` (created on first write)."
+				},
+				{
+					"name": "sequence",
+					"kind": "property",
+					"type": "str",
+					"doc": "Its bases 5'\u21923'; ``N`` for a base never assigned."
+				},
+				{
+					"name": "nucleotide_count",
+					"kind": "property",
+					"type": "int",
+					"doc": "Bases it holds: one per position, none for a skip, n for an insertion."
 				}
 			]
 		},

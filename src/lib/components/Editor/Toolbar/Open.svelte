@@ -8,7 +8,7 @@
 		type FileDropZoneProps,
 	} from '$lib/components/ui/file-drop-zone';
 	import { onDestroy, untrack } from 'svelte';
-	import { toast } from 'svelte-sonner';
+	import { notify } from '$lib/notifications/notify.svelte';
 	import { SvelteDate } from 'svelte/reactivity';
 	import { FileJson2, LoaderCircle, XIcon } from '@lucide/svelte';
 	import { parseDesignFile, getParseWarnings, LocalPluginZipFile } from './parsers';
@@ -45,7 +45,7 @@
 	};
 
 	const onFileRejected: FileDropZoneProps['onFileRejected'] = async ({ reason, file }) => {
-		toast.error(`${file.name} failed to upload!`, { description: reason });
+		notify.error(`${file.name} failed to upload!`, { description: reason });
 	};
 
 	const uploadFile = async (file: File) => {
@@ -111,10 +111,10 @@
 		const outcome = await editorViewContext.pluginInstallGate.requestInstall(prepare);
 		if (outcome.status === 'installed') {
 			editorViewContext.openSidePanel('PLUGIN');
-			toast.success(`Plugin "${pluginName}" installed.`);
+			notify.success(`Plugin "${pluginName}" installed.`, { history: true });
 			toggleDialog();
 		} else if (outcome.status === 'error') {
-			toast.error('Failed to install plugin', { description: outcome.message });
+			notify.error('Failed to install plugin', { description: outcome.message });
 		}
 	}
 
@@ -137,7 +137,7 @@
 	// Open a cadnano JSON as a brand-new .fn.json document
 	const onLoadCadnanoAsNewDoc = async (uploadedFile: UploadedFile, part: Part) => {
 		for (const w of getParseWarnings()) {
-			toast.warning('Cadnano import warning', { description: w });
+			notify.warning('Cadnano import warning', { description: w });
 		}
 		isLoading = true;
 		try {
@@ -152,7 +152,7 @@
 			const inRepo = addToRepoFolder && !!repoCtx;
 			const baseName = await session.uniqueImportName(fileBaseName, inRepo ? folderPath : null);
 			if (baseName !== fileBaseName) {
-				toast.warning(`Opened as "${baseName}"`, {
+				notify.warning(`Opened as "${baseName}"`, {
 					description: inRepo
 						? `"${fileBaseName}.fn.json" already exists in this folder.`
 						: `A saved design is already named "${fileBaseName}".`,
@@ -175,9 +175,9 @@
 						content,
 						branch: repoCtx.branch,
 					});
-					toast.success(`"${uploadedFile.name}" committed to repo.`);
+					notify.success(`"${uploadedFile.name}" committed to repo.`, { history: true });
 				} catch (e) {
-					toast.error(`Could not commit original .json: ${(e as Error).message}`);
+					notify.error(`Could not commit original .json: ${(e as Error).message}`);
 				}
 				// Register the new .fn.json as a local-only file in the explorer
 				const fnName = fnPath.split('/').pop()!;

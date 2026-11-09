@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { toast } from 'svelte-sonner';
+	import { notify } from '$lib/notifications/notify.svelte';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { getEditorViewContext } from '../context/EditorViewContext.svelte';
 	import { help } from '$lib/components/help/help';
@@ -93,7 +93,7 @@
 		try {
 			action();
 		} catch (err) {
-			toast.error(err instanceof Error ? err.message : String(err));
+			notify.error(err instanceof Error ? err.message : String(err));
 		}
 	}
 

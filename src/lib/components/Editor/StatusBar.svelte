@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { GitBranch, HardDrive, History } from '@lucide/svelte';
 	import { getEditorViewContext } from './context/EditorViewContext.svelte';
+	import NotificationHistory from './NotificationHistory.svelte';
 
 	const ctx = getEditorViewContext();
 	const session = $derived(ctx.session);
@@ -111,11 +112,17 @@
 	<!-- Right: active region, then whatever is under the pointer -->
 	<div class="flex min-w-0 shrink items-center gap-2">
 		{#if region}
-			<span class="shrink-0" title="Active region">{region.name} · {region.maxBase} bp</span>
+			<span
+				class="shrink-0"
+				title="The region your edits apply to. Click in another region to switch; the rest of this bar follows the pointer."
+				>{region.name} <span class="text-primary-foreground/55">(active)</span></span
+			>
 		{/if}
 		{#if region && ctx.strandViewContext.footnote}
 			{@render divider()}
 		{/if}
 		<span class="truncate font-mono text-xs tabular-nums">{ctx.strandViewContext.footnote}</span>
+		{@render divider()}
+		<NotificationHistory />
 	</div>
 </div>

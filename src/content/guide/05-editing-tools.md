@@ -148,6 +148,8 @@ The panel also shows the scaffold sequence status (✓ or ✗ **Scaffold Sequenc
 
 After a fill, the panel reports how much of the input sequence was **left** over and how many bases were **missing**, so you can tell whether a preset scaffold was long enough.
 
+A whole-oligo fill runs 5′→3′ from the strand's free 5′ end. A **circular** strand (one with no free ends) has no such end, so it can't be filled as a whole with **Random**, **Preset** or **Custom**: you get a warning and nothing changes. This is deliberate. A ring could start anywhere, and a guessed start point would quietly shift the whole sequence along the strand, a mistake that is easy to miss and costly to order. You choose where the sequence begins: break the ring at that point first, or switch to **segment** (`d`) and fill it one segment at a time. To find every circular strand in the design, turn on the "circular strand" highlight in the strand-view toolbar (see [Highlighting And Hiding](/docs/guide/selection#highlighting-and-hiding)). **Fill only the empty parts** with **Random**, **One base** and **Remove** work on a circular strand as usual.
+
 **Fill mode** (radio group at the top of the panel) controls how an action interacts with bases that are already assigned:
 
 | Option | Behaviour |

@@ -61,8 +61,7 @@ On narrower screens (such as an iPad), the toolbar buttons show only their icons
 | **Commit** | Shown for GitHub files. Opens the Source Control **Changes** tab; an amber dot means uncommitted changes. |
 | **GitHub** / your avatar | Not connected: **Connect to GitHub**. Connected: toggles the Source Control panel. See [Saving And GitHub](/docs/guide/saving-github). |
 | Sun / moon | Toggle dark mode |
-| Bug icon | Opens the **Error Log** (see [Error log](#error-log)) |
-| **?** (circle) | Help menu: **Workspace help** (the `?` overlay), plus the **User guide**, **Keyboard shortcuts** and **Plugin development** docs, each opening in a new tab |
+| **?** (circle) | Help menu: **Workspace help** (the `?` overlay) and the **Error log** (see [Error log](#error-log)), plus the **User guide**, **Keyboard shortcuts** and **Plugin development** docs, each opening in a new tab |
 
 ### Save menu
 
@@ -128,7 +127,7 @@ Click an active icon again to close its panel.
 
 ## Viewer Toolbar
 
-The toolbar row below the top toolbar belongs to whichever viewer you last worked in. A badge on its left names that viewer. When the left pane is active, a **Plane / 3D** toggle switches it between the plane view and the 3D view.
+The toolbar row below the top toolbar belongs to whichever viewer you last worked in. A badge on its left names that viewer. When the left pane is active, a **Plane / 3D** toggle switches it between the plane view and the 3D view. If a toolbar is too wide for its pane, its edge fades where buttons are cut off; scroll it sideways with the mouse wheel or a trackpad.
 
 ### Strand view toolbar
 
@@ -280,7 +279,9 @@ The strip along the bottom of the editor. On the left, where the design is kept 
 - **Backups**, with how many this design has. Click it to open them (see [Saving And GitHub](/docs/guide/saving-github#backups)).
 - With a repository connected and a design that isn't in it, the repository and branch, dimmed, marked *(not in repo)*.
 
-On the right, the **active region** with its length, then what is under the pointer in the strand view (helix, base pair, oligo).
+On the right, the **active region** marked "(active)" (it changes when you click in another region), then what is under the pointer in the strand view (helix, base pair, oligo).
+
+At the far right, the **bell** lists recent notifications from this tab, newest first, so a message that disappeared can be read again. It keeps errors, warnings and the results of operations such as commits, pulls and plugin installs; repeated messages are merged into one entry. An amber dot means a warning or error arrived since you last looked. **Error Log** in its header opens the saved error log, and error entries have a **Details** link to their entry in it. The list is cleared when you reload the page.
 
 ## Read-Only Tabs
 
@@ -288,4 +289,4 @@ If the same document is open in another tab, this tab shows *This file is open i
 
 ## Error Log
 
-The bug icon in the top toolbar opens **Error Log**, recent errors from this browser, kept locally for troubleshooting. Each entry can be copied as JSON, or use **Copy all as JSON** to include them in a bug report. Error notifications also offer a **View Details** link that jumps to the entry.
+**Error Log** in the header of the notifications list (the bell in the status bar), or in the **?** Help menu, opens the error log: errors from this browser kept locally for troubleshooting. It holds up to 50 entries from the last 30 days; older ones are removed automatically. Each entry can be copied as JSON, or use **Copy all as JSON** to include them in a bug report. Errors nobody expected, such as a crash in a canvas tool, are recorded automatically. When the same error happens again, its entry shows a count (×3) instead of filling the log. Errors from a plugin's own code appear on that plugin's row in the Plugin panel, not here. **Clear** empties the log. Error notifications also offer a **View Details** link that jumps to the entry. Actions the editor refuses on purpose, such as a crossover from a segment onto itself, show only a warning and are not logged here.

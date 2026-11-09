@@ -2,7 +2,7 @@
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { LoaderCircle, GitMerge, AlertTriangle, Check } from '@lucide/svelte';
-	import { toast } from 'svelte-sonner';
+	import { notify } from '$lib/notifications/notify.svelte';
 	import { getFileContent } from '$lib/services/github/api';
 	import { githubMetadataStore, githubExplorerStateStore } from '$lib/services/storage';
 	import { getEditorDocumentSession } from '../context/EditorDocumentSession.svelte';
@@ -152,7 +152,7 @@
 		try {
 			await session.overwriteGitHubWithLocal('Resolve conflict: keep local version');
 			open = false;
-			toast.success('Local version committed to GitHub');
+			notify.success('Local version committed to GitHub', { history: true });
 		} catch (e) {
 			error = (e as Error).message || 'Commit failed';
 		} finally {
@@ -172,7 +172,7 @@
 				return;
 			}
 			open = false;
-			toast.success('Remote version pulled');
+			notify.success('Remote version pulled', { history: true });
 		} catch (e) {
 			error = (e as Error).message || 'Pull failed';
 		} finally {
@@ -213,7 +213,9 @@
 				return;
 			}
 			open = false;
-			toast.success('Conflict resolved — review the document and commit when ready');
+			notify.success('Conflict resolved — review the document and commit when ready', {
+				history: true,
+			});
 		});
 	}
 </script>

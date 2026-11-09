@@ -30,6 +30,11 @@ function sortedSegments(oligo: Oligo): OligoSegment[] {
 	return [...oligo.segments].sort(compareSegmentsByEndpoints);
 }
 
+/** Where a circular oligo is read from: the segment with the lowest 5' end (helix index, then bp). */
+export function circularStartSegment(oligo: Oligo): OligoSegment | null {
+	return sortedSegments(oligo)[0] ?? null;
+}
+
 function orderedSegmentsForSignature(oligo: Oligo): OligoSegment[] {
 	const fallback = sortedSegments(oligo);
 	const start = oligo.isCircular ? fallback[0] : (oligo.fivePrimeEndSegment ?? fallback[0]);

@@ -26,6 +26,7 @@ from foldnano._frame import assert_right_handed_plane, normalize_frame
 from . import mutations as M
 from . import repeat
 from .checks import InvalidOperationError
+from .topology import oligo_segments_5to3, segment_slot_lengths
 
 
 class Transport(Protocol):
@@ -176,11 +177,58 @@ def _h_set_segment_modification(raw: dict, op: dict) -> None:
     seg[end_key]["modification"] = op["modification"]
 
 
+def _write_bases(oligo: dict, seg: dict, bp_index: int, seq: str) -> None:
+    """Store ``seq`` at one slot; a changed base clears the lock, as the host's ``Slot.seq``."""
+    existing = _find_slot(seg, bp_index)
+    before = (existing.get("seq") or "N") if existing is not None else "N"
+    slot = existing if existing is not None else _slot_at(seg, bp_index)
+    slot["seq"] = seq
+    if seq != before:
+        oligo["isSequenceLocked"] = False
+
+
 def _h_set_slot_sequence(raw: dict, op: dict) -> None:
     oligo = _find_oligo(raw, op["oligoId"])
     seg = _find_segment(oligo, op["segmentId"])
-    slot = _slot_at(seg, op["bpIndex"])
-    slot["seq"] = op["seq"]
+    _write_bases(oligo, seg, op["bpIndex"], op["seq"])
+
+
+def _bases_held(seg: dict) -> int:
+    return sum(n for _, n in segment_slot_lengths(seg))
+
+
+def _fill_segment(oligo: dict, seg: dict, sequence: str, cursor: int) -> int:
+    for bp, n in segment_slot_lengths(seg):
+        if n == 0:
+            continue
+        _write_bases(oligo, seg, bp, sequence[cursor : cursor + n])
+        cursor += n
+    return cursor
+
+
+def _h_set_oligo_sequence(raw: dict, op: dict) -> None:
+    """Port of ``Part.setOligoSequence``: 5'→3' over this oligo only, never its partners."""
+    oligo = _find_oligo(raw, op["oligoId"])
+    segments = oligo_segments_5to3(oligo, op.get("startSegmentId"))
+    held = sum(_bases_held(s) for s in segments)
+    if held != len(op["sequence"]):
+        raise InvalidOperationError(
+            f"The oligo holds {held} bases; the sequence has {len(op['sequence'])}."
+        )
+    cursor = 0
+    for seg in segments:
+        cursor = _fill_segment(oligo, seg, op["sequence"], cursor)
+
+
+def _h_set_segment_sequence(raw: dict, op: dict) -> None:
+    oligo = _find_oligo(raw, op["oligoId"])
+    seg = _find_segment(oligo, op["segmentId"])
+    held = _bases_held(seg)
+    if held != len(op["sequence"]):
+        raise InvalidOperationError(
+            f"The segment holds {held} bases; the sequence has {len(op['sequence'])}."
+        )
+    _fill_segment(oligo, seg, op["sequence"], 0)
 
 
 def _complementary_segment(raw: dict, seg: dict, bp_index: int) -> dict | None:
@@ -855,6 +903,8 @@ _HANDLERS: _HandlersT = {
     M.OP_SET_OLIGO_IS_SCAFFOLD: _h_set_oligo_is_scaffold,
     M.OP_SET_SEGMENT_MODIFICATION: _h_set_segment_modification,
     M.OP_SET_SLOT_SEQUENCE: _h_set_slot_sequence,
+    M.OP_SET_OLIGO_SEQUENCE: _h_set_oligo_sequence,
+    M.OP_SET_SEGMENT_SEQUENCE: _h_set_segment_sequence,
     M.OP_SET_SLOT_SKIP: _h_set_slot_skip,
     M.OP_SET_SLOT_INSERTION: _h_set_slot_insertion,
     M.OP_ADD_SKIP_OR_INSERTION: _h_add_skip_or_insertion,

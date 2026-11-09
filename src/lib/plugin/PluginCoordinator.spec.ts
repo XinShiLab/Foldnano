@@ -23,6 +23,7 @@ import { StorageManager } from '$lib/services/storage/StorageManager';
 import type { StorageProvider } from '$lib/services/storage/StorageProvider';
 import type { PluginManifest, PythonPlugin } from './types';
 import { reportError } from '$lib/errorReporting';
+import { notify } from '$lib/notifications/notify.svelte';
 
 const reportErrorMock = vi.mocked(reportError);
 
@@ -933,6 +934,64 @@ describe('PluginCoordinator', () => {
 		expect(doc.parts[0].name).toBe('From Plugin');
 		expect(historyStack.numberOfUndos).toBe(1);
 	});
+
+	it.each([
+		['A'.repeat(11), 1],
+		['G'.repeat(11), 0],
+	])(
+		'confirmApply warns when a sequence write leaves pairs unmatched (%s)',
+		async (sequence, warnings) => {
+			const warn = vi.spyOn(notify, 'warning').mockImplementation(() => '');
+			const manifest: PluginManifest = {
+				schemaVersion: 1,
+				id: 'fill-sequence',
+				name: 'Fill',
+				version: '1.0.0',
+				format: 'foldnano_edit',
+				applyStrategy: 'replayMutationLog',
+				entrypoint: 'def run(ctx): pass',
+			};
+			const doc = new FoldnanoDocument('doc-fill', 'Plugin Doc');
+			const part = makeHoneycombPart('Duplex');
+			const vh = addLatticeVh(part, 0, 0);
+			const top = part.createOligo(vh, 0, 10, '#000000');
+			const bottom = part.createOligo(vh, 10, 0, '#111111');
+			bottom.fillSequence('C'.repeat(11)); // fills top with G as its complement
+			doc.parts.push(part);
+			const plugin = makePlugin(manifest);
+			const registry = {
+				get: vi.fn((id: string) => (id === manifest.id ? plugin : undefined)),
+				hasReservation: () => false,
+			} as const;
+			const bridge = {
+				runPlugin: vi.fn().mockResolvedValue({
+					logs: [],
+					artifacts: {},
+					pluginResult: null,
+					primaryArtifact: null,
+					mutationLog: [{ op: 'set_oligo_sequence', oligoId: top.id, sequence }],
+				}),
+				terminate: vi.fn(),
+			};
+			const coordinator = new PluginCoordinator(
+				registry as never,
+				() => doc,
+				() => createHistory(doc),
+				() => null,
+				(() => bridge) as never
+			);
+
+			await coordinator.run(manifest.id);
+			expect(coordinator.confirmApply(manifest.id)).toBe('applied');
+
+			expect(top.sequence).toBe(sequence);
+			expect(warn).toHaveBeenCalledTimes(warnings);
+			if (warnings) {
+				expect(warn.mock.calls[0][0]).toBe("11 base pairs don't match the opposite strand");
+			}
+			warn.mockRestore();
+		}
+	);
 
 	it('confirmApply reports a visible PluginApplyError when applyResult rejects its own precondition before any mutation is attempted', async () => {
 		const manifest: PluginManifest = {

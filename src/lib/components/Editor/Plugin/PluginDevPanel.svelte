@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { ComponentProps, Snippet } from 'svelte';
-	import { toast } from 'svelte-sonner';
+	import { notify } from '$lib/notifications/notify.svelte';
 	import { resolve } from '$app/paths';
 	import {
 		Bot,
@@ -44,7 +44,7 @@
 		try {
 			await action();
 		} catch (e) {
-			toast.error(label, { description: e instanceof Error ? e.message : String(e) });
+			notify.error(label, { description: e instanceof Error ? e.message : String(e) });
 		}
 	}
 
@@ -77,7 +77,7 @@
 				return;
 			}
 			const plugin = await devMode.linkPickedFolder(dir);
-			if (plugin) toast.success(`Linked "${plugin.manifest.name}".`);
+			if (plugin) notify.success(`Linked "${plugin.manifest.name}".`, { history: true });
 		});
 		linking = false;
 	}
@@ -319,7 +319,8 @@
 
 <NewPluginDialog
 	bind:folder={newPluginFolder}
-	onCreated={(plugin) => toast.success(`Created and linked "${plugin.manifest.name}".`)}
+	onCreated={(plugin) =>
+		notify.success(`Created and linked "${plugin.manifest.name}".`, { history: true })}
 />
 
 {#if checkResult}

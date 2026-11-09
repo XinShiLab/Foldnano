@@ -9,7 +9,7 @@
 		GitBranch,
 		GitMerge,
 	} from '@lucide/svelte';
-	import { toast } from 'svelte-sonner';
+	import { notify } from '$lib/notifications/notify.svelte';
 	import { githubStorageProvider } from '$lib/services/storage/providers/GitHubStorageProvider';
 	import { GitHubConflictError } from '$lib/services/github/api';
 	import { getEditorDocumentSession } from '../context/EditorDocumentSession.svelte';
@@ -57,7 +57,8 @@
 		error = '';
 		try {
 			await session.createAndSwitchBranch(newBranchName.trim());
-			toast.success(`Switched to new branch "${newBranchName.trim()}"`, {
+			notify.success(`Switched to new branch "${newBranchName.trim()}"`, {
+				history: true,
 				description: 'You can now commit to this branch.',
 			});
 			creatingBranch = false;
@@ -82,7 +83,8 @@
 			}
 			const sha = await session.commitCurrentDocToGitHub(message.trim());
 			open = false;
-			toast.success('Committed successfully', {
+			notify.success('Committed successfully', {
+				history: true,
 				description: `${fileMeta.path} → ${fileMeta.branch} (${sha.slice(0, 7)})`,
 			});
 		} catch (e) {
@@ -104,7 +106,8 @@
 		try {
 			const sha = await session.overwriteGitHubWithLocal(message.trim());
 			open = false;
-			toast.success('Force-committed successfully', {
+			notify.success('Force-committed successfully', {
+				history: true,
 				description: `${fileMeta.path} → ${fileMeta.branch} (${sha.slice(0, 7)})`,
 			});
 		} catch (e) {
@@ -128,7 +131,8 @@
 			const ok = await session.pullCurrentDocFromGitHub('before_accept_remote');
 			if (ok) {
 				open = false;
-				toast.success('Pulled latest version', {
+				notify.success('Pulled latest version', {
+					history: true,
 					description: `${fileMeta.path} updated from ${fileMeta.branch}`,
 				});
 			} else {

@@ -26,7 +26,7 @@
 	import type { ReplayFrameRenderer, VideoSize } from '../View3D/replay/replayVideoExport';
 	import type { View3DToolPanelMode } from '../context/EditorViewContext.svelte';
 	import { clearOverlayPlacementCmd, setOverlayPlacementCmd } from '$lib/commands/overlays';
-	import { toast } from 'svelte-sonner';
+	import { notify } from '$lib/notifications/notify.svelte';
 	import { help } from '$lib/components/help/help';
 
 	type RbsDiagnostics = Pick<
@@ -229,7 +229,7 @@
 				data.format === 'pdb'
 					? `${data.stats.chainCount} chains, ${data.stats.residueCount} residues`
 					: `${data.stats.nucleotideCount} nts, ${data.stats.strandCount} strands`;
-			toast.success(`${isPdb ? 'PDB' : 'mrDNA'} overlay loaded`, { description });
+			notify.success(`${isPdb ? 'PDB' : 'mrDNA'} overlay loaded`, { history: true, description });
 		} catch (err) {
 			const description =
 				err instanceof MrdnaOverlayParseError ||
@@ -237,7 +237,7 @@
 				err instanceof Error
 					? err.message
 					: 'Could not parse the selected file.';
-			toast.error('Could not load overlay', { description });
+			notify.error('Could not load overlay', { description });
 		}
 	}
 

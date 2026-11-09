@@ -567,7 +567,30 @@ single-base slots (`seq.length === 1`, excluding skip/insert and unassigned
 complementary. It's consumed by the StrandView's mismatch-warning overlay
 (`docs/editor-strand-viewer.md`) and by the post-translate warning toast in
 `movingEndsOps.ts` — both are UI affordances for finding and fixing mismatches
-manually, not model-level enforcement.
+manually, not model-level enforcement. `Part.countMismatchedBasePairs()` sums it
+over strand-0 segments (each pair once); `PluginCoordinator.confirmApply` uses it
+to warn when an applied plugin result added mismatches.
+
+### One-strand sequence writes (plugins)
+
+`Part.setOligoSequence(oligo, seq)` / `Part.setSegmentSequence(segment, seq)` write
+bases 5'→3' over that oligo or segment **only** — unlike `Oligo.fillSequence` /
+`OligoSegment.fillSequence`, they never write the complementary strand. They back the
+`foldnano.edit` `fill_sequence` ops: a plugin owns both strands, and an
+editor-style complement fill would make its result depend on write order. Length must
+match `totalNucleotides` exactly (skips hold 0, insertions n) and letters are
+`ACGTN`. A circular oligo has no free 5' end, so it starts at an explicit segment or at
+`circularStartSegment` (`oligoKey.ts`: lowest 5' end by helix index, then bp), the same
+start the OligoKey / oligo report use; the Python side always records the start it chose
+(`startSegmentId`), since helix indices of helices added in a run are provisional there. As
+everywhere, a changed base clears `isSequenceLocked` (the `Slot.seq` setter) — the
+flag is a "set deliberately" reminder, not a lock, and nothing refuses a write to a
+locked oligo.
+
+Editor whole-oligo fills (`Oligo.fillSequence` / `fillRandomSequence`) start at the free
+5' end and do nothing on a ring; `fillRandomSequence` throws `InvalidOperationError`
+(`CIRCULAR_FILL_ERROR`) there rather than a plain `Error`, so a caller that reaches it gets a
+refusal toast, not an Error Log entry. The Sequence tool refuses before calling either.
 
 ### Empty-only fill (random or one base)
 

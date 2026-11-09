@@ -2,7 +2,7 @@
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { LoaderCircle, History, AlertTriangle, Check, Download } from '@lucide/svelte';
-	import { toast } from 'svelte-sonner';
+	import { notify } from '$lib/notifications/notify.svelte';
 	import { getEditorDocumentSession } from './context/EditorDocumentSession.svelte';
 	import { backupFileName, type BackupEntry } from './context/documentRecovery';
 	import { downloadJsonAsTextFile } from './Toolbar/utils';
@@ -73,7 +73,7 @@
 			const result = await session.restoreBackup(session.currentDoc.id, selectedBackup);
 			if (result === 'restored') {
 				open = false;
-				toast.success(`Restored the backup from ${label}`);
+				notify.success(`Restored the backup from ${label}`, { history: true });
 			} else if (result === 'not-allowed') {
 				error = 'This design is open in another tab. Restore it there.';
 			} else if (result === 'save-failed') {

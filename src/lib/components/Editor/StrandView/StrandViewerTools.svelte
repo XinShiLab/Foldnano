@@ -39,6 +39,7 @@
 	import { exportStageAsPng } from '../utils';
 	import { downloadStrandViewSvg } from './exportSvg';
 	import { changeRegionLengthCmd } from '$lib/commands/regions';
+	import { scrollStrip } from '$lib/components/scroll-strip/scroll-strip';
 	import {
 		applyEndAlignment,
 		planEndAlignment,
@@ -165,6 +166,7 @@
 
 <div
 	class="flex h-8 min-w-0 flex-1 scrollbar-none items-center gap-2 overflow-x-auto overflow-y-hidden [&::-webkit-scrollbar]:hidden"
+	{@attach scrollStrip}
 >
 	<!-- Reset View -->
 	<ButtonGroup.Root class="shrink-0">

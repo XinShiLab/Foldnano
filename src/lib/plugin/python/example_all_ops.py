@@ -321,6 +321,15 @@ seg_a0.slot_at(5).seq = "T"
 assert seg_a0.slot_at(5).seq == "T"
 ok("slot[5] seq", seg_a0.slot_at(5).seq)
 
+sep("Op 6b — set_segment_sequence / set_oligo_sequence")
+# Whole-strand writes, 5'→3'; the opposite strand is never filled.
+seg_a0.fill_sequence("A" * seg_a0.nucleotide_count)
+assert seg_a0.sequence == "A" * seg_a0.nucleotide_count
+ok("segment sequence", seg_a0.sequence)
+oligo_a = seg_a0.oligo
+oligo_a.fill_sequence(("ACGT" * oligo_a.nucleotide_count)[: oligo_a.nucleotide_count])
+ok("oligo sequence", oligo_a.sequence)
+
 sep("Op 7 — set_slot_skip")
 # A skip or insertion needs the complementary strand (both strands' slots change).
 seg_comp = part.create_segment(vh=0, five_index=20, three_index=0, color="#888888")

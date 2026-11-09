@@ -130,6 +130,13 @@ class FakeIndexedDbBackend implements IndexedDbPersistenceBackend {
 		this.errorLogs.set(record.id, record);
 	}
 
+	async bumpErrorLog(id: string, by: number, lastSeenAt: number): Promise<boolean> {
+		const record = this.errorLogs.get(id);
+		if (!record) return false;
+		this.errorLogs.set(id, { ...record, count: (record.count ?? 1) + by, lastSeenAt });
+		return true;
+	}
+
 	async getRecentErrorLogs(limit = 50): Promise<ErrorLogRecord[]> {
 		return [...this.errorLogs.values()].sort((a, b) => b.timestamp - a.timestamp).slice(0, limit);
 	}

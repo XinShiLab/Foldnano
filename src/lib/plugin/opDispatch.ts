@@ -60,6 +60,8 @@ export type MutationOp =
 	| SetOligoIsScaffoldOp
 	| SetSegmentModificationOp
 	| SetSlotSequenceOp
+	| SetOligoSequenceOp
+	| SetSegmentSequenceOp
 	| SetSlotSkipOp
 	| SetSlotInsertionOp
 	| AddSkipOrInsertionOp
@@ -118,6 +120,22 @@ interface SetSlotSequenceOp {
 	segmentId: string;
 	bpIndex: number;
 	seq: string;
+}
+
+/** Whole-oligo write, 5'→3'; the opposite strand is left as it is. */
+interface SetOligoSequenceOp {
+	op: 'set_oligo_sequence';
+	oligoId: string;
+	sequence: string;
+	/** Circular oligos only: the segment whose 5' end the sequence starts at. */
+	startSegmentId?: string | null;
+}
+
+interface SetSegmentSequenceOp {
+	op: 'set_segment_sequence';
+	oligoId: string;
+	segmentId: string;
+	sequence: string;
 }
 
 interface SetSlotSkipOp {
@@ -426,6 +444,19 @@ export function dispatchOp(op: MutationOp, part: Part, options: DispatchOptions 
 			const slot = seg.slotForBp(op.bpIndex);
 			if (!slot) throw new Error(`No slot at bp ${op.bpIndex} on segment ${seg.id}`);
 			slot.seq = op.seq;
+			return;
+		}
+		case 'set_oligo_sequence': {
+			const oligo = findOligo(part, op.oligoId);
+			guardOligoInRegion(part, oligo, activeRegionId);
+			const start = op.startSegmentId ? findSegment(part, op.startSegmentId) : null;
+			part.setOligoSequence(oligo, op.sequence, start);
+			return;
+		}
+		case 'set_segment_sequence': {
+			const seg = findSegment(part, op.segmentId);
+			guardVhInRegion(part, seg.inVirtualHelix.regionId, activeRegionId);
+			part.setSegmentSequence(seg, op.sequence);
 			return;
 		}
 		case 'set_slot_skip': {

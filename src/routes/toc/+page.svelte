@@ -30,7 +30,7 @@
 		Trash2,
 	} from '@lucide/svelte';
 	import { onMount } from 'svelte';
-	import { toast } from 'svelte-sonner';
+	import { notify } from '$lib/notifications/notify.svelte';
 
 	const SORT_OPTIONS = {
 		'modified-desc': 'Last modified (newest)',
@@ -141,15 +141,15 @@
 			const count = manifest.designs.length;
 			const summary = `${count} design${count === 1 ? '' : 's'} in ${designArchiveFileName(exportedAt)}`;
 			if (skipped.length > 0) {
-				toast.warning(`Downloaded ${summary}`, {
+				notify.warning(`Downloaded ${summary}`, {
 					description: `Couldn't read ${skipped.map((d) => `"${d.name || UNTITLED}"`).join(', ')}, so ${skipped.length === 1 ? 'it is' : 'they are'} not included.`,
 				});
 			} else {
-				toast.success(`Downloaded ${summary}`);
+				notify.success(`Downloaded ${summary}`);
 			}
 		} catch (e) {
 			reportError(e, 'storage:export-all', { notify: false });
-			toast.error("Couldn't download your designs", {
+			notify.error("Couldn't download your designs", {
 				description: e instanceof Error ? e.message : undefined,
 			});
 		} finally {

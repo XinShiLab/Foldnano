@@ -12,7 +12,7 @@
 	import { DEMO_TAG, countTags, filterByTags, hasTag, tagKey } from '$lib/plugin/pluginTags';
 	import type { PluginManifest, PythonPlugin } from '$lib/plugin/types';
 	import { getEditorViewContext } from '../context/EditorViewContext.svelte';
-	import { toast } from 'svelte-sonner';
+	import { notify } from '$lib/notifications/notify.svelte';
 	import { CircleArrowUp, Download, Trash2 } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import PluginHubCard from './PluginHubCard.svelte';
@@ -65,7 +65,7 @@
 			);
 			if (outcome.status === 'installed') onInstalled();
 			else if (outcome.status === 'error')
-				toast.error('Cannot install plugin', { description: outcome.message });
+				notify.error('Cannot install plugin', { description: outcome.message });
 		} finally {
 			installingId = null;
 		}

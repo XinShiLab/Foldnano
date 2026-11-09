@@ -1,4 +1,4 @@
-import { toast } from 'svelte-sonner';
+import { notify } from '$lib/notifications/notify.svelte';
 import type { Tool } from './index';
 import type { ViewContext } from '$lib/canvasEditor/core/views';
 import { duplicateOligosCmd } from '$lib/commands/strands';
@@ -20,7 +20,7 @@ function exit(ctx: ViewContext): void {
 
 function commit(ctx: ViewContext, state: DuplicateState): void {
 	if (!state.check.ok) {
-		toast.error(state.check.reason);
+		notify.error(state.check.reason);
 		return;
 	}
 	try {
@@ -47,7 +47,7 @@ function commit(ctx: ViewContext, state: DuplicateState): void {
 		}
 	} catch (err) {
 		// A failed command restores the document, so the placement state is stale: exit too.
-		toast.error(err instanceof Error ? err.message : String(err));
+		notify.error(err instanceof Error ? err.message : String(err));
 	}
 	exit(ctx);
 }

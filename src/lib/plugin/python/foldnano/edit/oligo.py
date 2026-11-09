@@ -26,12 +26,34 @@ from typing import TYPE_CHECKING, Any, ClassVar
 from . import invariants, mutations as M
 from .checks import Check, InvalidOperationError
 from .repeat import MIRROR_EDIT_ERROR
-from .topology import slot_length
+from .topology import (
+    circular_start_segment,
+    oligo_segments_5to3,
+    segment_sequence,
+    segment_slot_lengths,
+    slot_length,
+)
 
 if TYPE_CHECKING:
     from .part import MutablePart
     from .repeat_group import MirrorInfo, MutableRepeatGroup
     from .vh import MutableVirtualHelix
+
+
+_SEQUENCE_LETTERS = frozenset("ACGTN")
+
+
+def _normalize_sequence(sequence: str, expected: int, what: str) -> str:
+    if not isinstance(sequence, str):
+        raise TypeError(f"sequence must be str, got {type(sequence).__name__}")
+    bases = sequence.upper()
+    if not set(bases) <= _SEQUENCE_LETTERS:
+        raise ValueError("A sequence may only contain A, C, G, T and N.")
+    if len(bases) != expected:
+        raise InvalidOperationError(
+            f"The {what} holds {expected} bases; the sequence has {len(bases)}."
+        )
+    return bases
 
 
 class _ReadOnly:
@@ -461,6 +483,16 @@ class SegmentView(_ReadOnly):
         """Return a proxy for the slot at ``bp_index`` (created on first write)."""
         return self._slot_cls(self._part, self.oligo_id, self._id, int(bp_index))
 
+    @property
+    def sequence(self) -> str:
+        """Its bases 5'→3'; ``N`` for a base never assigned."""
+        return segment_sequence(self._raw())
+
+    @property
+    def nucleotide_count(self) -> int:
+        """Bases it holds: one per position, none for a skip, n for an insertion."""
+        return sum(n for _, n in segment_slot_lengths(self._raw()))
+
     def __eq__(self, other: object) -> bool:
         return isinstance(other, SegmentView) and other._id == self._id
 
@@ -533,6 +565,20 @@ class MutableSegment(SegmentView):
         """Return a proxy for the slot at ``bp_index`` (created on first write)."""
         return super().slot_at(bp_index)  # type: ignore[return-value]
 
+    def fill_sequence(self, sequence: str) -> None:
+        """Write this segment's bases 5'→3'. ``len(sequence)`` must equal
+        ``nucleotide_count``. Only this strand changes: the opposite strand is never filled,
+        so a disagreement shows as a mismatch in the editor."""
+        bases = _normalize_sequence(sequence, self.nucleotide_count, "segment")
+        self._part._apply(
+            {
+                "op": M.OP_SET_SEGMENT_SEQUENCE,
+                "oligoId": self.oligo_id,
+                "segmentId": self._id,
+                "sequence": bases,
+            }
+        )
+
 
 # ---------------------------------------------------------------------------
 # Oligo
@@ -572,6 +618,9 @@ class OligoView(_ReadOnly):
 
     @property
     def is_sequence_locked(self) -> bool:
+        """Set when a sequence was applied deliberately in the editor. A reminder, not a
+        lock: any change to the bases (a plugin's included) clears it, and plugins can't set
+        it."""
         return bool(self._raw().get("isSequenceLocked", False))
 
     @property
@@ -608,6 +657,19 @@ class OligoView(_ReadOnly):
             if s["id"] == segment_id:
                 return self._segment_cls(self._part, self._id, segment_id)
         return None
+
+    @property
+    def sequence(self) -> str:
+        """Its bases 5'→3' from the free 5' end (a circular oligo from the segment with the
+        lowest 5' end, as ``fill_sequence`` writes it); ``N`` for a base never assigned."""
+        return "".join(segment_sequence(s) for s in oligo_segments_5to3(self._raw()))
+
+    @property
+    def nucleotide_count(self) -> int:
+        """Bases it holds, skips and insertions counted."""
+        return sum(
+            n for s in self._raw().get("segments", []) for _, n in segment_slot_lengths(s)
+        )
 
     @property
     def five_modification(self) -> str | None:
@@ -710,6 +772,32 @@ class MutableOligo(OligoView):
         if end is None:
             raise InvalidOperationError(f"Oligo {self._id!r} is circular: it has no free 3' end")
         end.modification = value
+
+    def fill_sequence(self, sequence: str, start: "SegmentView | None" = None) -> None:
+        """Write the oligo's bases 5'→3'. ``len(sequence)`` must equal ``nucleotide_count``.
+        A linear oligo starts at its free 5' end. A circular one starts at the 5' end of
+        ``start`` (one of its segments), by default the segment with the lowest 5' end (helix
+        index, then bp), as the app's oligo report reads it. Only this oligo changes: the
+        opposite strand is never filled, so a disagreement shows as a mismatch in the editor."""
+        raw = self._raw()
+        start_id = None
+        if start is not None:
+            if not any(s["id"] == start.id for s in raw.get("segments", [])):
+                raise InvalidOperationError("The start segment is not part of this oligo.")
+            start_id = start.id
+        if self.is_circular:
+            start_id = start_id or circular_start_segment(raw)["id"]
+        elif start_id is not None and start_id != self.five_prime.segment.id:
+            raise InvalidOperationError(
+                "A linear oligo starts at its free 5' end; only a circular oligo takes a start segment."
+            )
+        else:
+            start_id = None
+        bases = _normalize_sequence(sequence, self.nucleotide_count, "oligo")
+        op = {"op": M.OP_SET_OLIGO_SEQUENCE, "oligoId": self._id, "sequence": bases}
+        if start_id is not None:
+            op["startSegmentId"] = start_id
+        self._part._apply(op)
 
     def remove(self) -> None:
         """Same as ``part.remove_oligo(oligo)``."""

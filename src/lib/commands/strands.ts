@@ -580,7 +580,7 @@ export const makeCrossoverCmd = (
 			endInfo.bpIdx === endSegment.threePrime.index ||
 			endInfo.bpIdx === endSegment.threePrime.minus1Index
 		) {
-			throw new Error("Cannot create crossover at or 1nt away from 3' end");
+			throw new InvalidOperationError("Cannot create crossover at or 1nt away from 3' end");
 		}
 
 		const startOligo = startVh

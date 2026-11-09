@@ -62,7 +62,7 @@ import {
 	requestStoragePersistence,
 	type StoragePersistence,
 } from '$lib/services/storage/persistentStorage';
-import { toast } from 'svelte-sonner';
+import { notify } from '$lib/notifications/notify.svelte';
 import type { Part } from '$lib/model/Part';
 
 export interface EditorDocumentSessionHooks {
@@ -486,7 +486,7 @@ export class EditorDocumentSession {
 			return true;
 		} catch (e) {
 			console.error('[EditorDocumentSession] Failed to load document:', e);
-			toast.error('Failed to load document from local storage');
+			notify.error('Failed to load document from local storage');
 			return false;
 		} finally {
 			this.#isLoading = false;
@@ -738,7 +738,7 @@ export class EditorDocumentSession {
 			}
 			const name = await this.uniqueImportName(imported.name);
 			if (name !== imported.name) {
-				toast.warning(`Opened as "${name}"`, {
+				notify.warning(`Opened as "${name}"`, {
 					description: `A saved design is already named "${imported.name}".`,
 				});
 				imported.name = name;
@@ -771,14 +771,15 @@ export class EditorDocumentSession {
 			backup: { reason: 'before_import' },
 		});
 		if (!ok) {
-			toast.error("Couldn't save the opened file in this browser");
+			notify.error("Couldn't save the opened file in this browser");
 			return;
 		}
 		const persistedAt = await this.#storedSaveTime(imported.id);
 		this.#lastLocalPersistAt = persistedAt;
 		this.#historyStack.markSaved(persistedAt);
 		await this.hooks.savePersistedContext();
-		toast.success('Replaced the saved design', {
+		notify.success('Replaced the saved design', {
+			history: true,
 			description: 'The previous version is in Backups.',
 		});
 		if (savedMeta) this.#checkRemoteAheadInBackground(imported.id);
@@ -846,7 +847,7 @@ export class EditorDocumentSession {
 			return true;
 		} catch (e) {
 			console.error('[EditorDocumentSession] Failed to load document from GitHub:', e);
-			if (e instanceof DocumentFormatError) toast.error(e.message);
+			if (e instanceof DocumentFormatError) notify.error(e.message);
 			return false;
 		} finally {
 			this.#isLoading = false;
@@ -938,7 +939,7 @@ export class EditorDocumentSession {
 		} catch (e) {
 			console.error('[EditorDocumentSession] Failed to pull from GitHub:', e);
 			if (e instanceof GitHubNetworkError) this.#remoteCheckFailed = true;
-			if (e instanceof Error) toast.error(e.message);
+			if (e instanceof Error) notify.error(e.message);
 			return false;
 		} finally {
 			this.#isLoading = false;

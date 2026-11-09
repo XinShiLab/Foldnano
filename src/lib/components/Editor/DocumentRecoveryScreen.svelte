@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { toast } from 'svelte-sonner';
+	import { notify } from '$lib/notifications/notify.svelte';
 	import { getEditorDocumentSession } from './context/EditorDocumentSession.svelte';
 	import {
 		backupFileName,
@@ -35,7 +35,7 @@
 	async function downloadRaw() {
 		const raw = await session.loadRawDocument(failure.docId);
 		if (!raw) {
-			toast.error('The saved data could not be read from browser storage.');
+			notify.error('The saved data could not be read from browser storage.');
 			return;
 		}
 		const base = failure.name?.trim() || failure.docId;
@@ -60,12 +60,13 @@
 		restoringId = backup.id;
 		try {
 			const result = await session.restoreBackup(failure.docId, backup);
-			if (result === 'restored') toast.success(`Restored the backup from ${when}`);
+			if (result === 'restored')
+				notify.success(`Restored the backup from ${when}`, { history: true });
 			else if (result === 'not-allowed')
-				toast.error('This design is open in another tab. Restore it there.');
+				notify.error('This design is open in another tab. Restore it there.');
 			else if (result === 'save-failed')
-				toast.error("The backup couldn't be written to browser storage. Download it instead.");
-			else toast.error("The restored version couldn't be opened either. Try an older backup.");
+				notify.error("The backup couldn't be written to browser storage. Download it instead.");
+			else notify.error("The restored version couldn't be opened either. Try an older backup.");
 		} finally {
 			restoringId = null;
 		}

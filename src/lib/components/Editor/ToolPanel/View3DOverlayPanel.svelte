@@ -19,7 +19,7 @@
 	import { FileDropZone } from '$lib/components/ui/file-drop-zone/index.js';
 	import type { Part } from '$lib/model/Part';
 	import { getEditorViewContext } from '../context/EditorViewContext.svelte';
-	import { toast } from 'svelte-sonner';
+	import { notify } from '$lib/notifications/notify.svelte';
 
 	type Props = {
 		part: Part;
@@ -263,7 +263,7 @@
 			class="h-24 rounded-md border border-border p-3"
 			onUpload={loadOverlay}
 			onFileRejected={({ reason, file }) => {
-				toast.error('File rejected', { description: `${file.name}: ${reason}` });
+				notify.error('File rejected', { description: `${file.name}: ${reason}` });
 			}}
 		>
 			<div

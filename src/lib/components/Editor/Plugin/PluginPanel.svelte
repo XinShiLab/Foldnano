@@ -31,7 +31,7 @@
 		listingVersion,
 		prepareListingInstall,
 	} from '$lib/plugin/pluginUpdates';
-	import { toast } from 'svelte-sonner';
+	import { notify } from '$lib/notifications/notify.svelte';
 	import PluginHubPanel from './PluginHubPanel.svelte';
 	import PluginDevPanel from './PluginDevPanel.svelte';
 	import PluginRunOutput from './PluginRunOutput.svelte';
@@ -73,9 +73,9 @@
 				{ review: true }
 			);
 			if (outcome.status === 'installed')
-				toast.success(`Updated "${name}" to v${outcome.manifest.version}.`);
+				notify.success(`Updated "${name}" to v${outcome.manifest.version}.`, { history: true });
 			else if (outcome.status === 'error')
-				toast.error('Cannot update plugin', { description: outcome.message });
+				notify.error('Cannot update plugin', { description: outcome.message });
 		} finally {
 			updatingId = null;
 		}
@@ -134,7 +134,7 @@
 			// Run errors land on the plugin row via status='error'; pre-run guard
 			// failures (no design, unapplied result, …) would otherwise be silent.
 			if (registry.get(pluginId)?.status !== 'error') {
-				toast.error('Plugin run failed', {
+				notify.error('Plugin run failed', {
 					description: e instanceof Error ? e.message : String(e),
 				});
 			}
@@ -166,7 +166,7 @@
 			coordinator.remove(plugin.manifest.id);
 			editorCtx.closePluginEditor(plugin.manifest.id);
 		} catch (e) {
-			toast.error('Cannot remove plugin', {
+			notify.error('Cannot remove plugin', {
 				description: e instanceof Error ? e.message : String(e),
 			});
 		}
@@ -176,7 +176,7 @@
 		const busy = coordinator.isPluginBusyOrPending(plugin.manifest.id);
 		if (busy.busy) {
 			const reason = busy.reason ?? 'it is busy';
-			toast.error(`Cannot remove "${plugin.manifest.name}"`, {
+			notify.error(`Cannot remove "${plugin.manifest.name}"`, {
 				description: `${reason[0].toUpperCase()}${reason.slice(1)}.`,
 			});
 			return;
@@ -199,7 +199,7 @@
 		try {
 			await exportOwnedPlugin(registry, plugin.manifest.id);
 		} catch (e) {
-			toast.error("Couldn't export the plugin", {
+			notify.error("Couldn't export the plugin", {
 				description: e instanceof Error ? e.message : String(e),
 			});
 		}
@@ -245,7 +245,7 @@
 		// Reset so the same file can be re-selected after an error
 		(event.target as HTMLInputElement).value = '';
 		if (file.size > MAX_PLUGIN_ZIP_BYTES) {
-			toast.error(`"${file.name}" exceeds the 50 MB limit.`);
+			notify.error(`"${file.name}" exceeds the 50 MB limit.`);
 			return;
 		}
 		// Nothing else shows this zip's details before it installs, so ask the user to review them.
@@ -254,10 +254,10 @@
 			{ review: true }
 		);
 		if (outcome.status === 'installed') {
-			toast.success('Local plugin installed.');
+			notify.success('Local plugin installed.', { history: true });
 			activeTab = 'mine';
 		} else if (outcome.status === 'error') {
-			toast.error('Failed to install plugin', { description: outcome.message });
+			notify.error('Failed to install plugin', { description: outcome.message });
 		}
 	}
 </script>

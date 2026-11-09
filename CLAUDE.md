@@ -73,6 +73,7 @@ once to returning users as a bottom-right card (rarely; major changes only). See
 | Design guards (shared shape / integrity / export checks)          | `docs/design-guards.md`                                         |
 | Commands, undo/redo, history mementos                             | `docs/commands-and-history.md`                                  |
 | Workspace help (`?` overlay, `help()` attachment, first visit)    | `docs/workspace-help.md`                                        |
+| Toasts via `notify()`, per-tab notification list                  | `docs/notifications.md`                                         |
 | Routes, page wiring, multi-tab init                               | `docs/routes-guide.md`                                          |
 | Landing page (`/`), 3D hero, featured design                      | `docs/landing-page.md`                                          |
 | Doc site: search, `llms*.txt`, per-page `.md`, Ask AI menu        | `docs/doc-site.md`                                              |

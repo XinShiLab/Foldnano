@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { X } from '@lucide/svelte/icons';
-	import { toast } from 'svelte-sonner';
+	import { notify } from '$lib/notifications/notify.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { getEditorViewContext } from '../context/EditorViewContext.svelte';
 	import { startDuplicate } from '../strandActions';
@@ -23,7 +23,7 @@
 		try {
 			action();
 		} catch (err) {
-			toast.error(err instanceof Error ? err.message : String(err));
+			notify.error(err instanceof Error ? err.message : String(err));
 		}
 	}
 

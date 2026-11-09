@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { toast } from 'svelte-sonner';
+	import { notify } from '$lib/notifications/notify.svelte';
 	import { Input } from '$lib/components/ui/input';
 	import { renameOligoCmd } from '$lib/commands/strands';
 	import type Oligo from '$lib/model/Oligo';
@@ -27,7 +27,7 @@
 		try {
 			renameOligoCmd({ oligo: target, name: draft }, ctx.historyStack);
 		} catch (err) {
-			toast.error(err instanceof Error ? err.message : String(err));
+			notify.error(err instanceof Error ? err.message : String(err));
 		}
 	}
 

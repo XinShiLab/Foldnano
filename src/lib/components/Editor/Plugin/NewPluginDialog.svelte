@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { toast } from 'svelte-sonner';
+	import { notify } from '$lib/notifications/notify.svelte';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -118,7 +118,7 @@
 			folder = null;
 			onCreated(plugin);
 		} catch (e) {
-			toast.error("Couldn't create the plugin", {
+			notify.error("Couldn't create the plugin", {
 				description: e instanceof Error ? e.message : String(e),
 			});
 		} finally {

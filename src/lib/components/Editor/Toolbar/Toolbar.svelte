@@ -72,7 +72,7 @@
 	import SaveStatusIndicator from '../SaveStatusIndicator.svelte';
 	import AgentRunIndicator from '../Plugin/AgentRunIndicator.svelte';
 	import { githubAuth, getAuthStatus, loginWithGitHub } from '$lib/services/github/auth.svelte';
-	import { toast } from 'svelte-sonner';
+	import { notify } from '$lib/notifications/notify.svelte';
 	import { githubExplorerStateStore } from '$lib/services/storage';
 	import { errorLogPanelState } from '$lib/errorLogPanel.svelte';
 	import { onMount } from 'svelte';
@@ -157,7 +157,7 @@
 		}
 		if (result.kind === 'repo-file-renamed') {
 			editorViewContext.repoTreeVersion++;
-			toast.success(`Renamed to ${result.filename}`);
+			notify.success(`Renamed to ${result.filename}`, { history: true });
 		}
 	}
 
@@ -171,7 +171,7 @@
 				return;
 			}
 			if (check.kind === 'blocked') {
-				toast.error(check.message);
+				notify.error(check.message);
 				docNameInput = foldnanoDoc.name;
 				return;
 			}
@@ -193,7 +193,7 @@
 		try {
 			handleRenameResult(await session.renameDocument(name));
 		} catch (e) {
-			toast.error(`Couldn't rename "${foldnanoDoc.name}"`, { description: (e as Error).message });
+			notify.error(`Couldn't rename "${foldnanoDoc.name}"`, { description: (e as Error).message });
 			docNameInput = foldnanoDoc.name;
 		}
 	}
@@ -236,7 +236,7 @@
 		if (!part) return;
 		const region = activeLatticeRegion;
 		if (!region) {
-			toast.error('Select a lattice region first', {
+			notify.error('Select a lattice region first', {
 				description:
 					'Click a region header in the StrandView (or a plane in 3D) to make it active.',
 			});
@@ -250,7 +250,7 @@
 		if (!part) return;
 		const region = activeLatticeRegion;
 		if (!region) {
-			toast.error('Cannot export: no active lattice region', {
+			notify.error('Cannot export: no active lattice region', {
 				description: 'Select a Honeycomb or Square region in the StrandView first.',
 			});
 			return;
@@ -287,7 +287,7 @@
 			exportPartSequencesToCSV(part, foldnanoDoc.name);
 		} catch (error) {
 			editorViewContext.strandViewContext.highlightContext.circular_strand = true;
-			toast.error('Cannot export oligo CSV', {
+			notify.error('Cannot export oligo CSV', {
 				description: error instanceof Error ? error.message : 'The design cannot be exported.',
 			});
 		}
@@ -299,7 +299,7 @@
 	const saveToGitHub = () => {
 		const repoCtx = session.currentRepoContext;
 		if (!repoCtx) {
-			toast.error('Connect to GitHub first', {
+			notify.error('Connect to GitHub first', {
 				description: 'Open the GitHub panel and set up a repository.',
 			});
 			return;
@@ -749,20 +749,6 @@
 							<Moon size={15} />
 						{/if}
 					</Button>
-					<Button
-						variant="ghost"
-						size="icon-sm"
-						title="View error log"
-						{@attach help({
-							text: 'Errors and warnings from this session, with details you can copy into a bug report.',
-						})}
-						onclick={() => {
-							errorLogPanelState.open = true;
-							errorLogPanelState.focusedEntryId = null;
-						}}
-					>
-						<Bug size={15} />
-					</Button>
 					<DropdownMenu.Root>
 						<DropdownMenu.Trigger>
 							{#snippet child({ props })}
@@ -773,7 +759,7 @@
 									title="Help"
 									aria-label="Help"
 									{@attach help({
-										text: 'Workspace help, the user guide, keyboard shortcuts and the plugin development docs.',
+										text: 'Workspace help, the error log, the user guide, keyboard shortcuts and the plugin development docs.',
 										doc: 'getting-started',
 									})}
 								>
@@ -786,6 +772,14 @@
 								<DropdownMenu.Item onclick={() => (editorViewContext.showShortcuts = true)}>
 									<CircleQuestionMark />Workspace help
 									<DropdownMenu.Shortcut>?</DropdownMenu.Shortcut>
+								</DropdownMenu.Item>
+								<DropdownMenu.Item
+									onclick={() => {
+										errorLogPanelState.focusedEntryId = null;
+										errorLogPanelState.open = true;
+									}}
+								>
+									<Bug />Error log
 								</DropdownMenu.Item>
 								<DropdownMenu.Separator />
 								{#each helpLinks as link (link.slug)}

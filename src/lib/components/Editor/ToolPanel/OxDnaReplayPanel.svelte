@@ -12,7 +12,7 @@
 		Trash2,
 		Upload,
 	} from '@lucide/svelte/icons';
-	import { toast } from 'svelte-sonner';
+	import { notify } from '$lib/notifications/notify.svelte';
 	import * as Accordion from '$lib/components/ui/accordion/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { FileDropZone } from '$lib/components/ui/file-drop-zone/index.js';
@@ -100,7 +100,7 @@
 		const size = VIDEO_SIZES.find((s) => s.id === videoSizeId)?.size ?? null;
 		const renderer = controller.onCreateReplayFrameRenderer?.(size);
 		if (!renderer) {
-			toast.error('Show the replay in the 3D view to export a video.');
+			notify.error('Show the replay in the 3D view to export a video.');
 			return;
 		}
 		const blob = await replay.exportVideo({
@@ -534,7 +534,7 @@
 			class="h-24 rounded-md border border-border p-3"
 			onUpload={async (files) => replay.addFiles(files)}
 			onFileRejected={({ reason, file }) => {
-				toast.error('File rejected', { description: `${file.name}: ${reason}` });
+				notify.error('File rejected', { description: `${file.name}: ${reason}` });
 			}}
 		>
 			<div

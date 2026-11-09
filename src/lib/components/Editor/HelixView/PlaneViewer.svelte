@@ -9,6 +9,7 @@
 	import FreeformViewer from './FreeformViewer.svelte';
 	import PlaneGestureHint from './PlaneGestureHint.svelte';
 	import { handleWheel } from '../mouseHandler';
+	import { scrollStrip } from '$lib/components/scroll-strip/scroll-strip';
 	import { getEditorViewContext } from '../context/EditorViewContext.svelte';
 
 	interface Props {
@@ -24,7 +25,6 @@
 	const latticeCanvasWidth = 1200;
 	const latticeCanvasHeight = 1200;
 	const DRAW_NUDGE_MS = 4000;
-	let tabsScroller = $state<HTMLDivElement | null>(null);
 	let drawNudge = $state(false);
 	let drawNudgeTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -44,28 +44,13 @@
 		}
 		return part.regions[0] ?? null;
 	});
-
-	function handleRegionTabsWheel(e: WheelEvent): void {
-		if (!tabsScroller || tabsScroller.scrollWidth <= tabsScroller.clientWidth) return;
-		const dominantDelta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
-		if (dominantDelta === 0) return;
-		const scale =
-			e.deltaMode === WheelEvent.DOM_DELTA_LINE
-				? 16
-				: e.deltaMode === WheelEvent.DOM_DELTA_PAGE
-					? tabsScroller.clientWidth
-					: 1;
-		tabsScroller.scrollLeft += dominantDelta * scale;
-		e.preventDefault();
-	}
 </script>
 
 <div class="flex h-full flex-col overflow-hidden">
 	{#if part.regions.length > 1}
 		<div
-			bind:this={tabsScroller}
 			class="shrink-0 scrollbar-none overflow-x-auto overflow-y-hidden border-b border-border bg-background px-2 py-1 [&::-webkit-scrollbar]:hidden"
-			onwheel={handleRegionTabsWheel}
+			{@attach scrollStrip}
 		>
 			<div class="flex min-w-max gap-1">
 				{#each part.regions as region (region.id)}

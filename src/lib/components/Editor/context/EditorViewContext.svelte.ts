@@ -7,7 +7,7 @@ import type { CadnanoLattice } from '$lib/model/io/cadnanoLattice';
 import { createContext, untrack } from 'svelte';
 import type { Stage } from 'svelte-konva';
 import { SvelteSet } from 'svelte/reactivity';
-import { toast } from 'svelte-sonner';
+import { notify } from '$lib/notifications/notify.svelte';
 
 import type { Category, EditorMode, LeafTarget } from '$lib/canvasEditor/core/modes';
 import { PluginCoordinator } from '$lib/plugin/PluginCoordinator.svelte';
@@ -655,7 +655,7 @@ export class EditorViewContext {
 		try {
 			return { mesh: await readPlyMeshFile(file), fileName: file.name, scale: 1 };
 		} catch (err) {
-			toast.error('Could not read this mesh', {
+			notify.error('Could not read this mesh', {
 				description: err instanceof Error ? err.message : String(err),
 			});
 			return null;
@@ -666,7 +666,7 @@ export class EditorViewContext {
 		if (!this.meshDraft || !Number.isFinite(scale) || scale <= 0) return;
 		// JSON saves a non-finite coordinate as null, which would silently damage the mesh.
 		if (!hasFiniteVertices(scaleReferenceMesh(this.meshDraft.mesh, scale))) {
-			toast.error('This scale is too large', {
+			notify.error('This scale is too large', {
 				description: 'It makes some mesh coordinates too large to store.',
 			});
 			return;
@@ -743,7 +743,7 @@ export class EditorViewContext {
 			notifyDesignIssues(this.currentDoc.id, checkPartIntegrity(part, new Set([regionId])));
 		}
 		for (const w of cadnano.warnings) {
-			toast.warning('Cadnano import warning', { description: w });
+			notify.warning('Cadnano import warning', { description: w });
 		}
 	}
 
@@ -848,11 +848,11 @@ export class EditorViewContext {
 		const plane = part.getPlaneById(planeId);
 		if (!plane) return;
 		if (part.regions.some((region) => region.planeId === planeId)) {
-			toast.error('Cannot remove a plane that has regions attached to it.');
+			notify.error('Cannot remove a plane that has regions attached to it.');
 			return;
 		}
 		if (part.planes.length <= 1) {
-			toast.error('Cannot remove the only plane in the part.');
+			notify.error('Cannot remove the only plane in the part.');
 			return;
 		}
 		removePlaneCmd(this.historyStack, part, plane);
