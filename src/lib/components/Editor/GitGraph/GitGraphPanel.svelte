@@ -428,7 +428,9 @@
 						>
 
 						<!-- Meta (hidden until hover) -->
-						<span class="hidden shrink-0 text-xs text-muted-foreground group-hover:inline">
+						<span
+							class="hidden shrink-0 text-xs text-muted-foreground select-all group-hover:inline"
+						>
 							{node.shortSha}
 						</span>
 						{#if node.authorDate}

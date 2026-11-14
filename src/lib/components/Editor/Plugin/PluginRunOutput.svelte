@@ -95,7 +95,7 @@
 <div class="flex min-h-0 flex-col gap-3">
 	{#if plugin.status === 'error'}
 		<div
-			class="rounded border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs text-destructive"
+			class="rounded border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs text-destructive select-text"
 		>
 			<div>{plugin.errorMessage || RUN_FAILED_WITHOUT_MESSAGE}</div>
 			{#if plugin.errorTraceback}
@@ -121,7 +121,9 @@
 				{#if hasConsole}
 					<Tabs.Content value="console" class="mt-0 p-0 pt-3">
 						<div class="rounded border border-border bg-muted px-3 py-2">
-							<div class="max-h-40 overflow-y-auto font-mono text-[11px] text-muted-foreground">
+							<div
+								class="max-h-40 overflow-y-auto font-mono text-[11px] text-muted-foreground select-text"
+							>
 								{#each plugin.logs as line, i (i)}
 									<div>{line}</div>
 								{/each}
@@ -134,7 +136,7 @@
 					<Tabs.Content value="result" class="mt-0 p-0 pt-3">
 						<div class="rounded border border-border bg-background px-3 py-2">
 							<pre
-								class="max-h-40 overflow-y-auto text-[11px] whitespace-pre-wrap">{pluginResultJson}</pre>
+								class="max-h-40 overflow-y-auto text-[11px] whitespace-pre-wrap select-text">{pluginResultJson}</pre>
 						</div>
 					</Tabs.Content>
 				{/if}
@@ -198,7 +200,9 @@
 			</Tabs.Root>
 		{:else if hasConsole}
 			<div class="rounded border border-border bg-muted px-3 py-2">
-				<div class="max-h-40 overflow-y-auto font-mono text-[11px] text-muted-foreground">
+				<div
+					class="max-h-40 overflow-y-auto font-mono text-[11px] text-muted-foreground select-text"
+				>
 					{#each plugin.logs as line, i (i)}
 						<div>{line}</div>
 					{/each}
@@ -207,7 +211,7 @@
 		{:else if hasResult}
 			<div class="rounded border border-border bg-background px-3 py-2">
 				<pre
-					class="max-h-40 overflow-y-auto text-[11px] whitespace-pre-wrap">{pluginResultJson}</pre>
+					class="max-h-40 overflow-y-auto text-[11px] whitespace-pre-wrap select-text">{pluginResultJson}</pre>
 			</div>
 		{:else if hasArtifacts}
 			<div class="rounded border border-border bg-background px-3 py-2">

@@ -1,8 +1,12 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
 	import ArrowRight from '@lucide/svelte/icons/arrow-right';
 	import ChevronDown from '@lucide/svelte/icons/chevron-down';
+	import Blocks from '@lucide/svelte/icons/blocks';
+	import Bot from '@lucide/svelte/icons/bot';
 	import Code2 from '@lucide/svelte/icons/code-2';
+	import Copy from '@lucide/svelte/icons/copy';
 	import FileImage from '@lucide/svelte/icons/file-image';
 	import FileJson from '@lucide/svelte/icons/file-json';
 	import FileOutput from '@lucide/svelte/icons/file-output';
@@ -12,9 +16,11 @@
 	import HardDrive from '@lucide/svelte/icons/hard-drive';
 	import Puzzle from '@lucide/svelte/icons/puzzle';
 	import Rotate3d from '@lucide/svelte/icons/rotate-3d';
+	import Shapes from '@lucide/svelte/icons/shapes';
 	import Waypoints from '@lucide/svelte/icons/waypoints';
 
 	import AlphaAccessGate from '$lib/components/AlphaAccessGate.svelte';
+	import EditorShowcase from '$lib/components/landing/EditorShowcase.svelte';
 	import Hero3D from '$lib/components/landing/Hero3D.svelte';
 	import fn from '$lib/assets/fn.svg';
 	import heroIllustration from '$lib/assets/landing/hero-illustration.svg';
@@ -30,16 +36,63 @@
 	const GITHUB_URL = 'https://github.com/XinShiLab/foldnano';
 
 	const PLUGIN_DOCS = resolve('/docs/plugin-development/plugin-quickstart');
+	const PLUGINS_GUIDE = resolve('/docs/guide/plugins-for-users');
+	const REPEAT_DOCS = resolve('/docs/guide/duplicates-repeat-groups');
+	const WIREFRAME_DOCS = resolve('/docs/guide/wireframe');
+	const AGENT_RUNS_DOCS = resolve('/docs/plugin-development/agent-runs');
+
+	// The editor's ?url= loader needs an absolute http(s) URL.
+	const exampleHref = $derived(
+		`${resolve('/editor')}?url=${encodeURIComponent(new URL(HERO_DESIGN_URL, page.url).href)}`
+	);
 
 	// Read-only illustrative snippet; not executed, no highlighter dependency.
-	const codeSample = `part = doc.active_part()
-for vh in part.virtual_helices():
-    vh.extend(21)`;
+	const codeSample = `part = load_part(ctx.get_part_as_foldnano_json(), ctx.active_region_id)
+region = part.get_region(ctx.active_region_id)
+region.increase_length_by(region.step)
+ctx.set_result_mutation_log(part.mutation_log)`;
+
+	// Minimal Python highlighting for the static snippet; avoids shipping a highlighter.
+	type TokenKind = 'kw' | 'fn' | 'attr' | 'str' | 'num' | 'com' | 'punct' | 'plain';
+	interface CodeToken {
+		text: string;
+		kind: TokenKind;
+	}
+	const PY_KEYWORDS = new Set(
+		'and as class def elif else False for from if import in is lambda None not or pass return True while with yield'.split(
+			' '
+		)
+	);
+	const PY_TOKEN_RE =
+		/(#.*)|('(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*")|(\b\d+(?:\.\d+)?\b)|([A-Za-z_]\w*)|(\s+)|(.)/g;
+
+	function tokenizePython(src: string): CodeToken[] {
+		const tokens: CodeToken[] = [];
+		for (const m of src.matchAll(PY_TOKEN_RE)) {
+			const [text, com, str, num, ident, space] = m;
+			let kind: TokenKind = 'punct';
+			if (com) kind = 'com';
+			else if (str) kind = 'str';
+			else if (num) kind = 'num';
+			else if (space) kind = 'plain';
+			else if (ident) {
+				const end = m.index + text.length;
+				if (PY_KEYWORDS.has(text)) kind = 'kw';
+				else if (src[end] === '(') kind = 'fn';
+				else if (src[m.index - 1] === '.') kind = 'attr';
+				else kind = 'plain';
+			}
+			tokens.push({ text, kind });
+		}
+		return tokens;
+	}
+
+	const codeTokens = tokenizePython(codeSample);
 
 	type Accent = 'green' | 'blue';
 	interface FeatureCard {
-		kind: 'text' | 'code';
-		span: string; // lg column span
+		kind: 'text' | 'code' | 'build';
+		span: string; // md/lg column span
 		icon?: typeof HardDrive;
 		pre?: string;
 		hi: string;
@@ -58,7 +111,7 @@ for vh in part.virtual_helices():
 			pre: 'No installation, no registration.',
 			hi: ' Local-first.',
 			accent: 'green',
-			body: 'Runs entirely in your browser; designs live in local storage and never leave your machine unless you push them.',
+			body: 'Runs entirely in your browser; designs live in browser storage and never leave your machine unless you push them.',
 		},
 		{
 			kind: 'text',
@@ -81,15 +134,36 @@ for vh in part.virtual_helices():
 		{
 			kind: 'text',
 			span: 'lg:col-span-2',
+			icon: Copy,
+			hi: 'Repeat groups',
+			post: ' with linked mirror copies',
+			accent: 'blue',
+			body: 'Copy a unit once; every mirror follows each edit you make to the original.',
+			href: REPEAT_DOCS,
+		},
+		{
+			kind: 'text',
+			span: 'lg:col-span-2',
+			icon: Shapes,
+			hi: 'Wireframe designs',
+			post: ' from a mesh',
+			accent: 'green',
+			body: 'Start a wireframe region from a mesh and route it with a plugin such as pyDAEDALUS.',
+			href: WIREFRAME_DOCS,
+			chips: ['Experimental'],
+		},
+		{
+			kind: 'text',
+			span: 'lg:col-span-2',
 			icon: Rotate3d,
 			pre: 'Built-in',
 			hi: ' 3D structure view',
 			accent: 'blue',
-			body: 'Inspect your design in 3D as you edit, with no export round-trip.',
+			body: 'Inspect your design in 3D as you edit, and overlay PDB protein structures to check the fit.',
 		},
 		{
 			kind: 'code',
-			span: 'lg:col-span-4',
+			span: 'md:col-span-2 lg:col-span-4',
 			icon: Code2,
 			hi: 'Edit programmatically',
 			post: ' with live 3D preview',
@@ -99,10 +173,21 @@ for vh in part.virtual_helices():
 		{
 			kind: 'text',
 			span: 'lg:col-span-2',
+			icon: Bot,
+			pre: 'Bring your own',
+			hi: ' AI agent',
+			accent: 'blue',
+			body: 'Any coding agent on your machine can edit your open design while you watch, using a hosted model or a fully local one. Your choice of model, your data.',
+			href: AGENT_RUNS_DOCS,
+			chips: ['Experimental'],
+		},
+		{
+			kind: 'text',
+			span: 'lg:col-span-2',
 			icon: GitBranch,
 			hi: 'Git(hub)-integrated',
 			post: ' version control',
-			accent: 'blue',
+			accent: 'green',
 			body: 'Sync designs to GitHub repos; history and collaboration that just work.',
 		},
 		{
@@ -111,9 +196,9 @@ for vh in part.virtual_helices():
 			icon: Puzzle,
 			hi: 'Python-in-browser',
 			post: ' plugin system',
-			accent: 'green',
-			body: 'Extend the editor with sandboxed Python plugins. No server required, no setup.',
-			href: PLUGIN_DOCS,
+			accent: 'blue',
+			body: 'Install sandboxed Python plugins from the Plugin Hub. No server required, no setup.',
+			href: PLUGINS_GUIDE,
 		},
 		{
 			kind: 'text',
@@ -121,27 +206,36 @@ for vh in part.virtual_helices():
 			icon: Waypoints,
 			pre: 'Built-in',
 			hi: ' rigid-body simulation',
-			accent: 'blue',
+			accent: 'green',
 			body: 'Relax and optimize long bonds without leaving the editor.',
 		},
 		{
 			kind: 'text',
-			span: 'lg:col-span-3',
+			span: 'lg:col-span-2',
 			icon: FileOutput,
 			pre: 'Direct export for',
 			hi: ' oxDNA and mrDNA',
-			accent: 'green',
-			body: 'Generate simulation-ready files in one click.',
+			accent: 'blue',
+			body: 'Generate simulation-ready files in one click, then replay oxDNA trajectories on your own strands.',
 			chips: ['oxDNA', 'mrDNA'],
 		},
 		{
 			kind: 'text',
-			span: 'lg:col-span-3',
+			span: 'lg:col-span-2',
 			icon: FileImage,
 			hi: 'Publication-ready',
 			post: ' design maps',
-			accent: 'blue',
+			accent: 'green',
 			body: 'Clean, vector design diagrams straight from the editor.',
+		},
+		{
+			kind: 'build',
+			span: 'md:col-span-2 lg:col-span-2',
+			icon: Blocks,
+			pre: 'Build on',
+			hi: ' Foldnano',
+			accent: 'blue',
+			body: 'An open platform: write Python plugins that run in the browser and share them with the community.',
 		},
 	];
 
@@ -157,12 +251,12 @@ for vh in part.virtual_helices():
 		return () => window.removeEventListener('scroll', onScroll);
 	});
 
-	// Pause the hero 3D (spin + drag + render loop) while the feature cards
-	// overlay it; resume once the user scrolls back up to the hero.
-	let featuresEl = $state<HTMLElement>();
+	// Pause the hero 3D (spin + drag + render loop) while the showcase and feature
+	// cards overlay it; resume once the user scrolls back up to the hero.
+	let overlayStartEl = $state<HTMLElement>();
 	let heroSuspended = $state(false);
 	$effect(() => {
-		const el = featuresEl;
+		const el = overlayStartEl;
 		if (!el) return;
 		const io = new IntersectionObserver((entries) => {
 			const e = entries[0];
@@ -177,12 +271,12 @@ for vh in part.virtual_helices():
 	<title>Foldnano: DNA nanostructure design in your browser</title>
 	<meta
 		name="description"
-		content="Free, open-source, local-first DNA origami design tool. Mix lattices, run python plugins, and export to oxDNA/mrDNA. No installation, no account."
+		content="Free, open-source, local-first DNA origami design tool. Mix lattices, run Python plugins, and export to oxDNA/mrDNA. No installation, no account."
 	/>
 	<meta property="og:title" content="Foldnano: DNA nanostructure design in your browser" />
 	<meta
 		property="og:description"
-		content="Free, open-source, local-first DNA origami design tool. Mix lattices, run python plugins, and export to oxDNA/mrDNA. No installation, no account."
+		content="Free, open-source, local-first DNA origami design tool. Mix lattices, run Python plugins, and export to oxDNA/mrDNA. No installation, no account."
 	/>
 	<meta property="og:type" content="website" />
 </svelte:head>
@@ -273,7 +367,7 @@ for vh in part.virtual_helices():
 								>
 							</h1>
 							<p class="mt-4 max-w-md text-base text-[var(--landing-muted)] sm:text-lg">
-								Design, inspect, and export DNA origami entirely in your browser. Run python plugins
+								Design, inspect, and export DNA origami entirely in your browser. Run Python plugins
 								and scripts directly to analyze and modify your designs. No installation, no
 								account, your data stays on your machine.
 							</p>
@@ -291,21 +385,47 @@ for vh in part.virtual_helices():
 									Read the Docs
 								</a>
 							</div>
+							<!-- eslint-disable svelte/no-navigation-without-resolve -- exampleHref is built with resolve() -->
+							<a
+								href={exampleHref}
+								class="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-[var(--landing-blue)] hover:underline"
+							>
+								Or open an example design in the editor <ArrowRight size={15} />
+							</a>
+							<!-- eslint-enable svelte/no-navigation-without-resolve -->
 						</div>
 						<a
-							href="#features"
-							aria-label="Jump to features"
+							href="#showcase"
+							aria-label="Jump to the editor tour"
 							class="scroll-cue pointer-events-auto mx-auto mt-4 w-fit text-[var(--landing-muted)] transition-colors hover:text-[var(--landing-ink)] md:absolute md:inset-x-0 md:bottom-3 md:mt-0"
 						>
 							<ChevronDown size={24} />
 						</a>
 					</section>
 
+					<!-- Editor showcase: first panel to scroll over the pinned 3D stage -->
+					<section
+						id="showcase"
+						bind:this={overlayStartEl}
+						class="mx-auto max-w-6xl scroll-mt-20 px-4 pt-8 md:px-6 md:pt-14"
+					>
+						<div class="glass-card pointer-events-auto rounded-3xl p-5 sm:p-8">
+							<p
+								class="font-heading text-[10px] tracking-[0.12em] text-[var(--landing-muted)] uppercase md:text-xs md:tracking-[0.18em]"
+							>
+								The editor
+							</p>
+							<h2 class="mt-2 mb-5 text-2xl font-bold text-[var(--landing-ink)] sm:text-3xl">
+								One workspace, from routing to simulation
+							</h2>
+							<EditorShowcase />
+						</div>
+					</section>
+
 					<!-- Feature cards: frosted glass, scrolling over the pinned 3D stage -->
 					<section
 						id="features"
-						bind:this={featuresEl}
-						class="mx-auto max-w-6xl scroll-mt-20 px-4 py-8 md:px-6 md:pt-14 md:pb-16"
+						class="mx-auto max-w-6xl scroll-mt-20 px-4 py-8 md:px-6 md:pt-12 md:pb-16"
 					>
 						<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-6 lg:gap-5">
 							{#each features as f (f.hi)}
@@ -344,10 +464,32 @@ for vh in part.virtual_helices():
 										</div>
 									{/if}
 
+									{#if f.kind === 'build'}
+										<div class="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
+											<a
+												href={PLUGIN_DOCS}
+												class="inline-flex items-center gap-1 font-semibold text-[var(--landing-blue)] hover:underline"
+											>
+												Plugin development guide <ArrowRight size={15} />
+											</a>
+											<span
+												class="inline-flex cursor-default items-center gap-2 text-[var(--landing-muted)]"
+												aria-disabled="true"
+											>
+												Plugin community
+												<span
+													class="rounded-[8px] border border-[var(--landing-border)] px-2 py-0.5 font-heading text-xs"
+													>SOON</span
+												>
+											</span>
+										</div>
+									{/if}
+
 									{#if f.kind === 'code'}
 										<pre
 											class="mt-4 overflow-x-auto rounded-xl bg-[#1d1d1f] p-4 font-heading text-xs leading-relaxed text-[#e8e8ed]"><code
-												>{codeSample}</code
+												>{#each codeTokens as t, i (i)}<span class="tok-{t.kind}">{t.text}</span
+													>{/each}</code
 											></pre>
 									{/if}
 								</svelte:element>
@@ -357,32 +499,29 @@ for vh in part.virtual_helices():
 				</div>
 			</div>
 
-			<!-- Build-on band -->
-			<section class="relative z-10 mt-8 bg-[var(--landing-card)]">
-				<div class="mx-auto max-w-6xl px-4 py-12 text-center sm:px-6 sm:py-14">
-					<h2 class="text-2xl font-bold text-[var(--landing-ink)]">Build on Foldnano</h2>
-					<p class="mx-auto mt-3 max-w-xl text-[var(--landing-muted)]">
-						An open platform: write Python plugins that run in the browser and share them with the
-						community.
-					</p>
-					<div class="mt-6 flex flex-wrap items-center justify-center gap-x-8 gap-y-3">
-						<a
-							href={PLUGIN_DOCS}
-							class="inline-flex items-center gap-1 font-semibold text-[var(--landing-blue)] hover:underline"
-						>
-							Plugin development guide <ArrowRight size={16} />
-						</a>
-						<span
-							class="inline-flex cursor-default items-center gap-2 text-[var(--landing-muted)]"
-							aria-disabled="true"
-						>
-							Plugin community
-							<span
-								class="rounded-[8px] border border-[var(--landing-border)] px-2 py-0.5 font-heading text-xs"
-								>SOON</span
-							>
-						</span>
-					</div>
+			<!-- Closing call to action -->
+			<section class="mx-auto max-w-6xl px-4 py-16 text-center sm:px-6 sm:py-20">
+				<h2 class="text-3xl font-extrabold text-[var(--landing-ink)] sm:text-4xl">
+					Start designing
+				</h2>
+				<p class="mx-auto mt-3 max-w-md text-[var(--landing-muted)]">
+					Free and open source. No installation, no account.
+				</p>
+				<div class="mt-7 flex flex-wrap items-center justify-center gap-3">
+					<a
+						href={resolve('/editor')}
+						class="lift rounded-full bg-[var(--landing-blue)] px-7 py-3 text-base font-semibold text-white shadow-sm"
+					>
+						Open Editor
+					</a>
+					<!-- eslint-disable svelte/no-navigation-without-resolve -- exampleHref is built with resolve() -->
+					<a
+						href={exampleHref}
+						class="rounded-full border border-[var(--landing-border)] bg-[var(--landing-card)] px-7 py-3 text-base font-semibold text-[var(--landing-ink)] transition-colors hover:border-[var(--landing-muted)]"
+					>
+						Try an example design
+					</a>
+					<!-- eslint-enable svelte/no-navigation-without-resolve -->
 				</div>
 			</section>
 		</main>
@@ -392,10 +531,22 @@ for vh in part.virtual_helices():
 			<div
 				class="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-4 py-10 text-center text-sm text-[var(--landing-muted)] sm:flex-row sm:px-6"
 			>
-				<span class="flex items-center gap-2">
-					<img src={fn} alt="" class="size-4 opacity-70" />
-					Foldnano, open-source DNA nanostructure design
-				</span>
+				<div class="flex flex-col items-center gap-1 sm:items-start">
+					<span class="flex items-center gap-2">
+						<img src={fn} alt="" class="size-4 opacity-70" />
+						Foldnano, open-source DNA nanostructure design
+					</span>
+					<span class="text-xs">
+						Maintained by Xin Shi, Department of Chemistry, KU Leuven ·
+						<a
+							href="{GITHUB_URL}/blob/main/LICENSE"
+							target="_blank"
+							rel="noopener"
+							class="underline-offset-2 hover:text-[var(--landing-ink)] hover:underline"
+							>MIT License</a
+						>
+					</span>
+				</div>
 				<nav class="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
 					<a href={resolve('/editor')} class="hover:text-[var(--landing-ink)]">Editor</a>
 					<a href={resolve('/docs')} class="hover:text-[var(--landing-ink)]">Docs</a>
@@ -406,12 +557,6 @@ for vh in part.virtual_helices():
 						rel="noopener"
 						class="hover:text-[var(--landing-ink)]">GitHub</a
 					>
-					<a
-						href={GITHUB_URL}
-						target="_blank"
-						rel="noopener"
-						class="hover:text-[var(--landing-ink)]">Source &amp; issues</a
-					>
 				</nav>
 			</div>
 		</footer>
@@ -419,6 +564,28 @@ for vh in part.virtual_helices():
 </AlphaAccessGate>
 
 <style>
+	/* Snippet colors: the code block is always dark, so these are fixed. */
+	.tok-kw {
+		color: #c792ea;
+	}
+	.tok-fn {
+		color: #82b1ff;
+	}
+	.tok-attr {
+		color: #7fdc9a;
+	}
+	.tok-str,
+	.tok-num {
+		color: #f7c97e;
+	}
+	.tok-com {
+		color: #8b8b93;
+		font-style: italic;
+	}
+	.tok-punct {
+		color: #a1a1aa;
+	}
+
 	/* Landing-scoped tokens. Fixed (not theme tokens) so the page has its own
 	   brand palette independent of the editor's --primary etc., but it does
 	   follow the app's `.dark` class (ModeWatcher, root layout) via the override

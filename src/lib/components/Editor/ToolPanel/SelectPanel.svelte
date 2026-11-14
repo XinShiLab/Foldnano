@@ -294,7 +294,7 @@
 {/snippet}
 
 <div
-	class="mt-2 flex-grow rounded-md border border-border p-2 font-mono text-xs text-muted-foreground"
+	class="mt-2 flex-grow rounded-md border border-border p-2 font-mono text-xs text-muted-foreground select-text"
 	{@attach help({
 		title: 'Selection',
 		text: 'What is selected, counted as whole oligos, segments, crossovers and loose ends. One item shows its details; several show what they have in common.',

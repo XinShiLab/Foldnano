@@ -103,7 +103,7 @@
 					{#if selectedPlane}
 						<div class="min-w-0 space-y-1">
 							<p class="font-medium text-foreground">{selectedPlane.name}</p>
-							<p class="truncate font-mono text-muted-foreground">{selectedPlane.id}</p>
+							<p class="truncate font-mono text-muted-foreground select-all">{selectedPlane.id}</p>
 						</div>
 					{:else}
 						<p class="text-muted-foreground">Click a plane in the 3D view to select it.</p>
@@ -132,9 +132,13 @@
 				{#if selectedPlane}
 					<div class="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-muted-foreground">
 						<span>Origin</span>
-						<span class="font-mono text-foreground">{formatVec3(selectedPlane.origin)}</span>
+						<span class="font-mono text-foreground select-text"
+							>{formatVec3(selectedPlane.origin)}</span
+						>
 						<span>Normal</span>
-						<span class="font-mono text-foreground">{formatVec3(selectedPlane.normal)}</span>
+						<span class="font-mono text-foreground select-text"
+							>{formatVec3(selectedPlane.normal)}</span
+						>
 					</div>
 				{/if}
 

@@ -43,7 +43,9 @@
 
 	<!-- Summary -->
 	{#if pending.summary}
-		<p class="mb-2 rounded bg-muted px-1.5 py-1 font-mono text-[10px] text-muted-foreground">
+		<p
+			class="mb-2 rounded bg-muted px-1.5 py-1 font-mono text-[10px] text-muted-foreground select-text"
+		>
 			{pending.summary}
 		</p>
 	{/if}

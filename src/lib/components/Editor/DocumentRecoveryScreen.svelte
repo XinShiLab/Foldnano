@@ -75,7 +75,7 @@
 
 <div class="absolute inset-0 z-50 overflow-y-auto bg-background">
 	<div class="mx-auto flex max-w-2xl flex-col gap-6 px-4 py-12">
-		<div class="flex flex-col gap-2">
+		<div class="flex flex-col gap-2 select-text">
 			<h1 class="text-xl font-semibold">{title} can't be opened</h1>
 			<p class="text-sm text-muted-foreground">{failure.message}</p>
 			{#if failure.reason !== 'too-new'}

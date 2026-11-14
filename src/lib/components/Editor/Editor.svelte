@@ -639,7 +639,7 @@
 
 <div
 	bind:this={editorRoot}
-	class="relative flex h-full w-full max-w-svw flex-col overflow-hidden pt-2 pr-2"
+	class="relative flex h-full w-full max-w-svw flex-col overflow-hidden pt-2 pr-2 select-none"
 >
 	{#if urlLoading || session.isLoading}
 		<div
@@ -658,8 +658,8 @@
 			<div
 				class="flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-sm text-amber-800 shadow-md dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200"
 			>
-				<span class="shrink-0 font-medium">This file is open in another tab.</span>
-				<span class="text-amber-600 dark:text-amber-400">Editing is disabled.</span>
+				<span class="shrink-0 font-medium select-text">This file is open in another tab.</span>
+				<span class="text-amber-600 select-text dark:text-amber-400">Editing is disabled.</span>
 				<button
 					class="ml-2 shrink-0 rounded border border-amber-400 bg-amber-100 px-2 py-0.5 text-xs font-medium hover:bg-amber-200 dark:border-amber-600 dark:bg-amber-900 dark:hover:bg-amber-800"
 					onclick={() => session.claimTabOwnership()}>Take back control</button
@@ -671,7 +671,7 @@
 				role="status"
 				class="flex items-center gap-2 rounded-md border border-border bg-card px-3 py-1.5 text-sm text-card-foreground shadow-md"
 			>
-				<span>
+				<span class="select-text">
 					Foldnano is built and tested in Chromium browsers (Chrome, Edge, Brave, Arc). In Firefox
 					and Safari it runs noticeably slower.
 				</span>

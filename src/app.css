@@ -168,6 +168,13 @@
 	html {
 		@apply font-sans;
 	}
+	/* Editor chrome is select-none; older Safari stops text entry in fields under it. */
+	input,
+	textarea,
+	[contenteditable]:not([contenteditable='false']) {
+		-webkit-user-select: text;
+		user-select: text;
+	}
 	/* Opt-in so full-viewport pages (editor, landing) don't get an empty gutter
 	   stripe; scrolling pages opt in to keep centered content from shifting. */
 	html:has([data-stable-gutter]) {

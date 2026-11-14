@@ -41,12 +41,13 @@
 				<GitBranch class="size-3" />
 				{repoCtx.branch}
 			</span>
-			<span class="truncate" title="{fileMeta.owner}/{fileMeta.repo}/{fileMeta.path}">
+			<span class="truncate select-all" title="{fileMeta.owner}/{fileMeta.repo}/{fileMeta.path}">
 				{fileMeta.owner}/{fileMeta.repo} › {fileMeta.path}
 			</span>
 			{#if fileMeta.commitSha}
-				<span class="shrink-0 font-mono text-xs" title="Current commit: {fileMeta.commitSha}"
-					>@{fileMeta.commitSha.slice(0, 7)}</span
+				<span
+					class="shrink-0 font-mono text-xs select-all"
+					title="Current commit: {fileMeta.commitSha}">@{fileMeta.commitSha.slice(0, 7)}</span
 				>
 			{/if}
 			{#if notCommitted || session.remoteAheadOfLocal || session.remoteCheckFailed}
