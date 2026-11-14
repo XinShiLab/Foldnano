@@ -15,8 +15,8 @@
 	role="alert"
 	class="flex max-w-full flex-wrap items-center gap-x-2 gap-y-1 rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-sm text-amber-800 shadow-md dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200"
 >
-	<span class="font-medium">Your GitHub session has expired.</span>
-	<span class="text-amber-700 dark:text-amber-300">
+	<span class="font-medium select-text">Your GitHub session has expired.</span>
+	<span class="text-amber-700 select-text dark:text-amber-300">
 		Sign in again to commit or pull. Your work is saved in this browser.
 	</span>
 	<span class="flex shrink-0 gap-2">

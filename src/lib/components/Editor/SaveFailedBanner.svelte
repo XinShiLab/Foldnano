@@ -23,8 +23,8 @@
 	role="alert"
 	class="flex max-w-full flex-wrap items-center gap-x-2 gap-y-1 rounded-md border border-red-300 bg-red-50 px-3 py-1.5 text-sm text-red-800 shadow-md dark:border-red-800 dark:bg-red-950 dark:text-red-200"
 >
-	<span class="font-medium">Your changes aren't being saved in this browser.</span>
-	<span class="text-red-700 dark:text-red-300">
+	<span class="font-medium select-text">Your changes aren't being saved in this browser.</span>
+	<span class="text-red-700 select-text dark:text-red-300">
 		Storage may be full or blocked. Download a copy so you don't lose work.
 	</span>
 	<span class="flex shrink-0 gap-2">

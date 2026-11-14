@@ -229,6 +229,13 @@ pnpm shadcn-svelte add <component>
   `{@attach scrollStrip}` (`src/lib/components/scroll-strip/`): browsers don't turn a plain
   vertical wheel into sideways scroll, so without it mouse-only users can't reach clipped buttons;
   it also fades the edges that hide content. Don't hand-roll `onwheel` handlers for this.
+- **Text selection: chrome off, content on.** The editor root (`Editor.svelte`) is `select-none`,
+  so labels, headings, toolbars and canvas drags never highlight text. Opt content back in with
+  `select-text` on its container: error and warning messages, logs and tracebacks, data readouts.
+  Use `select-all` for a short token people copy whole (commit SHA, ids). Portaled surfaces
+  (dialogs, popovers, menus, toasts) sit outside the root and stay selectable; inputs and
+  textareas are re-enabled in `app.css` (older Safari blocks typing under `select-none`).
+  Content pages (landing, docs, Oligos) keep normal selection.
 
 ## Comments
 
