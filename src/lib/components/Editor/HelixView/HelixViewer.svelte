@@ -28,6 +28,7 @@
 	import { clearOverlayPlacementCmd, setOverlayPlacementCmd } from '$lib/commands/overlays';
 	import { notify } from '$lib/notifications/notify.svelte';
 	import { help } from '$lib/components/help/help';
+	import { VIEW_ONLY_PLANE_HELP } from './utils';
 
 	type RbsDiagnostics = Pick<
 		SolverResult,
@@ -53,6 +54,7 @@
 
 	const helixToolbarController = $state({
 		stage: undefined as Stage | undefined,
+		fitView: undefined as (() => void) | undefined,
 	});
 
 	const view3DToolbarController = $state({
@@ -425,10 +427,13 @@
 			: {
 					area: true,
 					title: 'Plane view',
-					text: editorViewContext.activeRegion?.supportsFreeformPlacement
-						? 'In Draw mode (N), drag to draw an in-plane helix or double-click to add a perpendicular one. Each helix gets a row in the strand viewer.'
-						: 'In Draw mode (N), click an empty lattice cell to add a helix; Select mode only selects and moves. Each helix gets a row in the strand viewer.',
-					newVsCadnano: true,
+					text:
+						editorViewContext.activeRegion?.supportsPlaneViewEditing === false
+							? VIEW_ONLY_PLANE_HELP
+							: editorViewContext.activeRegion?.supportsFreeformPlacement
+								? 'In Draw mode (N), drag to draw an in-plane helix or double-click to add a perpendicular one. Each helix gets a row in the strand viewer.'
+								: 'In Draw mode (N), click an empty lattice cell to add a helix; Select mode only selects and moves. Each helix gets a row in the strand viewer.',
+					newVsCadnano: editorViewContext.activeRegion?.supportsPlaneViewEditing !== false,
 					doc: 'views',
 				}
 	)}

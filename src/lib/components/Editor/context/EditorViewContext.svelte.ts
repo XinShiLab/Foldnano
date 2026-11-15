@@ -87,10 +87,14 @@ export interface StrandToolbarController {
 	panBy: (dx: number, dy: number) => void;
 	/** Centers the view on a helix's base, expanding its region if collapsed; false if not shown. */
 	centerOn: (vhId: string, bp: number) => boolean;
+	/** Scrolls vertically until a helix's row is on screen (no-op if it already is); false if not shown. */
+	revealVh: (vhId: string) => boolean;
 }
 
 export interface HelixToolbarController {
 	stage: Stage | undefined;
+	/** Zooms and pans to the active region's helices; set by viewers that support it. */
+	fitView?: () => void;
 }
 
 export interface View3DToolbarDiagnostics {
@@ -208,6 +212,10 @@ const fromToggleToLeafTarget = (toggles: SelectionToggle[]): Set<LeafTarget | Ca
 	return new Set<LeafTarget | Category>(withAlwaysOn);
 };
 
+const DETAIL_ZOOM_THRESHOLD = 0.6;
+const DESIGN_CHECK_MAX_WAIT_MS = 1000;
+const DESIGN_CHECK_DELAY_MS = 150;
+
 const DEFAULT_DESIGN_CHECKS: DesignCheckSelection = {
 	integrity: true,
 	simulation: false,
@@ -295,6 +303,15 @@ class StrandViewContext {
 	});
 
 	viewportScale: number = $state(1.0);
+
+	/** What viewport culling tests against: the viewport plus a margin, replaced only when the
+	 * viewport nears its edge (`nextRenderWindow`). Cull against this, not `viewportBounds`,
+	 * which changes on every pan and zoom step. */
+	renderBounds = $state.raw({ x: -250, y: -200, width: 1500, height: 1200 });
+
+	/** Zoomed in far enough for sequence letters and modification names. Read this instead of
+	 * comparing `viewportScale`, so a zoom step re-evaluates readers only when it flips. */
+	isDetailZoom: boolean = $derived(this.viewportScale > DETAIL_ZOOM_THRESHOLD);
 }
 
 export interface SerializableStrandViewContext {
@@ -373,6 +390,7 @@ export class EditorViewContext {
 			repairActiveRegion: () => this.repairActiveRegion(),
 			loadPersistedContext: () => this.loadContextFromLocalStorage(),
 			savePersistedContext: () => this.saveContextToLocalStorage(),
+			isEditorBusy: () => this.#isBusyForIdleSave(),
 		});
 		this.pluginCoordinator = new PluginCoordinator(
 			this.pluginRegistry,
@@ -422,6 +440,7 @@ export class EditorViewContext {
 				}
 			}
 		});
+		this.#startDesignChecks();
 	}
 
 	get currentDoc(): FoldnanoDocument {
@@ -434,6 +453,28 @@ export class EditorViewContext {
 
 	get historyStack() {
 		return this.session.historyStack;
+	}
+
+	/** A pointer is pressed; a drag may run longer than the idle delay between events. */
+	#pointerHeld = false;
+
+	/** Window-level input feed for the idle autosave (`docs/autosave.md` § Idle save). */
+	noteInputActivity(e: Event): void {
+		if (e instanceof PointerEvent) {
+			if (e.type === 'pointerdown') this.#pointerHeld = true;
+			else if (e.type === 'pointerup' || e.type === 'pointercancel') this.#pointerHeld = false;
+			else if (e.buttons === 0) {
+				// Hovering isn't editing; it also clears a press whose release landed off-window.
+				this.#pointerHeld = false;
+				return;
+			}
+		}
+		this.historyStack.noteActivity();
+	}
+
+	#isBusyForIdleSave(): boolean {
+		const view3D = this.view3DToolbarController;
+		return this.#pointerHeld || !!view3D?.simRunning || !!view3D?.replay?.playing;
 	}
 
 	get isTabOwner(): boolean {
@@ -474,14 +515,39 @@ export class EditorViewContext {
 		this.openSidePanel(tab);
 	}
 
-	/** Issues of the checks selected in `designChecks`, recomputed once per edit (not per drag frame). */
-	designIssues: DesignIssue[] = $derived.by(() => {
-		const { integrity, simulation, cadnano } = this.strandViewContext.designChecks;
-		void this.historyStack.revision;
-		const part = this.currentDoc.parts[0];
-		const region = this.activeRegion;
-		return untrack(() => collectDesignIssues(part, region, { integrity, simulation, cadnano }));
-	});
+	#designIssues = $state.raw<DesignIssue[]>([]);
+	#stopDesignChecks: (() => void) | null = null;
+
+	/** Issues of the checks selected in `designChecks`. The checks walk every base, so they run
+	 * shortly after an edit, when the browser is idle, instead of inside it; a burst of edits
+	 * runs them once. The list shown meanwhile is the previous one. */
+	get designIssues(): DesignIssue[] {
+		return this.#designIssues;
+	}
+
+	#startDesignChecks(): void {
+		this.#stopDesignChecks = $effect.root(() => {
+			$effect(() => {
+				const { integrity, simulation, cadnano } = this.strandViewContext.designChecks;
+				void this.historyStack.revision;
+				const part = this.currentDoc.parts[0];
+				const region = this.activeRegion;
+				const run = () => {
+					this.#designIssues = untrack(() =>
+						collectDesignIssues(part, region, { integrity, simulation, cadnano })
+					);
+				};
+				if (typeof window === 'undefined') return run();
+				// Safari has no requestIdleCallback before 26.
+				if (!window.requestIdleCallback) {
+					const timer = window.setTimeout(run, DESIGN_CHECK_DELAY_MS);
+					return () => window.clearTimeout(timer);
+				}
+				const handle = window.requestIdleCallback(run, { timeout: DESIGN_CHECK_MAX_WAIT_MS });
+				return () => window.cancelIdleCallback(handle);
+			});
+		});
+	}
 
 	/** Whether the fill highlight survives the current mode: Sequence, or panning to inspect it. */
 	get keepsRecentFill(): boolean {
@@ -924,6 +990,7 @@ export class EditorViewContext {
 	}
 
 	destroy(): void {
+		this.#stopDesignChecks?.();
 		this.agentRuns.dispose();
 		this.session.destroy();
 		this.pluginCoordinator.pendingApply = null;

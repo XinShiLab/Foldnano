@@ -86,3 +86,14 @@ export function getNearestLatticeCell(
 
 	return closest;
 }
+
+/** Font size for a helix index inside a 10 px-radius circle; 3+ digits shrink to stay inside. */
+export function helixCircleLabelFontSize(label: string): number {
+	if (label.length <= 2) return 10;
+	if (label.length === 3) return 8;
+	return 6.5;
+}
+
+/** Plane-view help for regions without plane-view editing (wireframes): card and toolbar note. */
+export const VIEW_ONLY_PLANE_HELP =
+	'In wireframe regions the plane view only draws and selects, so large designs stay fast. Click a helix or drag a box to select; the strand view jumps to it. Change a selected helix’s position or roll in the Select tool panel.';

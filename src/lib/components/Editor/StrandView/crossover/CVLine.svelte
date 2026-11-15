@@ -25,6 +25,7 @@
 		isSelected = false,
 	}: Props = $props();
 	const d = getDimensionContext();
+	const HOVER_STROKE_WIDTH = 8;
 
 	const { sideLength, strokeWidth: defaultStrokeWidth } = d.dimensions;
 	const { getBpCoordsByRowAndBpIdx } = d;
@@ -78,20 +79,25 @@
 	lineCap="round"
 	lineJoin="round"
 	tension={0.4}
-/>
-
-<Line
-	{id}
-	points={[x1, y1, bpx, bpy, x2, y2]}
-	stroke={isHovered ? strokeColor : 'transparent'}
-	strokeWidth={8}
-	opacity={0.2}
-	lineCap="round"
-	lineJoin="round"
-	tension={0.4}
+	hitStrokeWidth={HOVER_STROKE_WIDTH}
 	onpointerover={onPointerOverLine}
 	onpointerleave={onPointerLeaveLine}
 />
+
+<!-- The wide pick area is the line's own hit stroke; the halo exists only while hovered,
+     instead of a second, transparent line stroked for every crossover on every redraw. -->
+{#if isHovered}
+	<Line
+		points={[x1, y1, bpx, bpy, x2, y2]}
+		stroke={strokeColor}
+		strokeWidth={HOVER_STROKE_WIDTH}
+		opacity={0.2}
+		lineCap="round"
+		lineJoin="round"
+		tension={0.4}
+		listening={false}
+	/>
+{/if}
 {#if isConstrained}
 	<Circle
 		x={bpx}

@@ -23,7 +23,9 @@
 	// Shrink 3+ digit labels so they still fit inside the circle.
 	const fontSize = $derived(label.length <= 2 ? radius : (radius * 2) / label.length);
 	const selected = $derived(
-		!!vh.localFrame && editorViewContext.selectedFreeformVhIndices.has(vh.index)
+		vh.localFrame
+			? editorViewContext.selectedFreeformVhIndices.has(vh.index)
+			: !!vh.latticeCoords && editorViewContext.selectedLatticeVhIndices.has(vh.index)
 	);
 </script>
 

@@ -189,6 +189,13 @@ export class DesignRegion {
 	get supportsPlaneAxisEditing(): boolean {
 		return false;
 	}
+	/**
+	 * Whether helices can be added, moved, rotated or rolled, and ends dragged, in the plane view.
+	 * When false the plane view only draws and selects; edits go through the selection panel.
+	 */
+	get supportsPlaneViewEditing(): boolean {
+		return true;
+	}
 
 	/** Whether the region can carry a reference mesh (`referenceGeometry`). */
 	get supportsReferenceGeometry(): boolean {
@@ -774,6 +781,11 @@ export class WireframeRegion extends FreeformRegion {
 
 	// Plane-view axis edits set the axis z to 0, which would flatten a helix pointing out of the plane.
 	override get supportsPlaneAxisEditing(): boolean {
+		return false;
+	}
+
+	// Large wireframes can't be edited usefully by hand here; the plane view draws them batched.
+	override get supportsPlaneViewEditing(): boolean {
 		return false;
 	}
 

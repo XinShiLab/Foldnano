@@ -4,6 +4,7 @@
 	import { fillEmptyVhCmd } from '../../../commands/strands';
 	import { getEditorViewContext } from '../context/EditorViewContext.svelte';
 	import { canvasTheme } from '$lib/canvasEditor/theme.svelte';
+	import { helixCircleLabelFontSize } from './utils';
 	interface Props {
 		x: number;
 		y: number;
@@ -136,6 +137,7 @@
 		fill={finalFillColor}
 		stroke={finalStrokeColor}
 		strokeWidth={finalStrokeWidth}
+		perfectDrawEnabled={false}
 	/>
 	{#if active}
 		<Line
@@ -147,12 +149,13 @@
 		/>
 	{/if}
 	{#if text !== null}
-		{@const textOffset = text.length > 1 ? -0.5 : 2}
 		<Text
-			x={x - radius / 2 + textOffset}
-			y={y - radius / 2}
+			x={x - radius}
+			y={y - radius}
+			width={radius * 2}
+			height={radius * 2}
 			{text}
-			fontSize={10}
+			fontSize={helixCircleLabelFontSize(text)}
 			fontStyle="bold"
 			fill={canvasTheme.colors.hxText}
 			align="center"

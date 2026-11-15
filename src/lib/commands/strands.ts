@@ -24,13 +24,24 @@ const uniqueSegments = (segments: Iterable<OligoSegment | null | undefined>): Ol
 	return [...byId.values()];
 };
 
-const captureSegmentSlots = (segments: Iterable<OligoSegment>): SlotState[] => {
+/** Pass `rec` for the pre-mutation capture only: it registers the restore `tx()` runs if the
+ * mutation throws before the diffs are recorded. */
+const captureSegmentSlots = (
+	segments: Iterable<OligoSegment>,
+	rec?: HistoryRecorder
+): SlotState[] => {
 	const states: SlotState[] = [];
 	for (const segment of uniqueSegments(segments)) {
 		for (const slot of segment.slots) {
 			states.push({ segment, bpIndex: slot.bpIndex, seq: slot.seq });
 		}
 	}
+	rec?.onRollback(() => {
+		for (const { segment, bpIndex, seq } of states) {
+			const slot = segment.slotForBp(bpIndex);
+			if (slot && slot.seq !== seq) slot.seq = seq;
+		}
+	});
 	return states;
 };
 
@@ -42,7 +53,10 @@ const captureSegmentSlots = (segments: Iterable<OligoSegment>): SlotState[] => {
 export const segmentHasContentUnsafeForResize = (segment: OligoSegment): boolean =>
 	segment.slots.some((s) => s.seq !== 'N');
 
-const captureSegmentAndComplementSlots = (segments: Iterable<OligoSegment>): SlotState[] => {
+const captureSegmentAndComplementSlots = (
+	segments: Iterable<OligoSegment>,
+	rec?: HistoryRecorder
+): SlotState[] => {
 	const allSegments: OligoSegment[] = [];
 	for (const segment of uniqueSegments(segments)) {
 		allSegments.push(segment);
@@ -56,7 +70,7 @@ const captureSegmentAndComplementSlots = (segments: Iterable<OligoSegment>): Slo
 			if (compSeg) allSegments.push(compSeg);
 		}
 	}
-	return captureSegmentSlots(allSegments);
+	return captureSegmentSlots(allSegments, rec);
 };
 
 /** Segments on the other strand opposite `segment`'s bps: resizing a segment past a skip/insert
@@ -84,14 +98,27 @@ const recordSlotDiffs = (rec: HistoryRecorder, before: SlotState[], after: SlotS
 	}
 };
 
-const captureOligoFieldState = (oligos: Iterable<Oligo | null | undefined>) => {
-	return uniqueOligos(oligos).map((oligo) => ({
+const captureOligoFieldState = (
+	oligos: Iterable<Oligo | null | undefined>,
+	rec: HistoryRecorder
+) => {
+	const states = uniqueOligos(oligos).map((oligo) => ({
 		oligo,
 		color: oligo.color,
 		isScaffold: oligo.isScaffold,
 		isSequenceLocked: oligo.isSequenceLocked,
 		name: oligo.name,
 	}));
+	// Registered after the slot restore on purpose: writing a slot unlocks its oligo.
+	rec.onRollback(() => {
+		for (const { oligo, color, isScaffold, isSequenceLocked, name } of states) {
+			oligo.color = color;
+			oligo.isScaffold = isScaffold;
+			oligo.isSequenceLocked = isSequenceLocked;
+			oligo.name = name;
+		}
+	});
+	return states;
 };
 
 const uniqueOligos = (oligos: Iterable<Oligo | null | undefined>): Oligo[] => {
@@ -237,8 +264,11 @@ export const addSkipOrInsertionCmd = (
 	history.tx('Add skip or insertion', (rec) => {
 		const params = Array.isArray(para) ? para : [para];
 		const segments = uniqueSegments(params.map(({ segment }) => segment));
-		const beforeSlots = captureSegmentAndComplementSlots(segments);
-		const beforeOligos = captureOligoFieldState(segments.map((s) => s.oligo));
+		const beforeSlots = captureSegmentAndComplementSlots(segments, rec);
+		const beforeOligos = captureOligoFieldState(
+			segments.map((s) => s.oligo),
+			rec
+		);
 		for (const { segment, atIndex, count } of params) {
 			segment.addSkipOrInsertion(atIndex, count);
 		}
@@ -259,8 +289,11 @@ export const removeSkipOrInsertionCmd = (
 	history.tx('Remove skip or insertion', (rec) => {
 		const params = Array.isArray(para) ? para : [para];
 		const segments = uniqueSegments(params.map(({ segment }) => segment));
-		const beforeSlots = captureSegmentAndComplementSlots(segments);
-		const beforeOligos = captureOligoFieldState(segments.map((segment) => segment.oligo));
+		const beforeSlots = captureSegmentAndComplementSlots(segments, rec);
+		const beforeOligos = captureOligoFieldState(
+			segments.map((segment) => segment.oligo),
+			rec
+		);
 		for (const { segment, atIndex } of params) {
 			segment.removeSkipOrInsertion(atIndex);
 		}
@@ -736,8 +769,8 @@ export const fillRandomSequenceToOligoCmd = (
 		const params = Array.isArray(para) ? para : [para];
 		const oligos = uniqueOligos(params.map(({ oligo }) => oligo));
 		const segments = uniqueSegments(oligos.flatMap((oligo) => Array.from(oligo.segments)));
-		const beforeSlots = captureSegmentAndComplementSlots(segments);
-		const beforeOligos = captureOligoFieldState(oligos);
+		const beforeSlots = captureSegmentAndComplementSlots(segments, rec);
+		const beforeOligos = captureOligoFieldState(oligos, rec);
 		for (const { oligo, gcContent } of params) {
 			oligo.fillRandomSequence(gcContent);
 		}
@@ -758,8 +791,11 @@ export const fillRandomSequenceToSegmentCmd = (
 	history.tx('Fill random sequence to segment', (rec) => {
 		const params = Array.isArray(para) ? para : [para];
 		const segments = uniqueSegments(params.map(({ segment }) => segment));
-		const beforeSlots = captureSegmentAndComplementSlots(segments);
-		const beforeOligos = captureOligoFieldState(segments.map((segment) => segment.oligo));
+		const beforeSlots = captureSegmentAndComplementSlots(segments, rec);
+		const beforeOligos = captureOligoFieldState(
+			segments.map((segment) => segment.oligo),
+			rec
+		);
 		for (const { segment, gcContent } of params) {
 			segment.fillRandomSequence(gcContent);
 		}
@@ -784,8 +820,11 @@ export const fillEmptySequenceCmd = (
 	const targets = uniqueSegments(segments);
 	let result: EmptyFillResult = { cells: [], filled: 0, copied: 0, conflicts: 0 };
 	history.tx(base ? `Fill empty with ${base}` : 'Fill empty sequence', (rec) => {
-		const beforeSlots = captureSegmentAndComplementSlots(targets);
-		const beforeOligos = captureOligoFieldState(beforeSlots.map(({ segment }) => segment.oligo));
+		const beforeSlots = captureSegmentAndComplementSlots(targets, rec);
+		const beforeOligos = captureOligoFieldState(
+			beforeSlots.map(({ segment }) => segment.oligo),
+			rec
+		);
 		result = part.fillEmptySequence(targets, gcContent, base ?? null);
 		recordSlotDiffs(rec, beforeSlots, captureSegmentAndComplementSlots(targets));
 		recordOligoFieldDiffs(rec, beforeOligos);
@@ -822,8 +861,8 @@ export const fillSequenceToOligoCmd = (
 		const params = Array.isArray(para) ? para : [para];
 		const oligos = uniqueOligos(params.map(({ oligo }) => oligo));
 		const segments = uniqueSegments(oligos.flatMap((oligo) => Array.from(oligo.segments)));
-		const beforeSlots = captureSegmentAndComplementSlots(segments);
-		const beforeOligos = captureOligoFieldState(oligos);
+		const beforeSlots = captureSegmentAndComplementSlots(segments, rec);
+		const beforeOligos = captureOligoFieldState(oligos, rec);
 		for (const { oligo, sequence, lockSequence, onlyEmpty } of params) {
 			const res = oligo.fillSequence(sequence, lockSequence, onlyEmpty);
 			fillInfo.push(res);
@@ -842,8 +881,11 @@ export const fillSequenceToSegmentCmd = (
 	history.tx('Fill sequence to segment', (rec) => {
 		const params = Array.isArray(para) ? para : [para];
 		const segments = uniqueSegments(params.map(({ segment }) => segment));
-		const beforeSlots = captureSegmentAndComplementSlots(segments);
-		const beforeOligos = captureOligoFieldState(segments.map((segment) => segment.oligo));
+		const beforeSlots = captureSegmentAndComplementSlots(segments, rec);
+		const beforeOligos = captureOligoFieldState(
+			segments.map((segment) => segment.oligo),
+			rec
+		);
 		for (const { segment, sequence, lockSequence, onlyEmpty } of params) {
 			const res = segment.fillSequence(sequence, onlyEmpty);
 			fillInfo.push(res);
@@ -875,8 +917,8 @@ export const clearOligoSequenceCmd = (
 		const params = Array.isArray(para) ? para : [para];
 		const oligos = uniqueOligos(params.map(({ oligo }) => oligo));
 		const segments = uniqueSegments(oligos.flatMap((oligo) => Array.from(oligo.segments)));
-		const beforeSlots = captureSegmentSlots(segments);
-		const beforeOligos = captureOligoFieldState(oligos);
+		const beforeSlots = captureSegmentSlots(segments, rec);
+		const beforeOligos = captureOligoFieldState(oligos, rec);
 		for (const { oligo } of params) {
 			oligo.clearOwnSequence();
 		}
@@ -892,8 +934,11 @@ export const clearSegmentSequenceCmd = (
 	history.tx('Clear segment sequence', (rec) => {
 		const params = Array.isArray(para) ? para : [para];
 		const segments = uniqueSegments(params.map(({ segment }) => segment));
-		const beforeSlots = captureSegmentSlots(segments);
-		const beforeOligos = captureOligoFieldState(segments.map((segment) => segment.oligo));
+		const beforeSlots = captureSegmentSlots(segments, rec);
+		const beforeOligos = captureOligoFieldState(
+			segments.map((segment) => segment.oligo),
+			rec
+		);
 		for (const { segment } of params) {
 			segment.clearOwnSequence();
 		}
@@ -917,8 +962,11 @@ export const clearPartSequenceCmd = (
 				Array.from(part.oligos).flatMap((oligo) => Array.from(oligo.segments))
 			)
 		);
-		const beforeSlots = captureSegmentSlots(segments);
-		const beforeOligos = captureOligoFieldState(segments.map((segment) => segment.oligo));
+		const beforeSlots = captureSegmentSlots(segments, rec);
+		const beforeOligos = captureOligoFieldState(
+			segments.map((segment) => segment.oligo),
+			rec
+		);
 		for (const { part } of params) {
 			part.clearAllSequences();
 		}

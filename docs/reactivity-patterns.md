@@ -226,6 +226,14 @@ Mutations to `$state` model objects outside a `history.tx()` call will still upd
 
 `$derived` in a class is evaluated lazily on first access. Accessing a `$derived` property inside the constructor (before the class is fully initialized) can cause unexpected behavior if the derivation depends on other properties that aren't set yet. Initialize `$state` fields before any code that might trigger `$derived` reads.
 
+### Pitfall 5: Reading a big `$derived` inside a loop or sort comparator
+
+A `$derived` read while nothing mounted owns it yet (a component's first render, or a derived
+read only by another unowned derived) re-checks all of its dependencies on every read instead of
+using its cached value. A derived over 600 helix frames, read in a sort comparator, cost 2.4 s
+the first time the freeform plane view opened (and 16 ms once mounted). Read the derived once
+into a local before the loop (`const depths = depthByVhIndex;`) and pass it to helpers.
+
 ---
 
 ## Boundaries / Don'ts
@@ -234,5 +242,6 @@ Mutations to `$state` model objects outside a `history.tx()` call will still upd
 - **Don't `[...spread]` a reactive collection inside a `$derived`** unless you want to break the tracking link — iterate the original.
 - **Don't pass live model objects to a Web Worker.** Use `$state.snapshot(value)` first; the snapshot is plain and structuredClone-safe.
 - **Don't subscribe to `$state` from inside a long-lived callback registered outside Svelte's reactive scope.** Use `$effect` from a component or a class with a Svelte-tracked owner. Bare callbacks survive component unmount and leak.
+- **Don't read a large `$derived` per iteration of a loop or comparator.** Read it once into a local (Pitfall 5).
 - **Don't mutate during a `$derived` read.** Derivations must be pure; mutating fields the derivation depends on triggers re-runs and can loop.
 - **Always reach for `SvelteSet` / `SvelteMap` for reactive collections.** Plain `Set` / `Map` only inside non-reactive caches that are read through other reactive entry points.

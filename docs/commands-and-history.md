@@ -92,8 +92,25 @@ history.snapshotTx(label, () => { ... })
 recorded before/after state differs.
 
 `snapshotTx()` captures `before = doc.snapshot()` and `after = doc.snapshot()`
-around the mutation and stores a `DocumentSnapshotChange`. `tx()` also takes
-`doc.snapshot()` up front, for rollback if the mutation throws.
+around the mutation and stores a `DocumentSnapshotChange`.
+
+A targeted `tx()` takes no document copy on the normal path: `doc.snapshot()` costs
+O(total nt), which every paint or drag-end would pay. It takes one only when the
+design holds repeat-group state (a group, a grouped source or a mirror), because the
+repeat-group fallback below needs a `before`, and under the history verifier.
+
+**Rollback when the mutation throws.** Without a copy, `tx()` calls
+`HistoryRecorder.rollback()`, which closes the `PartScopeCapture`s still open,
+applies everything recorded so far in reverse, runs the `onRollback` steps, and
+rebuilds each part's spatial index (a `Part` method can throw between un-indexing
+and re-indexing an oligo). So a command must make its pre-mutation state known to
+the recorder _before_ it mutates: open the scope first, call `rec.field(...)` before
+the assignment, and for diffs recorded afterwards register a restore with
+`rec.onRollback(...)` (the `captureSegmentSlots` / `captureOligoFieldState` helpers
+in `strands.ts` do this when handed `rec`). With repeat-group state the copy exists
+and rollback is `doc.restore(before)` as before. In tests the verifier compares the
+rolled-back document with the copy and checks derived state, and throws
+`Rollback of "<label>" left the document changed` on a miss.
 
 Document copies use `FoldnanoDocument.snapshot()` (a JSON round-trip of
 `toJSON()`), never `$state.snapshot(doc)`: Svelte's server compile, which
@@ -195,14 +212,16 @@ Default config:
 ```ts
 {
   enabled: true,
-  editCountThreshold: 10,
-  timeIntervalMs: 60_000
+  editCountThreshold: 50,
+  timeIntervalMs: 60_000,
+  idleDelayMs: 2000
 }
 ```
 
 Public API:
 
 - `setAutoSaveConfig(partial)`
+- `noteActivity()`
 - `saveNow()`
 - `saveNowIfDirty()`
 - `markSaved(time?)`
@@ -228,7 +247,8 @@ toasts; repeated failures from a retrying timer stay silent while `error` remain
 `SaveStatusIndicator.svelte` reflects it as a distinct failed-save state instead of the normal
 amber "unsaved" one. The first failure of a streak also schedules one quick retry
 (`AUTOSAVE_RETRY_DELAY_MS`). The optional fifth constructor argument `onSaved` runs after every
-successful save; `EditorDocumentSession` uses it to request persistent storage. Banner, close-tab
+successful save; `EditorDocumentSession` uses it to request persistent storage. The optional sixth,
+`isBusy`, defers the idle save (`docs/autosave.md` § Idle save). Banner, close-tab
 guard and persistence details: `docs/autosave.md`.
 
 ---
@@ -433,6 +453,7 @@ test enforces it.
 
 - **Never mutate the model outside `tx` / `snapshotTx`.** Reactive UI updates will fire, but the change is silently lost from undo/redo and from any patch-based replay. If a live preview already mutated the model (e.g. a plane drag), rewind it before the `tx` and re-apply inside, as `transformPlaneCmd` does.
 - **Don't copy the document with `$state.snapshot(doc)`.** Use `doc.snapshot()`; in the server compile Vitest uses, `const x = $state.snapshot(y)` is just `const x = y`.
+- **Don't mutate before the recorder knows the old state.** `tx()` has no document copy to fall back on; a throw is undone from open scopes, recorded patches and `onRollback` steps only. Open the scope, record the field, or register `rec.onRollback` first.
 - **Don't add a command without a case in `undoRoundTrip.spec.ts`.** The coverage test fails, and the case is what exercises its capture seed.
 - **Don't silence the history verifier's error.** It means the capture seed misses something; widen the seed (see how `moveOligoEndCmd` adds complementary segments for resizes) rather than switching the command to `snapshotTx`.
 - **Don't reach into `Part` private fields from a command** (`_virtualHelices`, `_spatialIndex`, etc.). Use the documented `Part` methods so caches stay consistent.

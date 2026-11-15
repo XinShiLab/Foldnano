@@ -50,6 +50,7 @@
 	} from './crossover/connectionMarks';
 	import { help } from '$lib/components/help/help';
 	import { registerStrandCanvasHelp } from './strandCanvasHelp';
+	import { nextRenderWindow } from './renderWindow';
 
 	interface Props {
 		part: Part;
@@ -67,6 +68,7 @@
 		updateViewportScale,
 		panBy,
 		centerOn,
+		revealVh,
 	});
 
 	let stage = $state<Stage>();
@@ -181,12 +183,15 @@
 	function updateViewportBounds() {
 		if (!camera) return;
 		const bounds = camera.currentBounds;
-		editorViewContext.strandViewContext.viewportBounds = {
+		const strandCtx = editorViewContext.strandViewContext;
+		strandCtx.viewportBounds = {
 			x: bounds.x,
 			y: bounds.y,
 			width: bounds.width,
 			height: bounds.height,
 		};
+		const renderBounds = nextRenderWindow(strandCtx.renderBounds, bounds);
+		if (renderBounds !== strandCtx.renderBounds) strandCtx.renderBounds = renderBounds;
 	}
 
 	function panBy(dx: number, dy: number) {
@@ -196,10 +201,9 @@
 		updateViewportBounds();
 	}
 
-	function centerOn(vhId: string, bp: number): boolean {
-		const node = stage?.node;
+	function shownDisplayRow(vhId: string): number | null {
 		const vh = part.getVhById(vhId);
-		if (!node || !vh) return false;
+		if (!vh) return null;
 		const strandCtx = editorViewContext.strandViewContext;
 		if (vh.regionId && strandCtx.collapsedRegionIds.includes(vh.regionId)) {
 			strandCtx.collapsedRegionIds = strandCtx.collapsedRegionIds.filter(
@@ -207,12 +211,36 @@
 			);
 		}
 		const row = d.getEffectiveDisplayRowForVh(vhId);
-		if (row === null || row.isCollapsed) return false;
-		const [top, bottom] = getBpCoordsByRowAndBpIdx(row.displayRow, bp);
+		return row === null || row.isCollapsed ? null : row.displayRow;
+	}
+
+	function centerOn(vhId: string, bp: number): boolean {
+		const node = stage?.node;
+		if (!node) return false;
+		const displayRow = shownDisplayRow(vhId);
+		if (displayRow === null) return false;
+		const [top, bottom] = getBpCoordsByRowAndBpIdx(displayRow, bp);
 		const scale = node.scaleX() || 1;
 		const x = top[0] + sideLength / 2;
 		const y = (top[1] + bottom[1] + sideLength) / 2;
 		node.position({ x: viewerWidth / 2 - x * scale, y: viewerHeight / 2 - y * scale });
+		updateViewportBounds();
+		return true;
+	}
+
+	function revealVh(vhId: string): boolean {
+		const node = stage?.node;
+		if (!node) return false;
+		const displayRow = shownDisplayRow(vhId);
+		if (displayRow === null) return false;
+		const [top, bottom] = getBpCoordsByRowAndBpIdx(displayRow, 0);
+		const scale = node.scaleX() || 1;
+		const rowTop = top[1] * scale + node.y();
+		const rowBottom = (bottom[1] + sideLength) * scale + node.y();
+		// Already fully on screen: leave the view alone so repeated clicks don't make it twitch.
+		if (rowTop >= 0 && rowBottom <= viewerHeight) return true;
+		const y = (top[1] + bottom[1] + sideLength) / 2;
+		node.y(viewerHeight / 2 - y * scale);
 		updateViewportBounds();
 		return true;
 	}
@@ -393,6 +421,10 @@
 			handleWheel(e, stage);
 			updateViewportBounds();
 			updateViewportScale();
+		}}
+		ondragmove={(e) => {
+			// Without this, a pan past the render window shows blank canvas until release.
+			if (e.target === stage?.node) updateViewportBounds();
 		}}
 		ondragend={() => updateViewportBounds()}
 	>

@@ -105,6 +105,15 @@
 
 	const planeMouseRows = $derived.by(() => {
 		if (activeViewer !== 'HELIX' || !ctx.activeRegion) return [];
+		if (!ctx.activeRegion.supportsPlaneViewEditing) {
+			return editorMode === 'SELECT'
+				? [
+						{ keys: ['Click'], label: 'Select helix' },
+						{ keys: ['Drag'], label: 'Box-select' },
+						{ keys: ['⇧', 'Click'], label: 'Toggle selection' },
+					]
+				: [];
+		}
 		if (editorMode === 'DRAW') {
 			return ctx.activeRegion.supportsFreeformPlacement
 				? [

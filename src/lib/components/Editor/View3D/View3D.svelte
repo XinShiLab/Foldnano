@@ -204,6 +204,10 @@
 	let currentLabels = $state<THREE.Group | null>(null);
 	let currentCrossovers = $state<THREE.Group | null>(null);
 	let isFirstBuild = true;
+	const REBUILD_MAX_DELAY_MS = 250;
+	let rebuildTick = $state(0);
+	let rebuildDue = true;
+	let rebuildTimer: number | null = null;
 	let planeOverlay: PlaneOverlayResult | undefined;
 	let transformGizmo: TransformGizmoResult | undefined;
 	let _hoveredPlaneMesh: THREE.Mesh | null = null;
@@ -770,9 +774,26 @@
 		isFirstBuild = true;
 	});
 
-	// Rebuild geometry whenever the part model or rendering options change
+	// Rebuild geometry whenever the part model or rendering options change.
+	// A rebuild blocks the main thread for its whole duration, so after one, the next waits about
+	// twice as long as it took: changes in between (a plane drag, simulation progress, a burst of
+	// edits) fold into one rebuild, and a small design still rebuilds on the next task. While
+	// waiting, the effect is subscribed to `rebuildTick` only; the build run re-reads everything.
 	$effect(() => {
 		if (!threeRenderer || !scene || !cursor) return;
+		void rebuildTick;
+		if (!rebuildDue) {
+			rebuildTimer ??= window.setTimeout(
+				() => {
+					rebuildTimer = null;
+					rebuildDue = true;
+					rebuildTick++;
+				},
+				Math.min(REBUILD_MAX_DELAY_MS, untrack(() => statsBuildMs) * 2)
+			);
+			return;
+		}
+		rebuildDue = false;
 		void part.oligos.size;
 		void part.virtualHelices.length;
 		void showNtModel;
@@ -1280,6 +1301,8 @@
 			dragController?.cancel();
 			dragController = undefined;
 			releaseCapturedPointer();
+			if (rebuildTimer !== null) window.clearTimeout(rebuildTimer);
+			rebuildTimer = null;
 			_markDirty = undefined;
 			simulateFn = undefined;
 			resetCameraFn = undefined;

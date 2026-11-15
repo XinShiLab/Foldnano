@@ -149,16 +149,17 @@ placement and lattice behavior through regions.
 
 UI and exporters use capability flags instead of `instanceof` checks. The flags live on `DesignRegion` (see below), not on `Part` — a mixed part with both lattice and freeform regions has no honest part-level answer, so callers gate on the _active_ region (`editorViewContext.activeRegion`):
 
-| Getter                          | Meaning                                                                                          |
-| ------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `supportsLatticeGrid`           | show lattice plane editor                                                                        |
-| `supportsConstrainedXoverSites` | show constrained xover overlays                                                                  |
-| `supportsLatticeAutoStaple`     | allow auto-staple                                                                                |
-| `supportsFreeformPlacement`     | helices placed by `localFrame`: show the freeform plane editor and tools                         |
-| `supportsPlaneAxisEditing`      | plane-view axis edits (rotate handle, direction field), which set the axis `z` to 0              |
-| `supportsReferenceGeometry`     | can carry a reference mesh: the 3D toolbar shows the Mesh button; `referenceMesh` reads the mesh |
+| Getter                          | Meaning                                                                                           |
+| ------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `supportsLatticeGrid`           | show lattice plane editor                                                                         |
+| `supportsConstrainedXoverSites` | show constrained xover overlays                                                                   |
+| `supportsLatticeAutoStaple`     | allow auto-staple                                                                                 |
+| `supportsFreeformPlacement`     | helices placed by `localFrame`: show the freeform plane editor and tools                          |
+| `supportsPlaneAxisEditing`      | plane-view axis edits (rotate handle, direction field), which set the axis `z` to 0               |
+| `supportsPlaneViewEditing`      | plane view may add / move / rotate / roll / delete helices and drag ends; else draw + select only |
+| `supportsReferenceGeometry`     | can carry a reference mesh: the 3D toolbar shows the Mesh button; `referenceMesh` reads the mesh  |
 
-`DesignRegion` and `FreeformRegion` return `false` for the three lattice flags; `LatticedDesignRegion` (and its `HoneycombRegion` / `SquareRegion` subclasses) return `true`. `FreeformRegion` returns `true` for the last two; `WireframeRegion` keeps `supportsFreeformPlacement` and turns off `supportsPlaneAxisEditing`, since its helices usually point out of the plane. Check these flags, not `kind === 'FREEFORM'`, which misses the subclass. Cadnano import/export is gated the same way, by checking whether the active region is a lattice region (e.g. `Toolbar.svelte`'s `activeLatticeRegion`), not by a dedicated capability getter.
+`DesignRegion` and `FreeformRegion` return `false` for the three lattice flags; `LatticedDesignRegion` (and its `HoneycombRegion` / `SquareRegion` subclasses) return `true`. `FreeformRegion` returns `true` for the last two; `WireframeRegion` keeps `supportsFreeformPlacement` and turns off `supportsPlaneAxisEditing`, since its helices usually point out of the plane, and `supportsPlaneViewEditing`, so its plane view is drawn batched and only selects (edits go through the Select panel). `supportsPlaneViewEditing` is `true` on every other region. Check these flags, not `kind === 'FREEFORM'`, which misses the subclass. Cadnano import/export is gated the same way, by checking whether the active region is a lattice region (e.g. `Toolbar.svelte`'s `activeLatticeRegion`), not by a dedicated capability getter.
 
 ### Geometry entry point
 
@@ -485,6 +486,10 @@ Slots still hold:
 - sequence text
 - skip / insertion information
 - per-base sequence assignment state
+
+`OligoSegment.seqVersion` bumps on every slot write (a base change, a slot added or
+removed, the slot array replaced). Views that only need to know "this segment's
+sequence changed" read it instead of subscribing to every slot. It is not persisted.
 
 Crossovers still connect `ThreePrimeEnd` to `FivePrimeEnd`.
 

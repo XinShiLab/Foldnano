@@ -246,8 +246,10 @@ overlay.
 
 **File:** `src/lib/components/Editor/StrandView/temporalLayer/SelectionOverlay.svelte`
 
-This draws selected segments and selected crossovers in one custom `Konva.Shape`
-using canvas drawing commands.
+This draws selected segments, selected crossovers and selected free ends (the red
+terminus glyph) in one custom `Konva.Shape` using canvas drawing commands. The draw
+function is rebuilt when the selection size or `historyStack.revision` changes, and
+reads the ends at draw time.
 
 ### `TemporalParts`
 
@@ -257,8 +259,9 @@ Still used for transient, low-count overlays such as:
 - `Marquee`
 - other temporary previews
 
-Free selected ends may still render separate end boxes, but the expensive
-"selection equals many mounted route components" path is gone.
+Selected free ends are drawn by `SelectionOverlay`, not as mounted end boxes:
+every staple has two, so select-all would mount thousands. The "selection equals
+many mounted route components" path is gone.
 
 ---
 

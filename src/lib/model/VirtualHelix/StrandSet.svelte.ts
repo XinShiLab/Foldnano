@@ -189,9 +189,11 @@ export default class StrandSet {
 		return null;
 	}
 
-	isRangeOccupiedBy(startIndex: number, endIndex: number): SvelteSet<OligoSegment> {
-		// Return segments whose interval overlaps the query range; no per-index iteration
-		const occupiedSegments = new SvelteSet<OligoSegment>();
+	isRangeOccupiedBy(startIndex: number, endIndex: number): Set<OligoSegment> {
+		// Return segments whose interval overlaps the query range; no per-index iteration.
+		// A throwaway result, built many times per drag step: a reactive set would only cost.
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity
+		const occupiedSegments = new Set<OligoSegment>();
 		const lo = Math.min(startIndex, endIndex);
 		const hi = Math.max(startIndex, endIndex);
 		for (const id of this.segmentIds) {

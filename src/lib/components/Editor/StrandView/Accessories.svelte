@@ -11,7 +11,7 @@
 	import VhTag from './Grid/VhTag.svelte';
 	import RegionHeader from './Grid/RegionHeader.svelte';
 	import { getDimensionContext } from './drawingContext';
-	import { rectsIntersect, expandRect } from '$lib/utils/utils';
+	import { rectsIntersect } from '$lib/utils/utils';
 
 	interface Props {
 		part: Part;
@@ -26,12 +26,7 @@
 	const { getBpCoordsByRowAndBpIdx } = d;
 	const { sideLength } = d.dimensions;
 
-	const overscanPx = $derived(
-		200 / Math.max(editorViewContext.strandViewContext.viewportScale, 0.1)
-	);
-	const renderBounds = $derived(
-		expandRect(editorViewContext.strandViewContext.viewportBounds, overscanPx)
-	);
+	const renderBounds = $derived(editorViewContext.strandViewContext.renderBounds);
 </script>
 
 <!-- @component

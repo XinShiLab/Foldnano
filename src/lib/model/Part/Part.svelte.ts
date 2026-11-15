@@ -720,6 +720,9 @@ export class Part {
 	}
 
 	getOligoBySegment(segment: OligoSegment): Oligo | null {
+		// O(1) via the index; the membership checks reject an entry that is stale mid-mutation.
+		const indexed = this._spatialIndex.getOligoBySegmentId(segment.id);
+		if (indexed && indexed.segments.has(segment) && this.oligos.has(indexed)) return indexed;
 		for (const oligo of this.oligos) {
 			if (oligo.segments.has(segment)) {
 				return oligo;

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Shape } from 'svelte-konva';
-	import SelectedEndBox from './SelectedEndBox.svelte';
+	import { getEditorViewContext } from '../../context/EditorViewContext.svelte';
 	import { getDimensionContext } from '../drawingContext';
 	import type { EndSelection } from '../../context/EditorViewContext.svelte';
 	import { bulgePoint, getAttachmentPoints, direction } from '../crossover/utils';
@@ -32,12 +32,36 @@
 	const halfSide: [number, number] = [sideLength / 2, sideLength / 2];
 
 	let ends = $derived(selected.ends);
-	let freeEnds = $derived([...ends].filter((e) => e.isFree));
+	const editorViewContext = getEditorViewContext();
 
-	// Returns a new draw function whenever selection size changes.
-	// The returned closure iterates `ends` at draw time (always current state).
+	// Free ends get the red terminus glyph of `Terminus.svelte` (5' square, 3' triangle).
+	const buildFreeEndPath = (ctx: Context) => {
+		const w = baseStrokeWidth;
+		ctx.beginPath();
+		for (const end of ends) {
+			if (!end.isFree) continue;
+			const rowIdx = d.getDisplayRowForVh(end.segment.inVirtualHelix.id);
+			if (rowIdx === null) continue;
+			const strandIdx = end.segment.inStrandIndex as 0 | 1;
+			const [x, y] = withOffset(getBpCoordsByRowAndBpIdx(rowIdx, end.index), halfSide)[strandIdx];
+			if (!end.isThreePrime) {
+				ctx.rect(x - 3 * w, y - 3 * w, 6 * w, 6 * w);
+				continue;
+			}
+			const half = 4 * w;
+			const dir = strandIdx === 0 ? 1 : -1;
+			ctx.moveTo(x + dir * (half + 1), y);
+			ctx.lineTo(x - dir * (half - 1), y - half);
+			ctx.lineTo(x - dir * (half - 1), y + half);
+			ctx.closePath();
+		}
+	};
+
+	// Returns a new draw function whenever the selection size changes or an edit lands (an end
+	// can stop being free). The returned closure iterates `ends` at draw time (current state).
 	const drawFn = $derived.by(() => {
 		const _size = ends.size; // reactive dependency — recompute on any add/remove
+		void editorViewContext.historyStack.revision;
 		return (ctx: Context) => {
 			if (_size === 0) return;
 
@@ -122,6 +146,10 @@
 			buildCrossoverPath();
 			ctx.stroke();
 
+			ctx.fillStyle = 'red';
+			buildFreeEndPath(ctx);
+			ctx.fill();
+
 			ctx.restore();
 		};
 	});
@@ -133,22 +161,9 @@
   avoiding per-segment Svelte component instantiation.
   Single pass per frame: a wide semi-transparent gold halo over selected segments
   and crossovers, leaving the underlying strand color intact.
-  Free ends (termini) are still rendered as individual SelectedEndBox components
-  since there are very few of them.
+  Selected free ends (termini) are filled red in the same pass: every staple has two, so
+  select-all would otherwise mount thousands of components.
 -->
 {#if ends.size > 0}
 	<Shape listening={false} perfectDrawEnabled={false} sceneFunc={drawFn} />
-	{#each freeEnds as end (`${end.segment.id}-${end.isThreePrime ? '3' : '5'}`)}
-		{@const rowIdx = d.getDisplayRowForVh(end.segment.inVirtualHelix.id)}
-		{#if rowIdx !== null}
-			<SelectedEndBox
-				id={`SelectedEndBox-${end.segment.id}-${end.isThreePrime ? '3' : '5'}`}
-				{rowIdx}
-				fromBpIdx={end.index}
-				strandIdx={end.segment.inStrandIndex as 0 | 1}
-				isThreePrime={end.isThreePrime}
-				isFreeEnd={true}
-			/>
-		{/if}
-	{/each}
 {/if}

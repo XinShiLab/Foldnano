@@ -383,9 +383,11 @@ export class PartScopeCapture {
 		this.#seed = normalizeSeed(seed);
 		this.#vhIndicesExistingAtConstruction = new Set(part.virtualHelices.map((vh) => vh.index));
 		this.#before = capturePartMemento(part, this.#seed);
+		recorder.trackOpenScope(this);
 	}
 
 	commit(): void {
+		this.#recorder.untrackOpenScope(this);
 		const expandedSeed = expandSeedAfterMutation(this.#part, this.#seed, this.#before);
 		const before = capturePartMementoFromResolved(
 			this.#part,
@@ -412,7 +414,47 @@ export class HistoryRecorder {
 	#regionReferenceGeometries: RegionReferenceGeometryPatchDraft[] = [];
 	#overlayPlacements: OverlayPlacementPatchDraft[] = [];
 
+	#openScopes = new Set<PartScopeCapture>();
+	#rollbackSteps: (() => void)[] = [];
+
 	constructor(readonly doc: FoldnanoDocument) {}
+
+	trackOpenScope(scope: PartScopeCapture): void {
+		this.#openScopes.add(scope);
+	}
+
+	untrackOpenScope(scope: PartScopeCapture): void {
+		this.#openScopes.delete(scope);
+	}
+
+	/** Registers how to restore state captured before a mutation whose patches are only
+	 * recorded after it (slot and oligo-field diffs), so `rollback()` can undo a throw midway. */
+	onRollback(step: () => void): void {
+		this.#rollbackSteps.push(step);
+	}
+
+	/** Undoes a transaction whose mutation threw, without a whole-document copy: closes the
+	 * scopes still open, applies everything recorded so far in reverse, then the registered
+	 * pre-mutation restores. Best effort per step, so one failure doesn't strand the rest. */
+	rollback(): void {
+		const attempt = (step: () => void) => {
+			try {
+				step();
+			} catch (err) {
+				console.error('History rollback step failed:', err);
+			}
+		};
+		for (const scope of [...this.#openScopes]) attempt(() => scope.commit());
+		let entry: HistoryEntry | null = null;
+		attempt(() => (entry = this.commit('rollback')));
+		for (const change of (entry as HistoryEntry | null)?.undo ?? []) {
+			attempt(() => applyAtomicChanges(this.doc, [change]));
+		}
+		for (const step of this.#rollbackSteps) attempt(step);
+		// A Part method can throw after dropping an oligo from the spatial index and before
+		// re-adding it, which no patch above would notice.
+		for (const part of this.doc.parts) attempt(() => part.rebuildRspCaches());
+	}
 
 	field(ref: ModelRef, field: string, before: unknown, after: unknown): void {
 		this.#fields.push({ ref, field, before, after });

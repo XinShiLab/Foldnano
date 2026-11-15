@@ -151,6 +151,13 @@ This selection is separate from:
 - strand-view end selection
 - freeform VH selection
 
+A plain click (pointer-up without a drag), or a modifier-click that adds the helix,
+scrolls the strand view to that helix's row through
+`strandToolbarController.revealVh(vhId)`, which moves only vertically and does
+nothing if the row is already on screen. `VhTag` outlines lattice helices that are in
+`selectedLatticeVhIndices`, so the selection is visible there too; ends are not
+selected.
+
 ### Move lattice helices
 
 **Files:** `LatticeViewer.svelte`, `virtualHelix.ts`
@@ -190,7 +197,7 @@ Only **empty** VHs are deleted — those whose both strand sets carry zero segme
 
 The toolbar button is enabled whenever at least one lattice VH is selected; the command itself applies the empty-only filter.
 
-The same toolbar's two **Distribute in a circle** buttons are freeform-only; see `docs/editor-freeform-viewer.md` § Radial Distribute.
+The same toolbar's two **Distribute in a circle** buttons are freeform-only; see `docs/editor-freeform-viewer.md` § Radial Distribute. **Fit to helices** shows only while a viewer has registered `helixToolbarController.fitView` (the freeform viewer does; the lattice viewer doesn't). When the active region has `supportsPlaneViewEditing` false (wireframes), the Edit group (Delete, Distribute) is replaced by a short "select only" note pointing to the Select panel, the Draw mode button is disabled (`EditorModeToggleGroup` `disabledModes`), the Delete key leaves helices alone, and `PlaneGestureHint` shows nothing. `HelixCircle` sizes its index label with `helixCircleLabelFontSize` (`utils.ts`) so 3- and 4-digit indices fit inside the circle.
 
 ---
 
@@ -258,6 +265,6 @@ lattice coordinates.
 - **Don't bypass `region.addVhAtCoords` to add a VH.** The region owns parity rules and `vhOrder`; talking directly to `Part` skips this.
 - **Don't move VHs through `vh.latticeCoords =`.** Use `moveLatticeVirtualHelicesCmd` so undo/redo and parity validation run.
 - **Don't use Konva mouse events (`onclick`, `ondblclick`, `onmouse*`) on canvas shapes.** Konva fires them only for real mice, and it cancels `touchstart` on listening shapes, so iPad Safari never synthesizes the compat mouse events: Apple Pencil and finger taps are silently dropped. Use `onpointerclick` / `onpointerdblclick` / `onpointer*`, which fire for mouse, pen and touch alike.
-- **Don't share selection with the strand view or the freeform viewer.** This pane has its own `selectedLatticeVhIndices`.
+- **Don't share selection with the strand view or the freeform viewer.** This pane has its own `selectedLatticeVhIndices`. The strand view only scrolls to it and outlines the VH tag; never push the helix's ends into `strandViewContext.selected` (Delete there removes strands).
 - **Don't apply plane transforms in this pane.** It's region-local 2D — apply transforms in `View3D`.
 - **Don't add lattice VHs to a freeform region.** `region.kind` must match — mismatches break geometry queries.

@@ -21,6 +21,8 @@
 
 	interface Props {
 		modes: EditorMode[];
+		/** Shown but not selectable here, e.g. Draw in a view-only plane view. */
+		disabledModes?: readonly EditorMode[];
 		buttonSize?: ToggleSize;
 		value?: EditorMode;
 		onModeChange?: (mode: EditorMode) => void;
@@ -30,6 +32,7 @@
 
 	let {
 		modes,
+		disabledModes = [],
 		buttonSize = 'sm',
 		value = $bindable<EditorMode | undefined>(),
 		onModeChange,
@@ -89,7 +92,7 @@
 			<ToggleGroup.Item
 				value={mode}
 				title={titleByMode[mode]}
-				disabled={mode !== 'PAN' && isReadOnly}
+				disabled={(mode !== 'PAN' && isReadOnly) || disabledModes.includes(mode)}
 				data-tutorial-id={tutorialId}
 				class={activeTutorialId === tutorialId
 					? 'relative z-20 outline-2 outline-offset-2 outline-primary'
