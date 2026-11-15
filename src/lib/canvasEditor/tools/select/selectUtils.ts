@@ -1,6 +1,9 @@
 // src/editor/tools/selectHelpers.ts
 import type { Category, HitResult, LeafTarget } from '../../core/modes';
+import type Oligo from '$lib/model/Oligo';
 import type { SegmentEnd } from '$lib/model/Oligo';
+import type { Part } from '$lib/model/Part';
+import type { SelectAllMode } from '$lib/components/Editor/context/types';
 
 export function allowedByUserFilter(
 	leafOrCat: LeafTarget | Category,
@@ -43,4 +46,21 @@ export function filterEndsByStrandType(
 
 export function isDefined<T>(v: T | undefined | null): v is T {
 	return v !== undefined && v !== null;
+}
+
+/** Ends a click on `oligo` selects: its own, grown to same-colour or same-length oligos. */
+export function expandOligoEnds(part: Part, oligo: Oligo, mode: SelectAllMode): SegmentEnd[] {
+	const ends = Array.from(oligo.allEnds);
+	const match =
+		mode === 'SAME_COLOR'
+			? (o: Oligo) => o.color === oligo.color
+			: mode === 'SAME_LENGTH'
+				? (o: Oligo) => o.length === oligo.length
+				: null;
+	if (!match) return ends;
+	const grown = new Set<SegmentEnd>();
+	part.oligos.forEach((o) => {
+		if (match(o)) o.allEnds.forEach((end) => grown.add(end));
+	});
+	return [...ends, ...grown];
 }

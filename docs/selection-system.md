@@ -77,6 +77,11 @@ User-facing toggles still cover:
 - crossovers
 - segments
 
+The default toggles leave `SCAF` off (`StrandViewContext.selectionToggles`): the scaffold runs
+through every helix of an origami and is the easiest strand to mis-click. Saved editor contexts
+restore their own toggles, so this only changes new contexts. The same toggles gate 3D picking,
+Delete / Duplicate (`strandActions.ts`) and the Sequence panel's fill-empty targets.
+
 Strand hits carry a `SCAF` / `STAP` category (from `oligo.isScaffold`; crossovers
 take the 3' side's oligo). `filterHitsByUserFilter` requires **both** the kind
 toggle and the category toggle for those hits; non-strand hits pass on either.
@@ -234,6 +239,15 @@ select mode.
 
 Those handlers are why select mode now manages more than just strand-end
 selection.
+
+---
+
+### Clicks from the 3D view
+
+In Select mode, a click in the 3D line view writes the same `selected` set
+through the same filter and priority (crossover, oligo, segment; no ends). Oligo picks use
+`expandOligoEnds`, shared with `onOligo`. Shift-drag in 3D draws a box that adds every touched
+item the same way (no depth test, like marquee here). See `docs/editor-3d-view.md` § Select in 3D.
 
 ---
 

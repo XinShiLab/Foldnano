@@ -102,7 +102,8 @@ export async function initHero3d(
 	key.position.set(1, 1.4, 1);
 	scene.add(key);
 
-	const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+	// stencil: drawOncePerPixel on the design's translucent lines, as in the editor's 3D view.
+	const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, stencil: true });
 	renderer.setClearColor(0x000000, 0);
 
 	const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 1_000_000);

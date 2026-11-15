@@ -140,6 +140,12 @@ Auto-save defaults:
 - save after 60 seconds if there are unsaved edits
 
 `HistoryStack` saves the document snapshot only (via `StorageManager.saveDocument`). `EditorDocumentSession.saveDocumentToLocalStorage()` saves both the snapshot and the serialized view context.
+The view context also saves on its own: `Editor.svelte` watches
+`EditorViewContext.serializableContextSignature` and calls `scheduleContextSave()`, which writes
+it 500 ms after the last change. A filter or hide toggle is not a design edit, so without this it
+was lost on refresh unless a design save happened afterwards. The save is skipped while a document
+or its context is loading (the in-between defaults would overwrite the stored settings), in
+non-owner tabs, and for documents without a savable name.
 
 ### `EditorDocumentSession`
 

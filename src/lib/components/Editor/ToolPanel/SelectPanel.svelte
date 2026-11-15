@@ -18,7 +18,8 @@
 
 	import { getEditorViewContext } from '../context/EditorViewContext.svelte';
 	import { help } from '$lib/components/help/help';
-	import { type SelectAllMode, type SelectionToggle } from '../context/types';
+	import { type SelectionToggle } from '../context/types';
+	import { SELECT_ALL_OPTIONS } from './selectAllOptions';
 	import { Label } from '../../ui/label';
 	import type Oligo from '$lib/model/Oligo';
 	import { getModificationColor } from '$lib/model/modifications';
@@ -55,17 +56,7 @@
 		}
 	}
 
-	type QuickSelectOption = {
-		value: SelectAllMode;
-		label: string;
-		enabledFor?: SelectionToggle;
-	};
-	const quickSelect: QuickSelectOption[] = [
-		{ value: 'NONE', label: 'Where I click ' },
-		{ value: 'SAME_COLOR', label: 'Same Color', enabledFor: 'OLIGO' },
-		{ value: 'SAME_LENGTH', label: 'Same Length', enabledFor: 'OLIGO' },
-		{ value: 'SAME_MODI', label: 'Same Modification', enabledFor: 'END' },
-	];
+	const quickSelect = SELECT_ALL_OPTIONS;
 
 	// let quickSelectValue = $state("");
 

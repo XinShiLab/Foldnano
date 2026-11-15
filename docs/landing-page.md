@@ -90,6 +90,7 @@ for either. Fonts are the app's existing Nunito Sans (body/headline) and JetBrai
 
 ## Boundaries / Don'ts
 
+- **Keep `stencil: true` on the hero renderer.** The design's translucent lines use `drawOncePerPixel` (see `docs/editor-3d-view.md`); without a stencil buffer their joints show as dots.
 - **No editor bundle in the initial route JS.** Three.js and the model layer may only be
   reached through the dynamic `import()` in `Hero3D.svelte`. Konva and Pyodide must never
   be imported from landing code at all. After touching landing code, verify: build, then

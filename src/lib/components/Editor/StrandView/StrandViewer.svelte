@@ -214,13 +214,21 @@
 		return row === null || row.isCollapsed ? null : row.displayRow;
 	}
 
-	function centerOn(vhId: string, bp: number): boolean {
+	function centerOn(vhId: string, bp: number, opts?: { onlyIfOffscreen?: boolean }): boolean {
 		const node = stage?.node;
 		if (!node) return false;
 		const displayRow = shownDisplayRow(vhId);
 		if (displayRow === null) return false;
 		const [top, bottom] = getBpCoordsByRowAndBpIdx(displayRow, bp);
 		const scale = node.scaleX() || 1;
+		if (opts?.onlyIfOffscreen) {
+			const left = top[0] * scale + node.x();
+			const right = (top[0] + sideLength) * scale + node.x();
+			const rowTop = top[1] * scale + node.y();
+			const rowBottom = (bottom[1] + sideLength) * scale + node.y();
+			if (left >= 0 && right <= viewerWidth && rowTop >= 0 && rowBottom <= viewerHeight)
+				return true;
+		}
 		const x = top[0] + sideLength / 2;
 		const y = (top[1] + bottom[1] + sideLength) / 2;
 		node.position({ x: viewerWidth / 2 - x * scale, y: viewerHeight / 2 - y * scale });

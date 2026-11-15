@@ -26,7 +26,7 @@ export const MODE_TUTORIAL_INFO: Record<EditorMode, TutorialModeInfo> = {
 		mode: 'PAN',
 		id: 'mode-pan',
 		label: 'Pan',
-		shortcut: 'Cmd/Ctrl',
+		shortcut: 'Alt / ⌥ (hold)',
 		purpose: 'Move around the active canvas without changing the design.',
 		panel: null,
 	},
@@ -35,7 +35,8 @@ export const MODE_TUTORIAL_INFO: Record<EditorMode, TutorialModeInfo> = {
 		id: 'mode-select',
 		label: 'Select',
 		shortcut: 'v',
-		purpose: 'Select ends, segments, oligos, crossovers, region headers, and virtual helix tags.',
+		purpose:
+			'Select ends, segments, oligos, crossovers, region headers, and virtual helix tags. In the 3D view, click a strand or crossover to select it.',
 		panel: 'select',
 	},
 	DRAW: {

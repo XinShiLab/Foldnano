@@ -1,5 +1,21 @@
 <script lang="ts">
-	import { Eye, EyeOff, Layers, Move3d, Plus, Rotate3d, Trash2 } from '@lucide/svelte/icons';
+	import {
+		Eye,
+		EyeOff,
+		Layers,
+		Move3d,
+		Plus,
+		Rotate3d,
+		TextAlignJustify,
+		Trash2,
+	} from '@lucide/svelte/icons';
+	import EndsIcon from '$lib/components/icons/EndsIcon.svelte';
+	import CrossoverIcon from '$lib/components/icons/CrossoverIcon.svelte';
+	import OligoIcon from '$lib/components/icons/OligoIcon.svelte';
+	import { FILTER_TOGGLE_CLASS, SCAF_TOGGLE_CLASS, STAP_TOGGLE_CLASS } from './filterToggleClasses';
+	import { hasPickableKind } from '../View3D/linePick';
+	import { SELECT_ALL_OPTIONS } from './selectAllOptions';
+	import * as Select from '$lib/components/ui/select/index.js';
 	import * as ToggleGroup from '$lib/components/ui/toggle-group/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
@@ -16,6 +32,15 @@
 
 	const editorViewContext = getEditorViewContext();
 	let view3DToolbar = $derived(editorViewContext.view3DToolbarController);
+	const strandCtx = $derived(editorViewContext.strandViewContext);
+	let pickKindMissing = $derived(!hasPickableKind(strandCtx.selectionFilter));
+	// 3D picking follows the editor's Select mode, in the line view only.
+	let pickActive = $derived(
+		editorViewContext.editorMode === 'SELECT' && !!view3DToolbar && !view3DToolbar.showNtModel
+	);
+	let selectAllLabel = $derived(
+		SELECT_ALL_OPTIONS.find((o) => o.value === strandCtx.selectAllMode)?.label ?? 'Where I click'
+	);
 	let selectedPlane = $derived.by(() => {
 		const selectedPlaneId = view3DToolbar?.selectedPlaneId;
 		return selectedPlaneId ? part.getPlaneById(selectedPlaneId) : null;
@@ -53,6 +78,91 @@
 	</div>
 {:else}
 	<div class="flex flex-col gap-3 text-xs">
+		<!-- Select in 3D: shares the strand viewer's filters; ends aren't drawn in 3D -->
+		{#if pickActive}
+			<div class="rounded-md border border-border p-2">
+				<Label class="text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
+					Select in 3D
+				</Label>
+				<div class="mt-2 flex flex-row flex-wrap gap-2">
+					<ToggleGroup.Root
+						type="multiple"
+						variant="outline"
+						size="sm"
+						bind:value={strandCtx.selectionToggles}
+					>
+						<ToggleGroup.Item value="SCAF" class={SCAF_TOGGLE_CLASS} title="Scaffold">
+							SCAF
+						</ToggleGroup.Item>
+						<ToggleGroup.Item value="STAP" class={STAP_TOGGLE_CLASS} title="Staples">
+							STAP
+						</ToggleGroup.Item>
+					</ToggleGroup.Root>
+					<ToggleGroup.Root
+						type="multiple"
+						variant="outline"
+						size="sm"
+						bind:value={strandCtx.selectionToggles}
+					>
+						<ToggleGroup.Item
+							value="END"
+							disabled
+							class="w-9 {FILTER_TOGGLE_CLASS}"
+							title="Ends are not drawn in 3D; pick them in the strand viewer"
+						>
+							<EndsIcon />
+						</ToggleGroup.Item>
+						<ToggleGroup.Item value="XOVER" class={FILTER_TOGGLE_CLASS} title="Crossovers">
+							<CrossoverIcon />
+						</ToggleGroup.Item>
+						<ToggleGroup.Item value="SEGMENT" class={FILTER_TOGGLE_CLASS} title="Segments">
+							<TextAlignJustify />
+						</ToggleGroup.Item>
+						<ToggleGroup.Item value="OLIGO" class={FILTER_TOGGLE_CLASS} title="Oligos">
+							<OligoIcon />
+						</ToggleGroup.Item>
+					</ToggleGroup.Root>
+				</div>
+				<div class="mt-2 flex flex-row items-center">
+					<Label for="select3dQuickSelection" class="mr-2 text-xs">Select:</Label>
+					<Select.Root
+						type="single"
+						name="select3dQuickSelection"
+						bind:value={strandCtx.selectAllMode}
+					>
+						<Select.Trigger class="w-[160px]" size="sm" title="Select all with">
+							{selectAllLabel}
+						</Select.Trigger>
+						<Select.Content>
+							<Select.Group>
+								<Select.Label>Select all with</Select.Label>
+								{#each SELECT_ALL_OPTIONS as option (option.value)}
+									<!-- Ends aren't pickable in 3D, so their option stays off here. -->
+									<Select.Item
+										value={option.value}
+										label={option.label}
+										disabled={option.enabledFor === 'END' ||
+											(!!option.enabledFor && !strandCtx.selectionFilter.has(option.enabledFor))}
+										class="text-xs"
+									>
+										{option.label}
+									</Select.Item>
+								{/each}
+							</Select.Group>
+						</Select.Content>
+					</Select.Root>
+				</div>
+				<p class="mt-2 text-muted-foreground">
+					{#if pickKindMissing}
+						Turn on crossovers, segments or oligos to pick in 3D.
+					{:else}
+						Click to select, Shift-click to add or remove, Shift-drag a box to add everything in it,
+						click empty space to clear. Dragging to rotate or pan keeps the selection.
+					{/if}
+				</p>
+			</div>
+		{/if}
+
 		<!-- Region visibility -->
 		{#if regionRows.length >= 1}
 			<div class="rounded-md border border-border p-2">

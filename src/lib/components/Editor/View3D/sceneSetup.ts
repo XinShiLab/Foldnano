@@ -18,6 +18,8 @@ export function setupScene(canvas: HTMLCanvasElement): SceneRig {
 	const renderer = new THREE.WebGLRenderer({
 		canvas,
 		antialias: true,
+		// drawOncePerPixel: translucent fat lines blend once where their pieces overlap.
+		stencil: true,
 	});
 	renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 	renderer.setClearColor(0xfafafa);

@@ -47,6 +47,8 @@ import {
 } from '$lib/model/io/simulationNtModel';
 import { createWatercolorMaterial, softenColor } from './ntWatercolorMaterial';
 import { getModificationColor } from '$lib/model/modifications';
+import { LinePickIndexBuilder, type LinePickIndex } from './linePick';
+import { drawOncePerPixel, nextStencilRef } from './drawOncePerPixel';
 
 export {
 	BACKBONE_RISE_NM,
@@ -60,8 +62,8 @@ export {
 
 // ── Physical constants (nm) ────────────────────────────────────────────────
 export const HELIX_VISUAL_RADIUS = 1.0; // ghost cylinder radius (nm)
-const LINE_WIDTH = 0.5; // world-unit line half-width → ~1 nm visible diameter
-const CROSSOVER_LINE_WIDTH = 0.2; // thinner: crossovers have no base-pair geometry
+export const LINE_WIDTH = 0.5; // world-unit line half-width → ~1 nm visible diameter
+export const CROSSOVER_LINE_WIDTH = 0.2; // thinner: crossovers have no base-pair geometry
 const DIMMED_FATLINE_OPACITY = 0.25;
 
 // ── NT model (watercolor) ───────────────────────────────────────────────────
@@ -486,6 +488,8 @@ export interface BuildResult {
 	crossovers: THREE.Group;
 	/** World-space center of all helices — use as OrbitControls target */
 	center: THREE.Vector3;
+	/** What the line view drew, for click picking; null in NT-model mode. */
+	pickIndex: LinePickIndex | null;
 }
 
 const DEFAULT_HIGHLIGHT_CONTEXT: Record<CanHighlight, boolean> = {
@@ -533,6 +537,7 @@ export function buildScene(
 ): BuildResult {
 	const group = new THREE.Group();
 	const filterSegments = excludeHiddenRegions(part, segmentFilter, hiddenRegionIds);
+	const pick = showNtModel ? null : new LinePickIndexBuilder();
 
 	// Collect per-VH frames and twist params for all geometry; keyed by vh.index
 	const vhFrames = new Map<number, VirtualHelixFrame>();
@@ -634,6 +639,8 @@ export function buildScene(
 				const override = segPositionOverrides?.get(seg.id);
 				const radial1 = vhRadial1.get(seg.inVirtualHelix.index)!;
 
+				const pickItem = pick!.addItem({ kind: 'segment', segment: seg }, dim);
+
 				const bucketKey = `${color.getHexString()}:${dim ? '1' : '0'}`;
 				let bucket = strandBuckets.get(bucketKey);
 				if (!bucket) {
@@ -663,6 +670,7 @@ export function buildScene(
 					}
 					if (i > 0) {
 						bucket.positions.push(prev[0], prev[1], prev[2], tmp[0], tmp[1], tmp[2]);
+						pick!.addPiece(pickItem, prev, tmp, physStart + i - 1, physStart + i);
 					}
 					prev[0] = tmp[0];
 					prev[1] = tmp[1];
@@ -682,6 +690,7 @@ export function buildScene(
 				transparent: bucket.dim,
 				opacity: bucket.dim ? DIMMED_FATLINE_OPACITY : 1,
 			});
+			if (bucket.dim) drawOncePerPixel(mat, nextStencilRef());
 			group.add(new LineSegments2(geo, mat));
 		}
 	}
@@ -830,6 +839,15 @@ export function buildScene(
 			const constraintId = `${seg.id}:3-${toSeg.id}:5`;
 			const stress = stressMap?.get(constraintId);
 			const arcPoints = new THREE.QuadraticBezierCurve3(from3D, mid, to3D).getPoints(20);
+			if (pick) {
+				const pickItem = pick.addItem({ kind: 'xover', segment: seg, toSegment: toSeg }, dim);
+				const bp = threePrime.index;
+				for (let i = 0; i < 20; i += 4) {
+					const a = arcPoints[i],
+						b = arcPoints[i + 4];
+					pick.addPiece(pickItem, [a.x, a.y, a.z], [b.x, b.y, b.z], bp, bp);
+				}
+			}
 
 			if (stress !== undefined) {
 				const arcColor = stressToColor(stress);
@@ -867,18 +885,16 @@ export function buildScene(
 		geo.setPositions(new Float32Array(bucket.positions));
 		// In NT (watercolor) mode the arcs are softened to blend with the translucent tubes.
 		const solidOpacity = showNtModel ? NT_CROSSOVER_OPACITY : 1;
-		crossovers.add(
-			new LineSegments2(
-				geo,
-				new LineMaterial({
-					color: bucket.color,
-					linewidth: CROSSOVER_LINE_WIDTH,
-					worldUnits: true,
-					transparent: bucket.dim || showNtModel,
-					opacity: bucket.dim ? DIMMED_FATLINE_OPACITY : solidOpacity,
-				})
-			)
-		);
+		const translucent = bucket.dim || showNtModel;
+		const mat = new LineMaterial({
+			color: bucket.color,
+			linewidth: CROSSOVER_LINE_WIDTH,
+			worldUnits: true,
+			transparent: translucent,
+			opacity: bucket.dim ? DIMMED_FATLINE_OPACITY : solidOpacity,
+		});
+		if (translucent) drawOncePerPixel(mat, nextStencilRef());
+		crossovers.add(new LineSegments2(geo, mat));
 	}
 
 	if (stressSolid.positions.length > 0) {
@@ -899,13 +915,16 @@ export function buildScene(
 		crossovers.add(
 			new LineSegments2(
 				geo,
-				new LineMaterial({
-					linewidth: CROSSOVER_LINE_WIDTH,
-					worldUnits: true,
-					vertexColors: true,
-					transparent: true,
-					opacity: DIMMED_FATLINE_OPACITY,
-				})
+				drawOncePerPixel(
+					new LineMaterial({
+						linewidth: CROSSOVER_LINE_WIDTH,
+						worldUnits: true,
+						vertexColors: true,
+						transparent: true,
+						opacity: DIMMED_FATLINE_OPACITY,
+					}),
+					nextStencilRef()
+				)
 			)
 		);
 	}
@@ -924,7 +943,7 @@ export function buildScene(
 	}
 	center.divideScalar(cylEntries.length || 1);
 
-	return { group, cylinders, labels, crossovers, center };
+	return { group, cylinders, labels, crossovers, center, pickIndex: pick?.build() ?? null };
 }
 
 // ── Export-safe scene builder ──────────────────────────────────────────────

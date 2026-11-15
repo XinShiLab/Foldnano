@@ -23,6 +23,7 @@ export function downloadScreenshot(
 		canvas: offscreen,
 		antialias: true,
 		preserveDrawingBuffer: true,
+		stencil: true, // drawOncePerPixel, as in the live view
 	});
 	tmp.setPixelRatio(renderer.getPixelRatio());
 	tmp.setSize(src.clientWidth, src.clientHeight, false);

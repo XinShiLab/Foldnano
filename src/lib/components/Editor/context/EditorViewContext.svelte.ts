@@ -85,8 +85,11 @@ export interface StrandToolbarController {
 	updateViewportScale: () => void;
 	/** Shifts the view by screen pixels; positive dx/dy moves the content right/down. */
 	panBy: (dx: number, dy: number) => void;
-	/** Centers the view on a helix's base, expanding its region if collapsed; false if not shown. */
-	centerOn: (vhId: string, bp: number) => boolean;
+	/**
+	 * Centers the view on a helix's base, expanding its region if collapsed; false if not shown.
+	 * `onlyIfOffscreen` leaves the view alone when that base is already on screen.
+	 */
+	centerOn: (vhId: string, bp: number, opts?: { onlyIfOffscreen?: boolean }) => boolean;
 	/** Scrolls vertically until a helix's row is on screen (no-op if it already is); false if not shown. */
 	revealVh: (vhId: string) => boolean;
 }
@@ -214,6 +217,7 @@ const fromToggleToLeafTarget = (toggles: SelectionToggle[]): Set<LeafTarget | Ca
 
 const DETAIL_ZOOM_THRESHOLD = 0.6;
 const DESIGN_CHECK_MAX_WAIT_MS = 1000;
+const CONTEXT_SAVE_DELAY_MS = 500;
 const DESIGN_CHECK_DELAY_MS = 150;
 
 const DEFAULT_DESIGN_CHECKS: DesignCheckSelection = {
@@ -269,7 +273,8 @@ class StrandViewContext {
 	});
 	/** Which design checks the issue overlay shows; editor rules on, export profiles opt-in. */
 	designChecks: DesignCheckSelection = $state({ ...DEFAULT_DESIGN_CHECKS });
-	selectionToggles: SelectionToggle[] = $state(['SCAF', 'STAP', 'END', 'XOVER', 'SEGMENT']);
+	// Scaffold off: it runs through every helix of an origami, so it's the easiest thing to mis-click.
+	selectionToggles: SelectionToggle[] = $state(['STAP', 'END', 'XOVER', 'SEGMENT']);
 	selectionFilter: Set<LeafTarget | Category> = $derived(
 		fromToggleToLeafTarget(this.selectionToggles)
 	);
@@ -965,6 +970,30 @@ export class EditorViewContext {
 		this.strandViewContext.activeCsRegionId = data.activeCsRegionId ?? null;
 	}
 
+	#contextSaveTimer: ReturnType<typeof setTimeout> | null = null;
+	#contextLoading = false;
+
+	/** Changes whenever a persisted view setting does; the editor watches it to save them. */
+	get serializableContextSignature(): string {
+		return JSON.stringify(this.getSerializableContext());
+	}
+
+	/**
+	 * Saves the view settings shortly after they change. They aren't design edits, so the design's
+	 * own saves (which also write them) never run for a filter toggle alone.
+	 */
+	scheduleContextSave(): void {
+		if (this.#contextSaveTimer) clearTimeout(this.#contextSaveTimer);
+		this.#contextSaveTimer = setTimeout(() => {
+			this.#contextSaveTimer = null;
+			// Mid-load the settings are defaults about to be replaced; saving them would overwrite
+			// the stored ones.
+			if (this.session.isLoading || this.#contextLoading) return;
+			if (!this.isTabOwner || !this.session.hasSavableName) return;
+			void this.saveContextToLocalStorage();
+		}, CONTEXT_SAVE_DELAY_MS);
+	}
+
 	async saveContextToLocalStorage(): Promise<boolean> {
 		try {
 			return await this.storageManager.saveContext(
@@ -978,6 +1007,7 @@ export class EditorViewContext {
 	}
 
 	async loadContextFromLocalStorage(): Promise<boolean> {
+		this.#contextLoading = true;
 		try {
 			const data = await this.storageManager.loadContext(this.currentDoc.id);
 			if (!data) return false;
@@ -986,10 +1016,13 @@ export class EditorViewContext {
 		} catch (e) {
 			console.error('[EditorViewContext] Failed to load context:', e);
 			return false;
+		} finally {
+			this.#contextLoading = false;
 		}
 	}
 
 	destroy(): void {
+		if (this.#contextSaveTimer) clearTimeout(this.#contextSaveTimer);
 		this.#stopDesignChecks?.();
 		this.agentRuns.dispose();
 		this.session.destroy();
