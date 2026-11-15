@@ -61,7 +61,7 @@ The **Saved Documents** page (`/toc`) lists every document in this browser. Each
 
 ## Autosave
 
-Autosave writes the current working copy to IndexedDB **after committed edits or after some elapsed time** (default policy: roughly every 10 committed edits or every minute). It does **not** download a file, push to GitHub, or create a commit. It only refreshes the level-1 working copy.
+Autosave writes the current working copy to IndexedDB **when you pause after an edit** (about two seconds with no editing, dragging, scrolling or typing). While you keep working without a pause, it still saves at least once a minute. It does **not** download a file, push to GitHub, or create a commit. It only refreshes the level-1 working copy.
 
 Foldnano also saves when you switch to another tab or window. If you try to close the tab while edits are still unsaved, the browser asks you to confirm.
 

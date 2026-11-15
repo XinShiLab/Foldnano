@@ -33,7 +33,7 @@
 	const showEmptyGestures = $derived(editorMode === 'DRAW' && isEmpty);
 </script>
 
-{#if showModeSwitch || showMissingGesture || showEmptyGestures}
+{#if region.supportsPlaneViewEditing && (showModeSwitch || showMissingGesture || showEmptyGestures)}
 	<div
 		class="pointer-events-none absolute inset-x-4 text-center text-xs leading-relaxed text-muted-foreground select-none {isEmpty
 			? 'top-1/4'

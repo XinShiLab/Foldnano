@@ -1,6 +1,13 @@
 <script lang="ts">
 	import type { Stage } from 'svelte-konva';
-	import { Shrink, ImageDown, Trash2, CircleDashed, CircleDotDashed } from '@lucide/svelte/icons';
+	import {
+		Shrink,
+		Scan,
+		ImageDown,
+		Trash2,
+		CircleDashed,
+		CircleDotDashed,
+	} from '@lucide/svelte/icons';
 	import * as ButtonGroup from '$lib/components/ui/button-group/index.js';
 	import * as Separator from '$lib/components/ui/separator/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -16,20 +23,24 @@
 		moveFreeformVirtualHelicesCmd,
 	} from '$lib/commands/virtualHelix';
 	import { planRadialDistribute } from './radialDistribute';
+	import { VIEW_ONLY_PLANE_HELP } from './utils';
 	import { scrollStrip } from '$lib/components/scroll-strip/scroll-strip';
 	import type VirtualHelix from '$lib/model/VirtualHelix/VirtualHelix.svelte';
 
 	interface Props {
 		stage: Stage | undefined;
+		fitView?: () => void;
 	}
 
-	let { stage }: Props = $props();
+	let { stage, fitView }: Props = $props();
 
 	const ctx = getEditorViewContext();
 	const session = getEditorDocumentSession();
 
+	const planeEditable = $derived(ctx.activeRegion?.supportsPlaneViewEditing ?? true);
 	const hasVhSelection = $derived(
-		ctx.selectedLatticeVhIndices.size > 0 || ctx.selectedFreeformVhIndices.size > 0
+		planeEditable &&
+			(ctx.selectedLatticeVhIndices.size > 0 || ctx.selectedFreeformVhIndices.size > 0)
 	);
 
 	const selectedFreeformVhsInActiveRegion = $derived.by(() => {
@@ -41,7 +52,9 @@
 			.filter((vh): vh is VirtualHelix => vh?.regionId === activeRegion.id);
 	});
 	const canDistributeRadially = $derived(
-		ctx.isTabOwner && planRadialDistribute(selectedFreeformVhsInActiveRegion) !== null
+		ctx.isTabOwner &&
+			planeEditable &&
+			planRadialDistribute(selectedFreeformVhsInActiveRegion) !== null
 	);
 
 	function distributeRadially(faceCenter: boolean) {
@@ -96,6 +109,17 @@
 	>
 		<Shrink />
 	</Button>
+	{#if fitView}
+		<Button
+			variant="ghost"
+			size="icon-sm"
+			title="Fit to helices"
+			onclick={fitView}
+			{@attach help({ text: 'Zoom and pan so every helix of this region is in view.' })}
+		>
+			<Scan />
+		</Button>
+	{/if}
 
 	<Separator.Root orientation="vertical" class="h-5 shrink-0 self-center" />
 
@@ -103,55 +127,67 @@
 		<span class="px-1 text-[9px] font-medium tracking-[0.14em] text-muted-foreground uppercase"
 			>Mode</span
 		>
-		<EditorModeToggleGroup modes={['PAN', 'SELECT', 'DRAW']} />
+		<EditorModeToggleGroup
+			modes={['PAN', 'SELECT', 'DRAW']}
+			disabledModes={planeEditable ? [] : ['DRAW']}
+		/>
 	</div>
 
 	<Separator.Root orientation="vertical" class="h-5 shrink-0 self-center" />
 
-	<div class="flex shrink-0 items-center gap-1">
-		<span class="px-1 text-[9px] font-medium tracking-[0.14em] text-muted-foreground uppercase"
-			>Edit</span
+	{#if !planeEditable}
+		<span
+			class="shrink-0 px-1 text-xs whitespace-nowrap text-muted-foreground"
+			{@attach help({ text: VIEW_ONLY_PLANE_HELP })}
 		>
-		<ButtonGroup.Root class="shrink-0">
-			<Button
-				variant="outline"
-				size="icon-sm"
-				title="Delete selected helices"
-				disabled={!hasVhSelection}
-				onclick={deleteSelectedVhs}
-				{@attach help({
-					key: '⌫',
-					text: 'Delete the selected helices. In lattice regions only empty helices are removed.',
-				})}
+			Wireframe: select only. Edit helices in the Select panel.
+		</span>
+	{:else}
+		<div class="flex shrink-0 items-center gap-1">
+			<span class="px-1 text-[9px] font-medium tracking-[0.14em] text-muted-foreground uppercase"
+				>Edit</span
 			>
-				<Trash2 />
-			</Button>
-			<Button
-				variant="outline"
-				size="icon-sm"
-				title="Distribute in a circle"
-				disabled={!canDistributeRadially}
-				onclick={() => distributeRadially(false)}
-				{@attach help({
-					text: 'Space three or more selected perpendicular helices evenly on a circle around their centre, keeping their order and roll.',
-				})}
-			>
-				<CircleDashed />
-			</Button>
-			<Button
-				variant="outline"
-				size="icon-sm"
-				title="Distribute in a circle, facing the centre"
-				disabled={!canDistributeRadially}
-				onclick={() => distributeRadially(true)}
-				{@attach help({
-					text: 'Like Distribute in a circle, and also rolls each helix so roll 0 points at the centre.',
-				})}
-			>
-				<CircleDotDashed />
-			</Button>
-		</ButtonGroup.Root>
-	</div>
+			<ButtonGroup.Root class="shrink-0">
+				<Button
+					variant="outline"
+					size="icon-sm"
+					title="Delete selected helices"
+					disabled={!hasVhSelection}
+					onclick={deleteSelectedVhs}
+					{@attach help({
+						key: '⌫',
+						text: 'Delete the selected helices. In lattice regions only empty helices are removed.',
+					})}
+				>
+					<Trash2 />
+				</Button>
+				<Button
+					variant="outline"
+					size="icon-sm"
+					title="Distribute in a circle"
+					disabled={!canDistributeRadially}
+					onclick={() => distributeRadially(false)}
+					{@attach help({
+						text: 'Space three or more selected perpendicular helices evenly on a circle around their centre, keeping their order and roll.',
+					})}
+				>
+					<CircleDashed />
+				</Button>
+				<Button
+					variant="outline"
+					size="icon-sm"
+					title="Distribute in a circle, facing the centre"
+					disabled={!canDistributeRadially}
+					onclick={() => distributeRadially(true)}
+					{@attach help({
+						text: 'Like Distribute in a circle, and also rolls each helix so roll 0 points at the centre.',
+					})}
+				>
+					<CircleDotDashed />
+				</Button>
+			</ButtonGroup.Root>
+		</div>
+	{/if}
 
 	<Separator.Root orientation="vertical" class="h-5 shrink-0 self-center" />
 

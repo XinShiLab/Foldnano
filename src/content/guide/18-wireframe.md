@@ -6,6 +6,7 @@ order: 18
 slug: wireframe
 covers:
   - src/lib/components/Editor/ToolPanel/ReferenceMesh*.svelte
+  - src/lib/components/Editor/HelixView/freeformBatch.ts
 ---
 
 <script>
@@ -75,7 +76,11 @@ Changing the mesh never changes helices, and changing helices never changes the 
 
 ## Helices In A Wireframe Region
 
-Helices are placed as in a [freeform region](/docs/guide/creating-a-design), at any position and angle, and you edit strands as usual. The plane view does not offer the rotate handle or direction field, because those edits would flatten a helix into the plane.
+Helices are placed as in a [freeform region](/docs/guide/creating-a-design), at any position and angle, and you edit strands as usual in the strand view.
+
+The plane view of a wireframe region is for looking and selecting only, so that large designs stay fast to draw. Click a helix to select it (Shift or Cmd/Ctrl-click to add or remove one), or drag a box to select several. Selecting a helix scrolls the strand view to it. To change a selected helix's position or roll, use the fields in the Select tool panel. The plane view does not add, move, rotate or delete helices in a wireframe region, and strand ends can't be dragged there.
+
+Zooming in past 100% keeps lines, end markers and numbers at the same size on screen while the helices spread apart, so crowded areas separate into readable strands.
 
 The plane view looks along +W, so depth shows as opacity: helices at more negative W are nearer and more solid, and helices at more positive W are fainter. Where helices overlap, the nearer one is on top and takes the click.
 

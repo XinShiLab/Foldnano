@@ -249,6 +249,12 @@ row.
 Dragging a VH tag in `SELECT` mode calls `reorderVirtualHelixCmd(...)`, which
 reorders the VH **within its region-local row order** rather than globally.
 
+The tag is outlined when its helix is selected in a plane view: freeform helices
+from `selectedFreeformVhIndices`, lattice helices from `selectedLatticeVhIndices`.
+The plane viewers bring the row into view with `StrandToolbarController.revealVh`
+(vertical only, no-op when the row is already on screen) or `centerOn` (in-plane
+freeform helices, centred on the clicked base).
+
 ---
 
 ## Cross-Section Cursor
@@ -278,14 +284,32 @@ That same bp index is consumed by:
 The current viewer keeps several optimizations introduced during the region
 refactor:
 
+- **Cull against `strandViewContext.renderBounds`, not `viewportBounds`.** The render
+  window is the viewport plus a margin, and `nextRenderWindow` (`renderWindow.ts`) replaces
+  it only when the viewport nears its edge or has shrunk well inside it. Every segment and
+  crossover holds a derived on it, so a pan or wheel step that stays inside re-evaluates
+  nothing; `viewportBounds` changes on every step and would re-run all of them.
+  `StrandViewer.updateViewportBounds` maintains both, on wheel, on stage `dragmove` (so a
+  long pan never shows blank canvas) and on `dragend`.
+- **Zoom thresholds go through `strandViewContext.isDetailZoom`** (a derived boolean), not
+  a per-node comparison with `viewportScale`, for the same reason.
 - `OligoSegmentInPart` always mounts (for every segment in the part) but toggles
-  its Konva `visible` attribute based on an overscanned viewport window. Sequence
-  text is gated the same way.
+  its Konva `visible` attribute from the render window. Sequence text is gated the same
+  way, and its `sceneFunc` narrows to the exact viewport at draw time (`stageViewRect`).
+- **Sequence changes reach the view through `OligoSegment.seqVersion`**, one signal per
+  segment that every slot write bumps. The sequence Shape passes it as a `redrawKey` attr
+  (not a Konva attr; changing it is what triggers the layer redraw). Don't read each
+  `slot.seq` in a derived to detect changes: that is one subscription per base.
+- `VhGrid` draws its lines in one Shape and clips the loop at draw time to the rows and bp
+  range the stage shows, and drops the per-bp lines when they would be closer than
+  `MIN_BP_LINE_SPACING_PX` device pixels. It measures that from the canvas transform, which
+  includes the export pixel ratio, so the image export keeps them.
 - `Accessories` wraps crossovers and skip/insert markers in `<Group visible={…}>`
-  culled against an overscanned render rect — again a `visible` toggle, not
-  mount/unmount.
-- `SelectionOverlay` draws highlighted segments and crossovers in one batched
-  `Konva.Shape` instead of many per-selection components
+  culled against the render window — again a `visible` toggle, not mount/unmount.
+- A crossover's wide pick area is its line's `hitStrokeWidth`; the hover halo is a second
+  line mounted only while hovered (hover-driven, not pan/zoom-driven, so `{#if}` is fine).
+- `SelectionOverlay` draws highlighted segments, crossovers and selected free ends in one
+  batched `Konva.Shape` instead of many per-selection components
 - the world layer uses `listening=false` so background strand geometry never
   participates in Konva hit testing
 - `MismatchMarkers` is gated behind `warningContext.mismatch` (an `{#if}` at
@@ -375,7 +399,10 @@ rule, used by `Accessories` to skip a line and by `buildConnectionMarks` to add 
 `EditorViewContext.designIssues` is `collectDesignIssues(part, activeRegion, designChecks)` (see
 `design-guards.md`), recomputed when `strandViewContext.designChecks`, the active region, the
 document or `historyStack.revision` change. The model is read inside `untrack`, so dragging
-(live mutations before the commit) doesn't recompute it; the commit does.
+(live mutations before the commit) doesn't recompute it; the commit does. The checks walk every
+base, so they don't run inside the edit: an effect root owned by `EditorViewContext` schedules
+them with `requestIdleCallback` (a short timeout where that is missing) and cancels the pending
+run when another change arrives. The markers and the list show the previous result until then.
 
 - `DesignIssueMarkers` frames each `error` (red) / `warning` (amber) issue that names a helix: the
   base column when the anchor has a `bp`, else a frame just left of the helix's first base.
@@ -394,6 +421,7 @@ document or `historyStack.revision` change. The model is read inside `untrack`, 
 - **Don't bypass `drawingDimensions` for coordinate math.** It is the only consistent source of (bpIdx ↔ x) and (displayRow ↔ y) under collapse/region rules.
 - **Don't mount one component per segment for selection.** Use the batched `SelectionOverlay`. The "many mounted route components" path was deliberately retired.
 - **Don't reorder `VhGrid` / `MismatchMarkers` / `StrandRoutes` in the world layer without checking z-order.** Mount order there is bottom-to-top paint order, and it's intentional (grid under warnings under sequence text) — see Layer Architecture above.
+- **Don't read `viewportBounds` or `viewportScale` in a per-segment or per-crossover expression.** They change on every pan/zoom step; use `renderBounds` and `isDetailZoom`, or read the stage inside a `sceneFunc`.
 - **Don't viewport-cull with `{#if}` / `{#each}`.** Toggle Konva `visible` instead. Mounting/unmounting svelte-konva nodes on pan/zoom mutates the DOM every frame and pins Firefox at ~40% CPU in `RestyleManager`. See _Cull with `visible`, never with `{#if}`_ above.
 - **Don't poke at `strandViewContext.collapsedRegionIds` from inside a tool.** Toggle through the `RegionHeader` interaction so cleanup of `activeAround`, hover, and menu state runs. (`centerOn` sets it directly, but only ever expands a region, which hides nothing.)
 - **Don't mount a component per hidden-crossover mark, or draw the hover preview in a listening layer.** See _Hidden Crossover Marks_.

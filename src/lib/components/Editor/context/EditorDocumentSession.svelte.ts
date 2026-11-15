@@ -71,6 +71,8 @@ export interface EditorDocumentSessionHooks {
 	repairActiveRegion: () => void;
 	loadPersistedContext: () => Promise<boolean>;
 	savePersistedContext: () => Promise<boolean>;
+	/** True while the editor should defer an idle autosave (pointer held, simulation, replay). */
+	isEditorBusy?: () => boolean;
 }
 
 interface PersistResult {
@@ -258,7 +260,8 @@ export class EditorDocumentSession {
 				this.hooks.repairActiveRegion();
 			},
 			() => this.isTabOwner && this.hasSavableName,
-			() => this.#afterSave()
+			() => this.#afterSave(),
+			() => this.hooks.isEditorBusy?.() ?? false
 		);
 	}
 

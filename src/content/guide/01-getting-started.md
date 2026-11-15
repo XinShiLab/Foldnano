@@ -78,7 +78,7 @@ Use `.fn.json` whenever the goal is to preserve the design. Use cadnano JSON onl
 
 ## Local-First Saving, And Its One Caveat
 
-Foldnano stores browser working copies in IndexedDB. **Autosave** writes to that browser storage after committed edits or after some elapsed time, but it does **not** download a file and it does **not** create a Git commit.
+Foldnano stores browser working copies in IndexedDB. **Autosave** writes to that browser storage when you pause after an edit (and at least once a minute while you keep editing), but it does **not** download a file and it does **not** create a Git commit.
 
 <Callout type="warning">
 

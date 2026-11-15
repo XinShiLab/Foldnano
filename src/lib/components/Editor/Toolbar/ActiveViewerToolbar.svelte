@@ -97,7 +97,7 @@
 				/>
 			{:else if activeViewer === 'HELIX' && helixToolbar}
 				<div class="flex h-full items-center">
-					<HelixViewerTools stage={helixToolbar.stage} />
+					<HelixViewerTools stage={helixToolbar.stage} fitView={helixToolbar.fitView} />
 				</div>
 			{:else if activeViewer === 'VIEW3D' && view3DToolbar}
 				<View3DTools

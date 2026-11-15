@@ -11,7 +11,7 @@
 
 	let showSaveFromUrlDialog = $state(false);
 
-	// Update every second for relative time display
+	// Update every second for the relative time in the tooltip
 	let now = $state(Date.now());
 	$effect(() => {
 		const interval = setInterval(() => {
@@ -20,19 +20,18 @@
 		return () => clearInterval(interval);
 	});
 
-	function getRelativeTime(): string {
-		const { lastSavedTime } = session;
-		if (!lastSavedTime) return 'Not saved';
-
+	function getRelativeTime(lastSavedTime: number): string {
 		const seconds = Math.floor((now - lastSavedTime) / 1000);
-		if (seconds < 5) return 'Saved just now';
-		if (seconds < 60) return `Saved ${seconds}s ago`;
+		if (seconds < 5) return 'just now';
+		if (seconds < 60) return `${seconds}s ago`;
 
 		const minutes = Math.floor(seconds / 60);
-		if (minutes < 60) return `Saved ${minutes}m ago`;
+		if (minutes < 60) return `${minutes}m ago`;
 
 		const hours = Math.floor(minutes / 60);
-		return `Saved ${hours}h ago`;
+		if (hours < 24) return `${hours}h ago`;
+
+		return `${Math.floor(hours / 24)}d ago`;
 	}
 
 	async function handleManualSave() {
@@ -48,7 +47,7 @@
 	}
 </script>
 
-<div class="flex items-center gap-1">
+<div class="flex items-center gap-2">
 	{#if session.pendingUrlSave}
 		<button
 			class="flex cursor-pointer items-center gap-2 rounded border border-blue-300 bg-blue-50 px-3 py-1 text-[13px] text-blue-700 transition-all hover:bg-blue-100 dark:border-blue-700 dark:bg-blue-950 dark:text-blue-300 dark:hover:bg-blue-900"
@@ -68,40 +67,60 @@
 			onConfirm={handleConfirmUrlSave}
 		/>
 	{:else}
-		<button
-			class="flex items-center gap-2 rounded border border-border bg-background px-3 py-1 text-[13px] text-muted-foreground transition-all"
-			class:cursor-pointer={!session.isSaved || session.autoSaveError}
-			class:cursor-default={session.isSaved && !session.autoSaveError}
-			class:hover:bg-muted={!session.isSaved || session.autoSaveError}
-			onclick={handleManualSave}
-			{@attach help({
-				title: 'Save status',
-				text: 'Green: saved in this browser. Amber: autosave pending, click to save now. Red: the last save failed, click to retry.',
-				doc: 'saving-github',
-			})}
-			title={session.autoSaveError
-				? `Save failed: ${session.autoSaveError} - Click to retry`
-				: session.isSaved
-					? 'All changes saved locally'
-					: `${session.editsSinceLastSave} unsaved edits - Click to save now`}
-		>
-			<span
-				class="size-2 shrink-0 rounded-full transition-colors duration-300"
-				class:bg-emerald-500={session.isSaved && !session.autoSaveError}
-				class:bg-amber-400={!session.isSaved && !session.autoSaveError}
-				class:bg-red-500={session.autoSaveError}
-				class:animate-pulse={!session.isSaved}
-			></span>
-			<span class="whitespace-nowrap select-none">
-				{#if session.autoSaveError}
-					Save failed
-				{:else if session.isSaved}
-					{getRelativeTime()}
-				{:else}
-					{session.editsSinceLastSave} unsaved {session.editsSinceLastSave === 1 ? 'edit' : 'edits'}
-				{/if}
-			</span>
-		</button>
+		<Tooltip.Provider delayDuration={300}>
+			<Tooltip.Root>
+				<Tooltip.Trigger>
+					{#snippet child({ props })}
+						<button
+							{...props}
+							class="flex items-center gap-2 rounded border border-border bg-background px-3 py-1 text-[13px] text-muted-foreground transition-all"
+							class:cursor-pointer={!session.isSaved || session.autoSaveError}
+							class:cursor-default={session.isSaved && !session.autoSaveError}
+							class:hover:bg-muted={!session.isSaved || session.autoSaveError}
+							onclick={handleManualSave}
+							{@attach help({
+								title: 'Save status',
+								text: 'Green: saved in this browser. Amber: autosave pending, click to save now. Red: the last save failed, click to retry.',
+								doc: 'saving-github',
+							})}
+						>
+							<span
+								class="size-2 shrink-0 rounded-full transition-colors duration-300"
+								class:bg-emerald-500={session.isSaved && !session.autoSaveError}
+								class:bg-amber-400={!session.isSaved && !session.autoSaveError}
+								class:bg-red-500={session.autoSaveError}
+								class:animate-pulse={!session.isSaved}
+							></span>
+							<span class="whitespace-nowrap select-none">
+								{#if session.autoSaveError}
+									Save failed
+								{:else if session.isSaved}
+									{session.lastSavedTime ? 'Saved' : 'Not saved'}
+								{:else}
+									{session.editsSinceLastSave} unsaved {session.editsSinceLastSave === 1
+										? 'edit'
+										: 'edits'}
+								{/if}
+							</span>
+						</button>
+					{/snippet}
+				</Tooltip.Trigger>
+				<!-- A native title would re-render every second with the clock and never show. -->
+				<Tooltip.Content class="text-xs">
+					{#if session.autoSaveError}
+						Save failed: {session.autoSaveError}. Click to retry.
+					{:else if session.isSaved}
+						All changes saved locally{session.lastSavedTime
+							? ` (${getRelativeTime(session.lastSavedTime)})`
+							: ''}
+					{:else}
+						{session.editsSinceLastSave} unsaved {session.editsSinceLastSave === 1
+							? 'edit'
+							: 'edits'}. Click to save now.
+					{/if}
+				</Tooltip.Content>
+			</Tooltip.Root>
+		</Tooltip.Provider>
 	{/if}
 	<Tooltip.Provider delayDuration={200}>
 		<Tooltip.Root>
@@ -111,7 +130,7 @@
 					aria-label="Storage info">!</span
 				>
 			</Tooltip.Trigger>
-			<Tooltip.Content class="max-w-64 text-center text-xs leading-relaxed">
+			<Tooltip.Content class="block max-w-64 text-center text-xs leading-relaxed">
 				Your design is saved in your browser's local storage, not on any server. To back it up or
 				collaborate, connect a GitHub repository and commit your changes.
 				{#if session.storagePersistence === 'best-effort'}

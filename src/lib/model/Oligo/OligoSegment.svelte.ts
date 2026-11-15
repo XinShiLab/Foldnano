@@ -32,6 +32,7 @@ class Slot {
 	set seq(value: string) {
 		if (value === this._seq) return;
 		this._seq = value;
+		this.segment.seqVersion++;
 		// sequence change unlocks the oligo
 		const oligo = this.segment.oligo;
 		if (oligo) oligo.isSequenceLocked = false;
@@ -47,6 +48,9 @@ export default class OligoSegment {
 
 	// canonical storage
 	private _slots: Slot[] = $state([]);
+	/** Bumps when any slot's sequence changes. A view that only needs "something changed"
+	 * reads this one signal instead of subscribing to every base. Not persisted. */
+	seqVersion = $state(0);
 
 	// legacy fields now derived (keep signatures for external code)
 	get sequence(): string {
@@ -195,6 +199,7 @@ export default class OligoSegment {
 		const oligo = this.oligo;
 		if (oligo) oligo.isSequenceLocked = false;
 		this._slots = newSlots;
+		this.seqVersion++;
 	}
 
 	addSlot(bpIndex: number, seq: string): void {
@@ -205,12 +210,14 @@ export default class OligoSegment {
 		this._slots.sort((a, b) =>
 			this.inStrandIndex === 0 ? a.bpIndex - b.bpIndex : b.bpIndex - a.bpIndex
 		);
+		this.seqVersion++;
 	}
 
 	removeSlotAt(bpIndex: number): void {
 		const oligo = this.oligo;
 		if (oligo) oligo.isSequenceLocked = false;
 		this._slots = this._slots.filter((s) => s.bpIndex !== bpIndex);
+		this.seqVersion++;
 	}
 
 	// convenience: sequence at bp (may be '', length 1, or >1)

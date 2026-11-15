@@ -16,10 +16,11 @@ This document covers how Foldnano persists the current document locally while th
 
 Autosave is enabled by default through `HistoryStack` in `src/lib/commands/history.svelte.ts`.
 
-By default, the current document snapshot is persisted to IndexedDB when either condition is met:
+By default, the current document snapshot is persisted to IndexedDB when any condition is met:
 
-- 10 undoable edits have happened since the last save
-- 60 seconds have passed and there are unsaved edits
+- **idle**: the user has paused for 2 s after an edit (see § Idle save); this does most saves
+- **timer**: 60 seconds have passed and there are unsaved edits (cap for continuous editing)
+- **edit-count**: 50 undoable edits since the last save (safety net if input keeps deferring idle)
 
 The active document is also explicitly persisted before operations that could otherwise lose in-memory changes, such as:
 
@@ -87,7 +88,36 @@ That second state is exposed via `hasUncommittedGitHubChanges`.
 2. `HistoryStack` records granular before/after patches for the affected model state.
 3. If the command changed recorded state, the undo stack is updated and the edit counter increments.
 4. If the edit threshold is reached, autosave persists the plain snapshot object to IndexedDB.
-5. A timer also checks periodically and saves if the document is dirty.
+   Only one write runs at a time: an edit or timer tick that arrives while a write is pending
+   starts no second one, it re-checks the threshold when the write finishes. Edits made during
+   the write are not in it, so they stay counted as unsaved. `saveNow()` / `saveNowIfDirty()`
+   wait for the pending write and then write again, so they always hold the state at call time.
+5. Every edit, undo and redo also arms the idle save (below).
+6. A timer also checks periodically and saves if the document is dirty.
+
+### Idle save
+
+Each save is a full synchronous snapshot on the main thread, so the edit-count trigger, which
+fires mid-burst by definition, is the one that hitches on a large design. The idle save moves
+that cost to a pause. "Idle" is checked in three layers:
+
+1. **No edit** for `idleDelayMs` (2 s): `#markDirty` stamps `#lastActivityAt` and arms one timeout.
+2. **No input** for the same window: edits commit only at gesture end, so `Editor.svelte` feeds
+   window-level capture listeners (pointer down/move/up/cancel, wheel, keydown) into
+   `EditorViewContext.noteInputActivity()`, which calls `HistoryStack.noteActivity()`. That only
+   stamps the time; the timer reschedules itself for the remaining quiet window, so there is no
+   timer churn per pointer move. Hover moves (no buttons) don't count.
+3. **Not busy**: the injected `isBusy` predicate (session hook `isEditorBusy`) defers while a
+   pointer is held, a rigid-body simulation runs or an oxDNA replay plays. Plugin runs don't
+   count: they run off-thread and only touch the document on apply, which is a normal edit.
+
+Once all pass, the save starts through `requestIdleCallback` (1 s timeout; immediate where
+missing). That only picks when the snapshot starts; it cannot chunk it. The delay is
+`max(idleDelayMs, 10 × last save duration)`, so a design whose save takes hundreds of ms is not
+rewritten after every short pause. The idle save goes through `#performAutoSave('idle')`, so the
+in-flight guard, owner-tab gate and `hasSavableName` apply unchanged; if a write was in flight,
+the idle save re-arms when it finishes. While `autoSaveStatus.error` is set it stands down: the
+quick retry and the timer own retrying, so a broken store isn't hit on every pause.
 
 ### Explicit local save
 
@@ -139,8 +169,8 @@ URL-loaded design is still pending its first save.
 
 - `beforeunload`: when the owner tab has unsaved edits or a failed save, the browser shows its
   leave-page prompt. If the last save didn't fail, it also starts a save, which usually completes
-  while the prompt is open. Autosave waits for 10 edits or 60 s, so without this guard closing the
-  tab inside that window drops the latest edits silently.
+  while the prompt is open. Autosave waits for a 2 s pause (or 60 s / 50 edits), so without this
+  guard closing the tab inside that window drops the latest edits silently.
 - `visibilitychange` → hidden: saves if dirty (owner tab, not a pending URL design). Switching tabs
   or minimising flushes the dirty window, so the leave-page prompt is rarely needed.
 
@@ -202,7 +232,8 @@ Once the design has a Part and still has the reserved name (`session.needsName`)
 `HistoryStack` exposes the auto-save knobs:
 
 ```ts
-historyStack.setAutoSaveConfig({ enabled, editCountThreshold, timeIntervalMs })
+historyStack.setAutoSaveConfig({ enabled, editCountThreshold, timeIntervalMs, idleDelayMs })
+historyStack.noteActivity()      // stamp user input so the idle save waits for a pause
 historyStack.saveNow()           // force-save regardless of dirty
 historyStack.saveNowIfDirty()    // save only if dirty (used before file switches)
 historyStack.markSaved(time?)    // reset counters without writing (e.g. after a successful Git commit)
@@ -212,7 +243,7 @@ historyStack.destroy()           // tear down the timer
 historyStack.autoSaveStatus      // reactive { lastSavedTime, hasUnsavedChanges, editsSinceLastSave, error? }
 ```
 
-Auto-save trigger labels reported in logs: `'edit-count' | 'timer' | 'manual'`.
+Auto-save trigger labels reported in logs: `'idle' | 'edit-count' | 'timer' | 'manual' | 'retry'`.
 
 ## Current Limits
 
@@ -226,6 +257,10 @@ Auto-save trigger labels reported in logs: `'edit-count' | 'timer' | 'manual'`.
 - **Don't call `saveNow()` from within a render or a `$derived`.** Auto-save is async — call it from event handlers or effects.
 - **Don't bump `documents.lastModified` for a no-op save.** Use `saveNowIfDirty()`; otherwise GitHub-dirty detection produces false positives.
 - **Don't replace the snapshot path with stringification.** Working-copy saves are plain objects in IndexedDB. JSON-string round-trips happen only at GitHub and export boundaries.
+- **Don't start a write past the in-flight guard.** Each save copies the whole document; on a large design, one per edit while a write is pending stalls editing. Go through `#performAutoSave`.
+- **Don't reset the edit counter to zero after a write.** Subtract what the snapshot held; edits made while it was pending are still unsaved.
+- **Don't make `noteActivity()` do more than stamp a time.** It runs on every pointer move; the idle timer does the rescheduling.
+- **Don't drop the timer or edit-count triggers in favour of idle alone.** Continuous input (a long drag session, a running simulation) defers idle indefinitely; those two bound the unsaved window.
 - **Don't autosave from a non-owner tab.** Saves must be gated on `EditorDocumentSession.isTabOwner`.
 - **Don't autosave a pristine blank document.** `isPristineUnsavedBlankDocument()` is the guard — preserving it keeps the TOC clean of untouched defaults.
 - **Don't add a snapshot write that skips `hasSavableName`.** A design saved as `"Untitled Document"` is what the name prompt exists to prevent.

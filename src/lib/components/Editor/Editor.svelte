@@ -218,6 +218,8 @@
 		e.returnValue = '';
 	}
 
+	const noteInputActivity = (e: Event) => editorViewContext.noteInputActivity(e);
+
 	function handleVisibilityChange() {
 		// Coming back to the tab: GitHub may have changed meanwhile.
 		if (document.visibilityState === 'visible') session.recheckRemote();
@@ -517,11 +519,13 @@
 				}
 
 				if (editorViewContext.selectedFreeformVhIndices.size > 0) {
-					const selectedInActiveRegion = activeRegion?.supportsFreeformPlacement
-						? Array.from(editorViewContext.selectedFreeformVhIndices).filter(
-								(vhIndex) => part.getVhByIndex(vhIndex)?.regionId === activeRegion!.id
-							)
-						: [];
+					// View-only regions (wireframes) don't delete helices from the plane view.
+					const selectedInActiveRegion =
+						activeRegion?.supportsFreeformPlacement && activeRegion.supportsPlaneViewEditing
+							? Array.from(editorViewContext.selectedFreeformVhIndices).filter(
+									(vhIndex) => part.getVhByIndex(vhIndex)?.regionId === activeRegion!.id
+								)
+							: [];
 					if (selectedInActiveRegion.length > 0) {
 						deleteFreeformVirtualHelicesCmd(
 							{ part, vhIndices: selectedInActiveRegion },
@@ -629,6 +633,12 @@
 </script>
 
 <svelte:window
+	onpointerdowncapture={noteInputActivity}
+	onpointermovecapture={noteInputActivity}
+	onpointerupcapture={noteInputActivity}
+	onpointercancelcapture={noteInputActivity}
+	onwheelcapture={noteInputActivity}
+	onkeydowncapture={noteInputActivity}
 	onbeforeunload={handleBeforeUnload}
 	onoffline={() => session.markRemoteUnchecked()}
 	ononline={() => session.recheckRemote()}

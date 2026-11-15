@@ -106,6 +106,12 @@ setOligoForSegment(segmentId, oligo): void
 clear(): void
 ```
 
+`Part.getOligoBySegment(segment)` (and so `segment.oligo`) answers from
+`getOligoBySegmentId`, after checking that the indexed oligo still holds the segment and is
+still in the part; only a miss or a stale entry (mid-mutation, between un-indexing and
+re-indexing) falls back to scanning all oligos. It never writes the index, so it is safe to
+call inside a `$derived`.
+
 `Part` wraps that service with view-friendly helpers:
 
 ```ts

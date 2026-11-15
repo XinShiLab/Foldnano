@@ -5,6 +5,7 @@ covers:
   - src/lib/components/Editor/HelixView/planeDepthFade.ts
   - src/lib/components/Editor/HelixView/planeAxes.ts
   - src/lib/components/Editor/HelixView/radialDistribute.ts
+  - src/lib/components/Editor/HelixView/freeformBatch.ts
   - src/lib/components/Editor/ToolPanel/FreeformVhPanel.svelte
   - src/lib/components/Editor/ToolPanel/RollDial.svelte
 ---
@@ -93,6 +94,13 @@ Supported interactions in `SELECT` mode:
 - drag a selected VH -> move the whole selected group
 - drag an unselected VH -> select it, then move it
 - drag a visible rotate handle -> rotate one in-plane VH
+
+A plain click on a helix (pointer-up without a drag), or a modifier-click that adds
+it, brings it into view in the strand view: an in-plane helix through
+`strandToolbarController.centerOn(vh.id, bp)` at the base under the pointer
+(`layerPointToBpIndex`), a perpendicular one through `revealVh(vh.id)` (vertical
+only, no-op when on screen). The strand view outlines the VH tag; ends are not
+selected.
 
 Delete / Backspace is handled at the editor level and calls
 `deleteFreeformVirtualHelicesCmd(...)` when the active part is freeform and the
@@ -215,6 +223,72 @@ The viewer renders:
 - per-VH rotate handles on hover
 - roll markers (see below)
 
+### Layers and redraw cost
+
+The stage has two layers. The **design layer** holds the background hit rect, axes,
+helices and crossovers. The **overlay layer** holds what changes per pointer event:
+drag guides, marquee, line / connection previews, and the per-helix adornments
+(selection halos, roll handles and glyphs, rotate handle) for `adornedVhs` only
+(selected ∪ hovered ∪ the helix being rotated or rolled). A hover, selection change
+or marquee drag therefore repaints a handful of nodes, not the region.
+
+What keeps a helix drag from re-running the whole region per pointer event:
+
+- `extentByVhIndex` reads strands only; `depthByVhIndex` and `drawnVhs` hand back
+  their previous value when unchanged, so an in-plane move doesn't re-run every
+  helix's opacity or re-sort the draw order.
+- per-helix hover goes through the per-key `hoverFlags` proxy, not a read of
+  `hoveredVhIdx` in every helix.
+- `freeformCrossovers` is topology only (walks the region's own segments); the
+  endpoints and bulge are computed per crossover in the template, so only crossovers
+  touching a moved helix update.
+- end hit circles and the roll-glyph hit circle draw on the hit canvas only
+  (`skipSceneDraw` + `circleHitFunc`); outlines and helix circles set
+  `perfectDrawEnabled={false}` to avoid Konva's buffer-canvas path under opacity.
+
+Zoom and pan (same rule as the strand view's render window): the stage transform is
+mutated directly by `handleWheel`, PAN drag and the toolbar, and the viewer listens to
+Konva's `xChange` / `yChange` / `scaleXChange` to keep two coarse values:
+
+- `renderWindow`, the visible area plus half its size on each side in layer
+  coordinates, replaced only when the view leaves it (or after zooming far in). Helices
+  whose `vhCanvasBounds` miss it, and crossovers whose curve misses it, are not mounted.
+  The background hit rect is sized to it, so marquee, in-plane draw and double-click
+  add work anywhere on screen after zooming or panning.
+- `isDetailZoom` (scale ≥ `DETAIL_ZOOM_THRESHOLD`). Below it the index labels, end
+  markers and end hit circles are dropped; ends can't be dragged at that zoom.
+
+**Fit to helices** in `HelixViewerTools` calls `fitView`, which the viewer registers
+on `helixToolbarController` while mounted (the lattice viewer registers none, so the
+button is hidden there).
+
+### View-only regions (wireframes): batched drawing
+
+When `region.supportsPlaneViewEditing` is false (`WireframeRegion`), the design layer
+holds no per-helix nodes. `batchedScene` flattens the region into a `FreeformScene`
+(`freeformBatch.ts`): canvas-space helices in `drawnVhs` order with their opacity,
+strands and bounds, and crossovers with their bulge point. One `listening={false}`
+Konva `Shape` draws it through `drawFreeformScene`, which culls to `renderWindow` and
+applies `isDetailZoom` and the cross-section cursor at draw time. The scene is rebuilt
+only on model, selection or StrandView focus changes; the `scene` / `renderWindow` /
+`detail` / `cursorIdx` attrs on the Shape exist so Konva redraws when one changes.
+
+Pointer input goes to the background rect: a drag is a marquee, and a click is resolved
+by `pickVhAt` against the scene (nearest helix first), then selects or toggles and jumps
+to the strand view like a helix click in an editable region. Every editing entry point
+(helix drag, rotate, roll, end drag, connections, Draw-mode add, Delete key / toolbar
+Delete and Distribute, gesture hint) is gated on the flag. Position and roll stay
+editable in `FreeformVhPanel`.
+
+Past `FIXED_SIZE_FROM_SCALE` (100 %), `screenSizeFactor` keeps strokes, end markers,
+crossover dots and labels at their on-screen size while geometry keeps growing, so
+zooming into a dense wireframe opens gaps between strands instead of only thickening
+them. The draw callback reads the stage scale directly (a zoom redraws the layer
+without any Svelte update); selection halos use `strokeScaleEnabled={false}` there.
+
+Crossovers are quadratic curves through the bulge point here, instead of the editable
+path's tension spline; the shapes are close but not identical.
+
 ---
 
 ## Roll
@@ -327,4 +401,10 @@ Those are current product boundaries, not just documentation gaps.
 - **Don't connect a 3' to a 3'.** Connections are 3'→5' only — the directional convention is enforced by `createCrossoverCmd`.
 - **Don't reset `radial0` when changing a VH's axis.** That silently drops the user's roll; use `withRoll(newFrame, rollDegOf(oldFrame))`.
 - **Don't render VHs from other regions.** Filter by `vh.regionId === region.id` so mixed-region parts work.
+- **Don't read `hoveredVhIdx`, `selectedFreeformVhIndices` misses, `activeRotate` or `activeRoll` in per-helix design-layer expressions.** Each read fans out to every helix on each hover or drag event. Put the visual in the overlay's `adornedVhs` loop, or use a per-key flag like `hoverFlags`.
+- **Don't put hover / drag-time visuals on the design layer.** Any change there repaints every helix and its hit canvas.
+- **Don't add an editing gesture without checking `planeEditable` (`region.supportsPlaneViewEditing`).** View-only regions have no helix nodes, and their plane view must not mutate helices.
+- **Don't change how helices or crossovers look in only one path.** The editable template and `drawFreeformScene` draw the same things; keep sizes in step with `SCENE_GEOMETRY`.
+- **Don't read `depthByVhIndex`, `depthRange`, `selectedVhIndices` or other deriveds per helix inside a derived's loop or sort.** Read each into a local first and pass it to `vhOpacity`; the first, unmounted evaluation otherwise re-checks every dependency per read (it made the 3D → plane switch take seconds; `docs/reactivity-patterns.md` Pitfall 5).
+- **Don't read the stage scale or position in per-helix expressions.** Read `renderWindow` / `isDetailZoom`; they change only when the view leaves the window or crosses the threshold.
 - **Don't apply lab-frame plane transforms in this 2D pane.** Use `View3D` for that.

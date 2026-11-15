@@ -175,8 +175,9 @@ On the right, *press ? for help* is a reminder of the workspace help (shortcuts 
 | Control | What it does |
 | --- | --- |
 | **Reset view** | Fits the plane view back to its default zoom |
-| **Mode** | **Pan**, **Select**, **Draw** (see [Views And Regions](/docs/guide/views)) |
-| **Delete selected helices** | Deletes the selected helices; in lattice regions only empty ones are removed |
+| **Fit to helices** | Freeform only: zooms and pans so every helix of the region is in view. Zoomed far out, helix numbers and strand end markers are hidden; zoom in to drag ends |
+| **Mode** | **Pan**, **Select**, **Draw** (see [Views And Regions](/docs/guide/views)). **Draw** is disabled in wireframe regions |
+| **Delete selected helices** | Deletes the selected helices; in lattice regions only empty ones are removed. In wireframe regions the plane view only selects, so the Edit buttons are replaced by a note pointing to the Select panel |
 | **Distribute in a circle** | Freeform only: spaces three or more selected perpendicular helices evenly on a circle around their centre, keeping their order and roll |
 | **Distribute in a circle, facing the centre** | Same, and rolls each helix so roll 0 points at the centre |
 | **Export as image** | Downloads the plane view as a PNG image |

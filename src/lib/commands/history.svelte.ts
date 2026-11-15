@@ -31,6 +31,8 @@ export interface AutoSaveConfig {
 	enabled: boolean;
 	editCountThreshold: number; // Save every N edits
 	timeIntervalMs: number; // Save every N milliseconds
+	/** Save once nothing has happened for this long after an edit; 0 turns the idle save off. */
+	idleDelayMs: number;
 }
 
 export interface AutoSaveStatus {
@@ -43,6 +45,14 @@ export interface AutoSaveStatus {
 
 /** One quick retry after the first failure of a streak; the regular timer keeps retrying after. */
 export const AUTOSAVE_RETRY_DELAY_MS = 3000;
+
+/** The idle save waits at least this many times the last write's duration, so a design whose
+ * snapshot takes hundreds of ms isn't written after every short pause. */
+const IDLE_DELAY_PER_SAVE_MS = 10;
+/** Upper bound on how long `requestIdleCallback` may defer the idle save. */
+const IDLE_CALLBACK_TIMEOUT_MS = 1000;
+
+type AutoSaveTrigger = 'edit-count' | 'timer' | 'idle' | 'manual' | 'retry';
 
 export interface SaveResult {
 	success: boolean;
@@ -64,10 +74,18 @@ export class HistoryStack {
 	#lastAutoSaveError: string | undefined = undefined;
 	#autoSaveTimer: number | null = null;
 	#retryTimer: number | null = null;
+	#idleTimer: number | null = null;
+	#idleCallback: number | null = null;
+	#lastActivityAt = 0;
+	#lastSaveDurationMs = 0;
+	#saveInFlight: Promise<SaveResult> | null = null;
+	#saveQueued = false;
 	#autoSaveConfig: AutoSaveConfig = {
 		enabled: true,
-		editCountThreshold: 10, // Save every 10 edits
-		timeIntervalMs: 60 * 1000, // Save every minute
+		// A safety net for when activity keeps deferring the idle save; the idle save does the work.
+		editCountThreshold: 50,
+		timeIntervalMs: 60 * 1000,
+		idleDelayMs: 2000,
 	};
 
 	// Reactive auto-save status
@@ -82,7 +100,9 @@ export class HistoryStack {
 		private storageManager: StorageManager,
 		private onMutation?: () => void,
 		private canPersistSnapshot?: () => boolean,
-		private onSaved?: () => void
+		private onSaved?: () => void,
+		/** True while something (a held pointer, a running simulation) should defer the idle save. */
+		private isBusy?: () => boolean
 	) {
 		this.#startAutoSaveTimer();
 	}
@@ -129,7 +149,16 @@ export class HistoryStack {
 			this.#startAutoSaveTimer();
 		} else {
 			this.#stopAutoSaveTimer();
+			this.#cancelIdleSave();
 		}
+	}
+
+	/**
+	 * Record user input (pointer, wheel, key) so the idle save waits until the user pauses.
+	 * Cheap enough to call on every pointer move: it only stamps a time.
+	 */
+	noteActivity(): void {
+		this.#lastActivityAt = Date.now();
 	}
 
 	private pushEntry(entry: HistoryEntry | null) {
@@ -164,8 +193,10 @@ export class HistoryStack {
 	#markDirty() {
 		this.#revision++;
 		this.#editsSinceLastSave++;
+		this.#lastActivityAt = Date.now();
 		this.#updateAutoSaveStatus();
 		this.#checkAutoSave();
+		this.#scheduleIdleSave();
 	}
 
 	/**
@@ -226,21 +257,99 @@ export class HistoryStack {
 		}
 	}
 
+	get #idleDelayMs(): number {
+		return Math.max(
+			this.#autoSaveConfig.idleDelayMs,
+			IDLE_DELAY_PER_SAVE_MS * this.#lastSaveDurationMs
+		);
+	}
+
+	/** Arms the idle save (once; later edits and input only move `#lastActivityAt`). */
+	#scheduleIdleSave(delayMs = this.#idleDelayMs) {
+		if (typeof window === 'undefined') return;
+		if (!this.#autoSaveConfig.enabled || this.#autoSaveConfig.idleDelayMs <= 0) return;
+		if (this.#idleTimer !== null || this.#idleCallback !== null) return;
+		this.#idleTimer = window.setTimeout(() => {
+			this.#idleTimer = null;
+			this.#onIdleTimer();
+		}, delayMs);
+	}
+
+	#onIdleTimer() {
+		// During a failure streak the quick retry and the timer own retrying, not every pause.
+		if (this.#editsSinceLastSave === 0 || this.#lastAutoSaveError !== undefined) return;
+		const delay = this.#idleDelayMs;
+		const quietFor = Date.now() - this.#lastActivityAt;
+		if (quietFor < delay) return this.#scheduleIdleSave(delay - quietFor);
+		if (this.isBusy?.()) return this.#scheduleIdleSave(delay);
+		// The snapshot is one synchronous task: idle callback only picks when it starts.
+		const run = () => {
+			this.#idleCallback = null;
+			if (this.#editsSinceLastSave === 0) return;
+			if (Date.now() - this.#lastActivityAt < delay || this.isBusy?.()) {
+				return this.#scheduleIdleSave(delay);
+			}
+			void this.#performAutoSave('idle');
+		};
+		if (typeof window.requestIdleCallback === 'function') {
+			this.#idleCallback = window.requestIdleCallback(run, { timeout: IDLE_CALLBACK_TIMEOUT_MS });
+		} else {
+			run();
+		}
+	}
+
+	#cancelIdleSave() {
+		if (typeof window === 'undefined') return;
+		if (this.#idleTimer !== null) window.clearTimeout(this.#idleTimer);
+		if (this.#idleCallback !== null) window.cancelIdleCallback?.(this.#idleCallback);
+		this.#idleTimer = null;
+		this.#idleCallback = null;
+	}
+
 	/**
 	 * Perform the actual auto-save operation
 	 */
-	async #performAutoSave(
-		trigger: 'edit-count' | 'timer' | 'manual' | 'retry'
-	): Promise<SaveResult> {
+	async #performAutoSave(trigger: AutoSaveTrigger): Promise<SaveResult> {
+		// One write at a time: each save copies the whole document, so edits made while one is
+		// pending must not each start another.
+		if (this.#saveInFlight) {
+			if (trigger !== 'manual') {
+				this.#saveQueued = true;
+				return { success: false, savedAt: null };
+			}
+			// A manual save must persist the state at call time, so run again after the pending one.
+			await this.#saveInFlight;
+			return this.#performAutoSave(trigger);
+		}
+		const run = this.#writeSnapshot(trigger);
+		this.#saveInFlight = run;
+		try {
+			return await run;
+		} finally {
+			this.#saveInFlight = null;
+			if (this.#saveQueued) {
+				this.#saveQueued = false;
+				this.#checkAutoSave();
+			}
+			// Edits made during the write, or an idle save the write turned away, still need one.
+			if (this.#editsSinceLastSave > 0) this.#scheduleIdleSave();
+		}
+	}
+
+	async #writeSnapshot(trigger: AutoSaveTrigger): Promise<SaveResult> {
 		if (this.canPersistSnapshot && !this.canPersistSnapshot()) {
 			return { success: false, savedAt: null };
 		}
 		try {
+			const editsInSnapshot = this.#editsSinceLastSave;
+			const startedAt = performance.now();
 			const snapshot = this.doc.snapshot();
 			const success = await this.storageManager.saveDocument(this.doc.id, snapshot);
 			if (success) {
+				this.#lastSaveDurationMs = performance.now() - startedAt;
 				const savedAt = Date.now();
-				this.#editsSinceLastSave = 0;
+				// Edits made while the write was pending are not in it; keep them counted.
+				this.#editsSinceLastSave = Math.max(0, this.#editsSinceLastSave - editsInSnapshot);
 				this.#lastSaveTime = savedAt;
 				this.#lastAutoSaveError = undefined;
 				this.#cancelRetry();
@@ -324,6 +433,7 @@ export class HistoryStack {
 		this.#editsSinceLastSave = 0;
 		this.#lastAutoSaveError = undefined;
 		this.#cancelRetry();
+		this.#cancelIdleSave();
 		this.#updateAutoSaveStatus();
 		this.onSaved?.();
 	}
@@ -343,6 +453,7 @@ export class HistoryStack {
 	destroy() {
 		this.#stopAutoSaveTimer();
 		this.#cancelRetry();
+		this.#cancelIdleSave();
 	}
 
 	tx<R>(fn: () => R): R;
@@ -354,12 +465,15 @@ export class HistoryStack {
 
 		const recorder = new HistoryRecorder(this.doc);
 		const label = labelOrFn;
-		const before = this.doc.snapshot();
+		// A whole-document copy costs O(total nt), so a targeted edit takes one only when the
+		// repeat-group fallback below may need it (or the verifier does).
+		const mayRebuildMirrors = this.#hasRepeatGroupState();
+		const before = mayRebuildMirrors || VERIFY_HISTORY ? this.doc.snapshot() : null;
 		let result: R;
 		let entry: HistoryEntry | null;
 		try {
 			result = maybeFn!(recorder);
-			if (this.#syncRepeatGroups()) {
+			if (this.#syncRepeatGroups() && before) {
 				// Mirror rebuilds aren't expressed as targeted patches; record the whole edit
 				// as a document snapshot instead (`before` is already in hand).
 				const snapshot = new HistoryRecorder(this.doc);
@@ -369,12 +483,24 @@ export class HistoryStack {
 				entry = recorder.commit(label);
 			}
 		} catch (err) {
-			this.doc.restore(before);
+			if (mayRebuildMirrors && before) {
+				this.doc.restore(before);
+			} else {
+				recorder.rollback();
+				if (before && JSON.stringify(this.doc.snapshot()) !== JSON.stringify(before)) {
+					this.doc.restore(before);
+					this.onMutation?.();
+					throw new Error(
+						`Rollback of "${label}" left the document changed (the command mutates something it captures no scope or onRollback step for). Original error: ${err instanceof Error ? err.message : String(err)}`
+					);
+				}
+				this.#assertDerivedState(`rollback of "${label}"`);
+			}
 			this.onMutation?.();
 			throw err;
 		}
 		this.pushEntry(entry);
-		if (entry && VERIFY_HISTORY && !isWholeDocumentEntry(entry)) {
+		if (entry && before && VERIFY_HISTORY && !isWholeDocumentEntry(entry)) {
 			const mismatch = verifyHistoryEntry(before, this.doc.snapshot(), entry);
 			if (mismatch) {
 				throw new Error(
@@ -384,6 +510,17 @@ export class HistoryStack {
 		}
 		if (entry) this.#assertDerivedState(`"${label}"`);
 		return result;
+	}
+
+	/** Whether `syncRepeatGroups` could change anything: a group, a grouped source or a mirror. */
+	#hasRepeatGroupState(): boolean {
+		for (const part of this.doc.parts) {
+			if (part.repeatGroups.length > 0) return true;
+			for (const oligo of part.oligos) {
+				if (oligo.repeatGroupId !== null || oligo.mirrorOf !== null) return true;
+			}
+		}
+		return false;
 	}
 
 	/** Rebuilds mirror oligos whose originals this edit changed (docs/repeat-units.md). */

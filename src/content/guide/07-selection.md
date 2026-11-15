@@ -174,6 +174,7 @@ Lattice plane view has its own VH-based selection, separate from both strand-end
 - **Drag a selected helix** moves the whole selected set together, only if every target cell is valid.
 - **`Delete` / `Backspace`** (or the Delete toolbar button) removes the selected helices, but only **empty** ones; helices that still carry strands are skipped to prevent accidental data loss.
 - **Undo / redo** restores lattice helix positions after a move or a delete.
+- Clicking a helix also scrolls the strand viewer to its row, where its number tag is outlined.
 
 ![Lattice plane with one constrained-move group already selected (blue ring) and a marquee rectangle actively in progress over several other circles](/screenshots/guide/selection-and-highlighting/04-marquee-selection.webp)
 
@@ -186,6 +187,7 @@ Freeform plane view selects whole helices, the same way the lattice plane view d
 - **Click or marquee-select** VHs.
 - **Drag** to move selected VHs.
 - `Delete` / `Backspace` removes selected freeform VHs.
+- Clicking a helix also brings it into view in the strand viewer and outlines its number tag. For a helix lying in the plane, the strand viewer centres on the base you clicked.
 
 Clicking a freeform helix's number tag at the left of the strand viewer selects it too (`Shift`-click adds or removes it), so you can turn a helix from the strand viewer while the 3D view is open in the other pane. With freeform helices selected, the Selection Tool panel shows their **Roll**, **position** and **direction**:
 

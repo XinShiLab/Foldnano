@@ -45,7 +45,9 @@ a layer they open themselves never has to be skipped.
   double-click in Select, double-click to remove in Skip/Insert), because canvas gestures have no
   control to hang a hover card on. A Plane View Mouse section does the same in Draw and Select
   while the plane pane is active, and the Plane view caption names the region kind's creation
-  gesture. Outside this overlay, `PlaneViewer` shows its own hint for those gestures
+  gesture. For a region with `supportsPlaneViewEditing` false (wireframes) both switch to the
+  select-only behaviour: the caption and the toolbar note share `VIEW_ONLY_PLANE_HELP`
+  (`HelixView/utils.ts`), and the Mouse section lists only the Select gestures. Outside this overlay, `PlaneViewer` shows its own hint for those gestures
   (`editor-helix-viewer.md` § Gesture hint).
 - **Visibility.** Non-area controls are shown only if `elementFromPoint` at their centre lands
   inside them, which hides controls clipped by scrolling toolbars or covered by floating panels.

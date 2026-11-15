@@ -336,6 +336,16 @@ The scene rebuild effect tracks:
 - stress toggle
 - plane transforms
 
+**Throttle.** A rebuild disposes and recreates every strand, crossover and label, and blocks
+the main thread while it does. After one, the next waits about twice as long as it took (capped
+at `REBUILD_MAX_DELAY_MS`), so changes in between (plane-gizmo drag events, simulation progress,
+a burst of edits) fold into one rebuild and at most about a third of the time goes to
+rebuilding; a small design still rebuilds on the next task. While waiting, the effect is
+subscribed to `rebuildTick` only, and the build run re-reads all of the above. Anything that
+reads `currentGroup` right after an edit can therefore see the previous scene for that long.
+During a plane drag the plane quad still follows the pointer (`updatePosePlaneMesh`); the
+helices catch up at the throttled rate.
+
 Plane transforms are especially important now because a region's 3D pose is no
 longer stored only on each VH. Moving a plane changes many derived VH lab
 frames at once, so the 3D scene must rebuild even when strand topology did not

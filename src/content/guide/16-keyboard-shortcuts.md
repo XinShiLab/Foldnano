@@ -48,7 +48,7 @@ strand viewer is the active viewer.
 
 | Key | Action |
 | --- | --- |
-| `Delete` / `Backspace` | delete current selection |
+| `Delete` / `Backspace` | delete current selection (helices selected in a wireframe region's plane view are not deleted) |
 | `Escape` | clear selection / cancel current action |
 | `Ctrl/Cmd + Z` | undo |
 | `Ctrl/Cmd + Shift + Z` or `Ctrl/Cmd + Y` | redo |

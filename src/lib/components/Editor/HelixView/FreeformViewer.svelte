@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { onDestroy } from 'svelte';
-	import { SvelteMap } from 'svelte/reactivity';
-	import { Stage, Layer, Group, Rect, Arrow, Text, Line, Circle } from 'svelte-konva';
+	import { onDestroy, untrack } from 'svelte';
+	import type Konva from 'konva';
+	import { Stage, Layer, Group, Rect, Arrow, Text, Line, Circle, Shape } from 'svelte-konva';
 	import type { Stage as StageType, KonvaPointerEvent } from 'svelte-konva';
 	import type { Part } from '$lib/model/Part/Part.svelte';
 	import { FreeformRegion, type DesignRegion } from '$lib/model/Part/DesignRegion';
@@ -36,6 +36,13 @@
 	import { PLANE_AXIS_COLORS } from './planeAxes';
 	import { depthFadeOpacity, helixDepthW } from './planeDepthFade';
 	import { canvasTheme } from '$lib/canvasEditor/theme.svelte';
+	import {
+		drawFreeformScene,
+		pickVhAt,
+		type FreeformScene,
+		type SceneCrossover,
+		type SceneHelix,
+	} from './freeformBatch';
 
 	interface Props {
 		part: Part;
@@ -64,6 +71,8 @@
 	const editorViewContext = getEditorViewContext();
 	const editorMode = $derived(editorViewContext.editorMode);
 	const history = $derived(editorViewContext.historyStack);
+	// False for wireframes: one batched shape draws the region and the view only selects.
+	const planeEditable = $derived(region.supportsPlaneViewEditing);
 
 	// Measured from the wrapper div — Stage fills whatever space is available.
 	let containerW = $state(0);
@@ -101,14 +110,42 @@
 	const ROLL_HANDLE_RADIUS_PX = 4;
 	const ROLL_GLYPH_RADIUS_PX = 7;
 	const ROLL_GLYPH_GAP_PX = 6;
-	const END_HIT_TARGET_FILL = 'rgba(37, 99, 235, 0.001)';
+	const DEFAULT_STRAND_COLOR = '#f59e0b';
+	const ROTATE_GRIP_DOTS: readonly (readonly [number, number])[] = [
+		[-1.5, -3],
+		[1.5, -3],
+		[-1.5, 0],
+		[1.5, 0],
+		[-1.5, 3],
+		[1.5, 3],
+	];
 	const DIMMED_FATLINE_OPACITY = 0.25;
+	// Below this scale labels, end markers and end hit targets are a few pixels wide: noise.
+	const DETAIL_ZOOM_THRESHOLD = 0.5;
+	// The render window extends this fraction of the visible size past each edge.
+	const RENDER_WINDOW_MARGIN = 0.5;
+	const FIT_PADDING_PX = 40;
+	const FIT_MIN_SCALE = 0.02;
+	const FIT_MAX_SCALE = 2;
 	const selectionColor = $derived(themeColors.freeformDragColor);
 	const marqueeFill = $derived(themeColors.freeformDragColor);
 	const hasFocusedSegments = $derived((focusedSegments?.size ?? 0) > 0);
 
 	let hoveredVhIdx = $state<number | null>(null);
+	// Per-key flags so a hover change re-runs only the two helices involved, not every helix.
+	const hoverFlags = $state<Record<number, boolean>>({});
 	const selectedVhIndices = $derived(editorViewContext.selectedFreeformVhIndices);
+
+	function setHovered(vhIdx: number | null): void {
+		if (hoveredVhIdx === vhIdx) return;
+		if (hoveredVhIdx !== null) delete hoverFlags[hoveredVhIdx];
+		if (vhIdx !== null) hoverFlags[vhIdx] = true;
+		hoveredVhIdx = vhIdx;
+	}
+
+	function clearHovered(vhIdx: number): void {
+		if (hoveredVhIdx === vhIdx) setHovered(null);
+	}
 	let activeConnection = $state<{
 		fromSegment: OligoSegment;
 		start: { x: number; y: number };
@@ -123,27 +160,227 @@
 	// Only VHs belonging to this region
 	const regionVhs = $derived(part.virtualHelices.filter((vh) => vh.regionId === region.id));
 
-	const depthByVhIndex = $derived.by(() => {
-		const depths = new SvelteMap<number, number>();
+	// dsDNA extent per helix. Reads strands only, so dragging a helix doesn't recompute it.
+	const extentByVhIndex = $derived.by(() => {
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity
+		const extents = new Map<number, { lowIndex: number; highIndex: number }[]>();
 		for (const vh of regionVhs) {
-			if (vh.localFrame) depths.set(vh.index, helixDepthW(vh.localFrame, segmentsForVh(vh)));
+			let lowIndex = Infinity;
+			let highIndex = -Infinity;
+			for (const strandSet of vh.strandSets) {
+				for (const id of strandSet.segmentIds) {
+					const segment = part.getSegmentById(id);
+					if (!segment) continue;
+					lowIndex = Math.min(lowIndex, segment.lowIndex);
+					highIndex = Math.max(highIndex, segment.highIndex);
+				}
+			}
+			extents.set(vh.index, lowIndex <= highIndex ? [{ lowIndex, highIndex }] : []);
 		}
+		return extents;
+	});
+
+	// Previous results, handed back when unchanged so a drag that doesn't change depth (any move
+	// within the plane) doesn't re-run every helix's opacity or re-sort the draw order.
+	let lastDepths = new Map<number, number>();
+	let lastDrawnVhs: VirtualHelix[] = [];
+
+	// Loops and sort comparators below read each $derived once into a local. Until the view is
+	// mounted these deriveds are unowned, and every read re-checks all their dependencies: reading
+	// one per comparison cost seconds on a 600-helix wireframe.
+	const depthByVhIndex = $derived.by(() => {
+		const extents = extentByVhIndex;
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity
+		const depths = new Map<number, number>();
+		for (const vh of regionVhs) {
+			const frame = vh.localFrame;
+			if (frame) depths.set(vh.index, helixDepthW(frame, extents.get(vh.index) ?? []));
+		}
+		const unchanged =
+			depths.size === lastDepths.size &&
+			[...depths].every(([index, w]) => lastDepths.get(index) === w);
+		if (unchanged) return lastDepths;
+		lastDepths = depths;
 		return depths;
 	});
-	const minDepthW = $derived(Math.min(...depthByVhIndex.values()));
-	const maxDepthW = $derived(Math.max(...depthByVhIndex.values()));
+	const depthRange = $derived.by(() => {
+		let min = Infinity;
+		let max = -Infinity;
+		for (const w of depthByVhIndex.values()) {
+			min = Math.min(min, w);
+			max = Math.max(max, w);
+		}
+		return { min, max };
+	});
 	// Far first, so where helices overlap the nearer one is on top and takes the click.
-	const drawnVhs = $derived(
-		[...regionVhs].sort(
-			(a, b) => (depthByVhIndex.get(b.index) ?? 0) - (depthByVhIndex.get(a.index) ?? 0)
-		)
-	);
+	const drawnVhs = $derived.by(() => {
+		const depths = depthByVhIndex;
+		const sorted = [...regionVhs].sort(
+			(a, b) => (depths.get(b.index) ?? 0) - (depths.get(a.index) ?? 0)
+		);
+		const unchanged =
+			sorted.length === lastDrawnVhs.length && sorted.every((vh, i) => vh === lastDrawnVhs[i]);
+		if (unchanged) return lastDrawnVhs;
+		lastDrawnVhs = sorted;
+		return sorted;
+	});
 
-	function vhOpacity(vh: VirtualHelix): number {
-		const depth = depthByVhIndex.get(vh.index);
-		if (depth === undefined || selectedVhIndices.has(vh.index) || hoveredVhIdx === vh.index)
-			return 1;
-		return depthFadeOpacity(depth, minDepthW, maxDepthW);
+	// Loops pass the deriveds in, read once (see the note above depthByVhIndex).
+	function vhOpacity(
+		vh: VirtualHelix,
+		depths = depthByVhIndex,
+		range = depthRange,
+		selected: ReadonlySet<number> = selectedVhIndices
+	): number {
+		const depth = depths.get(vh.index);
+		if (depth === undefined || selected.has(vh.index) || hoverFlags[vh.index]) return 1;
+		return depthFadeOpacity(depth, range.min, range.max);
+	}
+
+	// Helices that carry a halo, handle or roll glyph; drawn on the overlay layer so hover and
+	// selection changes repaint only those, not the whole region.
+	const adornedVhs = $derived.by(() => {
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity
+		const indices = new Set<number>(selectedVhIndices);
+		if (hoveredVhIdx !== null) indices.add(hoveredVhIdx);
+		if (activeRotate) indices.add(activeRotate.vhIdx);
+		if (activeRoll) indices.add(activeRoll.vhIdx);
+		const vhs: VirtualHelix[] = [];
+		for (const index of indices) {
+			const vh = part.getVhByIndex(index);
+			if (vh?.localFrame && vh.regionId === region.id) vhs.push(vh);
+		}
+		return vhs;
+	});
+
+	interface LayerBounds {
+		minX: number;
+		minY: number;
+		maxX: number;
+		maxY: number;
+	}
+
+	// Stage scale and a viewport-plus-margin window in layer coordinates. The window is replaced
+	// only when the view leaves it, so most pan and zoom steps re-run no per-helix culling; per-helix
+	// expressions read it and isDetailZoom, never the raw stage transform.
+	let viewScale = $state(1);
+	const isDetailZoom = $derived(viewScale >= DETAIL_ZOOM_THRESHOLD);
+	let renderWindow = $state.raw<LayerBounds>({ minX: 0, minY: 0, maxX: 0, maxY: 0 });
+
+	function syncView(): void {
+		const node = stageRef?.node;
+		if (!node) return;
+		const scale = node.scaleX() || 1;
+		if (scale !== viewScale) viewScale = scale;
+		const visible = {
+			minX: -node.x() / scale,
+			minY: -node.y() / scale,
+			maxX: (CANVAS_W - node.x()) / scale,
+			maxY: (CANVAS_H - node.y()) / scale,
+		};
+		const width = visible.maxX - visible.minX;
+		const height = visible.maxY - visible.minY;
+		const current = renderWindow;
+		const contains =
+			current.minX <= visible.minX &&
+			current.minY <= visible.minY &&
+			current.maxX >= visible.maxX &&
+			current.maxY >= visible.maxY;
+		// After zooming far in, a window sized for the old view keeps too much mounted.
+		const tooLoose = current.maxX - current.minX > 4 * (1 + 2 * RENDER_WINDOW_MARGIN) * width;
+		if (contains && !tooLoose) return;
+		renderWindow = {
+			minX: visible.minX - width * RENDER_WINDOW_MARGIN,
+			minY: visible.minY - height * RENDER_WINDOW_MARGIN,
+			maxX: visible.maxX + width * RENDER_WINDOW_MARGIN,
+			maxY: visible.maxY + height * RENDER_WINDOW_MARGIN,
+		};
+	}
+
+	// Wheel zoom sets scale then position; coalesce so the window is computed once from both.
+	let syncQueued = false;
+	function queueSyncView(): void {
+		if (syncQueued) return;
+		syncQueued = true;
+		queueMicrotask(() => {
+			syncQueued = false;
+			syncView();
+		});
+	}
+
+	// Konva fires these for wheel zoom, PAN-mode drag and toolbar reset/fit alike.
+	$effect(() => {
+		const node = stageRef?.node;
+		void CANVAS_W;
+		void CANVAS_H;
+		if (!node) return;
+		node.on('xChange.planeView yChange.planeView scaleXChange.planeView', queueSyncView);
+		untrack(syncView);
+		return () => {
+			node.off('.planeView');
+		};
+	});
+
+	function fitView(): void {
+		const node = stageRef?.node;
+		if (!node) return;
+		let content: LayerBounds | null = null;
+		for (const vh of regionVhs) {
+			if (!vh.localFrame) continue;
+			const b = vhCanvasBounds(vh);
+			content = content
+				? {
+						minX: Math.min(content.minX, b.minX),
+						minY: Math.min(content.minY, b.minY),
+						maxX: Math.max(content.maxX, b.maxX),
+						maxY: Math.max(content.maxY, b.maxY),
+					}
+				: b;
+		}
+		if (!content) {
+			node.scale({ x: 1, y: 1 });
+			node.position({ x: 0, y: 0 });
+			return;
+		}
+		const fitW = (CANVAS_W - 2 * FIT_PADDING_PX) / Math.max(content.maxX - content.minX, 1);
+		const fitH = (CANVAS_H - 2 * FIT_PADDING_PX) / Math.max(content.maxY - content.minY, 1);
+		const scale = Math.min(Math.max(Math.min(fitW, fitH), FIT_MIN_SCALE), FIT_MAX_SCALE);
+		node.scale({ x: scale, y: scale });
+		node.position({
+			x: CANVAS_W / 2 - ((content.minX + content.maxX) / 2) * scale,
+			y: CANVAS_H / 2 - ((content.minY + content.maxY) / 2) * scale,
+		});
+	}
+
+	$effect(() => {
+		const controller = editorViewContext.helixToolbarController;
+		if (!controller) return;
+		controller.fitView = fitView;
+		return () => {
+			if (controller.fitView === fitView) controller.fitView = undefined;
+		};
+	});
+
+	function pointsBounds(...points: { x: number; y: number }[]): LayerBounds {
+		let minX = Infinity;
+		let minY = Infinity;
+		let maxX = -Infinity;
+		let maxY = -Infinity;
+		for (const p of points) {
+			minX = Math.min(minX, p.x);
+			minY = Math.min(minY, p.y);
+			maxX = Math.max(maxX, p.x);
+			maxY = Math.max(maxY, p.y);
+		}
+		return { minX, minY, maxX, maxY };
+	}
+
+	function revealInStrandView(vh: VirtualHelix, layerPoint: { x: number; y: number }): void {
+		const strandView = editorViewContext.strandToolbarController;
+		if (!strandView) return;
+		const bpIdx = layerPointToBpIndex(vh, layerPoint);
+		if (bpIdx === null) strandView.revealVh(vh.id);
+		else strandView.centerOn(vh.id, bpIdx);
 	}
 
 	function nmToCanvas(xNm: number, yNm: number): { x: number; y: number } {
@@ -299,6 +536,17 @@
 		return x + Math.sign(delta) * FIVE_PRIME_MARKER_INSET_PX;
 	}
 
+	// Invisible hit targets draw only on the hit canvas; a near-transparent fill still costs a
+	// scene fill per target per redraw.
+	function skipSceneDraw(): void {}
+
+	function circleHitFunc(context: Konva.Context, shape: Konva.Shape): void {
+		context.beginPath();
+		context.arc(0, 0, shape.getAttr('radius') as number, 0, Math.PI * 2, false);
+		context.closePath();
+		context.fillStrokeShape(shape);
+	}
+
 	function segmentsForVh(vh: VirtualHelix): OligoSegment[] {
 		const segments: OligoSegment[] = [];
 		for (const strandSet of vh.strandSets) {
@@ -369,40 +617,135 @@
 		};
 	}
 
+	// Topology only: positions are computed per crossover in the template, so moving a helix
+	// re-runs just the crossovers that touch it.
 	const freeformCrossovers = $derived.by(() => {
 		const crossovers: {
 			id: string;
 			fromSegment: OligoSegment;
 			toSegment: OligoSegment;
-			from: { x: number; y: number };
-			to: { x: number; y: number };
-			bulge: { x: number; y: number };
 			color: string;
 			constrained: boolean;
 		}[] = [];
-		for (const oligo of part.oligos) {
-			for (const segment of oligo.segments) {
-				if (segment.inVirtualHelix.regionId !== region.id) continue;
-				const connectedEnd = segment.threePrime.connectedEnd;
-				if (!connectedEnd) continue;
-				if (connectedEnd.segment.inVirtualHelix.regionId !== region.id) continue;
-				const from = segmentEndCanvasPoint(segment, 'threePrime');
-				const to = segmentEndCanvasPoint(connectedEnd.segment, 'fivePrime');
-				if (!from || !to) continue;
-				crossovers.push({
-					id: `${segment.id}->${connectedEnd.segment.id}`,
-					fromSegment: segment,
-					toSegment: connectedEnd.segment,
-					from,
-					to,
-					bulge: crossoverBulgePoint(from, to),
-					color: oligo.color,
-					constrained: segment.threePrime.isConstrained && connectedEnd.isConstrained,
-				});
+		for (const vh of regionVhs) {
+			for (const strandSet of vh.strandSets) {
+				for (const id of strandSet.segmentIds) {
+					const segment = part.getSegmentById(id);
+					const connectedEnd = segment?.threePrime.connectedEnd;
+					if (!segment || !connectedEnd) continue;
+					if (connectedEnd.segment.inVirtualHelix.regionId !== region.id) continue;
+					crossovers.push({
+						id: `${segment.id}->${connectedEnd.segment.id}`,
+						fromSegment: segment,
+						toSegment: connectedEnd.segment,
+						color: segment.oligo?.color ?? DEFAULT_STRAND_COLOR,
+						constrained: segment.threePrime.isConstrained && connectedEnd.isConstrained,
+					});
+				}
 			}
 		}
 		return crossovers;
 	});
+
+	// Plain canvas-space data for the batched shape. Rebuilt on model, selection or focus changes
+	// only; pan, zoom and the cross-section cursor are applied at draw time.
+	const batchedScene = $derived.by((): FreeformScene | null => {
+		if (planeEditable) return null;
+		const depths = depthByVhIndex;
+		const range = depthRange;
+		const selected = selectedVhIndices;
+		const focus = hasFocusedSegments ? focusedSegments : null;
+		const twistOffsetDeg = region.twistOffsetInDeg;
+		const twistPerBaseDeg = region.twistPerBaseInDeg;
+		const helices: SceneHelix[] = [];
+		for (const vh of drawnVhs) {
+			const frame = vh.localFrame;
+			if (!frame) continue;
+			const { x, y } = vhCanvasCenter(frame);
+			const base = {
+				vhIndex: vh.index,
+				x,
+				y,
+				opacity: vhOpacity(vh, depths, range, selected),
+				bounds: vhCanvasBounds(vh),
+			};
+			if (isPerpendicular(frame)) {
+				helices.push({
+					...base,
+					kind: 'perpendicular',
+					scafStartDeg: (vh.index % 2 === 0 ? 0 : 180) + twistOffsetDeg + radial0ScreenDeg(frame),
+					scafBpDeg: twistPerBaseDeg,
+				});
+				continue;
+			}
+			helices.push({
+				...base,
+				kind: 'inPlane',
+				angleRad: Math.atan2(frame.axis.y, frame.axis.x),
+				lengthPx: fullLengthPx(vh),
+				strands: segmentsForVh(vh).map((segment) => ({
+					fiveX: bpToLocalX(segment.fivePrime.index),
+					threeX: bpToLocalX(segment.threePrime.index),
+					strandIdx: segment.inStrandIndex as 0 | 1,
+					color: segment.oligo?.color ?? DEFAULT_STRAND_COLOR,
+					opacity: !focus || focus.has(segment) ? 1 : DIMMED_FATLINE_OPACITY,
+				})),
+			});
+		}
+		const crossovers: SceneCrossover[] = [];
+		for (const xover of freeformCrossovers) {
+			const from = segmentEndCanvasPoint(xover.fromSegment, 'threePrime');
+			const to = segmentEndCanvasPoint(xover.toSegment, 'fivePrime');
+			if (!from || !to) continue;
+			const bulge = crossoverBulgePoint(from, to);
+			const focused = !focus || (focus.has(xover.fromSegment) && focus.has(xover.toSegment));
+			crossovers.push({
+				from,
+				to,
+				bulge,
+				color: xover.color,
+				opacity: focused ? (xover.constrained ? 1 : 0.55) : DIMMED_FATLINE_OPACITY,
+				constrained: xover.constrained,
+				bounds: pointsBounds(from, to, bulge),
+			});
+		}
+		return {
+			helices,
+			crossovers,
+			theme: {
+				outline: themeColors.gridLine,
+				label: themeColors.vhText,
+				helixFill: themeColors.hxVhFill,
+				helixStroke: themeColors.hxVhStroke,
+				helixLabel: themeColors.hxText,
+				scafIndicator: themeColors.hxScafIndicator,
+				crossoverDotFill: themeColors.hxFill,
+			},
+		};
+	});
+	const csCursorIdx = $derived(editorViewContext.strandViewContext.csCursorIdx);
+
+	// The Shape's scene / window / detail / cursor attrs exist only so Konva redraws on change.
+	function drawBatchedScene(context: Konva.Context, shape: Konva.Shape): void {
+		if (!batchedScene) return;
+		drawFreeformScene(context._context, batchedScene, {
+			window: renderWindow,
+			detail: isDetailZoom,
+			cursorIdx: csCursorIdx,
+			// Raw, not viewScale: a stage zoom redraws the layer without a Svelte update.
+			scale: shape.getStage()?.scaleX() ?? 1,
+		});
+	}
+
+	function selectPickedVh(point: { x: number; y: number }, additive: boolean): boolean {
+		const vhIdx = batchedScene ? pickVhAt(batchedScene.helices, point) : null;
+		const vh = vhIdx === null ? undefined : part.getVhByIndex(vhIdx);
+		if (!vh) return false;
+		if (additive) editorViewContext.toggleSelectedFreeformVh(vh.index);
+		else editorViewContext.setSelectedFreeformVhs([vh.index]);
+		if (selectedVhIndices.has(vh.index)) revealInStrandView(vh, point);
+		return true;
+	}
 
 	function canStartConnection(segment: OligoSegment): boolean {
 		return segment.threePrime.isFree && segment.oligo?.threePrime === segment.threePrime;
@@ -425,7 +768,7 @@
 	}
 
 	function onFreeformHitPointerDown(e: KonvaPointerEvent, hit: FreeformHitTarget) {
-		if (editorMode !== 'DRAW' && editorMode !== 'SELECT') return;
+		if (!planeEditable || (editorMode !== 'DRAW' && editorMode !== 'SELECT')) return;
 		e.cancelBubble = true;
 
 		if (editorMode === 'SELECT') {
@@ -473,7 +816,7 @@
 	}
 
 	function onBackgroundDblClick(e: KonvaPointerEvent) {
-		if (editorMode !== 'DRAW') return;
+		if (editorMode !== 'DRAW' || !planeEditable) return;
 		if (e.target !== e.currentTarget) return;
 		const stage = e.target.getStage();
 		if (!stage) return;
@@ -505,7 +848,7 @@
 		if (!raw) return;
 		const layer = toLayerCoords(stage, raw);
 
-		if (editorMode === 'DRAW') {
+		if (editorMode === 'DRAW' && planeEditable) {
 			const nm = canvasToNm(layer.x, layer.y);
 			activeLine = {
 				startLayer: layer,
@@ -610,7 +953,7 @@
 	});
 
 	function onVhPointerDown(e: KonvaPointerEvent, vhIdx: number) {
-		if (editorMode === 'PAN') return;
+		if (editorMode === 'PAN' || !planeEditable) return;
 		e.cancelBubble = true;
 		const stage = e.target.getStage();
 		if (!stage) return;
@@ -622,6 +965,7 @@
 		if (editorMode === 'SELECT') {
 			if (hasSelectionModifier(e)) {
 				editorViewContext.toggleSelectedFreeformVh(vhIdx);
+				if (selectedVhIndices.has(vhIdx)) revealInStrandView(vh, toLayerCoords(stage, raw));
 				return;
 			} else if (!selectedVhIndices.has(vhIdx)) {
 				editorViewContext.setSelectedFreeformVhs([vhIdx]);
@@ -648,7 +992,7 @@
 	}
 
 	function onRotatePointerDown(e: KonvaPointerEvent, vhIdx: number) {
-		if (editorMode === 'PAN') return;
+		if (editorMode === 'PAN' || !planeEditable) return;
 		e.cancelBubble = true;
 		const vh = part.getVhByIndex(vhIdx);
 		if (!vh?.localFrame) return;
@@ -660,7 +1004,7 @@
 	}
 
 	function onRollPointerDown(e: KonvaPointerEvent, vhIdx: number) {
-		if (editorMode !== 'SELECT') return;
+		if (editorMode !== 'SELECT' || !planeEditable) return;
 		e.cancelBubble = true;
 		const vh = part.getVhByIndex(vhIdx);
 		if (!vh?.localFrame) return;
@@ -776,8 +1120,11 @@
 				activeMarquee.currentLayer.y - activeMarquee.startLayer.y
 			);
 			if (distancePx < DRAG_THRESHOLD_PX) {
-				if (!activeMarquee.additive && selectedVhIndices.size === 0) onIdleClick?.();
-				editorViewContext.clearSelectedFreeformVhs();
+				// Batched regions have no helix nodes: a click on a helix arrives here and is picked.
+				if (planeEditable || !selectPickedVh(activeMarquee.startLayer, activeMarquee.additive)) {
+					if (!activeMarquee.additive && selectedVhIndices.size === 0) onIdleClick?.();
+					editorViewContext.clearSelectedFreeformVhs();
+				}
 			} else {
 				const rect = normalizedRect(activeMarquee.startLayer, activeMarquee.currentLayer);
 				const marqueeBounds = {
@@ -863,6 +1210,8 @@
 			const vh = part.getVhByIndex(activeDrag.vhIdx);
 			if (vh?.localFrame && editorMode === 'DRAW' && isPerpendicular(vh.localFrame)) {
 				fillFreeformVirtualHelixCmd({ part, vh }, history);
+			} else if (vh && editorMode === 'SELECT') {
+				revealInStrandView(vh, activeDrag.startLayer);
 			}
 		}
 		activeDrag = null;
@@ -889,13 +1238,16 @@
 		onpointerup={onStagePointerUp}
 		onpointercancel={onStagePointerCancel}
 	>
+		<!-- Design layer: helices and crossovers. Transient previews and per-helix adornments live on
+		     the overlay layer below, so a hover or a marquee drag doesn't repaint the whole region. -->
 		<Layer>
-			<!-- Clickable background to add new VHs in DRAW mode -->
+			<!-- Background for marquee, in-plane draw and double-click add; covers the render window,
+			     which always contains the visible area, so it follows pan and zoom. -->
 			<Rect
-				x={0}
-				y={0}
-				width={CANVAS_W}
-				height={CANVAS_H}
+				x={renderWindow.minX}
+				y={renderWindow.minY}
+				width={renderWindow.maxX - renderWindow.minX}
+				height={renderWindow.maxY - renderWindow.minY}
 				fill="transparent"
 				onpointerdown={onBackgroundPointerDown}
 				onpointerdblclick={onBackgroundDblClick}
@@ -951,6 +1303,227 @@
 				/>
 			</Group>
 
+			{#if !planeEditable}
+				<Shape
+					sceneFunc={drawBatchedScene}
+					scene={batchedScene}
+					{renderWindow}
+					detail={isDetailZoom}
+					cursorIdx={csCursorIdx}
+					listening={false}
+					perfectDrawEnabled={false}
+				/>
+			{:else}
+				{#each drawnVhs as vh (vh.index)}
+					{#if boundsIntersect(vhCanvasBounds(vh), renderWindow)}
+						{@const xNm = vh.localFrame ? vh.localFrame.origin.x : 0}
+						{@const yNm = vh.localFrame ? vh.localFrame.origin.y : 0}
+						{@const { x, y } = nmToCanvas(xNm, yNm)}
+						{@const perpendicular = isPerpendicular(vh.localFrame)}
+
+						<Group
+							{x}
+							{y}
+							opacity={vhOpacity(vh)}
+							onpointerdown={(e) => onVhPointerDown(e, vh.index)}
+						>
+							{#if perpendicular}
+								<HelixCircle
+									x={0}
+									y={0}
+									radius={RADIUS}
+									strokeWidth={STROKE_W}
+									vhIdx={vh.index}
+									{part}
+									text={isDetailZoom ? `${vh.index}` : null}
+									active={true}
+									scafStartAngle={(vh.index % 2 === 0 ? 0 : 180) +
+										region.twistOffsetInDeg +
+										radial0ScreenDeg(vh.localFrame)}
+									scafBpAngle={region.twistPerBaseInDeg}
+								/>
+							{:else if vh.localFrame}
+								{@const lengthPx = fullLengthPx(vh)}
+								<Group
+									rotation={frameAngleDeg(vh.localFrame)}
+									onpointerenter={() => setHovered(vh.index)}
+									onpointerleave={() => clearHovered(vh.index)}
+								>
+									<Rect
+										x={0}
+										y={-HELIX_WIDTH_PX / 2}
+										width={lengthPx}
+										height={HELIX_WIDTH_PX}
+										cornerRadius={VH_CORNER_RADIUS}
+										fill="transparent"
+										stroke={themeColors.gridLine}
+										strokeWidth={STROKE_W}
+										opacity={VH_OUTLINE_OPACITY}
+										perfectDrawEnabled={false}
+									/>
+									{#each segmentsForVh(vh) as segment (segment.id)}
+										{@const strandIdx = segment.inStrandIndex as 0 | 1}
+										{@const strandY = strandLocalY(strandIdx)}
+										{@const fiveX = bpToLocalX(segment.fivePrime.index)}
+										{@const threeX = bpToLocalX(segment.threePrime.index)}
+										{@const fiveMarkerX = fivePrimeMarkerX(fiveX, threeX)}
+										{@const color = segment.oligo?.color ?? DEFAULT_STRAND_COLOR}
+										{@const dragEnd = activeEndDrag?.end.segment === segment ? activeEndDrag : null}
+										{@const resizingThisSegment = dragEnd !== null}
+										{@const focused = !hasFocusedSegments || focusedSegments?.has(segment)}
+										{@const fatlineOpacity = resizingThisSegment
+											? 0.32
+											: focused
+												? 1
+												: DIMMED_FATLINE_OPACITY}
+										{@const previewFiveX =
+											dragEnd && !dragEnd.end.isThreePrime ? bpToLocalX(dragEnd.currentIdx) : fiveX}
+										{@const previewThreeX =
+											dragEnd && dragEnd.end.isThreePrime ? bpToLocalX(dragEnd.currentIdx) : threeX}
+										{@const previewFiveMarkerX = fivePrimeMarkerX(previewFiveX, previewThreeX)}
+										<Line
+											points={[fiveX, strandY, threeX, strandY]}
+											stroke={color}
+											lineCap="round"
+											lineJoin="round"
+											strokeWidth={STRAND_STROKE_W}
+											opacity={fatlineOpacity}
+											listening={false}
+										/>
+										{#if isDetailZoom}
+											<Rect
+												x={fiveMarkerX}
+												y={strandY}
+												offsetX={TERMINUS_SIZE_PX / 2}
+												offsetY={TERMINUS_SIZE_PX / 2}
+												width={TERMINUS_SIZE_PX}
+												height={TERMINUS_SIZE_PX}
+												fill={color}
+												opacity={fatlineOpacity}
+												listening={false}
+											/>
+											<Circle
+												x={fiveMarkerX}
+												y={strandY}
+												radius={END_HIT_RADIUS_PX}
+												fill="black"
+												sceneFunc={skipSceneDraw}
+												hitFunc={circleHitFunc}
+												onpointerdown={(e) =>
+													onFreeformHitPointerDown(e, { kind: 'FIVE_PRIME_END', segment })}
+											/>
+											<Line
+												points={threePrimeTrianglePoints(threeX, strandY, strandIdx)}
+												fill={color}
+												opacity={fatlineOpacity}
+												closed
+												listening={false}
+											/>
+											<Circle
+												x={threeX}
+												y={strandY}
+												radius={END_HIT_RADIUS_PX}
+												fill="black"
+												sceneFunc={skipSceneDraw}
+												hitFunc={circleHitFunc}
+												onpointerdown={(e) =>
+													onFreeformHitPointerDown(e, { kind: 'THREE_PRIME_END', segment })}
+											/>
+										{/if}
+										{#if resizingThisSegment}
+											<Line
+												points={[previewFiveX, strandY, previewThreeX, strandY]}
+												stroke={color}
+												lineCap="round"
+												lineJoin="round"
+												strokeWidth={STRAND_STROKE_W + 1}
+												dash={[5, 3]}
+												listening={false}
+											/>
+											{#if dragEnd?.end.isThreePrime}
+												<Line
+													points={threePrimeTrianglePoints(previewThreeX, strandY, strandIdx)}
+													fill={color}
+													closed
+													listening={false}
+												/>
+											{:else}
+												<Rect
+													x={previewFiveMarkerX}
+													y={strandY}
+													offsetX={TERMINUS_SIZE_PX / 2}
+													offsetY={TERMINUS_SIZE_PX / 2}
+													width={TERMINUS_SIZE_PX}
+													height={TERMINUS_SIZE_PX}
+													fill={color}
+													listening={false}
+												/>
+											{/if}
+										{/if}
+									{/each}
+									{#if isDetailZoom}
+										<Text
+											x={4}
+											y={-7}
+											text={`${vh.index}`}
+											fontSize={13}
+											fontStyle="bold"
+											fill={themeColors.vhText}
+											listening={false}
+										/>
+									{/if}
+								</Group>
+							{/if}
+						</Group>
+					{/if}
+				{/each}
+
+				{#each freeformCrossovers as xover (xover.id)}
+					{@const from = segmentEndCanvasPoint(xover.fromSegment, 'threePrime')}
+					{@const to = segmentEndCanvasPoint(xover.toSegment, 'fivePrime')}
+					{@const bulge = from && to ? crossoverBulgePoint(from, to) : null}
+					{#if from && to && bulge && boundsIntersect(pointsBounds(from, to, bulge), renderWindow)}
+						{@const focused =
+							!hasFocusedSegments ||
+							(focusedSegments?.has(xover.fromSegment) && focusedSegments?.has(xover.toSegment))}
+						<Line
+							points={[from.x, from.y, bulge.x, bulge.y, to.x, to.y]}
+							stroke={xover.color}
+							strokeWidth={2}
+							opacity={focused ? (xover.constrained ? 1 : 0.55) : DIMMED_FATLINE_OPACITY}
+							lineCap="round"
+							lineJoin="round"
+							tension={0.4}
+							listening={false}
+						/>
+						{#if xover.constrained}
+							<Circle
+								x={bulge.x}
+								y={bulge.y}
+								radius={3.2}
+								fill={themeColors.hxFill}
+								stroke={xover.color}
+								strokeWidth={1.5}
+								opacity={focused ? 1 : DIMMED_FATLINE_OPACITY}
+								perfectDrawEnabled={false}
+								listening={false}
+							/>
+							<Circle
+								x={bulge.x}
+								y={bulge.y}
+								radius={0.8}
+								fill={xover.color}
+								opacity={focused ? 1 : DIMMED_FATLINE_OPACITY}
+								listening={false}
+							/>
+						{/if}
+					{/if}
+				{/each}
+			{/if}
+		</Layer>
+
+		<!-- Overlay layer: few nodes, repainted on hover, selection and every drag step. -->
+		<Layer>
 			{#if dragIndicator}
 				{@const { cx, cy, xNm, yNm } = dragIndicator}
 				{@const xMid = (OFFSET_X + cx) / 2}
@@ -1047,345 +1620,144 @@
 				/>
 			{/if}
 
-			{#each drawnVhs as vh (vh.index)}
-				{@const xNm = vh.localFrame ? vh.localFrame.origin.x : 0}
-				{@const yNm = vh.localFrame ? vh.localFrame.origin.y : 0}
-				{@const { x, y } = nmToCanvas(xNm, yNm)}
-				{@const perpendicular = isPerpendicular(vh.localFrame)}
-				{@const selected = selectedVhIndices.has(vh.index)}
-
-				<Group {x} {y} opacity={vhOpacity(vh)} onpointerdown={(e) => onVhPointerDown(e, vh.index)}>
-					{#if perpendicular}
-						{#if selected}
-							<Circle
-								x={0}
-								y={0}
-								radius={RADIUS + 5}
-								stroke={selectionColor}
-								strokeWidth={2.5}
-								opacity={0.85}
-								listening={false}
-							/>
-						{/if}
-						<HelixCircle
-							x={0}
-							y={0}
-							radius={RADIUS}
-							strokeWidth={STROKE_W}
-							vhIdx={vh.index}
-							{part}
-							text={`${vh.index}`}
-							active={true}
-							scafStartAngle={(vh.index % 2 === 0 ? 0 : 180) +
-								part.getRegionForVh(vh).twistOffsetInDeg +
-								radial0ScreenDeg(vh.localFrame)}
-							scafBpAngle={part.getRegionForVh(vh).twistPerBaseInDeg}
-						/>
-						{#if vh.localFrame && (selected || activeRoll?.vhIdx === vh.index)}
-							{@const handle = rollDialPoint(
-								{ x: 0, y: 0 },
-								RADIUS + 9,
-								(radial0ScreenDeg(vh.localFrame) * Math.PI) / 180,
-								0
-							)}
-							{@const base = rollDialPoint(
-								{ x: 0, y: 0 },
-								RADIUS,
-								(radial0ScreenDeg(vh.localFrame) * Math.PI) / 180,
-								0
-							)}
-							<Line
-								points={[base.x, base.y, handle.x, handle.y]}
-								stroke={themeColors.freeformAccent}
-								strokeWidth={1.5}
-								listening={false}
-							/>
-							<Circle
-								x={handle.x}
-								y={handle.y}
-								radius={ROLL_HANDLE_RADIUS_PX}
-								fill={themeColors.freeformAccent}
-								hitStrokeWidth={8}
-								onpointerdown={(e) => onRollPointerDown(e, vh.index)}
-							/>
-						{/if}
-					{:else if vh.localFrame}
-						{@const lengthPx = fullLengthPx(vh)}
-						<Group
-							rotation={frameAngleDeg(vh.localFrame)}
-							onpointerenter={() => (hoveredVhIdx = vh.index)}
-							onpointerleave={() => {
-								if (hoveredVhIdx === vh.index) hoveredVhIdx = null;
-							}}
-						>
+			{#each adornedVhs as vh (vh.index)}
+				{#if vh.localFrame}
+					{@const frame = vh.localFrame}
+					{@const { x, y } = vhCanvasCenter(frame)}
+					{@const selected = selectedVhIndices.has(vh.index)}
+					{@const hovered = hoveredVhIdx === vh.index}
+					{@const rolling = activeRoll?.vhIdx === vh.index}
+					<Group {x} {y}>
+						{#if isPerpendicular(frame)}
 							{#if selected}
-								<Rect
-									x={-4}
-									y={-HELIX_WIDTH_PX / 2 - 4}
-									width={lengthPx + 8}
-									height={HELIX_WIDTH_PX + 8}
-									cornerRadius={VH_CORNER_RADIUS + 2}
-									fill="transparent"
+								<Circle
+									radius={RADIUS + 5}
 									stroke={selectionColor}
 									strokeWidth={2.5}
+									strokeScaleEnabled={planeEditable}
 									opacity={0.85}
 									listening={false}
 								/>
 							{/if}
-							<Rect
-								x={0}
-								y={-HELIX_WIDTH_PX / 2}
-								width={lengthPx}
-								height={HELIX_WIDTH_PX}
-								cornerRadius={VH_CORNER_RADIUS}
-								fill="transparent"
-								stroke={themeColors.gridLine}
-								strokeWidth={STROKE_W}
-								opacity={VH_OUTLINE_OPACITY}
-							/>
-							{#each segmentsForVh(vh) as segment (segment.id)}
-								{@const strandIdx = segment.inStrandIndex as 0 | 1}
-								{@const strandY = strandLocalY(strandIdx)}
-								{@const fiveX = bpToLocalX(segment.fivePrime.index)}
-								{@const threeX = bpToLocalX(segment.threePrime.index)}
-								{@const fiveMarkerX = fivePrimeMarkerX(fiveX, threeX)}
-								{@const color = segment.oligo?.color ?? '#f59e0b'}
-								{@const dragEnd = activeEndDrag?.end.segment === segment ? activeEndDrag : null}
-								{@const resizingThisSegment = dragEnd !== null}
-								{@const focused = !hasFocusedSegments || focusedSegments?.has(segment)}
-								{@const fatlineOpacity = resizingThisSegment
-									? 0.32
-									: focused
-										? 1
-										: DIMMED_FATLINE_OPACITY}
-								{@const previewFiveX =
-									dragEnd && !dragEnd.end.isThreePrime ? bpToLocalX(dragEnd.currentIdx) : fiveX}
-								{@const previewThreeX =
-									dragEnd && dragEnd.end.isThreePrime ? bpToLocalX(dragEnd.currentIdx) : threeX}
-								{@const previewFiveMarkerX = fivePrimeMarkerX(previewFiveX, previewThreeX)}
+							{#if selected || rolling}
+								{@const handleAngle = (radial0ScreenDeg(frame) * Math.PI) / 180}
+								{@const handle = rollDialPoint({ x: 0, y: 0 }, RADIUS + 9, handleAngle, 0)}
+								{@const base = rollDialPoint({ x: 0, y: 0 }, RADIUS, handleAngle, 0)}
 								<Line
-									points={[fiveX, strandY, threeX, strandY]}
-									stroke={color}
-									lineCap="round"
-									lineJoin="round"
-									strokeWidth={STRAND_STROKE_W}
-									opacity={fatlineOpacity}
-									listening={false}
-								/>
-								<Rect
-									x={fiveMarkerX}
-									y={strandY}
-									offsetX={TERMINUS_SIZE_PX / 2}
-									offsetY={TERMINUS_SIZE_PX / 2}
-									width={TERMINUS_SIZE_PX}
-									height={TERMINUS_SIZE_PX}
-									fill={color}
-									opacity={fatlineOpacity}
+									points={[base.x, base.y, handle.x, handle.y]}
+									stroke={themeColors.freeformAccent}
+									strokeWidth={1.5}
 									listening={false}
 								/>
 								<Circle
-									x={fiveMarkerX}
-									y={strandY}
-									radius={END_HIT_RADIUS_PX}
-									fill={END_HIT_TARGET_FILL}
-									onpointerdown={(e) =>
-										onFreeformHitPointerDown(e, { kind: 'FIVE_PRIME_END', segment })}
-								/>
-								<Line
-									points={threePrimeTrianglePoints(threeX, strandY, strandIdx)}
-									fill={color}
-									opacity={fatlineOpacity}
-									closed
-									listening={false}
-								/>
-								<Circle
-									x={threeX}
-									y={strandY}
-									radius={END_HIT_RADIUS_PX}
-									fill={END_HIT_TARGET_FILL}
-									onpointerdown={(e) =>
-										onFreeformHitPointerDown(e, { kind: 'THREE_PRIME_END', segment })}
-								/>
-								{#if resizingThisSegment}
-									<Line
-										points={[previewFiveX, strandY, previewThreeX, strandY]}
-										stroke={color}
-										lineCap="round"
-										lineJoin="round"
-										strokeWidth={STRAND_STROKE_W + 1}
-										dash={[5, 3]}
-										listening={false}
-									/>
-									{#if dragEnd?.end.isThreePrime}
-										<Line
-											points={threePrimeTrianglePoints(previewThreeX, strandY, strandIdx)}
-											fill={color}
-											closed
-											listening={false}
-										/>
-									{:else}
-										<Rect
-											x={previewFiveMarkerX}
-											y={strandY}
-											offsetX={TERMINUS_SIZE_PX / 2}
-											offsetY={TERMINUS_SIZE_PX / 2}
-											width={TERMINUS_SIZE_PX}
-											height={TERMINUS_SIZE_PX}
-											fill={color}
-											listening={false}
-										/>
-									{/if}
-								{/if}
-							{/each}
-							<Text
-								x={4}
-								y={-7}
-								text={`${vh.index}`}
-								fontSize={13}
-								fontStyle="bold"
-								fill={themeColors.vhText}
-								listening={false}
-							/>
-							{#if region.supportsPlaneAxisEditing && (hoveredVhIdx === vh.index || activeRotate?.vhIdx === vh.index)}
-								<Group x={lengthPx} y={0} onpointerdown={(e) => onRotatePointerDown(e, vh.index)}>
-									<Rect
-										offsetX={3}
-										offsetY={5}
-										width={6}
-										height={10}
-										cornerRadius={2}
-										fill={themeColors.freeformAccent}
-										stroke={themeColors.freeformAccent}
-										strokeWidth={2}
-									/>
-									<Circle
-										x={-1.5}
-										y={-3}
-										radius={0.8}
-										fill="white"
-										opacity={0.7}
-										listening={false}
-									/>
-									<Circle
-										x={1.5}
-										y={-3}
-										radius={0.8}
-										fill="white"
-										opacity={0.7}
-										listening={false}
-									/>
-									<Circle
-										x={-1.5}
-										y={0}
-										radius={0.8}
-										fill="white"
-										opacity={0.7}
-										listening={false}
-									/>
-									<Circle x={1.5} y={0} radius={0.8} fill="white" opacity={0.7} listening={false} />
-									<Circle
-										x={-1.5}
-										y={3}
-										radius={0.8}
-										fill="white"
-										opacity={0.7}
-										listening={false}
-									/>
-									<Circle x={1.5} y={3} radius={0.8} fill="white" opacity={0.7} listening={false} />
-								</Group>
-							{/if}
-						</Group>
-						{#if selected || hoveredVhIdx === vh.index || activeRoll?.vhIdx === vh.index}
-							{@const glyph = rollGlyphOffset(vh.localFrame)}
-							{@const refAngle = rollReferenceAngle(vh.localFrame)}
-							{@const tickIn = rollDialPoint(glyph, ROLL_GLYPH_RADIUS_PX - 2, refAngle, 0)}
-							{@const tickOut = rollDialPoint(glyph, ROLL_GLYPH_RADIUS_PX + 3, refAngle, 0)}
-							{@const dot = rollDialPoint(
-								glyph,
-								ROLL_GLYPH_RADIUS_PX,
-								refAngle,
-								rollDegOf(vh.localFrame)
-							)}
-							<Circle
-								x={glyph.x}
-								y={glyph.y}
-								radius={ROLL_GLYPH_RADIUS_PX}
-								stroke={themeColors.gridLine}
-								strokeWidth={1.5}
-								fill="transparent"
-								listening={false}
-							/>
-							<Line
-								points={[tickIn.x, tickIn.y, tickOut.x, tickOut.y]}
-								stroke={themeColors.gridLine}
-								strokeWidth={1.5}
-								listening={false}
-							/>
-							<Circle
-								x={dot.x}
-								y={dot.y}
-								radius={ROLL_HANDLE_RADIUS_PX - 1}
-								fill={themeColors.freeformAccent}
-								listening={false}
-							/>
-							{#if selected}
-								<Circle
-									x={glyph.x}
-									y={glyph.y}
-									radius={ROLL_GLYPH_RADIUS_PX + 4}
-									fill="transparent"
+									x={handle.x}
+									y={handle.y}
+									radius={ROLL_HANDLE_RADIUS_PX}
+									fill={themeColors.freeformAccent}
+									hitStrokeWidth={8}
+									listening={planeEditable}
 									onpointerdown={(e) => onRollPointerDown(e, vh.index)}
 								/>
 							{/if}
+						{:else}
+							{@const lengthPx = fullLengthPx(vh)}
+							<Group rotation={frameAngleDeg(frame)}>
+								{#if selected}
+									<Rect
+										x={-4}
+										y={-HELIX_WIDTH_PX / 2 - 4}
+										width={lengthPx + 8}
+										height={HELIX_WIDTH_PX + 8}
+										cornerRadius={VH_CORNER_RADIUS + 2}
+										stroke={selectionColor}
+										strokeWidth={2.5}
+										strokeScaleEnabled={planeEditable}
+										opacity={0.85}
+										listening={false}
+									/>
+								{/if}
+								{#if region.supportsPlaneAxisEditing && (hovered || activeRotate?.vhIdx === vh.index)}
+									<!-- Off the design layer, so entering it counts as staying on the helix. -->
+									<Group
+										x={lengthPx}
+										y={0}
+										onpointerdown={(e) => onRotatePointerDown(e, vh.index)}
+										onpointerenter={() => setHovered(vh.index)}
+										onpointerleave={() => clearHovered(vh.index)}
+									>
+										<Rect
+											offsetX={3}
+											offsetY={5}
+											width={6}
+											height={10}
+											cornerRadius={2}
+											fill={themeColors.freeformAccent}
+											stroke={themeColors.freeformAccent}
+											strokeWidth={2}
+										/>
+										{#each ROTATE_GRIP_DOTS as [dotX, dotY] (`${dotX},${dotY}`)}
+											<Circle
+												x={dotX}
+												y={dotY}
+												radius={0.8}
+												fill="white"
+												opacity={0.7}
+												listening={false}
+											/>
+										{/each}
+									</Group>
+								{/if}
+							</Group>
+							{#if selected || hovered || rolling}
+								{@const glyph = rollGlyphOffset(frame)}
+								{@const refAngle = rollReferenceAngle(frame)}
+								{@const tickIn = rollDialPoint(glyph, ROLL_GLYPH_RADIUS_PX - 2, refAngle, 0)}
+								{@const tickOut = rollDialPoint(glyph, ROLL_GLYPH_RADIUS_PX + 3, refAngle, 0)}
+								{@const dot = rollDialPoint(
+									glyph,
+									ROLL_GLYPH_RADIUS_PX,
+									refAngle,
+									rollDegOf(frame)
+								)}
+								<Circle
+									x={glyph.x}
+									y={glyph.y}
+									radius={ROLL_GLYPH_RADIUS_PX}
+									stroke={themeColors.gridLine}
+									strokeWidth={1.5}
+									listening={false}
+								/>
+								<Line
+									points={[tickIn.x, tickIn.y, tickOut.x, tickOut.y]}
+									stroke={themeColors.gridLine}
+									strokeWidth={1.5}
+									listening={false}
+								/>
+								<Circle
+									x={dot.x}
+									y={dot.y}
+									radius={ROLL_HANDLE_RADIUS_PX - 1}
+									fill={themeColors.freeformAccent}
+									listening={false}
+								/>
+								{#if selected && planeEditable}
+									<Circle
+										x={glyph.x}
+										y={glyph.y}
+										radius={ROLL_GLYPH_RADIUS_PX + 4}
+										fill="black"
+										sceneFunc={skipSceneDraw}
+										hitFunc={circleHitFunc}
+										onpointerdown={(e) => onRollPointerDown(e, vh.index)}
+									/>
+								{/if}
+							{/if}
 						{/if}
-					{/if}
-				</Group>
-			{/each}
-
-			{#each freeformCrossovers as xover (xover.id)}
-				{@const focused =
-					!hasFocusedSegments ||
-					(focusedSegments?.has(xover.fromSegment) && focusedSegments?.has(xover.toSegment))}
-				<Line
-					points={[
-						xover.from.x,
-						xover.from.y,
-						xover.bulge.x,
-						xover.bulge.y,
-						xover.to.x,
-						xover.to.y,
-					]}
-					stroke={xover.color}
-					strokeWidth={2}
-					opacity={focused ? (xover.constrained ? 1 : 0.55) : DIMMED_FATLINE_OPACITY}
-					lineCap="round"
-					lineJoin="round"
-					tension={0.4}
-					listening={false}
-				/>
-				{#if xover.constrained}
-					<Circle
-						x={xover.bulge.x}
-						y={xover.bulge.y}
-						radius={3.2}
-						fill={themeColors.hxFill}
-						stroke={xover.color}
-						strokeWidth={1.5}
-						opacity={focused ? 1 : DIMMED_FATLINE_OPACITY}
-						listening={false}
-					/>
-					<Circle
-						x={xover.bulge.x}
-						y={xover.bulge.y}
-						radius={0.8}
-						fill={xover.color}
-						opacity={focused ? 1 : DIMMED_FATLINE_OPACITY}
-						listening={false}
-					/>
+					</Group>
 				{/if}
 			{/each}
 
-			<!-- Active draw previews — rendered on top of helices and crossovers so they stay visible -->
+			<!-- Active draw previews — on top of helices and crossovers so they stay visible -->
 			{#if activeLine}
 				<Line
 					points={[

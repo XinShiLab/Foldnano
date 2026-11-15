@@ -36,6 +36,7 @@
 		/> -->
 		<OligoSegmentInPart
 			id={segment.id}
+			color={oligo.color}
 			opacity={oligo.isMirror ? MIRROR_OPACITY : 1}
 			strokeWidth={dimensions.strokeWidth * 2}
 		/>

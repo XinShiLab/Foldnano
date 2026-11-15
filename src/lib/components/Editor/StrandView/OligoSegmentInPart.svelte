@@ -6,17 +6,22 @@
 	// import Insert from './Insert';
 	// import Skip from './Skip';
 	import OligoSegment from '$lib/model/Oligo/OligoSegment.svelte';
-	import { rectsIntersect, expandRect } from '$lib/utils/utils';
+	import { rectsIntersect } from '$lib/utils/utils';
+	import { untrack } from 'svelte';
+	import { stageViewRect } from './renderWindow';
 	import type { Context } from 'konva/lib/Context';
+	import type { Shape as KonvaShape } from 'konva/lib/Shape';
 	import { getModificationColor, truncateModificationName } from '$lib/model/modifications';
 	import type { TemporalPartInfo } from '../context/types';
 	import { canvasTheme } from '$lib/canvasEditor/theme.svelte';
 
-	const MOD_ZOOM_THRESHOLD = 0.6;
 	const MOD_DOT_RADIUS = 3;
+	const ALL_N = /^N+$/;
 
 	export interface OligoSegmentProps {
 		id: string;
+		/** The owning oligo's colour, passed by the caller that already holds the oligo. */
+		color?: string;
 		opacity?: number;
 		strokeWidth?: number;
 		isSelected?: boolean;
@@ -27,7 +32,13 @@
 
 	let el = $state<Line>();
 
-	let { id, opacity = 1, strokeWidth = 2, isSelected = false }: OligoSegmentProps = $props();
+	let {
+		id,
+		color: colorProp,
+		opacity = 1,
+		strokeWidth = 2,
+		isSelected = false,
+	}: OligoSegmentProps = $props();
 
 	const segmentToRender = $derived.by(() => {
 		if (!foldnanoDoc) return null;
@@ -47,7 +58,7 @@
 	);
 	let start = $derived(segmentToRender?.fivePrime.index ?? 0);
 	let end = $derived(segmentToRender?.threePrime.index ?? 0);
-	let color = $derived(segmentToRender?.oligo?.color ?? 'red');
+	let color = $derived(colorProp ?? segmentToRender?.oligo?.color ?? 'red');
 	let marks = $derived([
 		segmentToRender?.fivePrime.isFree ?? false,
 		segmentToRender?.threePrime.isFree ?? false,
@@ -80,18 +91,12 @@
 		height: start_bp && end_bp ? sideLength : 0,
 	});
 
-	const overscanPx = $derived(
-		200 / Math.max(editorViewContext.strandViewContext.viewportScale, 0.1)
+	// The render window and the zoom flag change rarely, so a pan or zoom step re-evaluates
+	// nothing here; the sequence Shape narrows to the exact viewport when it draws.
+	const isInRenderWindow = $derived(
+		rectsIntersect(clickRect, editorViewContext.strandViewContext.renderBounds)
 	);
-	const renderBounds = $derived(
-		expandRect(editorViewContext.strandViewContext.viewportBounds, overscanPx)
-	);
-	const isInRenderWindow = $derived(rectsIntersect(clickRect, renderBounds));
-
-	// Tighter check used only for sequence text gating
-	const isInView = $derived(
-		rectsIntersect(clickRect, editorViewContext.strandViewContext.viewportBounds)
-	);
+	const showDetail = $derived(isInRenderWindow && editorViewContext.strandViewContext.isDetailZoom);
 
 	// While a crossover-connect drag is in progress, dim any modification badge that
 	// sits exactly at the candidate drop target — connecting there will drop it.
@@ -108,7 +113,6 @@
 		connectingTarget[1] === bpIdx &&
 		connectingTarget[2] === strandIdx;
 
-	// $inspect('isInView', isInView);
 	// $inspect('viewport scale', editorViewContext.strandViewContext.viewportScale);
 
 	// // TODO: dealing with hover globally instead of here later.
@@ -120,30 +124,40 @@
 	// 	isHovered = false;
 	// };
 
-	const sequenceData = $derived.by(() => {
-		if (!segmentToRender) return '';
-		return segmentToRender.slots.map((s) => `${s.bpIndex}:${s.seq}`).join('|');
-	});
-
-	const hasRenderableSequence = $derived(
-		segmentToRender?.slots.some((s) => s.seq.length > 0 && !/^N+$/.test(s.seq)) ?? false
+	// One signal per segment (`seqVersion`) plus the slot count, not a subscription per base.
+	const sequenceKey = $derived(
+		segmentToRender ? `${segmentToRender.seqVersion}:${segmentToRender.slots.length}` : ''
 	);
 
+	const hasRenderableSequence = $derived.by(() => {
+		void sequenceKey;
+		const segment = segmentToRender;
+		if (!segment) return false;
+		return untrack(() => segment.slots.some((s) => s.seq.length > 0 && !ALL_N.test(s.seq)));
+	});
+
 	// Custom shape function to batch-render all sequence text in a single canvas pass
-	const drawSequenceText = (ctx: Context, segmentToRender: OligoSegment) => {
-		if (!segmentToRender) return;
+	const drawSequenceText = (ctx: Context, shape: KonvaShape, segmentToRender: OligoSegment) => {
+		const stage = shape.getStage();
+		if (!segmentToRender || rowIdx === null || !stage) return;
+		const view = stageViewRect(stage);
+		const xMin = view.x - sideLength;
+		const xMax = view.x + view.width + sideLength;
+		const y = getBpCoordsByRowAndBpIdx(rowIdx, 0)[strandIdx][1] + offset[1] + 1;
+		const { seqInsertText, seqText } = canvasTheme.colors;
 
 		ctx.save();
 		ctx.textAlign = 'center';
 		ctx.textBaseline = 'top';
+		// Set once: assigning `font` per letter is slow in Firefox and Safari.
+		ctx.font = '5px sans-serif';
 
 		for (const slot of segmentToRender.slots) {
+			const x = d.getXByBpIdx(slot.bpIndex) + offset[0];
+			if (x < xMin || x > xMax) continue;
 			const slotSeq = slot.seq;
-			const bpIndex = slot.bpIndex;
-			const isSkip = slotSeq.length === 0;
+			if (slotSeq.length === 0 || ALL_N.test(slotSeq)) continue;
 			const isInsert = slotSeq.length > 1;
-
-			if (isSkip || /^N+$/.test(slotSeq)) continue;
 
 			const charToShow =
 				slotSeq.length > 2
@@ -152,14 +166,8 @@
 						? slotSeq.split('').reverse().join('')
 						: slotSeq;
 
-			if (rowIdx === null) continue;
-			const [x_nuc, y_nuc] = withOffset(getBpCoordsByRowAndBpIdx(rowIdx, bpIndex), offset)[
-				strandIdx
-			];
-
-			ctx.font = '5px sans-serif';
-			ctx.fillStyle = isInsert ? canvasTheme.colors.seqInsertText : canvasTheme.colors.seqText;
-			ctx.fillText(charToShow, x_nuc, y_nuc + 1);
+			ctx.fillStyle = isInsert ? seqInsertText : seqText;
+			ctx.fillText(charToShow, x, y);
 		}
 
 		ctx.restore();
@@ -219,9 +227,7 @@
 					radius={MOD_DOT_RADIUS}
 					fill={modColor}
 					opacity={dimmed ? 0.35 : 1}
-					visible={!(
-						isInView && editorViewContext.strandViewContext.viewportScale > MOD_ZOOM_THRESHOLD
-					)}
+					visible={!showDetail}
 					listening={false}
 				/>
 				<Text
@@ -231,8 +237,7 @@
 					fontSize={7}
 					fill={modColor}
 					opacity={dimmed ? 0.35 : 1}
-					visible={isInView &&
-						editorViewContext.strandViewContext.viewportScale > MOD_ZOOM_THRESHOLD}
+					visible={showDetail}
 					listening={false}
 				/>
 			{/if}
@@ -259,9 +264,7 @@
 					radius={MOD_DOT_RADIUS}
 					fill={modColor}
 					opacity={dimmed ? 0.35 : 1}
-					visible={!(
-						isInView && editorViewContext.strandViewContext.viewportScale > MOD_ZOOM_THRESHOLD
-					)}
+					visible={!showDetail}
 					listening={false}
 				/>
 				<Text
@@ -271,8 +274,7 @@
 					fontSize={7}
 					fill={modColor}
 					opacity={dimmed ? 0.35 : 1}
-					visible={isInView &&
-						editorViewContext.strandViewContext.viewportScale > MOD_ZOOM_THRESHOLD}
+					visible={showDetail}
 					listening={false}
 				/>
 			{/if}
@@ -282,19 +284,17 @@
 			<!-- Batch render all sequence text in a single Shape for performance. Viewport
 			     gating is on `visible` (canvas attr), not `{#if}`, to avoid DOM churn on
 			     pan/zoom — see the Group note above. -->
-			{#key `${sequenceData}|${canvasTheme.isDark}`}
-				<Shape
-					visible={isInView &&
-						editorViewContext.strandViewContext.viewportScale > 0.6 &&
-						!editorViewContext.strandViewContext.hideContext.sequence}
-					listening={false}
-					perfectDrawEnabled={false}
-					shadowForStrokeEnabled={false}
-					sceneFunc={(ctx) => {
-						drawSequenceText(ctx, segmentToRender);
-					}}
-				/>
-			{/key}
+			<!-- `redrawKey` is not a Konva attr; changing it is what makes the layer redraw. -->
+			<Shape
+				visible={showDetail && !editorViewContext.strandViewContext.hideContext.sequence}
+				redrawKey={`${sequenceKey}|${canvasTheme.isDark}`}
+				listening={false}
+				perfectDrawEnabled={false}
+				shadowForStrokeEnabled={false}
+				sceneFunc={(ctx, shape) => {
+					drawSequenceText(ctx, shape, segmentToRender);
+				}}
+			/>
 		{/if}
 
 		<!-- {#each segmentToRender.skipsAndInserts as skipOrInsert (`${segmentToRender.id}#at#${skipOrInsert[0]}`)}

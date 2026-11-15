@@ -143,6 +143,7 @@
 
 		if (hasSelectionModifier(e)) {
 			toggleConstraintGroup(vhIdx);
+			if (selectedVhIndices.has(vhIdx)) editorViewContext.strandToolbarController?.revealVh(vh.id);
 			return;
 		}
 
@@ -252,6 +253,9 @@
 				},
 				history
 			);
+		} else if (movedPx < dragThresholdPx) {
+			const vh = part.getVhByIndex(activeDrag.anchorVhIdx);
+			if (vh) editorViewContext.strandToolbarController?.revealVh(vh.id);
 		}
 		activeDrag = null;
 	}
