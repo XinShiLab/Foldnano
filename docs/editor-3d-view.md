@@ -3,6 +3,7 @@ covers:
   - src/lib/components/Editor/View3D/**
   - src/lib/model/geometry3d/**
   - src/lib/components/Editor/ToolPanel/View3DPanel.svelte
+  - src/lib/components/Editor/ToolPanel/selectAllOptions.ts
   - src/lib/components/Editor/ToolPanel/ReferenceMesh*.svelte
   - src/lib/model/io/plyMesh*.ts
 ---
@@ -127,6 +128,15 @@ Optional simulation overlays:
 - relaxed segment positions
 - crossover stress coloring
 
+**Translucent fat lines blend once per pixel.** Strands and arcs are `LineSegments2`: separate quads
+that overlap where pieces meet. Translucent (dimmed buckets, NT-mode arcs, the hover glow), those
+overlaps blended twice and showed as dots. `drawOncePerPixel.ts` gives each translucent object a
+stencil mark (`nextStencilRef`, cycling 1–254; the glow uses the reserved `GLOW_STENCIL_REF` across
+all its layers) with `NotEqual` / `Replace`, so a pixel blends once per object while different
+objects still blend over each other. Every renderer that draws this scene is created with
+`stencil: true` (three defaults to false): the live view, PNG export, replay video export, and the
+landing hero.
+
 ---
 
 ## Viewer Controls
@@ -149,6 +159,62 @@ Optional simulation overlays:
 
 Filtering is segment-based and comes from the strand-view end selection. Ghost
 helix cylinders are never filtered out.
+
+### Select in 3D
+
+While the editor-wide `editorMode` is `SELECT` (the 3D toolbar's **Mode** group), a click on the
+line view selects into the strand view (`linePickActive` in `View3D.svelte`). Any other mode, Pan
+in particular, leaves 3D view-only. It is inactive in NT-model mode and while the oxDNA replay is
+shown; replay keeps its own nucleotide pick, which always selects the whole oligo. There is no
+separate 3D toggle on purpose: one Select concept, shared with the strand view.
+
+- `buildScene` returns a `pickIndex` (`linePick.ts`) next to the batched lines: every drawn piece
+  with the segment or crossover it belongs to and its base range. The batched `LineSegments2`
+  carry no identity, so this side table is the only way back to the model. It is built only in
+  line mode and holds only what was drawn (hidden regions and "show only selected" leave items out).
+- `pickLine` projects pieces to screen and takes the nearest within a **pixel** radius, ties settled
+  by depth. A pixel radius keeps zoomed-out picks from grabbing a crowd.
+- `pickedEnds` maps the hit through the strand view's `selectionFilter` with the select tool's hit
+  priority (crossover, then oligo, then segment) and SCAF/STAP; oligo picks honour `selectAllMode`
+  via the shared `expandOligoEnds`. Ends are not drawn in 3D, so END is greyed out in the panel.
+- The result goes into `strandViewContext.selected` (plain click replaces, Shift toggles) and the
+  strand view scrolls there with
+  `centerOn(..., { onlyIfOffscreen: true })`, expanding a collapsed region. The 3D camera never moves.
+- A true click on empty space clears the selection, as in the strand view. Rotate (left-drag) and
+  pan (right-drag) are not clicks (4 px threshold), so looking around never picks or clears.
+- The pick filters and the "Select all with" dropdown show in the 3D inspector panel in Select mode,
+  bound to the same `selectionToggles` / `selectAllMode` as the strand view's Select panel
+  (options shared via `ToolPanel/selectAllOptions.ts`; Same Modification stays disabled in 3D).
+
+**Box select.** Shift + left-drag draws a rectangle (a `selectBox` div over the canvas) and, on
+release, **adds** everything it touches: `itemsInRect` takes items with any piece midpoint inside
+the rectangle, front or back (no occlusion, like the strand view's box), then `boxPickedEnds` maps
+them through `pickedEnds`, expanding each oligo once. It does not scroll the strand view. The
+gesture starts in a **capture-phase** `pointerdown` on the wrapper so `TrackballControls` is
+disabled before its own `pointerdown` (disabling mid-gesture would leave it holding the pointer);
+`endBox` re-enables it. A drag under 4 px is not a box and falls through to Shift-click.
+
+**Hover.** In Select mode, a pointer move (no button held) schedules one `pickLine` per animation
+frame with `sticky` set to the hovered item, so hover only switches when a neighbour is closer by
+more than 2 px. The hit drives two things:
+
+- `hoverGlow.ts`: a separate small overlay (not the batched design geometry) under everything a
+  click would select: `pickedEnds` → `itemsCoveredBy` → `piecesOf`. So with Oligo on it glows the
+  whole oligo, with Same Color every matching one. Each piece is drawn twice, at a world width a bit
+  wider than the strand and at a fixed pixel width so it stays visible zoomed out.
+  Polygon offset alone does not keep the glow behind these billboarded lines (the glow tinted the
+  hovered strand, with rings of its true colour at the joints), so a **stencil mask** does: an
+  invisible copy of the hovered _solid_ pieces (`itemDim` 0) at the strand's exact width
+  (`LINE_WIDTH` / `CROSSOVER_LINE_WIDTH`), drawn first in the transparent pass. It ties the
+  strand's depth only where the strand is front-most and stamps `GLOW_STENCIL_REF`, which the glow
+  then skips. The glow still tints strands behind the hovered one; dimmed hovered strands get no
+  mask, so the glow shows through them.
+- The status-bar footnote, via `formatHoverFootnote` (shared with the strand view's
+  `createHoverInfoBehavior`). `ownsFootnote` makes clearing leave the strand view's text alone.
+
+Hover clears on pointer leave, on any TrackballControls `start`/`change` (rotate, pan, zoom), on a
+scene rebuild (item indices belong to the old pick index), and when the mode, filters, select-all
+mode or crossover visibility change. It reappears on the next pointer move.
 
 ### RBS
 
@@ -364,4 +430,11 @@ change.
 - **Don't hide ghost helix cylinders by selection filter.** Filtering is segment-based and skipping cylinders breaks the orientation reference.
 - **Don't dispose the renderer before unmount.** `sceneSetup` registers the `ResizeObserver` and TrackballControls — they must be cleaned up in the cleanup callback.
 - **Don't persist oxDNA replay frames or poses.** See `docs/oxdna-replay.md`.
+- **Don't give the 3D view its own selection.** Select in 3D writes `strandViewContext.selected` and nothing else; 3D only reflects that selection.
+- **Don't change the strand line widths without the glow mask.** The mask must match `LINE_WIDTH` / `CROSSOVER_LINE_WIDTH` exactly (it imports them); a narrower mask lets the glow tint the strand's edges.
+- **Don't create a renderer for this scene without `stencil: true`.** Without a stencil buffer the test is skipped and translucent lines show dots at every joint again.
+- **Don't start the box from the canvas `pointerdown`.** It must disable the camera controls in the capture phase, before TrackballControls handles the same event.
+- **Don't run hover picks on every pointer event or while dragging.** One per frame, skipped with a button held; a big design has hundreds of thousands of pieces.
+- **Don't add pick pieces out of order.** `LinePickIndexBuilder.addPiece` must follow its item's `addItem` (pieces per item are contiguous; the glow relies on it).
+- **Don't draw line-view geometry without adding it to the pick index.** A piece drawn but missing from `LinePickIndexBuilder` can't be clicked; one indexed but not drawn is clickable empty space.
 - **Don't persist the external structure overlay's geometry.** The parsed nodes/chains are render-only — never feed them into `part`, history, or storage. The _only_ thing persisted is the lightweight PDB placement record (`Part.overlayPlacements`); the overlay file itself is re-dropped each session. Keep the data-vs-visibility `$effect` split so a Hide/Show toggle doesn't rebuild GPU buffers.

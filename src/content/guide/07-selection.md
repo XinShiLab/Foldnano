@@ -58,7 +58,7 @@ The strand viewer uses **end-based** selection: the underlying unit is a strand 
 
 The Select tool panel's filters control whether a click **expands** to neighboring objects. Filters cover:
 
-- **SCAF** / **STAP** (`c` / `t`): limit selection by strand class
+- **SCAF** / **STAP** (`c` / `t`): limit selection by strand class. **SCAF is off by default**: in an origami the scaffold runs through every helix, so it is the easiest thing to click by mistake. Turn it on (`c`) when you want to select the scaffold.
 - **ends** (`e`), **crossovers** (`x`), **segments** (`d`), **oligos** (`o`): which object types are eligible; with **oligos** on, a click selects the whole oligo
 
 The filter keys work while the strand viewer is the active viewer. Set the filters *before* clicking to control how far a selection grows. For example, enable only "scaffold" to marquee-select scaffold routing while leaving staples untouched.

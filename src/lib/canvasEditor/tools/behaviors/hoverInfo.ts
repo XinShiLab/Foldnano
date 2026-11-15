@@ -10,6 +10,20 @@ export function shortOligoId(id: string): string {
 	return id.slice(start, start + 6);
 }
 
+/** Status-bar text for a base under the pointer, shared by the strand view and the 3D view. */
+export function formatHoverFootnote(info: {
+	vhIndex: number;
+	bp: number;
+	oligoId?: string | null;
+	slotSeq?: string | null;
+}): string {
+	let text = `VH ${info.vhIndex} · BP ${info.bp}`;
+	if (info.oligoId) text += ` · Oligo ${shortOligoId(info.oligoId)}`;
+	const seq = info.slotSeq;
+	if (seq && seq.length > 2 && !/^N+$/.test(seq)) text += ` · Insert ${seq}`;
+	return text;
+}
+
 export function createHoverInfoBehavior(modes: Set<EditorMode>): ToolBehavior {
 	return {
 		name: 'HoverInfoBehavior',
@@ -29,14 +43,12 @@ export function createHoverInfoBehavior(modes: Set<EditorMode>): ToolBehavior {
 				const targets = ctx.part.getEntitiesAtVh(vh.id, hitRsp.strandIdx, hitRsp.bpIdx);
 				const vhIdx = targets.vh?.index ?? null;
 				if (vhIdx !== null) {
-					ctx.strandCtx.footnote = `VH ${vhIdx} · BP ${hitRsp.bpIdx}`;
-				}
-				if (targets.oligo) {
-					ctx.strandCtx.footnote += ` · Oligo ${shortOligoId(targets.oligo.id)}`;
-				}
-				const slotSeq = targets.segment?.slotForBp(hitRsp.bpIdx)?.seq;
-				if (slotSeq && slotSeq.length > 2 && !/^N+$/.test(slotSeq)) {
-					ctx.strandCtx.footnote += ` · Insert ${slotSeq}`;
+					ctx.strandCtx.footnote = formatHoverFootnote({
+						vhIndex: vhIdx,
+						bp: hitRsp.bpIdx,
+						oligoId: targets.oligo?.id,
+						slotSeq: targets.segment?.slotForBp(hitRsp.bpIdx)?.seq,
+					});
 				}
 				return;
 			}

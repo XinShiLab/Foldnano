@@ -220,6 +220,17 @@
 
 	const noteInputActivity = (e: Event) => editorViewContext.noteInputActivity(e);
 
+	// View settings (filters, hide/highlight, collapsed regions…) save on their own when they change.
+	let viewSettingsPrimed = false;
+	$effect(() => {
+		void editorViewContext.serializableContextSignature;
+		if (!viewSettingsPrimed) {
+			viewSettingsPrimed = true;
+			return;
+		}
+		untrack(() => editorViewContext.scheduleContextSave());
+	});
+
 	function handleVisibilityChange() {
 		// Coming back to the tab: GitHub may have changed meanwhile.
 		if (document.visibilityState === 'visible') session.recheckRemote();

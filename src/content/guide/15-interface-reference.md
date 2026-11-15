@@ -190,7 +190,7 @@ On the right, *press ? for help* is a reminder of the workspace help (shortcuts 
 | **3D Overlay** | Switches the tool panel between **3D View Inspector** and **3D Overlays** (see [3D Overlays](/docs/guide/3d-overlays)) |
 | **Replay oxDNA** | Switches the tool panel to **oxDNA Replay**, which plays back a trajectory simulated from this design's oxDNA export (see [Simulation And Export](/docs/guide/simulation-export#replaying-an-oxdna-trajectory)) |
 | **Mesh** | Wireframe regions only: switches the tool panel to **Reference Mesh** (see [Wireframe Designs](/docs/guide/wireframe#manage-the-mesh)) |
-| **Mode** | **Pan**, **Select**, **Draw** |
+| **Mode** | **Pan**, **Select**, **Draw**. In the 3D view, **Select** lets a click on a strand, crossover or oligo select it in the strand viewer, which scrolls to it, and Shift-drag adds everything in a box; dragging still rotates. See [Select in 3D](/docs/guide/views#select-in-3d) |
 | **View** toggles | **Helix grid** (`g`), **NT model** (`e`), **Cross-section cursor** (`c`, unavailable while the NT model is shown), **Coordinate axis**, **Base planes** (`f`) |
 | **Selection: show only selected strands** | Limits the 3D view to the strands selected in the strand viewer |
 | **Lock current selection** | Freezes that filter on the current selection, so you can keep selecting in the strand viewer without changing the 3D view |
@@ -235,6 +235,7 @@ A QC view of how staples bind the scaffold (explained in [Selection And Highligh
 
 | Section | Controls |
 | --- | --- |
+| **Select in 3D** | Shown in Select mode: the scaffold / staple and crossover / segment / oligo filters a click uses, and **Select all with** (same color or length). Shared with the strand viewer's Select panel; ends are greyed out |
 | **Regions** | Each region's plane color, name, and helix count; the eye button [hides or shows it in 3D](/docs/guide/views#hiding-regions-in-3d) |
 | **Planes** | **Show / Hide** the design planes in 3D. While shown: name and ID of the plane you clicked; **Rotate** / **Move** gizmo mode; origin and normal; **Add Plane**; **Remove Plane** (only for a plane no region uses, and never the last plane) |
 | **Simulation Diagnostics** | After a run: blocks, constraints, RMS error, and max overlap |

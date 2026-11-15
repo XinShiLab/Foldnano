@@ -13,6 +13,21 @@
 		STRESS_YELLOW_RATIO,
 		stressToColor,
 	} from './helixGeometry';
+	import {
+		applyPick,
+		boxPickedEnds,
+		isPickable,
+		itemsInRect,
+		itemsCoveredBy,
+		pickedEnds,
+		pickLine,
+		piecesOf,
+		type LinePickHit,
+		type LinePickIndex,
+		type LinePickItem,
+	} from './linePick';
+	import { createHoverGlow, type HoverGlow } from './hoverGlow';
+	import { formatHoverFootnote } from '$lib/canvasEditor/tools/behaviors/hoverInfo';
 	import type { CanHighlight, CanHide } from '$lib/components/Editor/context/types';
 	import type OligoSegment from '$lib/model/Oligo/OligoSegment.svelte';
 	import * as THREE from 'three';
@@ -203,6 +218,7 @@
 	let currentCylinders = $state<THREE.Group | null>(null);
 	let currentLabels = $state<THREE.Group | null>(null);
 	let currentCrossovers = $state<THREE.Group | null>(null);
+	let currentPickIndex: LinePickIndex | null = null;
 	let isFirstBuild = true;
 	const REBUILD_MAX_DELAY_MS = 250;
 	let rebuildTick = $state(0);
@@ -475,8 +491,179 @@
 		editorViewContext.strandToolbarController?.centerOn(nt.vhId, nt.bpIndex);
 	}
 
+	// ── Select in 3D (line view) ─────────────────────────────────────────────
+	const LINE_PICK_RADIUS_PX = 6;
+	const _viewProjection = new THREE.Matrix4();
+
+	const HOVER_STICKY_PX = 2;
+	let hoverGlow: HoverGlow | undefined;
+	let hoveredItem = -1;
+	// Set while the status-bar footnote shows a 3D hover, so clearing never wipes the strand view's.
+	let ownsFootnote = false;
+	let hoverFrame = 0;
+	let hoverPointer: { clientX: number; clientY: number } | null = null;
+
+	/** What a click or box may pick under the current filters and crossover visibility. */
+	function pickAccept() {
+		const filter = editorViewContext.strandViewContext.selectionFilter;
+		const showXovers = !hideContext.crossovers;
+		return (item: LinePickItem) =>
+			(showXovers || item.kind !== 'xover') && isPickable(item, filter);
+	}
+
+	function updateViewProjection(camera: THREE.PerspectiveCamera): THREE.Matrix4 {
+		return _viewProjection.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+	}
+
+	function pickLineAt(e: { clientX: number; clientY: number }, sticky = false) {
+		if (!currentPickIndex || !canvas || !_activeCamera) return null;
+		const rect = canvas.getBoundingClientRect();
+		updateViewProjection(_activeCamera);
+		return pickLine(currentPickIndex, {
+			x: e.clientX - rect.left,
+			y: e.clientY - rect.top,
+			width: rect.width,
+			height: rect.height,
+			radiusPx: LINE_PICK_RADIUS_PX,
+			viewProjection: _viewProjection,
+			accept: pickAccept(),
+			sticky:
+				sticky && hoveredItem >= 0
+					? { itemIndex: hoveredItem, marginPx: HOVER_STICKY_PX }
+					: undefined,
+		});
+	}
+
+	function clearHover(): void {
+		if (hoverFrame) cancelAnimationFrame(hoverFrame);
+		hoverFrame = 0;
+		hoverPointer = null;
+		if (hoveredItem < 0) return;
+		hoveredItem = -1;
+		hoverGlow?.clear();
+		if (ownsFootnote) editorViewContext.strandViewContext.footnote = '';
+		ownsFootnote = false;
+		_markDirty?.();
+	}
+
+	function showHover(hit: LinePickHit): void {
+		const strandCtx = editorViewContext.strandViewContext;
+		const segment = hit.item.segment;
+		const bp = hit.item.kind === 'xover' ? segment.threePrime.index : hit.bp;
+		strandCtx.footnote = formatHoverFootnote({
+			vhIndex: segment.inVirtualHelix.index,
+			bp,
+			oligoId: segment.oligo?.id,
+			slotSeq: segment.slotForBp(bp)?.seq,
+		});
+		ownsFootnote = true;
+		if (hit.itemIndex === hoveredItem) return;
+		hoveredItem = hit.itemIndex;
+		// Glow everything a click would select (a whole oligo, or every same-colour one).
+		const ends = pickedEnds(part, hit.item, strandCtx.selectionFilter, strandCtx.selectAllMode);
+		if (currentPickIndex && ends) {
+			const covered = itemsCoveredBy(currentPickIndex, new Set(ends));
+			const index = currentPickIndex;
+			const solid = covered.filter((i) => !index.itemDim[i]);
+			hoverGlow?.set(piecesOf(index, covered), piecesOf(index, solid));
+		} else {
+			hoverGlow?.clear();
+		}
+		_markDirty?.();
+	}
+
+	// At most one pick per frame; rotate/pan drags clear hover instead (see the controls listener).
+	function scheduleHover(e: PointerEvent): void {
+		hoverPointer = { clientX: e.clientX, clientY: e.clientY };
+		if (hoverFrame) return;
+		hoverFrame = requestAnimationFrame(() => {
+			hoverFrame = 0;
+			const pointer = hoverPointer;
+			if (!pointer || !linePickActive) return;
+			const hit = pickLineAt(pointer, true);
+			if (hit) showHover(hit);
+			else clearHover();
+		});
+	}
+
+	/** A click picks into the strand view's selection; true when it hit something pickable. */
+	function selectLineAt(e: MouseEvent): boolean {
+		const hit = pickLineAt(e);
+		if (!hit) return false;
+		const strandCtx = editorViewContext.strandViewContext;
+		const ends = pickedEnds(part, hit.item, strandCtx.selectionFilter, strandCtx.selectAllMode);
+		if (!ends) return false;
+		applyPick(strandCtx.selected, ends, e.shiftKey || e.metaKey || e.ctrlKey);
+		const vh = hit.item.segment.inVirtualHelix;
+		editorViewContext.strandToolbarController?.centerOn(vh.id, hit.bp, { onlyIfOffscreen: true });
+		return true;
+	}
+
+	// ── Box select (Shift-drag) ──────────────────────────────────────────────
+	const BOX_MIN_DRAG_PX = 4;
+	let boxStart: { pointerId: number; x: number; y: number } | null = null;
+	// Canvas-pixel rectangle while dragging; null until the drag passes BOX_MIN_DRAG_PX.
+	let selectBox = $state<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
+
+	function canvasPoint(e: { clientX: number; clientY: number }): { x: number; y: number } {
+		const rect = canvas!.getBoundingClientRect();
+		return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+	}
+
+	// Capture phase, so the camera controls are off before they see this pointerdown.
+	function handlePointerDownCapture(e: PointerEvent) {
+		if (e.button !== 0 || !e.shiftKey || !linePickActive || !canvas || !_controls) return;
+		if (e.target !== canvas) return;
+		_controls.enabled = false;
+		boxStart = { pointerId: e.pointerId, ...canvasPoint(e) };
+		clearHover();
+		capturePointer(e.pointerId);
+	}
+
+	function updateBox(e: PointerEvent): void {
+		if (!boxStart) return;
+		const p = canvasPoint(e);
+		if (!selectBox && Math.hypot(p.x - boxStart.x, p.y - boxStart.y) < BOX_MIN_DRAG_PX) return;
+		selectBox = { x0: boxStart.x, y0: boxStart.y, x1: p.x, y1: p.y };
+	}
+
+	/** Ends the box gesture; `commit` adds what it covers. A tiny drag falls through to the click. */
+	function endBox(commit: boolean): void {
+		if (!boxStart) return;
+		const box = selectBox;
+		boxStart = null;
+		selectBox = null;
+		if (_controls) _controls.enabled = true;
+		releaseCapturedPointer();
+		if (!commit || !box || !currentPickIndex || !canvas || !_activeCamera) return;
+		const rect = canvas.getBoundingClientRect();
+		const index = currentPickIndex;
+		const items = itemsInRect(index, {
+			...box,
+			width: rect.width,
+			height: rect.height,
+			viewProjection: updateViewProjection(_activeCamera),
+			accept: pickAccept(),
+		});
+		const strandCtx = editorViewContext.strandViewContext;
+		const ends = boxPickedEnds(
+			part,
+			items.map((i) => index.items[i]),
+			strandCtx.selectionFilter,
+			strandCtx.selectAllMode
+		);
+		if (ends.length > 0) strandCtx.selected.add(ends);
+	}
+
 	function handlePointerMove(e: PointerEvent) {
 		_updateMouseCoords(e);
+
+		if (boxStart) {
+			updateBox(e);
+			return;
+		}
+
+		if (linePickActive && e.buttons === 0 && !dragController?.isActive) scheduleHover(e);
 
 		if (dragController?.isActive) {
 			dragController.update(_mouse, _activeCamera!);
@@ -532,6 +719,7 @@
 	function handlePointerDown(e: PointerEvent) {
 		_mouseDownPos = { x: e.clientX, y: e.clientY };
 		_updateMouseCoords(e);
+		if (boxStart) return; // Shift-drag box owns this gesture
 
 		if (transformGizmo?.group.visible && dragController) {
 			const target = currentGizmoTarget();
@@ -543,11 +731,16 @@
 	}
 
 	function handlePointerUp(_e: PointerEvent) {
+		if (boxStart) {
+			endBox(true);
+			return;
+		}
 		if (dragController?.isActive) dragController.commit();
 		releaseCapturedPointer();
 	}
 
 	function handlePointerCancel() {
+		endBox(false);
 		dragController?.cancel();
 	}
 
@@ -562,6 +755,8 @@
 			selectReplayRow(replayRow, e.shiftKey || e.metaKey || e.ctrlKey);
 			return;
 		}
+
+		if (linePickActive && selectLineAt(e)) return;
 
 		// Axis plane click → create a new plane with that basis
 		if (showCoordinateAxis && axisObjects && _hoveredAxisPlane) {
@@ -597,6 +792,11 @@
 				editorViewContext.setActiveRegion(null);
 				selectedPlaneId = null;
 			}
+		}
+
+		// A true click on empty space clears, as in the strand viewer; rotate/pan drags aren't clicks.
+		if (linePickActive && !(e.shiftKey || e.metaKey || e.ctrlKey)) {
+			editorViewContext.strandViewContext.selected.clear();
 		}
 	}
 
@@ -853,9 +1053,11 @@
 				hiddenRegionIds
 			);
 		}
-		const { group, cylinders, labels, crossovers, center } = built;
+		const { group, cylinders, labels, crossovers, center, pickIndex } = built;
 		statsBuildMs = performance.now() - _buildStart;
 		currentGroup = group;
+		currentPickIndex = pickIndex;
+		untrack(clearHover); // hovered item indices belong to the old index
 		currentCylinders = cylinders;
 		currentLabels = labels;
 		currentCrossovers = crossovers;
@@ -991,6 +1193,18 @@
 		return !replay.isStale(part);
 	});
 	let designVisible = $derived(showDesign && (!replayShown || !!replay?.showDesign));
+	// Picking follows the editor's Select mode; Pan (or any other mode) leaves 3D view-only.
+	let linePickActive = $derived(
+		editorViewContext.editorMode === 'SELECT' && designVisible && !showNtModel && !replayShown
+	);
+	// A mode or filter change makes the current glow wrong; the next pointer move redraws it.
+	$effect(() => {
+		void linePickActive;
+		void editorViewContext.strandViewContext.selectionFilter;
+		void editorViewContext.strandViewContext.selectAllMode;
+		void hideContext.crossovers;
+		untrack(clearHover);
+	});
 	// "Show only selected strands" (and its lock) hides the other strands' nucleotides too.
 	let replayVisibleRows = $derived.by(() => {
 		const mapping = replay?.mapping;
@@ -1126,6 +1340,13 @@
 		scene = localScene;
 		_activeCamera = camera;
 		_controls = controls;
+		// Hover follows the pointer, not the camera: rotate, pan and zoom drop it until the next move.
+		controls.addEventListener('start', clearHover);
+		controls.addEventListener('change', () => {
+			if (hoveredItem >= 0) clearHover();
+		});
+		hoverGlow = createHoverGlow();
+		scene.add(hoverGlow.group);
 
 		const w = canvas.clientWidth;
 		const h = canvas.clientHeight;
@@ -1186,6 +1407,7 @@
 				canvas,
 				antialias: true,
 				preserveDrawingBuffer: true,
+				stencil: true, // drawOncePerPixel, as in the live view
 			});
 			offscreen.setPixelRatio(1);
 			offscreen.setSize(width, height, false);
@@ -1316,6 +1538,12 @@
 			frameOverlayFn = undefined;
 			cancelAnimationFrame(rafId);
 
+			clearHover();
+			if (hoverGlow) {
+				scene!.remove(hoverGlow.group);
+				hoverGlow.dispose();
+				hoverGlow = undefined;
+			}
 			if (cursor) {
 				scene!.remove(cursor.ringGroup);
 				scene!.remove(cursor.markers);
@@ -1378,22 +1606,37 @@
 	});
 </script>
 
-<div class="relative h-full w-full overflow-hidden">
+<div class="relative h-full w-full overflow-hidden" onpointerdowncapture={handlePointerDownCapture}>
 	<canvas
 		bind:this={canvas}
-		class={['h-full w-full', replayShown && replay?.hoveredRow != null && 'cursor-pointer']}
+		class={[
+			'h-full w-full',
+			replayShown && replay?.hoveredRow != null && 'cursor-pointer',
+			linePickActive && 'cursor-crosshair',
+		]}
 		style="display:block;"
 		onpointermove={handlePointerMove}
 		onpointerleave={() => {
 			if (replay) replay.hoveredRow = null;
+			clearHover();
 		}}
 		onpointerdown={handlePointerDown}
 		onpointerup={handlePointerUp}
 		onpointercancel={handlePointerCancel}
 		onclick={handleClick}
 	></canvas>
+	{#if selectBox}
+		<div
+			class="pointer-events-none absolute border border-primary bg-primary/10"
+			style:left="{Math.min(selectBox.x0, selectBox.x1)}px"
+			style:top="{Math.min(selectBox.y0, selectBox.y1)}px"
+			style:width="{Math.abs(selectBox.x1 - selectBox.x0)}px"
+			style:height="{Math.abs(selectBox.y1 - selectBox.y0)}px"
+		></div>
+	{/if}
 	<div class="pointer-events-none absolute right-3 bottom-4 text-xs text-gray-400 select-none">
-		drag to rotate · scroll to zoom · right-drag to pan
+		{linePickActive ? 'click to select · shift-drag to box-select · ' : ''}drag to rotate · scroll
+		to zoom · right-drag to pan
 	</div>
 	{#if showStats}
 		<div

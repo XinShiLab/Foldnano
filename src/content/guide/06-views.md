@@ -105,6 +105,7 @@ The 3D view shows the current design in **lab coordinates**. It can display:
 The 3D toolbar controls what's shown and what runs:
 
 - **View** toggles: helix grid (`g`), NT model (`e`), cross-section cursor (`c`), coordinate axis, and base planes (`f`). The keys work while the 3D view is the active viewer.
+- **Mode**: **Select** lets clicks in the 3D view [select strands](#select-in-3d); **Pan** keeps it view-only.
 - **Selection**: show only the strands selected in the strand viewer, and **lock** that filter so further selection changes don't affect the 3D view.
 - **RBS** (rigid-body simulation): **Relax**, relaxed layout, crossover stress, clear relaxed layout, and **Params**.
 - **Export**: image (PNG), **GLB**, **oxDNA**, and **mrDNA**.
@@ -113,6 +114,18 @@ The 3D toolbar controls what's shown and what runs:
 - **Mesh**, shown for a wireframe region, which switches the tool panel to [Reference Mesh](/docs/guide/wireframe#manage-the-mesh).
 
 Every button is listed in the [Interface Reference](/docs/guide/interface-reference#3d-view-toolbar).
+
+### Select in 3D
+
+In **Select** mode (the toolbar's Mode group), you can pick in the 3D line view. Switch to **Pan** when you only want to look around.
+
+- **Click** a strand or crossover to select it in the strand viewer, which scrolls to it if it's off screen (and expands its region if collapsed).
+- **Shift-click** adds to the selection, or removes what is already selected.
+- **Click empty space** (or press `Esc`) to clear the selection. Dragging to rotate or right-dragging to pan never changes the selection.
+- **Shift-drag** a box to add everything it touches to the selection, including strands hidden behind others. With oligos on, each touched oligo is selected whole.
+- **Hover** to see what a click would select: it glows (the whole oligo when oligos are on), and the status bar shows its helix, base and oligo, as in the strand viewer.
+
+What a click picks follows the filters shown in the 3D View Inspector in Select mode. They are the same filters as the strand viewer's Select panel: scaffold (off by default) or staples, and crossovers, segments or whole oligos, plus **Select all with** to grow an oligo pick to every oligo of the same color or length. Ends aren't drawn in 3D, so they can't be picked there. Picking works in the line view only, not with the NT model or during an oxDNA replay.
 
 Next to the 3D view, the **3D View Inspector** panel offers [region visibility](#hiding-regions-in-3d), plane visibility with **Add Plane**, the selected plane's details, and simulation diagnostics.
 

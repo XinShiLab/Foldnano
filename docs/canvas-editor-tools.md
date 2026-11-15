@@ -90,7 +90,7 @@ interface ToolBehavior {
 
 Current behaviors registered in `StrandViewer`:
 
-- `createHoverInfoBehavior` — updates `strandCtx.footnote` with hover info
+- `createHoverInfoBehavior` — updates `strandCtx.footnote` with hover info; the text comes from `formatHoverFootnote`, which the 3D view's line hover also uses so both read the same
 - `createContextMenuBehavior` — handles right-click context menu
 
 ### `ViewContext`

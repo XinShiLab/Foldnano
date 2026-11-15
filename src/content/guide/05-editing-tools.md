@@ -161,7 +161,7 @@ With **Random** and **Fill only the empty parts**, an empty base whose partner o
 
 ### Fill Empty Nucleotides
 
-Under **Random**, the **Fill … empty nt** button fills every empty base of the selected strands at once, using the same rules as above. Select strands first with the Select tool (`v`), then switch back here (`a`). With nothing selected it fills the whole design. The **SCAF** / **STAP** and **segment** / **oligo** toggles decide which strands count. Clicking a strand still fills only that strand. Linked copies can't be clicked; fill their original and the copies follow.
+Under **Random**, the **Fill … empty nt** button fills every empty base of the selected strands at once, using the same rules as above. Select strands first with the Select tool (`v`), then switch back here (`a`). With nothing selected it fills the whole design. The **SCAF** / **STAP** and **segment** / **oligo** toggles decide which strands count; SCAF is off by default, so turn it on to include the scaffold. Clicking a strand still fills only that strand. Linked copies can't be clicked; fill their original and the copies follow.
 
 ### Fill Empty Staple Bases with One Base
 
