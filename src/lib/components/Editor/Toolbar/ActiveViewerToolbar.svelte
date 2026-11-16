@@ -92,8 +92,8 @@
 				<StrandViewerTools
 					part={strandToolbar.part}
 					stage={strandToolbar.stage}
-					updateViewportBounds={strandToolbar.updateViewportBounds}
-					updateViewportScale={strandToolbar.updateViewportScale}
+					fitView={strandToolbar.fitView}
+					resetView={strandToolbar.resetView}
 				/>
 			{:else if activeViewer === 'HELIX' && helixToolbar}
 				<div class="flex h-full items-center">

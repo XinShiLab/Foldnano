@@ -131,7 +131,7 @@ The toolbar row below the top toolbar belongs to whichever viewer you last worke
 
 ### Strand view toolbar
 
-**Reset view** (arrows pointing inward) fits the strand view back to its default zoom.
+**Reset view** (arrows pointing inward) returns the strand view to its default zoom, scrolled to the top of the active region. **Fit** (a framed square) brings the selection into view, zooming out only if it does not fit at the current zoom; with nothing selected, it zooms out to show every helix.
 
 **Mode** holds the tools: **Pan**, **Select**, **Draw strands**, **Break strand**, **Skip bases**, **Insert bases**, **Paint oligo**, **Apply modification**, **Assign sequence**, and **Split region**. See [Editing Tools](/docs/guide/editing-tools).
 
@@ -207,6 +207,8 @@ Status chips at the right edge show *Simulation running*, *Relaxed layout stale*
 When a design has **no assigned sequence**, oxDNA export first opens **No Sequence Data**: unassigned double-stranded positions are filled with random complementary bases, and you choose the base for single-stranded positions (**T** by default, or **A**, **C**, **G**, **Random**), then click **Export**.
 
 See [Simulation And Export](/docs/guide/simulation-export) for the workflows.
+
+The **view cube** in the top-right corner of the 3D view (not on the toolbar) turns the camera to a face, edge or corner when clicked. See [Views](/docs/guide/views).
 
 ## Tool Panel
 

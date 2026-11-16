@@ -143,6 +143,9 @@ stack.
 3. pointer-up queries hits inside the rect
 4. end hits are expanded through `fromHitsCandsToSelectedEnds(...)`
 
+A box can start on any empty canvas and is committed wherever it is released, even outside
+the canvas (see `docs/editor-strand-viewer.md`); a real `cancel` hides the marquee unchanged.
+
 That expansion still honors the active selection filter, so marquee selection
 can mean:
 

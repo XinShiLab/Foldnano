@@ -233,15 +233,6 @@ export function backbonePointInto(
 	out[offset + 2] = cz + BACKBONE_RADIUS_NM * (c * frame.radial0.z + s * radial1.z);
 }
 
-export function getVhXYMap(part: Part): Map<number, { x: number; y: number }> {
-	const map = new Map<number, { x: number; y: number }>();
-	for (const vh of part.virtualHelices) {
-		const frame = part.getVirtualHelixFrame(vh);
-		map.set(vh.index, { x: frame.origin.x, y: frame.origin.y });
-	}
-	return map;
-}
-
 export type PhysOffsetMaps = Map<string, { offsets: number[] }>;
 
 /**

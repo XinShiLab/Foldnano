@@ -151,6 +151,42 @@ landing hero.
 - show/hide coordinate axis
 - show/hide persisted planes
 - reset camera
+- view cube (`ViewCube.svelte`, `cameraViews.ts`): see View Cube below
+
+### View Cube
+
+A CAD-style cube in the top-right corner. Each face is a 3×3 grid of buttons: the centre is the
+face, the sides its edges, the corners its corners, so there are 26 directions. An edge or corner
+cell belongs to two or three faces and they highlight together (`cellDir`/`dirKey`). Clicking one
+turns the camera there in `CUBE_TURN_MS`, framing the design box as seen from that side
+(`fitDistance`). The turn eases the camera quaternion along the shortest arc, keeps the position
+on the view axis (`tweenPose`/`posePosition`) and is stepped in the render loop before
+`controls.update()`; grabbing the view (controls `start`) cancels it, and reduced motion jumps.
+
+- **Axis triad:** Fusion-style X/Y/Z lines along the three edges leaving the front-left-bottom
+  corner (`axisTriad`). Drawn as flat SVG, not in the CSS 3D cube: CSS 3D lines have to be
+  strips, which thin and thicken with the angle, shimmer edge-on and flip depth order against the
+  faces near the outline. `projectOnCube` maps the points as the cube is turned (orthographic),
+  and `triadAxisInFront` puts a line (with its letter) in the SVG layer in front of the cube when
+  either face along its edge faces the viewer, else in the layer behind. So the cube takes the
+  camera quaternion, not a finished transform. Both layers are `pointer-events-none`; tooltips add
+  the axes (`dirAxes`). The inset from the viewport corner covers the farthest letter at any angle.
+- **Roll arrows:** two outlined SVG band arrows sharing the top-right quarter of a circle centred
+  on the cube's top-right corner (tails on the diagonal, heads apart). The radius clears the
+  face-on axis letters, which can sit right beside that corner, and the outline uses the cube's
+  border colour. Shown while the camera looks straight at a face (`isFaceOn`, judged on where a
+  running turn ends so they don't blink mid-turn). A wide transparent stroke is the click target;
+  they are keyboard-focusable. Each rolls the view a quarter turn about the line of sight (`rollQuaternion`), through the same tween; target and distance
+  stay, and a second click during a turn rolls on from that turn's end.
+- **Convention:** Z up; front from -Y, right from +X, top from +Z with +Y up (bottom with -Y up).
+  `upForDir` keeps +Z up for every other direction.
+- **Why DOM, not WebGL:** the cube is CSS 3D transforms (`cubeCssTransform` mirrors the camera,
+  `faceCssTransform` places each face; `backface-visibility: hidden`). Clicks and hover are plain
+  DOM events on its own elements, so it never touches the canvas's pick, box-select, gizmo and
+  TrackballControls handling, and it costs no render pass or WebGL context.
+- **Not three's `ViewHelper`:** it hard-codes Y-up target orientations, assumes OrbitControls and
+  needs its own click routing on the canvas. No drag-to-orbit on the cube: dragging the view
+  already does that.
 
 ### Selection
 
@@ -364,10 +400,20 @@ simulation, so the toolbar can warn when the relaxed view is no longer current.
 
 The cross-section cursor is shared with the strand view.
 
-When `showCursor` is on:
+When `showCursor` is on, `cursorGeometry` (`cursor.ts`) draws, for base `csCursorIdx` of every
+helix in the strand view's cursor region (`activeCsRegionId`):
 
-- one ring is drawn around each visible VH
-- markers are drawn for occupied nucleotides at `csCursorIdx`
+- a ring across the helix axis, centred on that base (`helixCenterPoint`)
+- a marker on each strand covering that base (`backbonePoint`, as the line view draws strands)
+
+- **Active region only:** the strand view draws its cursor line across that region's rows alone,
+  so the 3D view does the same. No region, or a region hidden in 3D, draws nothing; helices
+  shorter than the index are skipped.
+- **Each helix's own frame** (`part.getVirtualHelixFrame`): correct on any plane. In lattice
+  regions the rings form one flat slice; in freeform and wireframe regions, where helices point in
+  different directions, they scatter, still marking "base k" on each helix like the strand view.
+- Don't go back to a 2D `(x, y)` helix map slid along world Z: that only holds on the Top (XY)
+  plane, which is the bug this replaced.
 
 The cursor position is therefore a single editor state used by:
 

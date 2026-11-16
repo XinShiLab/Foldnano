@@ -35,10 +35,18 @@ describe('subjectToText', () => {
 		expect(subjectToText('Bug fix: StrandView fills the space')).toBe('StrandView fills the space');
 	});
 
-	it('rejects other commit types', () => {
+	it('rejects internal commit types', () => {
 		expect(subjectToText('docs: update manual')).toBeNull();
 		expect(subjectToText('refactor: split context')).toBeNull();
+		expect(subjectToText('chore(deps): bump vite')).toBeNull();
 		expect(subjectToText('fix:')).toBeNull();
+	});
+
+	it('keeps plain subjects without a type, as written', () => {
+		expect(subjectToText('Strand view: Fit button frames the selection.')).toBe(
+			'Strand view: Fit button frames the selection'
+		);
+		expect(subjectToText('selection filter: scaffold off')).toBe('Selection filter: scaffold off');
 	});
 });
 
@@ -116,7 +124,7 @@ describe('buildDrafts', () => {
 		expect(result.drafts).toEqual([]);
 		expect(result.skipped.map((s) => s.reason)).toEqual([
 			'no app files changed',
-			'not add/feat/fix',
+			'internal commit type',
 		]);
 		expect(result.reviewedThrough).toBe('2026-09-26T09:00:00+02:00');
 	});

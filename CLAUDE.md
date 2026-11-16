@@ -10,7 +10,7 @@ pnpm build        # production build
 pnpm preview      # preview production build
 pnpm check        # svelte-kit sync + svelte-check (type checking)
 pnpm format       # auto-format with prettier
-pnpm whats-new:draft  # draft About → What's New entries from add/feat/fix commits since the last review
+pnpm whats-new:draft  # draft About → What's New entries from user-facing commits since the last review
 
 # Tests — prefer the scoped variants; the full run is slow (~19s, golden suites dominate)
 pnpm test         # only suites affected by uncommitted changes (vitest --changed) — default inner loop

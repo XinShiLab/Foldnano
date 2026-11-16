@@ -1,17 +1,27 @@
 import * as THREE from 'three';
 import type { Part } from '$lib/model/Part';
-import { HELIX_VISUAL_RADIUS, backbonePointNm } from './helixGeometry';
+import {
+	backbonePoint,
+	crossVec,
+	helixCenterPoint,
+	type Vec3,
+} from '$lib/model/geometry3d/dnaGeometry';
+import { HELIX_VISUAL_RADIUS } from './helixGeometry';
 
 export interface CursorResult {
-	/** LineLoop circles, one per VH — add to scene. Position.z slides with csCursorIdx. */
-	ringGroup: THREE.Group;
-	/** InstancedMesh spheres at occupied nucleotide positions at the cursor BP. */
+	/** Rings round each helix of the cursor's region at the cursor base pair. */
+	rings: THREE.LineSegments;
+	/** Spheres on the strand backbones at the cursor base pair. */
 	markers: THREE.InstancedMesh;
-	/** Rebuild ring geometry from a fresh VH XY position map (call after scene rebuild). */
-	rebuildRings(vhXYCache: Map<number, { x: number; y: number }>): void;
-	/** Update instanced-mesh matrices to reflect occupied nucleotides at the given base-pair index. */
-	updateMarkers(bp: number, part: Part, vhXYCache: Map<number, { x: number; y: number }>): void;
+	/** Rebuilds both for base pair `bp` of region `regionId` (nothing when null). */
+	update(part: Part, regionId: string | null, bp: number): void;
 	dispose(): void;
+}
+
+export interface CursorGeometry {
+	/** Line-segment pairs (6 floats each) of every ring. */
+	rings: Float32Array;
+	markers: Vec3[];
 }
 
 const MAX_MARKERS = 1000;
@@ -20,9 +30,65 @@ const RING_RADIUS_OFFSET = 0.2;
 const RING_COLOR = 0x3b82f6;
 const MARKER_COLOR = 0xffd700;
 
+/**
+ * Where the cross-section cursor sits in 3D: base pair `bp` of every helix in region `regionId`,
+ * like the strand view's cursor line, which spans only that region. Each helix uses its own lab
+ * frame, so it holds for any plane and for freeform and wireframe helices, where the rings no
+ * longer form one flat slice. Helices shorter than `bp` get nothing.
+ */
+export function cursorGeometry(part: Part, regionId: string | null, bp: number): CursorGeometry {
+	const rings: number[] = [];
+	const markers: Vec3[] = [];
+	if (regionId === null) return { rings: new Float32Array(), markers };
+	const r = HELIX_VISUAL_RADIUS + RING_RADIUS_OFFSET;
+	for (const vh of part.virtualHelices) {
+		if (vh.regionId !== regionId || bp < 0 || bp >= vh.length) continue;
+		const frame = part.getVirtualHelixFrame(vh);
+		const c = helixCenterPoint(frame, bp);
+		const u = frame.radial0;
+		const v = crossVec(frame.axis, frame.radial0);
+		const at = (i: number) => {
+			const t = (i / RING_SEGMENTS) * Math.PI * 2;
+			const cos = Math.cos(t) * r;
+			const sin = Math.sin(t) * r;
+			return [
+				c.x + cos * u.x + sin * v.x,
+				c.y + cos * u.y + sin * v.y,
+				c.z + cos * u.z + sin * v.z,
+			];
+		};
+		for (let i = 0; i < RING_SEGMENTS; i++) rings.push(...at(i), ...at(i + 1));
+
+		const region = part.getRegionForVh(vh);
+		for (const strandIdx of [0, 1] as const) {
+			const covered = [...vh.strandSets[strandIdx].segmentIds].some((id) => {
+				const seg = part.getSegmentById(id);
+				if (!seg) return false;
+				const lo = Math.min(seg.fivePrime.index, seg.threePrime.index);
+				const hi = Math.max(seg.fivePrime.index, seg.threePrime.index);
+				return bp >= lo && bp <= hi;
+			});
+			if (!covered) continue;
+			markers.push(
+				backbonePoint(frame, bp, strandIdx, region.twistOffsetInDeg, region.twistPerBaseInDeg)
+			);
+		}
+	}
+	return { rings: new Float32Array(rings), markers };
+}
+
 export function createCursor(): CursorResult {
-	const ringGroup = new THREE.Group();
-	ringGroup.visible = false;
+	const rings = new THREE.LineSegments(
+		new THREE.BufferGeometry(),
+		new THREE.LineBasicMaterial({
+			color: RING_COLOR,
+			transparent: true,
+			opacity: 0.75,
+			depthWrite: false,
+		})
+	);
+	rings.frustumCulled = false;
+	rings.visible = false;
 
 	const markerGeo = new THREE.SphereGeometry(0.45, 8, 6);
 	const markerMat = new THREE.MeshBasicMaterial({ color: MARKER_COLOR });
@@ -33,81 +99,32 @@ export function createCursor(): CursorResult {
 
 	const dummy = new THREE.Object3D();
 
-	function rebuildRings(vhXYCache: Map<number, { x: number; y: number }>): void {
-		for (const child of ringGroup.children) {
-			const line = child as THREE.Line;
-			line.geometry.dispose();
-			(line.material as THREE.Material).dispose();
-		}
-		ringGroup.clear();
+	function update(part: Part, regionId: string | null, bp: number): void {
+		const geo = cursorGeometry(part, regionId, bp);
+		rings.geometry.dispose();
+		rings.geometry = new THREE.BufferGeometry();
+		rings.geometry.setAttribute('position', new THREE.BufferAttribute(geo.rings, 3));
 
-		const r = HELIX_VISUAL_RADIUS + RING_RADIUS_OFFSET;
-		for (const [, pos] of vhXYCache) {
-			const pts = new Float32Array((RING_SEGMENTS + 1) * 3);
-			for (let i = 0; i <= RING_SEGMENTS; i++) {
-				const theta = (i / RING_SEGMENTS) * Math.PI * 2;
-				pts[i * 3] = pos.x + r * Math.cos(theta);
-				pts[i * 3 + 1] = pos.y + r * Math.sin(theta);
-				pts[i * 3 + 2] = 0;
-			}
-			const geo = new THREE.BufferGeometry();
-			geo.setAttribute('position', new THREE.BufferAttribute(pts, 3));
-			const mat = new THREE.LineBasicMaterial({
-				color: RING_COLOR,
-				transparent: true,
-				opacity: 0.75,
-				depthWrite: false,
-			});
-			ringGroup.add(new THREE.LineLoop(geo, mat));
+		if (geo.markers.length > MAX_MARKERS) {
+			console.warn(`[View3D] cursor markers truncated at ${MAX_MARKERS}`);
 		}
-	}
-
-	function updateMarkers(
-		bp: number,
-		part: Part,
-		vhXYCache: Map<number, { x: number; y: number }>
-	): void {
-		let count = 0;
-		outer: for (const oligo of part.oligos) {
-			for (const seg of oligo.segments) {
-				const lo = Math.min(seg.fivePrime.index, seg.threePrime.index);
-				const hi = Math.max(seg.fivePrime.index, seg.threePrime.index);
-				if (bp < lo || bp > hi) continue;
-				const vhPos = vhXYCache.get(seg.inVirtualHelix.index);
-				if (!vhPos) continue;
-				if (count >= MAX_MARKERS) {
-					console.warn(`[View3D] cursor markers truncated at ${MAX_MARKERS}`);
-					break outer;
-				}
-				const region = part.getRegionForVh(seg.inVirtualHelix);
-				const p = backbonePointNm(
-					vhPos.x,
-					vhPos.y,
-					bp,
-					seg.inStrandIndex,
-					region.twistOffsetInDeg,
-					region.twistPerBaseInDeg
-				);
-				dummy.position.set(p.x, p.y, p.z);
-				dummy.updateMatrix();
-				markers.setMatrixAt(count, dummy.matrix);
-				count++;
-			}
+		const count = Math.min(geo.markers.length, MAX_MARKERS);
+		for (let i = 0; i < count; i++) {
+			const p = geo.markers[i];
+			dummy.position.set(p.x, p.y, p.z);
+			dummy.updateMatrix();
+			markers.setMatrixAt(i, dummy.matrix);
 		}
 		markers.count = count;
 		markers.instanceMatrix.needsUpdate = true;
 	}
 
 	function dispose(): void {
-		for (const child of ringGroup.children) {
-			const line = child as THREE.Line;
-			line.geometry.dispose();
-			(line.material as THREE.Material).dispose();
-		}
-		ringGroup.clear();
+		rings.geometry.dispose();
+		(rings.material as THREE.Material).dispose();
 		markerGeo.dispose();
 		markerMat.dispose();
 	}
 
-	return { ringGroup, markers, rebuildRings, updateMarkers, dispose };
+	return { rings, markers, update, dispose };
 }

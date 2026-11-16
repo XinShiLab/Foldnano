@@ -29,6 +29,7 @@
 	import { notify } from '$lib/notifications/notify.svelte';
 	import { help } from '$lib/components/help/help';
 	import { VIEW_ONLY_PLANE_HELP } from './utils';
+	import { firstPressActivates } from '../context/firstPressActivates';
 
 	type RbsDiagnostics = Pick<
 		SolverResult,
@@ -45,6 +46,11 @@
 	let { part }: Props = $props();
 
 	const editorViewContext = getEditorViewContext();
+	// The first left press on the inactive plane/3D pane only activates it.
+	const activation = firstPressActivates(
+		() => editorViewContext.activeViewer === 'HELIX' || editorViewContext.activeViewer === 'VIEW3D',
+		() => editorViewContext.activateHelixPane()
+	);
 	let csCursorIdx = $derived(editorViewContext.strandViewContext.csCursorIdx);
 	let highlightContext = $derived(editorViewContext.strandViewContext.highlightContext);
 	let hideContext = $derived(editorViewContext.strandViewContext.hideContext);
@@ -437,6 +443,7 @@
 					doc: 'views',
 				}
 	)}
+	{...activation}
 	onpointerdown={() => editorViewContext.activateHelixPane()}
 	onfocusin={() => editorViewContext.activateHelixPane()}
 >

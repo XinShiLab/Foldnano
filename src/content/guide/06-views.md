@@ -24,6 +24,8 @@ Foldnano shows the same design through three coordinated views. They never disag
 
 The left pane switches between Plane and 3D with the `Plane / 3D` toggle in its toolbar. The right pane is always the strand viewer.
 
+The toolbar and keyboard shortcuts follow the **active pane**. Clicking the inactive pane only makes it active: that first click doesn't select, deselect or draw anything, so a selection you made in the other pane survives. Click again to work in it. Scrolling to zoom (and right-dragging to pan in 3D) works straight away, without activating first.
+
 ![Editor with the left-pane Plane / 3D toggle highlighted, Plane active on the left and the strand viewer on the right](/screenshots/guide/views-and-regions/01-plane-3d-toggle.webp)
 
 *Editor with the left-pane Plane / 3D toggle highlighted, Plane active on the left and the strand viewer on the right.*
@@ -32,16 +34,16 @@ The left pane switches between Plane and 3D with the `Plane / 3D` toggle in its 
 
 The strand view is the routing canvas. Rows are grouped by **design region**, and each region gets a collapsible **header row**. Each visible virtual helix has a draggable **VH tag** at its left edge.
 
-To move around, use the **arrow keys** to pan (hold `Shift` for bigger steps), the **mouse wheel** to zoom, or hold `Option` / `Alt` and drag. **Reset view** in the strand-view toolbar returns to the default zoom. Arrow keys pan only while the strand view is the active pane (click it first).
+To move around, use the **arrow keys** to pan (hold `Shift` for bigger steps), the **mouse wheel** to zoom, or hold `Option` / `Alt` and drag. **Reset view** in the strand-view toolbar returns to the default zoom, scrolled to the top of the active region, and **Fit** next to it brings the selection (or, with nothing selected, every helix) into view. Arrow keys pan only while the strand view is the active pane (click it first).
 
-- **Click a region header** (Select mode) makes that region the **active region**; **double-click** it to collapse or expand its rows.
+- **Click a region header** (Select mode) makes that region the **active region** and moves the cross-section cursor to it; **double-click** it to collapse or expand its rows.
 - **Drag a VH tag** (Select mode) reorders that VH within its region. This changes only the *display* row; identity and crossovers are unaffected.
-- **Click a VH grid cell** activates the **cross-section cursor** for that region.
+- **Click a VH grid cell** moves the **cross-section cursor** to that region.
 - **Drag the vertical cursor bar** changes the current base (bp) index.
 - **Click the plane icon** on a region header to jump to that region's plane in 3D: the left pane switches to **3D**, planes are shown, and the camera frames the plane.
 - **Cross-region arrows** mark strands that continue into another region.
 
-The cross-section cursor is a shared position that drives **lattice helix-circle scaffold indicators** and **3D cursor markers**, so you can line up the same base index across all three views.
+The cross-section cursor is a shared position that drives **lattice helix-circle scaffold indicators** and **3D cursor markers**, so you can line up the same base index across all three views. The 3D view rings that base on each helix of the region holding the cursor, along each helix's own direction: a flat slice in a lattice region, and scattered rings in freeform or wireframe regions, where helices point different ways.
 
 ## Lattice Plane View
 
@@ -114,6 +116,8 @@ The 3D toolbar controls what's shown and what runs:
 - **Mesh**, shown for a wireframe region, which switches the tool panel to [Reference Mesh](/docs/guide/wireframe#manage-the-mesh).
 
 Every button is listed in the [Interface Reference](/docs/guide/interface-reference#3d-view-toolbar).
+
+The **view cube** in the top-right corner of the 3D view turns with the camera. Click a face to look at the design from that side, an edge or a corner to look from between them. The camera turns there smoothly and fits the design in view. Z points up: **Front** looks from -Y, **Right** from +X, and **Top** looks down from +Z, onto the cross-section of helices on the default plane. The red, green and blue lines on the cube's edges are the X, Y and Z axes, and each tooltip names the direction it looks from. When you look straight at a face, two curved arrows at the cube's top-right corner rotate the view 90° clockwise or counterclockwise.
 
 ### Select in 3D
 

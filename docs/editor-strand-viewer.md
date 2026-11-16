@@ -1,6 +1,7 @@
 ---
 covers:
   - src/lib/components/Editor/StrandView/**
+  - src/lib/components/Editor/context/firstPressActivates.ts
 ---
 
 # Editor - Strand Viewer
@@ -137,6 +138,11 @@ Important split:
 - pickable controls and accessories live in the overlay layer
 - transient previews and selection visuals live in the temporal layer
 
+Pointer events are forwarded from the `Stage`, not the overlay layer, so a press on bare
+canvas past the content (zoomed out, beyond the `EMPTY` rect) still reaches the tools as
+`EMPTY`. A left press captures the pointer, so a drag that leaves the canvas still ends with
+`up` where it is released; a pointer leaving with no button down sends `cancel`.
+
 Within the world layer, mount order is deliberate, not incidental: `VhGrid`
 paints first (bottom), then `MismatchMarkers`' red rungs, then `StrandRoutes`
 last (top) so its sequence letters stay legible over both. `VhGrid` used to be
@@ -179,6 +185,18 @@ Marquee queries use `drawingDimensions.queryRect(...)` plus
 naively scanning display rows as if every row were a helix.
 
 ---
+
+## Activating The Pane
+
+The strand viewer and the left pane (plane view / 3D) share one keyboard and toolbar, owned by
+`activeViewer`. A **left press on the inactive pane only activates it**: `firstPressActivates`
+(capture-phase handlers spread on each pane's wrapper, here and in `HelixViewer.svelte`) stops that
+whole gesture (pointerdown, pointerup, click, and a double-click it starts) before Konva, the tools
+or the 3D camera see it. Without this, the click that switched to the strand view also ran the
+Select tool and cleared a selection just made in 3D. Other buttons and the wheel pass through, so
+wheel zoom and 3D right-drag pan work without activating first (strand-view Alt + left-drag pan is a
+left press, so it activates first). The bubbling `onpointerdown` / `onfocusin` setters stay
+for presses on an already-active pane and for keyboard focus.
 
 ## Tool Integration
 
@@ -255,13 +273,25 @@ The plane viewers bring the row into view with `StrandToolbarController.revealVh
 (vertical only, no-op when the row is already on screen) or `centerOn` (in-plane
 freeform helices, centred on the clicked base).
 
+**Reset view** calls `StrandToolbarController.resetView`: scale 1 at base 0, scrolled so the
+active region's header sits where the first region's header does (so for the first region, or
+with no headers, it is the plain origin).
+
+The toolbar's **Fit** button calls `StrandToolbarController.fitView`: the box around every selected
+end (expanding collapsed regions, like `centerOn`), or the whole content extent when nothing is
+selected, framed by the pure `fitTransform` in `fitView.ts`. It never zooms in: a selection that
+fits at the current zoom is only centred, and fitting everything is also capped at the default
+scale of 1.
+
 ---
 
 ## Cross-Section Cursor
 
 The vertical cursor overlay is now region-scoped.
 
-`strandViewContext.activeCsRegionId` is set from the last clicked grid row.
+`strandViewContext.activeCsRegionId` is set from the last clicked grid row, and by
+`EditorViewContext.setActiveRegion` whenever a region is activated (from any view, even if it is
+already active), which also clamps `csCursorIdx` to that region's length.
 `CrossSectionSelector.svelte` then renders only across the visible rows that
 belong to that region.
 
@@ -413,6 +443,8 @@ run when another change arrives. The markers and the list show the previous resu
   which expands the helix's region if collapsed and centers the stage on that base.
 
 ## Boundaries / Don'ts
+
+- **Don't activate a pane from inside its canvas handlers.** Activation must stay in the capture-phase `firstPressActivates` on the pane wrapper, or the activating click reaches the tools again.
 
 - **Don't pass `vh.listRow` into `getEntitiesAtVh`.** Topology is keyed by `vh.id`. Use `getVisibleVhByDisplayRow(...)` to translate from a clicked row to a VH.
 - **Don't treat `displayRow` as model identity** — collapse/expand and region reorder change it.

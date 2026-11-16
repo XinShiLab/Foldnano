@@ -152,6 +152,11 @@ export function createEmptyHandler(): HandlerInstance {
 			return true;
 		},
 
+		cancel(_evt, ctx) {
+			hideMarquee(ctx);
+			return true;
+		},
+
 		reset() {
 			isMarquee = false;
 			downWorld = null;
