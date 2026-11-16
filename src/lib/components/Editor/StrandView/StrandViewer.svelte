@@ -51,6 +51,9 @@
 	import { help } from '$lib/components/help/help';
 	import { registerStrandCanvasHelp } from './strandCanvasHelp';
 	import { nextRenderWindow } from './renderWindow';
+	import { firstPressActivates } from '../context/firstPressActivates';
+	import { fitTransform, unionBounds, type ContentBounds } from './fitView';
+	import { regionHeaderGeometry } from './Grid/regionHeaderGeometry';
 
 	interface Props {
 		part: Part;
@@ -58,6 +61,11 @@
 	let { part }: Props = $props();
 
 	const editorViewContext = getEditorViewContext();
+	// The first left press on an inactive strand view only activates it (keeps a 3D selection).
+	const activation = firstPressActivates(
+		() => editorViewContext.activeViewer === 'STRAND',
+		() => editorViewContext.setActiveViewer('STRAND')
+	);
 	let viewerEl = $state<HTMLDivElement>();
 	let viewerWidth = $state(1000);
 	let viewerHeight = $state(800);
@@ -69,6 +77,8 @@
 		panBy,
 		centerOn,
 		revealVh,
+		fitView,
+		resetView,
 	});
 
 	let stage = $state<Stage>();
@@ -82,6 +92,8 @@
 	const radius = 16;
 	const sideLength = 12;
 	const strokeWidth = 1;
+	const FIT_PADDING_PX = 24;
+	const FIT_MIN_SCALE = 0.02;
 
 	let collapsedRegionIds = $derived(editorViewContext.strandViewContext.collapsedRegionIds);
 	let activeCsRegionId = $derived(editorViewContext.strandViewContext.activeCsRegionId);
@@ -253,6 +265,68 @@
 		return true;
 	}
 
+	function selectionBounds(): ContentBounds | null {
+		const boxes: ContentBounds[] = [];
+		for (const end of editorViewContext.strandViewContext.selected.ends) {
+			const displayRow = shownDisplayRow(end.inVirtualHelix.id);
+			if (displayRow === null) continue;
+			const [top, bottom] = getBpCoordsByRowAndBpIdx(displayRow, end.index);
+			boxes.push({
+				minX: top[0],
+				minY: top[1],
+				maxX: top[0] + sideLength,
+				maxY: bottom[1] + sideLength,
+			});
+		}
+		return unionBounds(boxes);
+	}
+
+	// Fits the selection (or the whole design), only ever zooming out from the current scale.
+	function fitView() {
+		const node = stage?.node;
+		if (!node) return;
+		const selection = selectionBounds();
+		const content = selection ?? { minX: 0, minY: 0, maxX: clickableWidth, maxY: clickableHeight };
+		const scale = node.scaleX() || 1;
+		const t = fitTransform(
+			content,
+			{ width: viewerWidth, height: viewerHeight },
+			{
+				paddingPx: FIT_PADDING_PX,
+				minScale: FIT_MIN_SCALE,
+				maxScale: selection ? scale : Math.min(scale, 1),
+			}
+		);
+		node.scale({ x: t.scale, y: t.scale });
+		node.position({ x: t.x, y: t.y });
+		updateViewportBounds();
+		updateViewportScale();
+	}
+
+	/** Top of a region's header row, or of the first header when `regionId` is omitted. */
+	function regionHeaderTop(regionId?: string): number | null {
+		const row = d
+			.getVisibleStrandRows()
+			.find(
+				(r) => r.kind === 'REGION_HEADER' && (regionId === undefined || r.regionId === regionId)
+			);
+		return row ? regionHeaderGeometry(d, row.displayRow, 0).top : null;
+	}
+
+	// Default zoom at base 0, scrolled so the active region's header sits where the first one does.
+	function resetView() {
+		const node = stage?.node;
+		if (!node) return;
+		const regionId = editorViewContext.activeRegionId;
+		const activeTop = regionId ? regionHeaderTop(regionId) : null;
+		const firstTop = regionHeaderTop();
+		const dy = activeTop !== null && firstTop !== null ? activeTop - firstTop : 0;
+		node.scale({ x: 1, y: 1 });
+		node.position({ x: 0, y: -dy });
+		updateViewportBounds();
+		updateViewportScale();
+	}
+
 	function updateViewportScale() {
 		if (!camera) return;
 		editorViewContext.strandViewContext.viewportScale = camera.scale;
@@ -293,6 +367,9 @@
 		if (type === 'down' && dom.button !== 0) {
 			return;
 		}
+		// Keep the drag's events coming when it leaves the canvas, so release outside still ends it.
+		if (type === 'down' && dom.target instanceof Element)
+			dom.target.setPointerCapture(dom.pointerId);
 		// console.log('Forwarding event', type, 'at', e.target.getAttr('id'));
 		const p = stage?.node.getPointerPosition() || { x: 0, y: 0 };
 		// Any pointer-down inside a region's row band activates that region.
@@ -308,7 +385,9 @@
 			}
 		}
 		// Marks have no Konva nodes; a label acts as the crossover line it stands in for.
-		const konvaTargetId = (e.target as Konva.Node).getAttr('id');
+		// Bare canvas past the content (zoomed out) is empty space too.
+		const konvaTargetId =
+			e.target === stage?.node ? 'EMPTY' : (e.target as Konva.Node).getAttr('id');
 		controller.handlePointer({
 			directTargetId:
 				konvaTargetId === 'EMPTY' && markHit?.onLabel ? markHit.mark.xoverId : konvaTargetId,
@@ -417,6 +496,7 @@
 	bind:clientWidth={viewerWidth}
 	bind:clientHeight={viewerHeight}
 	style={editorViewContext.editorMode === 'PAN' ? 'cursor: grab' : ''}
+	{...activation}
 	onpointerdown={() => editorViewContext.setActiveViewer('STRAND')}
 	onfocusin={() => editorViewContext.setActiveViewer('STRAND')}
 >
@@ -435,6 +515,18 @@
 			if (e.target === stage?.node) updateViewportBounds();
 		}}
 		ondragend={() => updateViewportBounds()}
+		onpointerdown={(e) => forward('down', e)}
+		onpointermove={(e) => forward('move', e)}
+		onpointerup={(e) => forward('up', e)}
+		onpointerleave={(e) => {
+			// A drag keeps the pointer captured, so it ends with `up` wherever it is released.
+			if (e.evt.buttons === 0) forward('cancel', e);
+		}}
+		onpointercancel={(e) => forward('cancel', e)}
+		oncontextmenu={(e) => {
+			e.evt.preventDefault();
+			forward('contextmenu', e);
+		}}
 	>
 		<Layer listening={false}>
 			<Group bind:this={world}>
@@ -464,20 +556,7 @@
 			</Group>
 		</Layer>
 
-		<Layer
-			bind:this={overlay}
-			listening={true}
-			onpointerdown={(e) => forward('down', e)}
-			onpointermove={(e) => forward('move', e)}
-			onpointerup={(e) => forward('up', e)}
-			onpointerleave={(e) => forward('cancel', e)}
-			onpointercancel={(e) => forward('cancel', e)}
-			onpointerdblclick={jumpToConnectionTarget}
-			oncontextmenu={(e) => {
-				e.evt.preventDefault();
-				forward('contextmenu', e);
-			}}
-		>
+		<Layer bind:this={overlay} listening={true} onpointerdblclick={jumpToConnectionTarget}>
 			<Rect
 				id="EMPTY"
 				x={-100}

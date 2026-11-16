@@ -1,4 +1,4 @@
-// Drafts "What's New" entries from add:/feat:/fix: commits authored since the last review.
+// Drafts "What's New" entries from user-facing commits authored since the last review.
 // Usage: pnpm whats-new:draft [--dry-run]
 // Drafts land at the top of src/lib/whats-new/entries.ts with `draft: true` (hidden in the
 // app); rewrite or merge them, remove the flag, and commit.

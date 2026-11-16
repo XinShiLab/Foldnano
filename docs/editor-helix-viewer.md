@@ -109,6 +109,9 @@ Unlike the 3D view, this pane is strictly a 2D region-local editor.
 
 ## Interaction Model
 
+The first left press on the inactive left pane only activates it (plane view or 3D alike); see
+`docs/editor-strand-viewer.md` § Activating The Pane for `firstPressActivates`.
+
 ### Add a lattice VH
 
 **File:** `HelixGrid.svelte`
@@ -145,6 +148,11 @@ In `SELECT` mode the lattice viewer now owns its own VH-based selection state:
 - modifier-click -> toggle that constrained-move group in the lattice selection
 - drag on empty background -> marquee-select intersecting helix circles
 - marquee selection expands through constrained crossovers before being committed
+
+The lattice `Stage` fills the pane, and `PlaneViewer` routes its pointer events to
+`LatticeViewer`'s exported handlers: any press reaching the stage is empty space (helix circles
+stop bubbling), so a box can start anywhere, even past a zoomed-out lattice. Marquee and helix
+drags capture the pointer, so releasing outside the canvas commits them like a release inside.
 
 This selection is separate from:
 

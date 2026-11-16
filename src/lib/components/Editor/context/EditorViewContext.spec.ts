@@ -172,6 +172,30 @@ describe('EditorViewContext', () => {
 		expect([...editorViewContext.selectedLatticeVhIndices]).toEqual([]);
 	});
 
+	it('moves the cross-section cursor to the region being activated, kept within its length', () => {
+		const editorViewContext = new EditorViewContext();
+		const doc = new FoldnanoDocument('doc-cs-follows-region', 'CS Follows Region');
+		const region = doc.addNewPart('HONEYCOMB').getDefaultRegion();
+		editorViewContext.session.replaceCurrentDocumentForTesting(doc);
+		const strandCtx = editorViewContext.strandViewContext;
+
+		strandCtx.activeCsRegionId = 'elsewhere';
+		strandCtx.csCursorIdx = region.maxBase + 50;
+		editorViewContext.setActiveRegion(region.id);
+		expect(strandCtx.activeCsRegionId).toBe(region.id);
+		expect(strandCtx.csCursorIdx).toBe(region.maxBase - 1);
+
+		// A cursor left in another region comes back when the active region is activated again.
+		strandCtx.activeCsRegionId = 'elsewhere';
+		strandCtx.csCursorIdx = 5;
+		editorViewContext.setActiveRegion(region.id);
+		expect(strandCtx.activeCsRegionId).toBe(region.id);
+		expect(strandCtx.csCursorIdx).toBe(5);
+
+		editorViewContext.setActiveRegion(null);
+		expect(strandCtx.activeCsRegionId).toBe(region.id);
+	});
+
 	it('wires the plugin registry busy check to the real plugin coordinator', async () => {
 		const editorViewContext = new EditorViewContext();
 		await editorViewContext.pluginRegistry.ready;

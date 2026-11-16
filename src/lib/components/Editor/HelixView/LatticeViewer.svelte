@@ -23,12 +23,10 @@
 	interface Props {
 		part: Part;
 		region: LatticedDesignRegion;
-		canvasWidth: number;
-		canvasHeight: number;
 		onIdleClick?: () => void;
 	}
 
-	const { part, region, canvasWidth, canvasHeight, onIdleClick }: Props = $props();
+	const { part, region, onIdleClick }: Props = $props();
 
 	const numOfCols = 32;
 	const numOfRows = 30;
@@ -120,9 +118,10 @@
 		});
 	}
 
-	function onBackgroundPointerDown(e: KonvaPointerEvent) {
-		if (editorMode !== 'SELECT') return;
-		if (e.target !== e.currentTarget) return;
+	// Presses on the helices stop bubbling, so any press reaching the stage is on empty space,
+	// including bare canvas past the lattice when zoomed out.
+	export function onStagePointerDown(e: KonvaPointerEvent) {
+		if (editorMode !== 'SELECT' || e.evt.button !== 0) return;
 		const stage = e.target.getStage();
 		const raw = stage?.getPointerPosition();
 		if (!stage || !raw) return;
@@ -131,6 +130,17 @@
 			currentLayer: toLayerCoords(stage, raw),
 			additive: hasSelectionModifier(e),
 		};
+		capturePointer(e);
+	}
+
+	// Keeps a drag's events coming when it leaves the canvas, so release outside still ends it.
+	function capturePointer(e: KonvaPointerEvent) {
+		if (e.evt.target instanceof Element) e.evt.target.setPointerCapture(e.evt.pointerId);
+	}
+
+	export function cancelPointer() {
+		activeMarquee = null;
+		activeDrag = null;
 	}
 
 	function onVhPointerDown(e: KonvaPointerEvent, vhIdx: number) {
@@ -147,6 +157,7 @@
 			return;
 		}
 
+		capturePointer(e);
 		const nextSelection = selectedVhIndices.has(vhIdx)
 			? Array.from(selectedVhIndices)
 			: selectConstraintGroup(vhIdx);
@@ -159,7 +170,7 @@
 		};
 	}
 
-	function onPointerMove(e: KonvaPointerEvent) {
+	export function onPointerMove(e: KonvaPointerEvent) {
 		const stage = e.target.getStage();
 		const raw = stage?.getPointerPosition();
 		if (!stage || !raw) return;
@@ -188,7 +199,7 @@
 		activeDrag.preview = previewForSelection(activeDrag.vhIndices, delta);
 	}
 
-	function onPointerUp(e: KonvaPointerEvent) {
+	export function onPointerUp(e: KonvaPointerEvent) {
 		const stage = e.target.getStage();
 		const raw = stage?.getPointerPosition();
 		const layer = stage && raw ? toLayerCoords(stage, raw) : null;
@@ -261,16 +272,7 @@
 	}
 </script>
 
-<Group onpointermove={onPointerMove} onpointerup={onPointerUp}>
-	<Rect
-		x={0}
-		y={0}
-		width={canvasWidth}
-		height={canvasHeight}
-		fill="transparent"
-		onpointerdown={onBackgroundPointerDown}
-	/>
-
+<Group>
 	<HelixGrid {part} {region} {numOfCols} {numOfRows} {radius} {strokeWidth} />
 
 	<Group>

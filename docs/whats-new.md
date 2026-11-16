@@ -145,8 +145,11 @@ already moved past them, so re-running the script won't recreate them.
 1. **Collect** — `git log --no-merges --since=<watermark> --name-only
 --format=%x1e%H%x1f%aI%x1f%s`. `--since` filters on commit date (never earlier than author
    date), so it only narrows the scan; `buildDrafts` applies the exact author-date cutoff.
-2. **Type filter** — keep subjects matching `add:`, `feat:`, `fix:` (optional `(scope)`, plus the
-   repo's `major feat:` / `Bug fix:` variants). Others are reported as skipped.
+2. **Type filter** — skip subjects with an internal conventional type (`chore:`, `refactor:`,
+   `docs:`, `test:`, `ci:`, `build:`, `style:`, `wip:`, `revert:`, `deps:`, optional `(scope)`)
+   as "internal commit type". Everything else is drafted, including plain subjects with no type
+   (`Strand view: Fit button …`), which is how most commits here are written. An `add:` / `feat:`
+   / `fix:` prefix (plus `major feat:` / `Bug fix:`) is stripped from the text.
 3. **App-file filter** — keep a commit only if it touches `src/lib/`, `src/routes/`, or
    `static/`, excluding `*.spec.*` / `*.test.*`, `/test/` folders, and `src/routes/docs/`. A
    `fix:` that only adds a PDF or edits `.gitattributes` is skipped.

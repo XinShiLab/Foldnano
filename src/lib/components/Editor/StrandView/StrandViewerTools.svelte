@@ -2,6 +2,7 @@
 	import { type Stage } from 'svelte-konva';
 	import {
 		Shrink,
+		Scan,
 		ArrowLeftFromLine,
 		ArrowRightFromLine,
 		TextAlignStart,
@@ -49,11 +50,11 @@
 	interface Props {
 		part: Part;
 		stage: Stage | undefined;
-		updateViewportBounds: () => void;
-		updateViewportScale: () => void;
+		fitView: () => void;
+		resetView: () => void;
 	}
 
-	let { part, stage, updateViewportBounds, updateViewportScale }: Props = $props();
+	let { part, stage, fitView, resetView }: Props = $props();
 
 	const ctx = getEditorViewContext();
 	const strandCtx = $derived(ctx.strandViewContext);
@@ -80,15 +81,6 @@
 		void ctx.activeRegionId;
 		increaseLengthBy = 0;
 	});
-
-	function resetScale(viewer: Stage | undefined) {
-		if (!viewer) return;
-		const node = viewer.node;
-		node.scale({ x: 1, y: 1 });
-		node.position({ x: 0, y: 0 });
-		updateViewportScale();
-		updateViewportBounds();
-	}
 
 	const activeRegion = $derived(ctx.activeRegion);
 	const regionSuffix = $derived(activeRegion ? ` (${activeRegion.name})` : '');
@@ -174,10 +166,24 @@
 			variant="ghost"
 			size="icon-sm"
 			title="Reset view"
-			onclick={() => resetScale(stage)}
-			{@attach help({ text: 'Return the strand view to its default zoom and position.' })}
+			onclick={resetView}
+			{@attach help({
+				text: 'Return the strand view to its default zoom, scrolled to the top of the active region.',
+			})}
 		>
 			<Shrink />
+		</Button>
+		<Button
+			variant="ghost"
+			size="icon-sm"
+			title={strandCtx.selected.ends.size > 0 ? 'Fit to selection' : 'Fit to all'}
+			onclick={fitView}
+			{@attach help({
+				title: 'Fit',
+				text: 'Bring the selection into view, zooming out only if it does not fit. With nothing selected, zoom out to show every helix.',
+			})}
+		>
+			<Scan />
 		</Button>
 	</ButtonGroup.Root>
 

@@ -34,7 +34,6 @@ import {
 	getHelixXY,
 	getSegmentEndPhysicalIndex,
 	getSegmentPhysicalRange,
-	getVhXYMap,
 	backbonePoint as backbonePointGeom,
 	helixCenterPoint,
 	type VirtualHelixFrame,
@@ -57,7 +56,6 @@ export {
 	getHelixXY,
 	getSegmentEndPhysicalIndex,
 	getSegmentPhysicalRange,
-	getVhXYMap,
 };
 
 // ── Physical constants (nm) ────────────────────────────────────────────────
@@ -236,33 +234,6 @@ function buildCylinderInstances(
 	mesh.instanceMatrix.needsUpdate = true;
 	mesh.computeBoundingSphere();
 	return mesh;
-}
-
-// ── Twist helper ────────────────────────────────────────────────────────────
-
-export function backbonePointNm(
-	hx: number,
-	hy: number,
-	bpIdx: number,
-	strandIdx: number,
-	twistOffsetDeg: number,
-	twistPerBaseDeg: number
-): THREE.Vector3 {
-	// Convenience wrapper for callers that still use the flat (hx, hy) API.
-	// Constructs a synthetic +Z frame from the given origin.
-	const syntheticFrame: VirtualHelixFrame = {
-		origin: { x: hx, y: hy, z: 0 },
-		axis: { x: 0, y: 0, z: 1 },
-		radial0: { x: 1, y: 0, z: 0 },
-	};
-	const p = backbonePointGeom(
-		syntheticFrame,
-		bpIdx,
-		strandIdx as 0 | 1,
-		twistOffsetDeg,
-		twistPerBaseDeg
-	);
-	return new THREE.Vector3(p.x, p.y, p.z);
 }
 
 // ── Block transform helpers ─────────────────────────────────────────────────

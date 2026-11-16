@@ -24,6 +24,10 @@
 	let editorMode = $derived(editorViewContext.editorMode);
 	const latticeCanvasWidth = 1200;
 	const latticeCanvasHeight = 1200;
+	// The stage fills the pane, so presses on bare canvas around a zoomed-out lattice still land.
+	let paneWidth = $state(0);
+	let paneHeight = $state(0);
+	let latticeViewer = $state<LatticeViewer>();
 	const DRAW_NUDGE_MS = 4000;
 	let drawNudge = $state(false);
 	let drawNudgeTimer: ReturnType<typeof setTimeout> | undefined;
@@ -68,21 +72,28 @@
 		</div>
 	{/if}
 
-	<div class="relative min-h-0 flex-1 overflow-hidden">
+	<div
+		class="relative min-h-0 flex-1 overflow-hidden"
+		bind:clientWidth={paneWidth}
+		bind:clientHeight={paneHeight}
+	>
 		{#if activeRegion instanceof LatticedDesignRegion}
 			<Stage
 				draggable={editorMode === 'PAN'}
-				width={latticeCanvasWidth}
-				height={latticeCanvasHeight}
+				width={paneWidth || latticeCanvasWidth}
+				height={paneHeight || latticeCanvasHeight}
 				bind:this={stageRef}
 				onwheel={(e) => handleWheel(e, stageRef)}
+				onpointerdown={(e) => latticeViewer?.onStagePointerDown(e)}
+				onpointermove={(e) => latticeViewer?.onPointerMove(e)}
+				onpointerup={(e) => latticeViewer?.onPointerUp(e)}
+				onpointercancel={() => latticeViewer?.cancelPointer()}
 			>
 				<Layer>
 					<LatticeViewer
+						bind:this={latticeViewer}
 						{part}
 						region={activeRegion}
-						canvasWidth={latticeCanvasWidth}
-						canvasHeight={latticeCanvasHeight}
 						onIdleClick={showDrawNudge}
 					/>
 				</Layer>

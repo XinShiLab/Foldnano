@@ -6,8 +6,6 @@
 	import {
 		buildScene,
 		buildExportScene,
-		BACKBONE_RISE_NM,
-		getVhXYMap,
 		STRESS_RED_RATIO,
 		STRESS_REST_RATIO,
 		STRESS_YELLOW_RATIO,
@@ -48,6 +46,18 @@
 		type CoordinateAxisResult,
 		type PlaneAxesResult,
 	} from './coordinateAxis';
+	import {
+		fitDistance,
+		isFaceOn,
+		poseQuaternion,
+		rollQuaternion,
+		posePosition,
+		tweenPose,
+		upForDir,
+		type CameraPose,
+		type CubeDir,
+	} from './cameraViews';
+	import ViewCube from './ViewCube.svelte';
 	import {
 		createTransformGizmo,
 		type GizmoMode,
@@ -239,8 +249,6 @@
 	let cursor: CursorResult | undefined;
 	let planeSelector: PlaneSelectorResult | undefined;
 	let referenceMeshOverlay: ReferenceMeshOverlay | undefined;
-	// eslint-disable-next-line svelte/prefer-svelte-reactivity
-	let vhXYCache = new Map<number, { x: number; y: number }>();
 
 	// ── RBS simulation state (drives geometry rebuild + bindable props) ────────
 	let simOverrides = $state<Map<string, BlockTransformOverride> | null>(null);
@@ -366,6 +374,69 @@
 		const center = box.isEmpty() ? new THREE.Vector3(0, 0, 0) : box.getCenter(new THREE.Vector3());
 		resetCameraToDesign(currentGroup, center);
 	};
+	// ── View cube: turn the camera to a face, edge or corner ─────────────────
+
+	const CUBE_TURN_MS = 350;
+	let viewCubeQuaternion = $state.raw<THREE.Quaternion | null>(null);
+	let viewCubeFaceOn = $state(false);
+	let cameraTween: { from: CameraPose; to: CameraPose; startMs: number } | null = null;
+
+	function viewFromCube(dir: CubeDir): void {
+		if (!currentGroup || !_activeCamera || !_controls) return;
+		let box = new THREE.Box3().setFromObject(currentGroup);
+		if (box.isEmpty() && referenceMeshOverlay) box = referenceMeshOverlay.bounds();
+		if (box.isEmpty())
+			box = new THREE.Box3(new THREE.Vector3(-10, -10, -10), new THREE.Vector3(10, 10, 10));
+		const camera = _activeCamera;
+		const fromDir = new THREE.Vector3(...dir).normalize();
+		const up = upForDir(dir);
+		const to: CameraPose = {
+			target: box.getCenter(new THREE.Vector3()),
+			quaternion: poseQuaternion(fromDir, up),
+			distance: fitDistance(box, fromDir, up, camera.fov, camera.aspect, 1.15),
+		};
+		startCameraTween(to);
+	}
+
+	/** Rolls the view a quarter turn about the line of sight, from where a running turn ends. */
+	function rollView(clockwise: boolean): void {
+		const to = cameraTween?.to ?? currentPose();
+		if (!to) return;
+		startCameraTween({ ...to, quaternion: rollQuaternion(to.quaternion, clockwise) });
+	}
+
+	function currentPose(): CameraPose | null {
+		if (!_activeCamera || !_controls) return null;
+		return {
+			target: _controls.target.clone(),
+			quaternion: _activeCamera.quaternion.clone(),
+			distance: _activeCamera.position.distanceTo(_controls.target),
+		};
+	}
+
+	function startCameraTween(to: CameraPose): void {
+		const from = currentPose();
+		if (!from) return;
+		const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+		cameraTween = { from, to, startMs: reduceMotion ? -Infinity : performance.now() };
+		_markDirty?.();
+	}
+
+	/** Advances a running view-cube turn; called each frame before the controls update. */
+	function stepCameraTween(now: number): void {
+		if (!cameraTween || !_activeCamera || !_controls) return;
+		const t = (now - cameraTween.startMs) / CUBE_TURN_MS;
+		const pose = t >= 1 ? cameraTween.to : tweenPose(cameraTween.from, cameraTween.to, t);
+		if (t >= 1) cameraTween = null;
+		const camera = _activeCamera;
+		_controls.target.copy(pose.target);
+		camera.quaternion.copy(pose.quaternion);
+		camera.position.copy(posePosition(pose));
+		// The controls re-aim with camera.up every frame; keep it on the turning camera.
+		camera.up.set(0, 1, 0).applyQuaternion(pose.quaternion);
+		_markDirty?.();
+	}
+
 	frameActivePlaneFn = () => {
 		if (!planeOverlay || !_activeCamera || !_controls) return;
 		const planeId = editorViewContext.activeRegion?.planeId ?? null;
@@ -1073,14 +1144,7 @@
 
 		scene.add(group);
 
-		untrack(() => {
-			vhXYCache = getVhXYMap(part);
-			for (const vh of part.virtualHelices) {
-				if (hiddenRegionIds.has(part.getRegionForVh(vh).id)) vhXYCache.delete(vh.index);
-			}
-			cursor!.rebuildRings(vhXYCache);
-			cursor!.updateMarkers(csCursorIdx, part, vhXYCache);
-		});
+		untrack(updateCursor);
 
 		if (isFirstBuild) {
 			isFirstBuild = false;
@@ -1290,21 +1354,27 @@
 		_markDirty?.();
 	});
 
-	// Slide cursor rings and update markers when the CrossSectionSelector moves
-	$effect(() => {
-		if (!threeRenderer || !cursor) return;
-		const bp = csCursorIdx;
-		cursor.ringGroup.position.z = bp * BACKBONE_RISE_NM;
-		untrack(() => cursor!.updateMarkers(bp, part, vhXYCache));
+	/**
+	 * Cross-section cursor at `csCursorIdx` of the strand view's cursor region, as that view draws
+	 * it; nothing when no region has the cursor or that region is hidden in 3D.
+	 */
+	function updateCursor(): void {
+		if (!cursor || !showCursor) return;
+		const regionId = editorViewContext.strandViewContext.activeCsRegionId;
+		const shown = regionId !== null && !editorViewContext.hidden3DRegionIds.has(regionId);
+		cursor.update(part, shown ? regionId : null, csCursorIdx);
 		_markDirty?.();
-	});
+	}
 
-	// Toggle cursor indicators
+	// Follow the cursor as it moves or changes region, and when it is toggled.
 	$effect(() => {
 		if (!threeRenderer || !cursor) return;
-		cursor.ringGroup.visible = showCursor;
+		void csCursorIdx;
+		void editorViewContext.strandViewContext.activeCsRegionId;
+		void editorViewContext.hidden3DRegionIds.size;
+		cursor.rings.visible = showCursor;
 		cursor.markers.visible = showCursor;
-		if (showCursor) untrack(() => cursor!.updateMarkers(csCursorIdx, part, vhXYCache));
+		untrack(updateCursor);
 		_markDirty?.();
 	});
 
@@ -1341,7 +1411,10 @@
 		_activeCamera = camera;
 		_controls = controls;
 		// Hover follows the pointer, not the camera: rotate, pan and zoom drop it until the next move.
-		controls.addEventListener('start', clearHover);
+		controls.addEventListener('start', () => {
+			cameraTween = null; // grabbing the view stops a view-cube turn
+			clearHover();
+		});
 		controls.addEventListener('change', () => {
 			if (hoveredItem >= 0) clearHover();
 		});
@@ -1358,7 +1431,7 @@
 
 		// ── Cursor indicators ──────────────────────────────────────────────────
 		cursor = createCursor();
-		scene.add(cursor.ringGroup);
+		scene.add(cursor.rings);
 		scene.add(cursor.markers);
 
 		// ── Coordinate axis ────────────────────────────────────────────────────
@@ -1502,9 +1575,15 @@
 		let _lastFrameTime = performance.now();
 		function animate() {
 			rafId = requestAnimationFrame(animate);
+			stepCameraTween(performance.now());
 			controls.update();
 			if (rig.consumeDirty()) {
 				renderer.render(localScene, camera);
+				if (!viewCubeQuaternion?.equals(camera.quaternion))
+					viewCubeQuaternion = camera.quaternion.clone();
+				// Judged on where a turn ends, so the roll buttons stay put while it animates.
+				const faceOn = isFaceOn(cameraTween?.to.quaternion ?? camera.quaternion);
+				if (faceOn !== viewCubeFaceOn) viewCubeFaceOn = faceOn;
 				if (showStats) {
 					const now = performance.now();
 					statsFrameMs = now - _lastFrameTime;
@@ -1545,7 +1624,7 @@
 				hoverGlow = undefined;
 			}
 			if (cursor) {
-				scene!.remove(cursor.ringGroup);
+				scene!.remove(cursor.rings);
 				scene!.remove(cursor.markers);
 				cursor.dispose();
 				cursor = undefined;
@@ -1638,9 +1717,17 @@
 		{linePickActive ? 'click to select · shift-drag to box-select · ' : ''}drag to rotate · scroll
 		to zoom · right-drag to pan
 	</div>
+	{#if viewCubeQuaternion}
+		<ViewCube
+			quaternion={viewCubeQuaternion}
+			faceOn={viewCubeFaceOn}
+			onPick={viewFromCube}
+			onRoll={rollView}
+		/>
+	{/if}
 	{#if showStats}
 		<div
-			class="pointer-events-none absolute top-2 right-2 rounded bg-black/70 px-2 py-1.5 font-mono text-[10px] leading-relaxed text-green-400 select-none"
+			class="pointer-events-none absolute top-40 right-2 rounded bg-black/70 px-2 py-1.5 font-mono text-[10px] leading-relaxed text-green-400 select-none"
 		>
 			<div>draw calls <span class="text-white">{statsDrawCalls}</span></div>
 			<div>geometries <span class="text-white">{statsGeometries}</span></div>

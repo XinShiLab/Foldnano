@@ -30,14 +30,50 @@ export interface WhatsNewEntry {
  * Author date of the newest commit already considered for this list. `pnpm whats-new:draft`
  * only drafts commits authored after it (author dates survive rebases; hashes don't).
  */
-export const WHATS_NEW_REVIEWED_THROUGH = '2026-11-09T11:48:50+01:00';
+export const WHATS_NEW_REVIEWED_THROUGH = '2026-11-15T23:39:51+01:00';
 
 // Newest first. Edit freely; the draft script only inserts new entries at the top.
 export const WHATS_NEW: readonly WhatsNewEntry[] = [
 	{
+		date: '2026-11-15',
+		area: '3D view',
+		text: 'Select in the 3D view: in Select mode, click a strand, crossover or oligo in the line view to select it in the strand view, which scrolls to it. Shift-click toggles, Shift-drag a box to add everything it touches, and hovering glows what a click would select and shows its helix, base and oligo in the status bar.',
+		link: 'views#select-in-3d',
+	},
+	{
+		date: '2026-11-15',
+		area: '3D view',
+		text: "A view cube in the 3D view turns the camera to look from any face, edge or corner, shows the X, Y and Z axes, and has arrows to rotate a face-on view by 90°. The cross-section cursor now appears on the active region's helices whatever their plane, including freeform and wireframe regions.",
+		link: 'views#3d-view',
+	},
+	{
+		date: '2026-11-15',
+		area: 'Strand view',
+		text: 'A Fit button frames the selection, or every helix, and Reset view returns to the top of the active region. Activating a region moves the cross-section cursor to it.',
+		link: 'views#strand-view',
+	},
+	{
+		date: '2026-11-15',
+		area: 'Selection',
+		text: 'The scaffold filter now starts off, since most selections target staples (turn SCAF on in the Select panel to pick the scaffold). A box selection in the strand or plane view can start anywhere on empty canvas, even zoomed out, and still applies if you release outside the view. The first click on an inactive view only activates it, so a selection made in another view is kept.',
+		link: 'selection#selection-filters',
+	},
+	{
+		date: '2026-11-15',
+		area: 'Plane view',
+		text: 'Clicking a helix in the plane view scrolls the strand view to it. Large freeform and wireframe regions draw much faster, and the freeform view has a Fit to helices button. Wireframe regions are select-only in the plane view (move or roll helices from the Select panel), and their lines keep their width when you zoom in.',
+		link: 'views#freeform-plane-view',
+	},
+	{
+		date: '2026-11-15',
+		area: 'Performance',
+		text: 'Editing, scrolling and zooming large designs is faster. Autosave waits for a pause in your editing instead of saving mid-gesture, view settings such as filters and collapsed regions are saved as soon as they change, and the Saved indicator shows how long ago it saved in its tooltip. Dragging no longer highlights labels and toolbar text.',
+		link: 'saving-github#autosave',
+	},
+	{
 		date: '2026-11-09',
 		area: 'General',
-		text: 'Interface updates: a notifications bell in the status bar, an Error Log that records unexpected errors and can be cleared (opened from the bell or the Help menu), a clearer status bar, a Select panel that summarizes multi-selections, and mouse-wheel scrolling for crowded toolbars.',
+		text: "Interface updates: a notifications bell in the status bar, an Error Log that records unexpected errors and can be cleared (opened from the bell or the Help menu), a clearer status bar, a Select panel that summarizes multi-selections, and mouse-wheel scrolling for crowded toolbars. Plugins can write a whole oligo's sequence with fill_sequence in foldnano.edit.",
 		link: 'interface-reference#status-bar',
 	},
 	{

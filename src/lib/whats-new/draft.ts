@@ -36,6 +36,10 @@ const DEFAULT_AREA = 'General';
 
 // Accepts `add:`, `feat:`, `fix:`, with an optional `(scope)`, plus `major feat:` / `Bug fix:`.
 const USER_FACING_PREFIX = /^(?:major\s+)?(?:bug\s+)?(add|feat|fix)(?:\([^)]*\))?\s*:\s*/i;
+// Conventional types for work users never see. Plain subjects ("Strand view: Fit button ...")
+// carry no type and are drafted, since most commits in this repo are written that way.
+const INTERNAL_PREFIX =
+	/^(chore|refactor|docs?|tests?|ci|build|style|wip|revert|deps)(?:\([^)]*\))?\s*:/i;
 
 /** A changed file that can affect what users see in the app (not tests, docs, or tooling). */
 export function isAppFile(path: string): boolean {
@@ -57,13 +61,13 @@ export function classifyArea(files: readonly string[]): string {
 	return best;
 }
 
-/** `fix: [3d-overlay] keep view active.` → `Keep view active`; null if not a user-facing type. */
+/** `fix: [3d-overlay] keep view active.` → `Keep view active`; null for an internal type. */
 export function subjectToText(subject: string): string | null {
-	const match = USER_FACING_PREFIX.exec(subject.trim());
-	if (!match) return null;
-	const text = subject
-		.trim()
-		.slice(match[0].length)
+	const trimmed = subject.trim();
+	if (INTERNAL_PREFIX.test(trimmed)) return null;
+	const match = USER_FACING_PREFIX.exec(trimmed);
+	const text = trimmed
+		.slice(match ? match[0].length : 0)
 		.replace(/^(\[[^\]]*\]\s*)+/, '')
 		.replace(/\.$/, '')
 		.trim();
@@ -91,7 +95,7 @@ export function buildDrafts(commits: readonly CommitInfo[], reviewedThrough: str
 	for (const commit of fresh) {
 		const text = subjectToText(commit.subject);
 		if (text === null) {
-			skipped.push({ commit, reason: 'not add/feat/fix' });
+			skipped.push({ commit, reason: 'internal commit type' });
 			continue;
 		}
 		const appFiles = commit.files.filter(isAppFile);

@@ -92,6 +92,10 @@ export interface StrandToolbarController {
 	centerOn: (vhId: string, bp: number, opts?: { onlyIfOffscreen?: boolean }) => boolean;
 	/** Scrolls vertically until a helix's row is on screen (no-op if it already is); false if not shown. */
 	revealVh: (vhId: string) => boolean;
+	/** Brings the selection into view (or every helix when nothing is selected); never zooms in. */
+	fitView: () => void;
+	/** Default zoom at base 0, scrolled to the active region's header. */
+	resetView: () => void;
 }
 
 export interface HelixToolbarController {
@@ -580,11 +584,23 @@ export class EditorViewContext {
 	}
 
 	setActiveRegion(regionId: string | null): void {
+		// The cross-section cursor follows the activated region, even one already active, whose
+		// cursor may have been left elsewhere (a restored view, an older session).
+		if (regionId !== null) this.moveCsCursorToRegion(regionId);
 		if (this.activeRegionId === regionId) return;
 		this.strandViewContext.selected.clear();
 		this.clearSelectedFreeformVhs();
 		this.clearSelectedLatticeVhs();
 		this.activeRegionId = regionId;
+	}
+
+	private moveCsCursorToRegion(regionId: string): void {
+		const strandCtx = this.strandViewContext;
+		strandCtx.activeCsRegionId = regionId;
+		const region = this.currentDoc.parts[0]?.regions.find((r) => r.id === regionId);
+		if (region && strandCtx.csCursorIdx >= region.maxBase) {
+			strandCtx.csCursorIdx = Math.max(0, region.maxBase - 1);
+		}
 	}
 
 	repairActiveRegion(): void {
