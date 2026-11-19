@@ -13,7 +13,7 @@
 	} from '$lib/services/github/diff';
 	import DiffHunkRow from './DiffHunk.svelte';
 	import FoldnanoDocument from '$lib/model/document.svelte';
-	import { DocumentFormatError } from '$lib/model/documentFormat';
+	import { DocumentFormatError, stringifyDesignFile } from '$lib/model/documentFormat';
 
 	interface Props {
 		open: boolean;
@@ -120,7 +120,7 @@
 		try {
 			// Local version from persisted working copy
 			const snapshot = await session.storageManager.loadDocument(docId);
-			localText = snapshot ? JSON.stringify(snapshot, null, 2) : '';
+			localText = snapshot ? stringifyDesignFile(snapshot, 2) : '';
 
 			if (isNewFile) {
 				// No remote version — show all-added diff (empty remote vs full local).
@@ -136,7 +136,8 @@
 				fileMeta!.branch
 			);
 			const decoded = atob(file.content.replace(/\s/g, ''));
-			remoteText = JSON.stringify(JSON.parse(decoded), null, 2);
+			// Older files still carry a name; it isn't part of what a commit writes, so leave it out.
+			remoteText = stringifyDesignFile(JSON.parse(decoded) as object, 2);
 			remoteCommitSha = file.sha.slice(0, 7);
 		} catch (e) {
 			error = (e as Error).message || 'Failed to load versions';

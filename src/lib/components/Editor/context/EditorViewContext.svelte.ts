@@ -16,6 +16,7 @@ import { PluginInstallGate } from '../Plugin/PluginInstallGate.svelte';
 import { PluginDevMode } from '$lib/plugin/PluginDevMode.svelte';
 import { AgentRunListener } from '$lib/plugin/AgentRunListener.svelte';
 import { buildDesignOverview } from '$lib/model/io/designOverview';
+import { SameDesignGate } from './SameDesignGate.svelte';
 import { LinkedPluginReviewGate } from '../Plugin/LinkedPluginReviewGate.svelte';
 import type { SegmentEnd, OligoSegment } from '$lib/model/Oligo';
 import type Oligo from '$lib/model/Oligo';
@@ -391,6 +392,7 @@ export class EditorViewContext {
 	pluginDevMode: PluginDevMode;
 	agentRuns: AgentRunListener;
 	linkedPluginReviewGate = new LinkedPluginReviewGate();
+	sameDesignGate = new SameDesignGate();
 
 	constructor() {
 		this.session = new EditorDocumentSession({
@@ -400,6 +402,7 @@ export class EditorViewContext {
 			loadPersistedContext: () => this.loadContextFromLocalStorage(),
 			savePersistedContext: () => this.saveContextToLocalStorage(),
 			isEditorBusy: () => this.#isBusyForIdleSave(),
+			chooseSameDesignAction: (question) => this.sameDesignGate.request(question),
 		});
 		this.pluginCoordinator = new PluginCoordinator(
 			this.pluginRegistry,

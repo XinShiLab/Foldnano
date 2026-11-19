@@ -41,6 +41,8 @@ describe('buildDesignArchive', () => {
 
 		expect(Object.keys(files).sort()).toEqual(['Box.fn.json', 'Tile.fn.json', 'manifest.json']);
 		expect(JSON.parse(files['Tile.fn.json']).id).toBe('a');
+		// The file's own name is the design's name; the manifest still records it.
+		expect(JSON.parse(files['Tile.fn.json'])).not.toHaveProperty('name');
 		const written = JSON.parse(files['manifest.json']) as DesignArchiveManifest;
 		expect(written).toEqual(manifest);
 		expect(written.format).toBe('foldnano-design-archive');
@@ -114,7 +116,13 @@ describe('exportAllDesigns', () => {
 
 		// Oldest first, so a later design with a repeated name gets the number.
 		expect(manifest.designs.map((d) => d.id)).toEqual(['broken', 'good']);
-		expect(JSON.parse(unzip(zip)['Broken.fn.json'])).toEqual(damaged);
+		const { name: _name, ...damagedFile } = damaged;
+		expect(JSON.parse(unzip(zip)['Broken.fn.json'])).toEqual(damagedFile);
+		// Readable designs are stamped like a single download; the damaged one can't be hashed.
+		expect(JSON.parse(unzip(zip)['Good.fn.json']).exported).toMatchObject({
+			at: EXPORTED_AT.toISOString(),
+			clock: 'local',
+		});
 		expect(skipped.map((d) => d.id)).toEqual(['gone']);
 	});
 });

@@ -135,6 +135,29 @@ describe('rotating local backups', () => {
 
 		await expect(db.getLocalBackups('doc-1')).resolves.toEqual([]);
 	});
+	it('moves a design, its backups and view context to a new id, rewriting the id inside', async () => {
+		await saveAt(now, 'v1');
+		await saveAt(now + LOCAL_BACKUP_INTERVAL_MS, 'v2');
+		await db.saveContext('doc-1', { zoom: 2 });
+
+		await expect(db.rekeyDocument('doc-1', 'doc-2')).resolves.toBe(true);
+
+		expect(await db.loadDocument('doc-1')).toBeNull();
+		expect(await db.loadDocument('doc-2')).toMatchObject({ id: 'doc-2', name: 'v2' });
+		expect(await db.loadContext('doc-2')).toEqual({ zoom: 2 });
+		const backups = await db.getLocalBackups('doc-2');
+		expect(backups.map((b) => (b.snapshot as { id: string; name: string }).id)).toEqual(['doc-2']);
+		expect(await db.getLocalBackups('doc-1')).toEqual([]);
+	});
+
+	it("won't move a design onto an id that is already taken", async () => {
+		await saveAt(now, 'one', 'doc-1');
+		await saveAt(now, 'two', 'doc-2');
+
+		await expect(db.rekeyDocument('doc-1', 'doc-2')).resolves.toBe(false);
+		expect(await db.loadDocument('doc-1')).toMatchObject({ name: 'one' });
+		expect(await db.loadDocument('doc-2')).toMatchObject({ name: 'two' });
+	});
 });
 
 describe('backup storage upgrade', () => {

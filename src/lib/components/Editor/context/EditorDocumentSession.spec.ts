@@ -1,5 +1,5 @@
 import 'fake-indexeddb/auto';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import FoldnanoDocument from '$lib/model/document.svelte';
 import { StorageManager } from '$lib/services/storage/StorageManager';
@@ -8,8 +8,18 @@ import { githubExplorerStateStore, githubMetadataStore } from '$lib/services/sto
 import { githubStorageProvider } from '$lib/services/storage/providers/GitHubStorageProvider';
 import type { DocumentMetadata, LocalBackup } from '$lib/services/storage/types';
 import { CURRENT_FORMAT_VERSION } from '$lib/model/documentFormat';
-import { GitHubConflictError, GitHubNetworkError } from '$lib/services/github/api';
-import { EditorDocumentSession } from './EditorDocumentSession.svelte';
+import {
+	GitHubApiError,
+	GitHubConflictError,
+	GitHubNetworkError,
+	deleteFileContent,
+} from '$lib/services/github/api';
+import { TabSync } from '$lib/services/tabSync.svelte';
+import {
+	EditorDocumentSession,
+	type SameDesignAnswer,
+	type SameDesignQuestion,
+} from './EditorDocumentSession.svelte';
 import { flushLocks, installFakeLocks } from '$lib/services/test/fakeLockManager';
 import {
 	FoldnanoIndexedDb,
@@ -81,6 +91,18 @@ class MockStorageProvider implements StorageProvider {
 		return this.docs.get(docId) ?? null;
 	}
 
+	async rekeyDocument(oldId: string, newId: string): Promise<boolean> {
+		const snapshot = this.docs.get(oldId);
+		if (!snapshot || this.docs.has(newId)) return false;
+		this.docs.set(newId, { ...snapshot, id: newId });
+		this.docs.delete(oldId);
+		const context = this.contexts.get(oldId);
+		if (context) this.contexts.set(newId, context);
+		this.contexts.delete(oldId);
+		for (const entry of this.docList) if (entry.id === oldId) entry.id = newId;
+		return true;
+	}
+
 	async deleteDocument(docId: string): Promise<boolean> {
 		this.docs.delete(docId);
 		this.docList = this.docList.filter((entry) => entry.id !== docId);
@@ -116,13 +138,16 @@ function makeStorage() {
 	return { storage, provider };
 }
 
-function makeSession() {
+function makeSession(
+	chooseSameDesignAction?: (question: SameDesignQuestion) => Promise<SameDesignAnswer>
+) {
 	const hooks = {
 		resetEphemeralEditorState: vi.fn(),
 		clearStaleSelectionsAfterReplay: vi.fn(),
 		repairActiveRegion: vi.fn(),
 		loadPersistedContext: vi.fn().mockResolvedValue(true),
 		savePersistedContext: vi.fn().mockResolvedValue(true),
+		chooseSameDesignAction,
 	};
 	const session = new EditorDocumentSession(hooks);
 	return { session, hooks };
@@ -288,9 +313,14 @@ describe('EditorDocumentSession', () => {
 		});
 		listCommitsMock.mockResolvedValue([{ sha: 'commit-sha' }]);
 
-		const ok = await session.loadDocumentFromGitHub('alice', 'designs', 'remote.fn.json', 'main');
+		const result = await session.loadDocumentFromGitHub(
+			'alice',
+			'designs',
+			'remote.fn.json',
+			'main'
+		);
 
-		expect(ok).toBe(true);
+		expect(result).toBe('loaded');
 		expect(session.currentDoc.id).toBe('doc-github');
 		expect(session.currentFileMetadata).toMatchObject({
 			path: 'remote.fn.json',
@@ -318,6 +348,406 @@ describe('EditorDocumentSession', () => {
 		await session.loadDocumentFromGitHub('alice', 'designs', 'designs/new-name.fn.json', 'main');
 
 		expect(session.currentDoc.name).toBe('new-name');
+	});
+
+	it('stores a GitHub file written without a name under its file name', async () => {
+		const { session } = makeSession();
+		const { storage, provider } = makeStorage();
+		session.replaceStorageManagerForTesting(storage);
+
+		const { name: _name, ...file } = new FoldnanoDocument('doc-nameless', 'ignored').toJSON();
+		getFileContentMock.mockResolvedValue({ content: btoa(JSON.stringify(file)), sha: 'sha-n' });
+		listCommitsMock.mockResolvedValue([]);
+
+		await session.loadDocumentFromGitHub('alice', 'designs', 'designs/crate.fn.json', 'main');
+
+		expect(session.currentDoc.name).toBe('crate');
+		expect(provider.docs.get('doc-nameless')).toMatchObject({ name: 'crate' });
+	});
+
+	describe('opening a GitHub file whose design id is taken here', () => {
+		const answer = (value: SameDesignAnswer) => vi.fn().mockResolvedValue(value);
+		const linkTo = (path: string) => ({
+			path,
+			sha: 'sha-linked',
+			owner: 'alice',
+			repo: 'designs',
+			branch: 'main',
+			lastSyncAt: 1,
+		});
+
+		function serveGitHubFile(doc: FoldnanoDocument) {
+			getFileContentMock.mockResolvedValue({
+				content: btoa(JSON.stringify(doc.toJSON())),
+				sha: 'remote-sha',
+			});
+			listCommitsMock.mockResolvedValue([]);
+		}
+
+		async function saveBrowserOnlyDesign(provider: MockStorageProvider, id: string) {
+			const saved = new FoldnanoDocument(id, 'Browser only');
+			saved.addNewPart('HONEYCOMB');
+			await provider.saveDocument(id, saved.toJSON());
+		}
+
+		function clearLinks(...ids: string[]) {
+			for (const id of ids) githubMetadataStore.clearFileMetadata(id);
+		}
+
+		describe('the id belongs to a design saved only in this browser', () => {
+			it('cancels without touching the browser design', async () => {
+				const ask = answer({ action: 'cancel' });
+				const { session } = makeSession(ask);
+				const { storage, provider } = makeStorage();
+				session.replaceStorageManagerForTesting(storage);
+				await saveBrowserOnlyDesign(provider, 'doc-taken');
+				serveGitHubFile(new FoldnanoDocument('doc-taken', 'Remote'));
+				const save = vi.spyOn(storage, 'saveDocument');
+
+				const result = await session.loadDocumentFromGitHub(
+					'alice',
+					'designs',
+					'box.fn.json',
+					'main'
+				);
+
+				expect(result).toBe('cancelled');
+				expect(ask).toHaveBeenCalledWith({
+					kind: 'browser-only',
+					designId: 'doc-taken',
+					incomingName: 'box',
+					savedName: 'Browser only',
+					savedAt: null,
+					sameContent: false,
+				});
+				expect(save).not.toHaveBeenCalled();
+				expect(githubMetadataStore.getFileMetadata('doc-taken')).toBeNull();
+			});
+
+			it('open as copy moves the browser design to a new id, so the file keeps its own', async () => {
+				const { session } = makeSession(answer({ action: 'copy' }));
+				const { storage, provider } = makeStorage();
+				session.replaceStorageManagerForTesting(storage);
+				await saveBrowserOnlyDesign(provider, 'doc-taken');
+				githubExplorerStateStore.saveLocalOnlyEntries('alice', 'designs', [
+					{ docId: 'doc-taken', path: 'draft.fn.json', name: 'draft.fn.json' },
+				]);
+				serveGitHubFile(new FoldnanoDocument('doc-taken', 'Remote'));
+				try {
+					const result = await session.loadDocumentFromGitHub(
+						'alice',
+						'designs',
+						'box.fn.json',
+						'main'
+					);
+
+					expect(result).toBe('loaded');
+					expect(session.currentDoc.id).toBe('doc-taken');
+					expect(session.currentFileMetadata?.path).toBe('box.fn.json');
+					const moved = provider.docList.find((d) => d.name === 'Browser only');
+					expect(moved?.id).toBeDefined();
+					expect(moved?.id).not.toBe('doc-taken');
+					const movedDoc = provider.docs.get(moved!.id) as { id: string; parts: unknown[] };
+					expect(movedDoc.id).toBe(moved!.id);
+					expect(movedDoc.parts).toHaveLength(1);
+					expect(githubExplorerStateStore.getLocalOnlyEntries('alice', 'designs')).toEqual([
+						{ docId: moved!.id, path: 'draft.fn.json', name: 'draft.fn.json' },
+					]);
+				} finally {
+					clearLinks('doc-taken');
+				}
+			});
+
+			it("won't move the browser design while another tab has it open", async () => {
+				const { uninstall } = installFakeLocks();
+				const otherTab = new TabSync('doc-taken');
+				const { session } = makeSession(answer({ action: 'copy' }));
+				const { storage, provider } = makeStorage();
+				session.replaceStorageManagerForTesting(storage);
+				await saveBrowserOnlyDesign(provider, 'doc-taken');
+				serveGitHubFile(new FoldnanoDocument('doc-taken', 'Remote'));
+				try {
+					await flushLocks();
+					const result = await session.loadDocumentFromGitHub(
+						'alice',
+						'designs',
+						'box.fn.json',
+						'main'
+					);
+
+					expect(result).toBe('cancelled');
+					expect((provider.docs.get('doc-taken') as { name: string }).name).toBe('Browser only');
+					expect(githubMetadataStore.getFileMetadata('doc-taken')).toBeNull();
+				} finally {
+					otherTab.destroy();
+					session.destroy();
+					uninstall();
+				}
+			});
+
+			it('replaces the browser design on request, keeping a backup', async () => {
+				const { session } = makeSession(answer({ action: 'replace' }));
+				const { storage, provider } = makeStorage();
+				session.replaceStorageManagerForTesting(storage);
+				await saveBrowserOnlyDesign(provider, 'doc-taken');
+				serveGitHubFile(new FoldnanoDocument('doc-taken', 'Remote'));
+				const save = vi.spyOn(storage, 'saveDocument');
+				try {
+					const result = await session.loadDocumentFromGitHub(
+						'alice',
+						'designs',
+						'box.fn.json',
+						'main'
+					);
+
+					expect(result).toBe('loaded');
+					expect(session.currentDoc.id).toBe('doc-taken');
+					expect(save).toHaveBeenCalledWith('doc-taken', expect.anything(), {
+						backup: { reason: 'before_import' },
+					});
+					expect((provider.docs.get('doc-taken') as { parts: unknown[] }).parts).toHaveLength(0);
+					expect(githubMetadataStore.getFileMetadata('doc-taken')?.path).toBe('box.fn.json');
+				} finally {
+					clearLinks('doc-taken');
+				}
+			});
+		});
+
+		describe('the id belongs to another file in the repo', () => {
+			it('saves a renamed copy as an uncommitted file, leaving both GitHub files alone', async () => {
+				const ask = answer({ action: 'copy', name: 'box v2' });
+				const { session } = makeSession(ask);
+				const { storage, provider } = makeStorage();
+				session.replaceStorageManagerForTesting(storage);
+				githubMetadataStore.setFileMetadata('doc-linked', linkTo('designs/box.fn.json'));
+				serveGitHubFile(new FoldnanoDocument('doc-linked', 'Remote'));
+				try {
+					const result = await session.loadDocumentFromGitHub(
+						'alice',
+						'designs',
+						'designs/twin.fn.json',
+						'main'
+					);
+
+					expect(result).toBe('loaded');
+					expect(ask).toHaveBeenCalledWith({
+						kind: 'other-repo-file',
+						designId: 'doc-linked',
+						incomingName: 'twin',
+						incomingPath: 'designs/twin.fn.json',
+						linkedPath: 'designs/box.fn.json',
+						suggestedName: 'twin copy',
+					});
+					expect(session.currentDoc.id).not.toBe('doc-linked');
+					expect(session.currentDoc.name).toBe('box v2');
+					expect(session.currentFileMetadata).toBeNull();
+					expect(provider.docs.has(session.currentDoc.id)).toBe(true);
+					expect(githubExplorerStateStore.getLocalOnlyEntries('alice', 'designs')).toEqual([
+						{
+							docId: session.currentDoc.id,
+							path: 'designs/box v2.fn.json',
+							name: 'box v2.fn.json',
+						},
+					]);
+					expect(githubMetadataStore.getFileMetadata('doc-linked')?.path).toBe(
+						'designs/box.fn.json'
+					);
+					expect(
+						githubMetadataStore.findDocIdByPath('alice', 'designs', 'designs/twin.fn.json')
+					).toBeNull();
+				} finally {
+					clearLinks('doc-linked');
+				}
+			});
+
+			it('cancels without opening anything', async () => {
+				const { session } = makeSession(answer({ action: 'cancel' }));
+				const { storage } = makeStorage();
+				session.replaceStorageManagerForTesting(storage);
+				githubMetadataStore.setFileMetadata('doc-linked', linkTo('designs/box.fn.json'));
+				serveGitHubFile(new FoldnanoDocument('doc-linked', 'Remote'));
+				const save = vi.spyOn(storage, 'saveDocument');
+				try {
+					const result = await session.loadDocumentFromGitHub(
+						'alice',
+						'designs',
+						'designs/twin.fn.json',
+						'main'
+					);
+
+					expect(result).toBe('cancelled');
+					expect(save).not.toHaveBeenCalled();
+				} finally {
+					clearLinks('doc-linked');
+				}
+			});
+
+			it('opens normally when the linked file is gone from GitHub', async () => {
+				const ask = vi.fn();
+				const { session } = makeSession(ask);
+				const { storage } = makeStorage();
+				session.replaceStorageManagerForTesting(storage);
+				githubMetadataStore.setFileMetadata('doc-linked', linkTo('designs/deleted.fn.json'));
+				const file = new FoldnanoDocument('doc-linked', 'Remote');
+				getFileContentMock.mockImplementation(async (_o: string, _r: string, path: string) => {
+					if (path === 'designs/deleted.fn.json') throw new GitHubApiError('Not Found', 404);
+					return { content: btoa(JSON.stringify(file.toJSON())), sha: 'remote-sha' };
+				});
+				listCommitsMock.mockResolvedValue([]);
+				try {
+					const result = await session.loadDocumentFromGitHub(
+						'alice',
+						'designs',
+						'designs/twin.fn.json',
+						'main'
+					);
+
+					expect(result).toBe('loaded');
+					expect(ask).not.toHaveBeenCalled();
+					expect(session.currentDoc.id).toBe('doc-linked');
+					expect(githubMetadataStore.getFileMetadata('doc-linked')?.path).toBe(
+						'designs/twin.fn.json'
+					);
+				} finally {
+					clearLinks('doc-linked');
+				}
+			});
+		});
+
+		describe("the file's id changed on GitHub", () => {
+			it('the design linked to the path follows the new id', async () => {
+				const ask = vi.fn();
+				const { session } = makeSession(ask);
+				const { storage, provider } = makeStorage();
+				session.replaceStorageManagerForTesting(storage);
+				await saveBrowserOnlyDesign(provider, 'doc-old');
+				githubMetadataStore.setFileMetadata('doc-old', linkTo('box.fn.json'));
+				serveGitHubFile(new FoldnanoDocument('doc-new', 'Remote'));
+				try {
+					const result = await session.loadDocumentFromGitHub(
+						'alice',
+						'designs',
+						'box.fn.json',
+						'main'
+					);
+
+					expect(result).toBe('loaded');
+					expect(ask).not.toHaveBeenCalled();
+					expect(session.currentDoc.id).toBe('doc-new');
+					expect(githubMetadataStore.getFileMetadata('doc-new')?.path).toBe('box.fn.json');
+					expect(githubMetadataStore.getFileMetadata('doc-old')).toBeNull();
+					expect(provider.docs.has('doc-old')).toBe(false);
+				} finally {
+					clearLinks('doc-old', 'doc-new');
+				}
+			});
+
+			it('keeps the local id when the new id is already used here', async () => {
+				const { session } = makeSession(vi.fn());
+				const { storage, provider } = makeStorage();
+				session.replaceStorageManagerForTesting(storage);
+				await saveBrowserOnlyDesign(provider, 'doc-old');
+				await saveBrowserOnlyDesign(provider, 'doc-new');
+				githubMetadataStore.setFileMetadata('doc-old', linkTo('box.fn.json'));
+				serveGitHubFile(new FoldnanoDocument('doc-new', 'Remote'));
+				try {
+					const result = await session.loadDocumentFromGitHub(
+						'alice',
+						'designs',
+						'box.fn.json',
+						'main'
+					);
+
+					expect(result).toBe('loaded');
+					expect(session.currentDoc.id).toBe('doc-old');
+					expect(githubMetadataStore.getFileMetadata('doc-old')?.path).toBe('box.fn.json');
+					expect((provider.docs.get('doc-new') as { parts: unknown[] }).parts).toHaveLength(1);
+				} finally {
+					clearLinks('doc-old');
+				}
+			});
+
+			it('a pull follows the new id and the URL is told', async () => {
+				const { session } = makeSession();
+				const { storage, provider } = makeStorage();
+				session.replaceStorageManagerForTesting(storage);
+				await saveBrowserOnlyDesign(provider, 'doc-old');
+				session.replaceCurrentDocumentForTesting(new FoldnanoDocument('doc-old', 'box'));
+				session.bindCurrentDocumentToGitHubFile(linkTo('box.fn.json'));
+				vi.mocked(githubStorageProvider.pullDocument).mockResolvedValue(
+					new FoldnanoDocument('doc-new', 'box').toJSON()
+				);
+				listCommitsMock.mockResolvedValue([]);
+				try {
+					await expect(session.pullCurrentDocFromGitHub()).resolves.toBe(true);
+
+					expect(session.currentDoc.id).toBe('doc-new');
+					expect(session.currentFileMetadata?.path).toBe('box.fn.json');
+					expect(githubMetadataStore.getFileMetadata('doc-old')).toBeNull();
+					expect(session.lastDocIdChange).toEqual({ from: 'doc-old', to: 'doc-new' });
+				} finally {
+					clearLinks('doc-old', 'doc-new');
+				}
+			});
+
+			it('a pull keeps the local id when the new id is already used here', async () => {
+				const { session } = makeSession();
+				const { storage, provider } = makeStorage();
+				session.replaceStorageManagerForTesting(storage);
+				await saveBrowserOnlyDesign(provider, 'doc-old');
+				await saveBrowserOnlyDesign(provider, 'doc-new');
+				session.replaceCurrentDocumentForTesting(new FoldnanoDocument('doc-old', 'box'));
+				session.bindCurrentDocumentToGitHubFile(linkTo('box.fn.json'));
+				vi.mocked(githubStorageProvider.pullDocument).mockResolvedValue(
+					new FoldnanoDocument('doc-new', 'box').toJSON()
+				);
+				listCommitsMock.mockResolvedValue([]);
+				try {
+					await expect(session.pullCurrentDocFromGitHub()).resolves.toBe(true);
+
+					expect(session.currentDoc.id).toBe('doc-old');
+					expect(session.currentFileMetadata?.path).toBe('box.fn.json');
+					expect(session.lastDocIdChange).toBeNull();
+				} finally {
+					clearLinks('doc-old');
+				}
+			});
+		});
+
+		it("doesn't ask when the id belongs to this same GitHub file", async () => {
+			const ask = vi.fn();
+			const { session } = makeSession(ask);
+			const { storage, provider } = makeStorage();
+			session.replaceStorageManagerForTesting(storage);
+			await saveBrowserOnlyDesign(provider, 'doc-same');
+			githubMetadataStore.setFileMetadata('doc-same', linkTo('box.fn.json'));
+			serveGitHubFile(new FoldnanoDocument('doc-same', 'Remote'));
+			try {
+				const result = await session.loadDocumentFromGitHub(
+					'alice',
+					'designs',
+					'box.fn.json',
+					'main'
+				);
+
+				expect(result).toBe('loaded');
+				expect(ask).not.toHaveBeenCalled();
+				expect(session.currentDoc.id).toBe('doc-same');
+			} finally {
+				clearLinks('doc-same');
+			}
+		});
+	});
+
+	it('opens a stored design under its storage key, even if an older pull stored another id', async () => {
+		const { session } = makeSession();
+		const { storage, provider } = makeStorage();
+		session.replaceStorageManagerForTesting(storage);
+		await provider.saveDocument('doc-key', new FoldnanoDocument('doc-inside', 'Mismatch').toJSON());
+
+		await expect(session.loadDocumentFromLocalStorage('doc-key')).resolves.toBe(true);
+
+		expect(session.currentDoc.id).toBe('doc-key');
 	});
 
 	it('keeps the path-derived name when pulling the current file from GitHub', async () => {
@@ -543,7 +973,7 @@ describe('EditorDocumentSession', () => {
 		});
 
 		vi.spyOn(githubMetadataStore, 'getUncommittedPaths').mockResolvedValue(new Set());
-		const loadSpy = vi.spyOn(session, 'loadDocumentFromGitHub').mockResolvedValue(false);
+		const loadSpy = vi.spyOn(session, 'loadDocumentFromGitHub').mockResolvedValue('failed');
 
 		const result = await session.switchToBranch('feature');
 
@@ -579,7 +1009,7 @@ describe('EditorDocumentSession', () => {
 		});
 
 		vi.spyOn(githubMetadataStore, 'getUncommittedPaths').mockResolvedValue(new Set());
-		vi.spyOn(session, 'loadDocumentFromGitHub').mockResolvedValue(true);
+		vi.spyOn(session, 'loadDocumentFromGitHub').mockResolvedValue('loaded');
 
 		const result = await session.switchToBranch('feature');
 
@@ -635,6 +1065,42 @@ describe('EditorDocumentSession', () => {
 		expect(path).toBe('designs/Hilbert.fn.json');
 		expect(session.currentDoc.name).toBe('Hilbert');
 		expect(session.currentDoc.parts[0].name).toBe('Hilbert');
+	});
+
+	it('commits a rename of a committed file, leaving nothing to commit', async () => {
+		const { session } = makeSession();
+		const { storage } = makeStorage();
+		session.replaceStorageManagerForTesting(storage);
+		session.replaceCurrentDocumentForTesting(new FoldnanoDocument('doc-ren', 'box'));
+		session.bindCurrentDocumentToGitHubFile({
+			path: 'designs/box.fn.json',
+			sha: 'sha-box',
+			owner: 'alice',
+			repo: 'designs',
+			branch: 'main',
+			lastSyncAt: 1,
+		});
+		vi.mocked(githubStorageProvider.commitDocument).mockResolvedValue('commit-rename');
+		try {
+			const result = await session.renameDocument('crate');
+
+			expect(result).toMatchObject({ kind: 'repo-file-renamed', newPath: 'designs/crate.fn.json' });
+			const uploaded = vi.mocked(githubStorageProvider.commitDocument).mock.calls[0][2];
+			expect(JSON.parse(JSON.stringify(uploaded)).name).toBe('crate');
+			expect(deleteFileContent).toHaveBeenCalledWith(
+				'alice',
+				'designs',
+				'designs/box.fn.json',
+				expect.objectContaining({ sha: 'sha-box' })
+			);
+			expect(session.hasUncommittedGitHubChanges).toBe(false);
+			expect(githubMetadataStore.getFileMetadata('doc-ren')).toMatchObject({
+				path: 'designs/crate.fn.json',
+				commitSha: 'commit-rename',
+			});
+		} finally {
+			githubMetadataStore.clearFileMetadata('doc-ren');
+		}
 	});
 
 	it('renames local-only files by doc id and returns a local-only rename result', async () => {
@@ -948,6 +1414,19 @@ describe('EditorDocumentSession recovery restore through IndexedDB', () => {
 		session.destroy();
 		await db.delete();
 	});
+
+	it('keeps the design name when the resolved JSON has none, as diffs leave it out', async () => {
+		const db = new FoldnanoIndexedDb(`test-resolve-${crypto.randomUUID()}`);
+		const session = await openSessionOn(db, new FoldnanoDocument('doc-n', 'Mine'));
+		const { name: _name, ...resolved } = new FoldnanoDocument('doc-n', 'x').toJSON();
+
+		await expect(session.applyResolvedConflict('doc-n', resolved)).resolves.toBe(true);
+
+		expect(session.currentDoc.name).toBe('Mine');
+		expect(await db.loadDocument('doc-n')).toMatchObject({ name: 'Mine' });
+		session.destroy();
+		await db.delete();
+	});
 });
 
 describe('EditorDocumentSession GitHub dirty detection', () => {
@@ -1025,6 +1504,105 @@ describe('EditorDocumentSession design names', () => {
 		await session.renameDocument('Box');
 		expect(session.needsName).toBe(false);
 		expect((provider.docs.get('doc-untitled') as { name: string }).name).toBe('Box');
+	});
+
+	describe('saveAsCopy', () => {
+		async function setupSaved(id: string, name: string) {
+			const doc = new FoldnanoDocument(id, name);
+			doc.addNewPart('HONEYCOMB');
+			const { session, provider } = setup(doc);
+			await provider.saveDocument(id, doc.toJSON());
+			return { session, provider };
+		}
+
+		afterEach(() => {
+			githubMetadataStore.clearFileMetadata('doc-orig');
+		});
+
+		it('opens a copy under a new id and name, leaving the original and carrying the view', async () => {
+			const { session, provider } = await setupSaved('doc-orig', 'Box');
+			await provider.saveContext('doc-orig', { zoom: 3 });
+
+			const id = await session.saveAsCopy('Box v2');
+
+			expect(id).toBe(session.currentDoc.id);
+			expect(id).not.toBe('doc-orig');
+			expect(session.currentDoc.name).toBe('Box v2');
+			expect(session.currentDoc.parts).toHaveLength(1);
+			expect(session.currentFileMetadata).toBeNull();
+			expect((provider.docs.get(id!) as { id: string; name: string }).name).toBe('Box v2');
+			expect((provider.docs.get('doc-orig') as { name: string }).name).toBe('Box');
+			expect(provider.contexts.get(id!)).toEqual({ zoom: 3 });
+		});
+
+		it('files the copy of a committed repo file next to it as an uncommitted file', async () => {
+			const { session } = await setupSaved('doc-orig', 'box');
+			session.bindCurrentDocumentToGitHubFile({
+				path: 'designs/box.fn.json',
+				sha: 'sha-box',
+				owner: 'alice',
+				repo: 'designs',
+				branch: 'main',
+				lastSyncAt: 1,
+			});
+
+			const id = await session.saveAsCopy('box v2');
+
+			expect(githubExplorerStateStore.getLocalOnlyEntries('alice', 'designs')).toEqual([
+				{ docId: id, path: 'designs/box v2.fn.json', name: 'box v2.fn.json' },
+			]);
+			expect(githubMetadataStore.getFileMetadata('doc-orig')?.path).toBe('designs/box.fn.json');
+			expect(githubMetadataStore.getFileMetadata(id!)).toBeNull();
+		});
+
+		it('files the copy of an uncommitted repo file in the same folder', async () => {
+			const { session } = await setupSaved('doc-orig', 'draft');
+			githubMetadataStore.setRepoContext({ owner: 'alice', repo: 'designs', branch: 'main' });
+			session.refreshGitHubStateFromStore();
+			githubExplorerStateStore.saveLocalOnlyEntries('alice', 'designs', [
+				{ docId: 'doc-orig', path: 'folder/draft.fn.json', name: 'draft.fn.json' },
+			]);
+
+			const id = await session.saveAsCopy('draft v2');
+
+			expect(githubExplorerStateStore.getLocalOnlyEntries('alice', 'designs')).toContainEqual({
+				docId: id,
+				path: 'folder/draft v2.fn.json',
+				name: 'draft v2.fn.json',
+			});
+		});
+
+		it('picks a free name when the folder already has that file', async () => {
+			const { session } = await setupSaved('doc-orig', 'box');
+			session.bindCurrentDocumentToGitHubFile({
+				path: 'designs/box.fn.json',
+				sha: 'sha-box',
+				owner: 'alice',
+				repo: 'designs',
+				branch: 'main',
+				lastSyncAt: 1,
+			});
+			getRepoTreeMock.mockResolvedValue({
+				sha: 't',
+				url: '',
+				tree: [{ path: 'designs/box v2.fn.json', type: 'blob' }],
+				truncated: false,
+			});
+
+			await session.saveAsCopy('box v2');
+
+			expect(session.currentDoc.name).not.toBe('box v2');
+			expect(session.currentDoc.name.startsWith('box v2')).toBe(true);
+		});
+
+		it('refuses an invalid name and stays on the original', async () => {
+			const { session, provider } = await setupSaved('doc-orig', 'Box');
+
+			await expect(session.saveAsCopy('a/b')).resolves.toBeNull();
+
+			expect(session.currentDoc.id).toBe('doc-orig');
+			expect(provider.docs.size).toBe(1);
+		});
 	});
 
 	it('does not ask for a name while the workspace is empty', () => {

@@ -119,6 +119,14 @@ export class GitHubMetadataStore {
 		}
 	}
 
+	/** Moves a document's GitHub link to its new id. */
+	async moveFileMetadata(oldId: string, newId: string): Promise<void> {
+		const meta = this.getFileMetadata(oldId);
+		if (!meta) return;
+		await this.setFileMetadata(newId, meta);
+		this.clearFileMetadata(oldId);
+	}
+
 	async getUncommittedPaths(owner: string, repo: string): Promise<Set<string>> {
 		const uncommitted = new Set<string>();
 		const repoFiles = [...this.fileMetadataByDocId.entries()].filter(

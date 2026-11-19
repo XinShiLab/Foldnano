@@ -61,6 +61,11 @@ export interface StorageProvider {
 	getLastModified?(docId: string): Promise<number | null>;
 
 	/**
+	 * Moves a document, its context and backups to a new id; false when nothing moved (optional)
+	 */
+	rekeyDocument?(oldId: string, newId: string): Promise<boolean>;
+
+	/**
 	 * Earlier generations of a document, newest first (optional)
 	 */
 	getLocalBackups?(docId: string): Promise<LocalBackup[]>;

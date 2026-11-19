@@ -12,6 +12,7 @@
 	// import { getDocContext } from '../context.ts.d';
 	import Open from './Open.svelte';
 	import LoadCadnanoAsRegionDialog from './LoadCadnanoAsRegionDialog.svelte';
+	import SaveAsCopyDialog from './SaveAsCopyDialog.svelte';
 	import AboutDialog from './AboutDialog.svelte';
 	import { page } from '$app/state';
 	import { markWhatsNewSeen } from '$lib/remote/announcements.remote';
@@ -21,10 +22,12 @@
 		Bolt,
 		BookOpen,
 		Bug,
+		Check,
 		ChevronDown,
 		CircleQuestionMark,
 		// CloudAlert,
 		// CloudCheck,
+		CopyPlus,
 		Database,
 		ExternalLink,
 		FileBracesCorner,
@@ -70,12 +73,14 @@
 	import { modKeySymbol } from '$lib/utils/platform';
 	import { goto, pushState, replaceState } from '$app/navigation';
 	import SaveStatusIndicator from '../SaveStatusIndicator.svelte';
+	import DesignIdChip from '../DesignIdChip.svelte';
+	import { serverClockOffset } from '$lib/services/serverClock';
 	import AgentRunIndicator from '../Plugin/AgentRunIndicator.svelte';
 	import { githubAuth, getAuthStatus, loginWithGitHub } from '$lib/services/github/auth.svelte';
 	import { notify } from '$lib/notifications/notify.svelte';
 	import { githubExplorerStateStore } from '$lib/services/storage';
 	import { errorLogPanelState } from '$lib/errorLogPanel.svelte';
-	import { onMount } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 	import ActiveViewerToolbar from './ActiveViewerToolbar.svelte';
 
 	// interface ToolbarProps {
@@ -95,6 +100,8 @@
 
 	onMount(() => {
 		getAuthStatus();
+		// Measured ahead, so a download or the Open dialog doesn't wait for the server clock.
+		void serverClockOffset();
 	});
 
 	const toggleDialog = () => {
@@ -130,11 +137,63 @@
 	const foldnanoDoc = $derived(session.currentDoc);
 	const history = $derived(session.historyStack);
 
-	// Local working copy of the document name while the user is typing.
-	// We avoid bind:value so the model isn't mutated on every keystroke —
-	// the rename (which may hit the GitHub API) only fires on blur/Enter.
+	// Local working copy of the document name while the user is typing. A typed name is only
+	// used when the user picks Rename (or Enter) or Save as a copy; clicking away keeps the draft.
 	let docNameInput: string = $state('');
 	let isEditingName: boolean = $state(false);
+	let nameInputEl: HTMLInputElement | null = $state(null);
+	const nameDraftChanged = $derived(
+		isEditingName && docNameInput.trim() !== '' && docNameInput.trim() !== foldnanoDoc.name
+	);
+	let renameNudge = $state(false);
+	let renameNudgeTimer: ReturnType<typeof setTimeout> | undefined;
+	let saveMenuOpen = $state(false);
+	let saveAsCopyDialogOpen = $state(false);
+
+	function nudgeRename() {
+		renameNudge = true;
+		clearTimeout(renameNudgeTimer);
+		renameNudgeTimer = setTimeout(() => (renameNudge = false), 2000);
+	}
+
+	/** True, pointing at Rename, while a typed name is neither confirmed nor cancelled. */
+	function holdForNameDraft(): boolean {
+		if (!nameDraftChanged) return false;
+		nudgeRename();
+		nameInputEl?.focus();
+		return true;
+	}
+
+	function endNameEdit() {
+		isEditingName = false;
+		docNameInput = foldnanoDoc.name;
+		nameInputEl?.blur();
+	}
+
+	function handleNameBlur() {
+		// Disabling the input while a rename runs also blurs it.
+		if (isRenaming) return;
+		if (nameDraftChanged) nudgeRename();
+		else endNameEdit();
+	}
+
+	// A tab that loses the design to another tab can't rename it.
+	$effect(() => {
+		if (!session.isTabOwner && untrack(() => isEditingName)) endNameEdit();
+	});
+
+	async function saveCopy(name: string) {
+		const id = await session.saveAsCopy(name);
+		if (!id) return;
+		editorViewContext.localOnlyEntriesVersion++;
+		goto(resolve(`/editor/${id}`));
+	}
+
+	async function saveDraftAsCopy() {
+		const name = docNameInput.trim() || foldnanoDoc.name;
+		endNameEdit();
+		await saveCopy(name);
+	}
 	$effect(() => {
 		// Keep the input in sync with external model changes (e.g. Explorer rename),
 		// but don't clobber what the user is actively typing.
@@ -161,7 +220,7 @@
 		}
 	}
 
-	async function handleNameBlur() {
+	async function confirmNameDraft() {
 		const trimmed = docNameInput.trim();
 		isRenaming = true;
 		try {
@@ -186,6 +245,7 @@
 		} finally {
 			isRenaming = false;
 			isEditingName = false;
+			nameInputEl?.blur();
 		}
 	}
 
@@ -460,7 +520,10 @@
 					<Button
 						variant="outline"
 						size="sm"
-						onclick={async () => await session.saveDocumentToLocalStorage()}
+						onclick={async () => {
+							if (holdForNameDraft()) return;
+							await session.saveDocumentToLocalStorage();
+						}}
 						title="Save"
 						aria-label="Save"
 						{@attach help({
@@ -471,7 +534,14 @@
 					>
 						<Save /><span class="hidden xl:inline">Save</span>
 					</Button>
-					<DropdownMenu.Root>
+					<DropdownMenu.Root
+						bind:open={
+							() => saveMenuOpen,
+							(open) => {
+								saveMenuOpen = open && !holdForNameDraft();
+							}
+						}
+					>
 						<DropdownMenu.Trigger>
 							{#snippet child({ props })}
 								<Button
@@ -509,6 +579,9 @@
 								</DropdownMenu.Item>
 								<DropdownMenu.Item onclick={() => (editorViewContext.showBackups = true)}>
 									<History />Backups…
+								</DropdownMenu.Item>
+								<DropdownMenu.Item onclick={() => (saveAsCopyDialogOpen = true)}>
+									<CopyPlus />Save as a Copy…
 								</DropdownMenu.Item>
 								<DropdownMenu.Separator />
 								<DropdownMenu.Item onclick={saveToGitHub}>
@@ -624,13 +697,14 @@
 					class="my-auto flex min-w-0 flex-grow"
 					{@attach help({
 						title: 'Document name',
-						text: 'Click to rename. The icon next to it shows whether the latest changes are saved.',
+						text: 'Click to edit the name, then Rename (or Enter) to rename this design, or Save as a copy to keep it and save a new design under the typed name. Esc cancels. Next to it: the design ID and whether the latest changes are saved.',
 					})}
 				>
 					<Input
 						type="text"
 						placeholder="Untitled Document"
 						class="font-small mx-2 border-0 shadow-none"
+						bind:ref={nameInputEl}
 						value={docNameInput}
 						disabled={isRenaming}
 						onfocus={() => {
@@ -641,16 +715,47 @@
 						}}
 						onblur={handleNameBlur}
 						onkeydown={(e) => {
-							if (e.key === 'Enter') (e.currentTarget as HTMLInputElement).blur();
-							if (e.key === 'Escape') {
-								docNameInput = foldnanoDoc.name;
-								isEditingName = false;
-								(e.currentTarget as HTMLInputElement).blur();
-							}
+							if (e.key === 'Enter' && nameDraftChanged) void confirmNameDraft();
+							else if (e.key === 'Enter' || e.key === 'Escape') endNameEdit();
 						}}
 					/>
+					{#if isEditingName}
+						<!-- mousedown keeps the input focused, so pressing a button never counts as clicking away -->
+						<div class="my-auto flex shrink-0 items-center gap-1">
+							{#if renameNudge}
+								<span
+									class="hidden text-xs whitespace-nowrap text-amber-700 lg:inline dark:text-amber-400"
+									>Rename, save as a copy, or Esc</span
+								>
+							{/if}
+							<Button
+								size="sm"
+								variant={nameDraftChanged ? 'default' : 'outline'}
+								class={renameNudge ? 'animate-pulse ring-2 ring-amber-400 ring-offset-1' : ''}
+								disabled={!nameDraftChanged || isRenaming}
+								title="Rename this design (Enter)"
+								aria-label="Rename"
+								onmousedown={(e) => e.preventDefault()}
+								onclick={confirmNameDraft}
+								><Check /><span class="hidden xl:inline">Rename</span></Button
+							>
+							<Button
+								size="sm"
+								variant="outline"
+								disabled={isRenaming}
+								title="Keep this design and save a new one under the typed name"
+								aria-label="Save as a copy"
+								onmousedown={(e) => e.preventDefault()}
+								onclick={saveDraftAsCopy}
+								><CopyPlus /><span class="hidden xl:inline">Save as a copy</span></Button
+							>
+						</div>
+					{/if}
 					{#if isRenaming}
 						<LoaderCircle size={14} class="my-auto shrink-0 animate-spin text-muted-foreground" />
+					{/if}
+					{#if !isEditingName && session.hasSavableName}
+						<DesignIdChip id={session.currentDoc.id} class="my-auto mr-2 hidden lg:block" />
 					{/if}
 					<SaveStatusIndicator />
 					<AgentRunIndicator />
@@ -688,6 +793,7 @@
 								doc: 'saving-github',
 							})}
 							onclick={() => {
+								if (holdForNameDraft()) return;
 								editorViewContext.openSidePanel('GITHUB');
 								editorViewContext.activeGitHubTab = 'changes';
 							}}
@@ -809,6 +915,12 @@
 </div>
 
 <AboutDialog bind:open={editorViewContext.aboutDialogOpen} />
+
+<SaveAsCopyDialog
+	bind:open={saveAsCopyDialogOpen}
+	currentName={foldnanoDoc.name}
+	onSave={saveCopy}
+/>
 
 <!-- Rename confirmation: committing a GitHub rename, or a name another saved design uses -->
 <Dialog.Root

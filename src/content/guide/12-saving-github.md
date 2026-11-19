@@ -43,7 +43,14 @@ Backups for important work:
 - connect GitHub and commit the file,
 - keep a copy of any exported simulation files you'll need.
 
-Opening a `.fn.json` that is already saved in this browser (for example one you downloaded earlier) lets you choose **Open as copy** or **Replace**. Replace keeps the saved version in **Backups**. If the name of an opened file is already taken, the design opens as `Name (2)` and a message says so.
+Opening a `.fn.json` that is already saved in this browser (for example one you downloaded earlier) lets you choose **Open as copy** or **Replace**. Replace keeps the saved version in **Backups**. The dialog also compares the file with the saved design:
+
+- **Same content**: the file matches what is saved in your browser.
+- **Older** or **newer**: a file downloaded from Foldnano records when it was downloaded, so Foldnano can tell which version came later. If the file is older, Replace reads **Replace newer browser version**, since replacing would undo the later work. Offline, the times come from your computer's clock and the dialog says the file *seems* older or newer.
+- **Changed outside Foldnano**: the file was edited after it was downloaded, so its download time no longer says how old its content is. If the dialog adds that Foldnano ignores those changes, the edits don't reach the design when it opens. For example, a segment stores its bases twice, in `slots` and in `sequence`, and when the two disagree Foldnano uses `sequence` (see [File Format](/docs/contributors/file-format)), so a base changed only in `slots` is dropped.
+- **Matches your backup from …**: the file has the same content as one of the design's backups.
+
+Files from older releases, from other tools, or saved from GitHub only say whether the content differs. If the name of an opened file is already taken, the design opens as `Name (2)` and a message says so.
 
 ![Save menu with 'View Saved Documents' highlighted](/screenshots/guide/saving-and-github/01-where-is-saved-documents.webp)
 
@@ -58,6 +65,14 @@ A design has a single name: the document name in the toolbar. For a design saved
 **Untitled Document** is the name of the empty workspace that **New Document** gives you, so you can drop in a design file or a plugin there without saving anything. Once you start building (add a region, load a cadnano file as a region, or run a plugin that creates one), Foldnano asks you to name the design, and saves it from then on. A design saved as **Untitled Document** by an older version asks for a name when you open it. Every export is named after it too, for example `My design.cadnano.json`, `My design_route.svg`, or the oxDNA and CSV files.
 
 The **Saved Documents** page (`/toc`) lists every document in this browser. Each card has **Open**, **View Oligos** (the [Oligo Report](/docs/guide/oligo-report)), and **Delete**; **New Document** starts a fresh one. **Download All** saves every design in this browser as one `.zip` with a `.fn.json` file per design, which you can unzip and open one at a time. It holds what is saved, so give an open editor tab a moment to save its latest edits first. Above the list you can sort by last modified or by name, show only **Local** or **GitHub** documents, and switch to a compact table view. Your choice is saved in the page address, so it survives a reload or a bookmark. The editor's save status next to the document name shows whether the latest edits are stored (see [Interface Reference](/docs/guide/interface-reference#save-status)).
+
+### How Foldnano tells designs apart
+
+A design is named after its file, so the name isn't stored inside the `.fn.json`: rename the file and the design opens under the new name.
+
+What stays the same is the **design ID**, stored inside the `.fn.json`. The toolbar shows its first eight characters next to the document name, for example `#3f9a1c2e`, and so do the Saved Documents page and the dialogs that ask about a design you already have. Hover over it for an explanation, or click it to copy the full ID. The ID, not the name, is how Foldnano knows two files are the same design: a downloaded file keeps the ID, so renaming the file on your disk doesn't make it a separate design, and opening it again asks whether to open it as a copy or replace the saved one.
+
+To start a separate design from this one, use **Save as a copy**, either from the Save menu or with the button that appears while you edit the document name. The copy gets its own ID and the name you give it, and the original stays as it is. For a design in a repository, the copy is a new uncommitted file in the same folder.
 
 ## Autosave
 
@@ -122,7 +137,12 @@ The panel header then shows three buttons: **Pull latest from GitHub** (for the 
 
 ### Files tab
 
-The Files tab shows the repository's design files (`.json`). Click a file to open it. A file marked as cached locally has no unsaved changes.
+The Files tab shows the repository's design files (`.json`). Click a file to open it. A file marked as cached locally has no unsaved changes. Foldnano recognises a design by an ID stored inside the file, not by its name, and a file in the repository always keeps its ID, because other people's browsers know it by that ID. Opening a file can therefore ask first:
+
+- **Same design as one saved only in this browser** (for example one you downloaded and later uploaded to the repository yourself): **Open as copy** keeps both, and the design in your browser moves to a new ID; **Replace** puts the file's content in it, and the replaced version stays in **Backups**.
+- **Same design ID as another file in the repository** (for example a file someone copied outside Foldnano): you can only **Save as a copy** with a new name. The copy is a new, uncommitted file in the same folder with its own ID, and both files on GitHub stay as they are for anyone else using them.
+
+If someone gave a file a new ID on GitHub, your copy in this browser follows it the next time you pull, so it stays linked to the file.
 
 - **New design file** (file-plus icon) opens **New Design File**: choose a **Folder**, enter a **File name** (`.fn.json` is added), and click **Create & Open**. The file exists only in this browser until you commit it.
 - Opening a cadnano `.json` asks **Open as Foldnano document?**: a new `.fn.json` is created in the same folder for your edits, and the original stays unchanged.

@@ -153,7 +153,7 @@ sync state.
 
 Key methods:
 
-- `loadDocumentFromGitHub(owner, repo, path, branch)` — fetch, validate (`migrateDocumentJson`), cache, load
+- `loadDocumentFromGitHub(owner, repo, path, branch)` — fetch, validate (`migrateDocumentJson`), settle the file's id against the designs here (`storage-architecture.md` § Open from GitHub: a GitHub file keeps its id, browser-only designs move aside, another repo file's twin opens as a renamed uncommitted copy, a changed id is followed), cache, load; returns `'loaded' | 'cancelled' | 'failed'`
 - `commitCurrentDocToGitHub(message)` — delegate to provider, update metadata
 - `pullCurrentDocFromGitHub(reason)` — delegate to provider (`before_pull` or `before_accept_remote`), reload editor
 - `applyResolvedConflict(docId, json)` — the diff dialog's _Apply resolved JSON_; saves with a `before_conflict_resolve` backup
@@ -206,6 +206,8 @@ A `.fn.json` file can be renamed from the Files tab (`GitHubExplorerState.rename
 - a committed file with uncommitted changes can't be renamed, so a rename never commits pending edits;
 - a name already used in the same folder blocks the rename, ignoring case and counting local-only files (and, in the explorer, pending deletes); a case-only rename of the file itself is allowed;
 - another saved design with the same name (anywhere in this browser) only warns; the toolbar asks **Rename Anyway**.
+
+A toolbar rename of a committed file saves the new name locally first, commits **that** snapshot to the new path (`githubStorageProvider.commitDocument`), deletes the old path, then stamps the sync time of the saved snapshot and the commit SHA, like a normal commit. Because the file had no pending edits, the rename commit holds only the rename and leaves nothing uncommitted. Files carry no design name (`stringifyDesignFile`; see `docs/storage-architecture.md` § The name stays out of files), so a rename changes only the path, and a Files-tab rename that copies GitHub's file verbatim is just as complete. Older files that still hold a `name` are named from the path anyway (`syncNameWithPath`).
 
 The toolbar check lists the repo tree itself (`findRepoPathClash`) because the explorer state only exists while the GitHub panel is mounted; offline it falls back to local-only entries. `NewFileDialog` checks its folder the same way.
 

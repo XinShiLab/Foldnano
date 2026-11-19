@@ -1,4 +1,5 @@
 import type { DocSnapshot } from './document.svelte';
+import { withoutExportStamp } from './exportStamp';
 
 export const FOLDNANO_FORMAT = 'foldnano';
 
@@ -106,9 +107,19 @@ export function migrateDocumentJson(raw: unknown): DocSnapshot {
 	if (!Array.isArray(migrated.parts)) {
 		throw new DocumentFormatError('malformed', 'This Foldnano design has no parts list.');
 	}
+	// A download stamp describes that one file; every stored or committed copy goes through here.
 	return {
-		...migrated,
+		...withoutExportStamp(migrated),
 		format: FOLDNANO_FORMAT,
 		formatVersion: CURRENT_FORMAT_VERSION,
 	} as unknown as DocSnapshot;
+}
+
+/**
+ * Serializes a design for a file (download, zip, GitHub commit). The design's name is the file's
+ * own name, so the top-level `name` is left out; browser storage keeps it.
+ */
+export function stringifyDesignFile(snapshot: object, space?: number): string {
+	const { name: _name, ...rest } = snapshot as Record<string, unknown>;
+	return JSON.stringify(rest, null, space);
 }

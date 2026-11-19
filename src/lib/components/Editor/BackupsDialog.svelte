@@ -6,6 +6,7 @@
 	import { getEditorDocumentSession } from './context/EditorDocumentSession.svelte';
 	import { backupFileName, type BackupEntry } from './context/documentRecovery';
 	import { downloadJsonAsTextFile } from './Toolbar/utils';
+	import { stringifyDesignFile } from '$lib/model/documentFormat';
 	import { computeDiff, MAX_DIFF_CHANGES } from '$lib/services/github/diff';
 	import DiffHunkRow from './GitHubDiff/DiffHunk.svelte';
 
@@ -28,7 +29,7 @@
 
 	const hunks = $derived.by(() => {
 		if (!selectedBackup || !currentText) return [];
-		return computeDiff(JSON.stringify(selectedBackup.snapshot, null, 2), currentText);
+		return computeDiff(stringifyDesignFile(selectedBackup.snapshot, 2), currentText);
 	});
 
 	// null: too many changes to show line by line.
@@ -43,7 +44,7 @@
 			return;
 		}
 		// Compare against what's on screen, including edits autosave hasn't written yet.
-		currentText = JSON.stringify(session.currentDoc.toJSON(), null, 2);
+		currentText = stringifyDesignFile(session.currentDoc.toJSON(), 2);
 		const docId = session.currentDoc.id;
 		void session.listBackups(docId).then((list) => {
 			if (!open || session.currentDoc.id !== docId) return;
@@ -55,7 +56,7 @@
 	function handleDownload() {
 		if (!selectedBackup) return;
 		downloadJsonAsTextFile(
-			JSON.stringify(selectedBackup.snapshot),
+			stringifyDesignFile(selectedBackup.snapshot),
 			backupFileName(session.currentDoc.name, selectedBackup.createdAt)
 		);
 	}

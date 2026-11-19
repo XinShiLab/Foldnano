@@ -3,6 +3,7 @@
 import FoldnanoDocument from '$lib/model/document.svelte';
 import { DocumentFormatError, migrateDocumentJson } from '$lib/model/documentFormat';
 import { repairDocumentJson } from '$lib/model/documentRepair';
+import { stripDesignExtension } from '$lib/model/io/designFileName';
 import { notifyDocumentRepairs } from '../../context/documentRecovery';
 import type { DesignFileParser, FileMeta } from '.';
 
@@ -34,6 +35,9 @@ export const foldnanojsonParser: DesignFileParser = {
 		try {
 			const { snapshot, repairs } = repairDocumentJson(migrateDocumentJson(raw));
 			const doc = FoldnanoDocument.fromJSON(snapshot);
+			// Files are written without a name: the design is named after the file.
+			const fileName = stripDesignExtension(meta.name);
+			if (typeof raw.name !== 'string' && fileName) doc.name = fileName;
 			notifyDocumentRepairs(repairs);
 			return doc;
 		} catch (err) {

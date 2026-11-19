@@ -23,6 +23,15 @@ export function isTabSyncSupported(): boolean {
 	return typeof navigator !== 'undefined' && !!navigator.locks;
 }
 
+const lockNameFor = (docId: string) => `foldnano-editor-${docId}`;
+
+/** True when a tab, this one included, has `docId` open as its owner. */
+export async function isDocumentLockHeld(docId: string): Promise<boolean> {
+	if (!isTabSyncSupported() || typeof navigator.locks.query !== 'function') return false;
+	const { held = [] } = await navigator.locks.query();
+	return held.some((lock) => lock.name === lockNameFor(docId));
+}
+
 export class TabSync {
 	readonly #lockName: string;
 	readonly #onRegained: TabSyncOptions['onRegained'];
@@ -36,7 +45,7 @@ export class TabSync {
 	isOwner: boolean = $state(true);
 
 	constructor(docId: string, options: TabSyncOptions = {}) {
-		this.#lockName = `foldnano-editor-${docId}`;
+		this.#lockName = lockNameFor(docId);
 		this.#onRegained = options.onRegained;
 		this.#request('steal');
 	}

@@ -37,6 +37,7 @@ export interface IndexedDbPersistenceBackend {
 	countLocalBackups(docId: string): Promise<number>;
 	getLastModified(docId: string): Promise<number | null>;
 	deleteDocument(docId: string): Promise<void>;
+	rekeyDocument(oldId: string, newId: string): Promise<boolean>;
 	saveContext(docId: string, context: object): Promise<void>;
 	loadContext(docId: string): Promise<object | null>;
 	getDocumentList(): Promise<DocumentMetadata[]>;
@@ -62,6 +63,10 @@ export interface IndexedDbPersistenceBackend {
 // plain object.
 function normalizeIndexedDbValue<T>(value: T): T {
 	return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function withDocumentId(snapshot: object, id: string): object {
+	return { ...snapshot, id };
 }
 
 /** Shape of the `githubBackups` table (versions 1-6), read once by the version 6 upgrade. */
@@ -279,6 +284,42 @@ export class FoldnanoIndexedDb extends Dexie implements IndexedDbPersistenceBack
 				await this.documentSnapshots.delete(docId);
 				await this.documentContexts.delete(docId);
 				await this.#backupsOf(docId).delete();
+			}
+		);
+	}
+
+	/**
+	 * Moves a design to a new id: its record, view context and backups, with the id inside every
+	 * stored snapshot rewritten so a restore or reload comes back under the new id. False when
+	 * there is nothing under `oldId` or `newId` is taken.
+	 */
+	async rekeyDocument(oldId: string, newId: string): Promise<boolean> {
+		return this.transaction(
+			'rw',
+			[this.documents, this.documentSnapshots, this.documentContexts, this.localBackups],
+			async () => {
+				const record = await this.documents.get(oldId);
+				const stored = await this.documentSnapshots.get(oldId);
+				if (!record || !stored) return false;
+				if (await this.documents.get(newId)) return false;
+				await this.documents.put({ ...record, id: newId });
+				await this.documents.delete(oldId);
+				await this.documentSnapshots.put({
+					...stored,
+					docId: newId,
+					snapshot: withDocumentId(stored.snapshot, newId),
+				});
+				await this.documentSnapshots.delete(oldId);
+				const context = await this.documentContexts.get(oldId);
+				if (context) {
+					await this.documentContexts.put({ ...context, docId: newId });
+					await this.documentContexts.delete(oldId);
+				}
+				await this.#backupsOf(oldId).modify((backup) => {
+					backup.docId = newId;
+					backup.snapshot = withDocumentId(backup.snapshot, newId);
+				});
+				return true;
 			}
 		);
 	}

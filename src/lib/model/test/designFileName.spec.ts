@@ -7,6 +7,7 @@ import {
 	fnJsonPathFor,
 	isReservedDesignName,
 	normalizeDesignName,
+	shortDesignId,
 	splitDesignExtension,
 	stripDesignExtension,
 	uniqueDesignName,
@@ -136,5 +137,12 @@ describe('FoldnanoDocument.addNewPart', () => {
 		const doc = new FoldnanoDocument();
 		expect(doc.addNewPart('HONEYCOMB').name).toBe('Part 1');
 		expect(doc.addNewPart('SQUARE').name).toBe('Part 2');
+	});
+});
+
+describe('shortDesignId', () => {
+	it('shows the first 8 hex characters of the ID, like a short commit', () => {
+		expect(shortDesignId('3F9A1C2E-71b4-4c0d-9e55-0a1b2c3d4e5f')).toBe('#3f9a1c2e');
+		expect(shortDesignId('3f9a-1c2e')).toBe('#3f9a1c2e');
 	});
 });

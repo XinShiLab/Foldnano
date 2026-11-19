@@ -9,6 +9,7 @@
 		type DocumentLoadFailure,
 	} from './context/documentRecovery';
 	import { downloadJsonAsTextFile } from './Toolbar/utils';
+	import { stringifyDesignFile } from '$lib/model/documentFormat';
 
 	interface Props {
 		failure: DocumentLoadFailure;
@@ -44,7 +45,7 @@
 
 	function downloadBackup(backup: BackupEntry) {
 		downloadJsonAsTextFile(
-			JSON.stringify(backup.snapshot),
+			stringifyDesignFile(backup.snapshot),
 			backupFileName(failure.name ?? failure.docId, backup.createdAt)
 		);
 	}

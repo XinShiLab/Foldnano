@@ -22,6 +22,7 @@ import { HistoryStack } from '$lib/commands/history.svelte';
 import {
 	StorageManager,
 	IndexedDbStorageProvider,
+	githubExplorerStateStore,
 	githubMetadataStore,
 	type DocumentMetadata,
 	type BackupGitHubSource,
@@ -29,8 +30,10 @@ import {
 	type GitHubRepoContext,
 	type OverwriteBackupReason,
 } from '$lib/services/storage';
+import { normalizedPartsHash } from '$lib/services/storage/fileProvenance';
 import { githubStorageProvider } from '$lib/services/storage/providers/GitHubStorageProvider';
 import {
+	GitHubApiError,
 	GitHubConflictError,
 	GitHubNetworkError,
 	createBranch,
@@ -39,14 +42,13 @@ import {
 	getRepoTree,
 	listBranches,
 	listCommits,
-	putFileContent,
 } from '$lib/services/github/api';
 import {
 	loadLocalFolderPaths,
 	loadLocalOnlyEntries,
 	saveLocalOnlyEntries,
 } from '../GitHubExplorer/localPersistence';
-import { isTabSyncSupported, TabSync } from '$lib/services/tabSync.svelte';
+import { isDocumentLockHeld, isTabSyncSupported, TabSync } from '$lib/services/tabSync.svelte';
 import { reportError } from '$lib/errorReporting';
 import {
 	describeLoadFailure,
@@ -73,7 +75,52 @@ export interface EditorDocumentSessionHooks {
 	savePersistedContext: () => Promise<boolean>;
 	/** True while the editor should defer an idle autosave (pointer held, simulation, replay). */
 	isEditorBusy?: () => boolean;
+	/** Asks what to do with a GitHub file whose id already belongs to a design here; tests default to copy. */
+	chooseSameDesignAction?: (question: SameDesignQuestion) => Promise<SameDesignAnswer>;
 }
+
+/** A GitHub file being opened whose design id already belongs to another design here. */
+export type SameDesignQuestion =
+	| {
+			/** A design saved only in this browser: open as copy (it moves aside) or replace it. */
+			readonly kind: 'browser-only';
+			readonly designId: string;
+			readonly incomingName: string;
+			readonly savedName: string | null;
+			readonly savedAt: number | null;
+			/** Same parts as the saved design; null when either can't be read. */
+			readonly sameContent: boolean | null;
+	  }
+	| {
+			/** Another repo file holds the id: only a renamed copy, so neither GitHub file changes. */
+			readonly kind: 'other-repo-file';
+			readonly designId: string;
+			readonly incomingName: string;
+			readonly incomingPath: string;
+			readonly linkedPath: string;
+			readonly suggestedName: string;
+	  };
+
+export type SameDesignAnswer =
+	| { readonly action: 'cancel' }
+	| { readonly action: 'replace' }
+	| { readonly action: 'copy'; readonly name?: string };
+
+/** A repo folder a copy is filed in, as an uncommitted file. */
+interface CopyTarget {
+	readonly owner: string;
+	readonly repo: string;
+	readonly folder: string;
+}
+
+/** How a GitHub file's id is settled against the designs already here. */
+type GitHubFileIdPlan =
+	| { readonly kind: 'open'; readonly id: string; readonly overwritesLocal: boolean }
+	| { readonly kind: 'replace'; readonly id: string }
+	| { readonly kind: 'copy-as'; readonly name: string }
+	| { readonly kind: 'cancel' };
+
+export type GitHubOpenResult = 'loaded' | 'cancelled' | 'failed';
 
 interface PersistResult {
 	snapshot: DocSnapshot;
@@ -129,6 +176,8 @@ export class EditorDocumentSession {
 	#remoteCheckFailed: boolean = $state(false);
 	#tabSync: TabSync | null = $state(null);
 	#isLoading: boolean = $state(false);
+	/** The open design's last id change (a GitHub file's id changed), so the URL can follow. */
+	#lastDocIdChange: { readonly from: string; readonly to: string } | null = $state(null);
 	#storagePersistence = $state<StoragePersistence | 'unknown'>('unknown');
 	#loadFailure = $state<DocumentLoadFailure | null>(null);
 	#pendingUrlSave: boolean = $state(false);
@@ -205,6 +254,10 @@ export class EditorDocumentSession {
 	/** The browser went offline: whatever we knew about GitHub is now unconfirmed. */
 	markRemoteUnchecked(): void {
 		if (this.#currentFileMetadata) this.#remoteCheckFailed = true;
+	}
+
+	get lastDocIdChange(): { readonly from: string; readonly to: string } | null {
+		return this.#lastDocIdChange;
 	}
 
 	get isLoading(): boolean {
@@ -456,7 +509,9 @@ export class EditorDocumentSession {
 			let restoredDoc: FoldnanoDocument;
 			let repairs: string[];
 			try {
-				const repaired = repairDocumentJson(migrateDocumentJson(docData));
+				// The key is the design's identity; older pulls could store a different id inside.
+				const keyed = isPlainObject(docData) ? { ...docData, id: docId } : docData;
+				const repaired = repairDocumentJson(migrateDocumentJson(keyed));
 				repairs = repaired.repairs;
 				restoredDoc = FoldnanoDocument.fromJSON(repaired.snapshot);
 			} catch (e) {
@@ -678,32 +733,36 @@ export class EditorDocumentSession {
 			this.#currentDoc.name = trimmed;
 			this.applyExternalCurrentFileRename(meta.path, newPath, { clearSha: true });
 
+			const docId = this.#currentDoc.id;
 			try {
-				const snapshot = await this.#storageManager.loadDocument(this.#currentDoc.id);
-				const raw = snapshot ? JSON.stringify(snapshot, null, 2) : '{}';
-				const bytes = new TextEncoder().encode(raw);
-				let binary = '';
-				for (const b of bytes) binary += String.fromCharCode(b);
-				const contentBase64 = btoa(binary);
-
-				const commitMessage = `Rename: ${meta.path.split('/').pop()} → ${newPath.split('/').pop()}`;
-				await putFileContent(repoCtx.owner, repoCtx.repo, newPath, {
-					message: commitMessage,
-					content: contentBase64,
-					branch: repoCtx.branch,
+				// Saved first, so the upload carries the new name and the sync stamp covers this save;
+				// renaming needs a clean file, so nothing else is in this commit.
+				const { snapshot, persistedAt } = await this.persistCurrentDocumentSnapshot('rename', {
+					force: true,
 				});
+				const commitMessage = `Rename: ${meta.path.split('/').pop()} → ${newPath.split('/').pop()}`;
+				const commitSha = await githubStorageProvider.commitDocument(
+					docId,
+					commitMessage,
+					snapshot
+				);
 				await deleteFileContent(repoCtx.owner, repoCtx.repo, meta.path, {
 					message: commitMessage,
 					sha: meta.sha,
 					branch: repoCtx.branch,
 				});
 
-				this.#lastGitHubSyncAt = Date.now();
-				await this.saveDocumentToLocalStorage({ force: true });
+				this.#lastGitHubSyncAt = persistedAt;
+				this.#remoteAheadOfLocal = false;
+				await githubMetadataStore.stampSyncTime(docId, persistedAt);
+				await githubMetadataStore.stampCommitSha(docId, commitSha);
+				this.#currentFileMetadata = githubMetadataStore.getFileMetadata(docId);
+				await this.hooks.savePersistedContext();
 			} catch (e) {
 				this.#currentDoc.name = oldName;
-				githubMetadataStore.setFileMetadata(this.#currentDoc.id, oldMeta);
+				githubMetadataStore.setFileMetadata(docId, oldMeta);
 				this.#currentFileMetadata = oldMeta;
+				await this.saveDocumentToLocalStorage({ force: true });
 				throw e;
 			}
 			return {
@@ -794,7 +853,7 @@ export class EditorDocumentSession {
 		path: string,
 		branch: string,
 		backup?: { reason: OverwriteBackupReason; github?: BackupGitHubSource }
-	): Promise<boolean> {
+	): Promise<GitHubOpenResult> {
 		this.#isLoading = true;
 		try {
 			const file = await getFileContent(owner, repo, path, branch);
@@ -802,22 +861,26 @@ export class EditorDocumentSession {
 			// Validate before anything is written locally, so a file from a newer app is refused intact.
 			let snapshot = migrateDocumentJson(JSON.parse(rawContent));
 
-			const existingMeta = githubMetadataStore.getFileMetadata(snapshot.id);
-			const isDifferentFile =
-				existingMeta &&
-				(existingMeta.path !== path || existingMeta.owner !== owner || existingMeta.repo !== repo);
-			if (isDifferentFile) {
-				const openAsCopy = window.confirm(
-					`This file shares a document ID with "${existingMeta.path}" already saved locally.\n\nOpen as a new independent copy? (Cancel to abort)`
-				);
-				if (!openAsCopy) return false;
-				snapshot = { ...snapshot, id: uuidv4() };
+			const plan = await this.#planGitHubFileId(snapshot, owner, repo, path);
+			if (plan.kind === 'cancel') return 'cancelled';
+			if (plan.kind === 'copy-as') {
+				return await this.#openGitHubFileAsRenamedCopy(snapshot, owner, repo, path, plan.name);
+			}
+			snapshot = { ...snapshot, id: plan.id };
+			// The replaced design was only in this browser, so the backup is all that keeps it.
+			if (plan.kind === 'replace') backup ??= { reason: 'before_import' };
+			if (plan.kind === 'open' && plan.overwritesLocal) {
+				backup ??= { reason: 'before_pull', github: { owner, repo, branch, path } };
 			}
 
 			const { snapshot: repairedSnapshot, repairs } = repairDocumentJson(snapshot);
 			const doc = FoldnanoDocument.fromJSON(repairedSnapshot);
 			syncNameWithPath(doc, path);
-			const saved = await this.#storageManager.saveDocument(doc.id, snapshot, { backup });
+			const saved = await this.#storageManager.saveDocument(
+				doc.id,
+				{ ...snapshot, name: doc.name },
+				{ backup }
+			);
 			if (!saved) throw new Error('Failed to save the GitHub file in this browser');
 
 			// The stored save time of what was just written, so later saves always read as newer.
@@ -846,15 +909,287 @@ export class EditorDocumentSession {
 			// GitHub keeps the unrepaired version; saving after the sync stamp marks the repair as
 			// a local change to commit.
 			await this.#persistRepair(repairs, { backup: false });
+			if (plan.kind === 'replace') {
+				notify.success('Replaced the saved design', {
+					history: true,
+					description: 'The previous version is in Backups.',
+				});
+			}
 
-			return true;
+			return 'loaded';
 		} catch (e) {
 			console.error('[EditorDocumentSession] Failed to load document from GitHub:', e);
 			if (e instanceof DocumentFormatError) notify.error(e.message);
-			return false;
+			return 'failed';
 		} finally {
 			this.#isLoading = false;
 		}
+	}
+
+	/**
+	 * Settles a GitHub file's design id against the designs here before anything is written.
+	 * The file keeps its id whenever possible, since other people's browsers know it by that id;
+	 * a design only this browser knows moves aside instead.
+	 */
+	async #planGitHubFileId(
+		file: DocSnapshot,
+		owner: string,
+		repo: string,
+		path: string
+	): Promise<GitHubFileIdPlan> {
+		const fileId = file.id;
+		const linkedId = githubMetadataStore.findDocIdByPath(owner, repo, path);
+		if (linkedId === fileId) return { kind: 'open', id: fileId, overwritesLocal: false };
+		if (linkedId) {
+			// The file's id changed on GitHub: the design linked to this path follows it when it can.
+			const id = (await this.#followGitHubIdChange(linkedId, fileId)) ? fileId : linkedId;
+			return { kind: 'open', id, overwritesLocal: true };
+		}
+
+		const ask =
+			this.hooks.chooseSameDesignAction ??
+			(async (question: SameDesignQuestion): Promise<SameDesignAnswer> => ({
+				action: 'copy',
+				name: question.kind === 'other-repo-file' ? question.suggestedName : undefined,
+			}));
+		const incomingName = designNameFromPath(path) || path;
+
+		const meta = githubMetadataStore.getFileMetadata(fileId);
+		if (meta && (await this.#githubFileExists(meta))) {
+			const folder = parentFolder(path);
+			const inCurrentRepo =
+				this.#currentRepoContext?.owner === owner && this.#currentRepoContext?.repo === repo;
+			const answer = await ask({
+				kind: 'other-repo-file',
+				designId: fileId,
+				incomingName,
+				incomingPath: path,
+				linkedPath:
+					meta.owner === owner && meta.repo === repo
+						? meta.path
+						: `${meta.owner}/${meta.repo}: ${meta.path}`,
+				suggestedName: await this.uniqueImportName(
+					`${incomingName} copy`,
+					inCurrentRepo ? folder : null
+				),
+			});
+			return answer.action === 'copy' && answer.name
+				? { kind: 'copy-as', name: answer.name }
+				: { kind: 'cancel' };
+		}
+
+		const saved = (await this.#storageManager.loadDocument(fileId)) as { name?: unknown } | null;
+		if (!saved) {
+			// The link points at a file that is gone, so nothing else holds this id any more.
+			if (meta) githubMetadataStore.clearFileMetadata(fileId);
+			return { kind: 'open', id: fileId, overwritesLocal: false };
+		}
+		const answer = await ask({
+			kind: 'browser-only',
+			designId: fileId,
+			incomingName,
+			savedName: typeof saved.name === 'string' ? saved.name : null,
+			savedAt: await this.#storageManager.getLastModified(fileId),
+			sameContent: await sameContent(file, saved),
+		});
+		if (answer.action === 'cancel') return { kind: 'cancel' };
+		if (meta) githubMetadataStore.clearFileMetadata(fileId);
+		if (answer.action === 'replace') {
+			githubExplorerStateStore.removeLocalOnlyEntryByDocId(fileId);
+			return { kind: 'replace', id: fileId };
+		}
+		if (!(await this.#moveDesignToNewId(fileId, uuidv4()))) return { kind: 'cancel' };
+		return { kind: 'open', id: fileId, overwritesLocal: false };
+	}
+
+	/** True when the linked file is still on GitHub; only a definite 404 says it is gone. */
+	async #githubFileExists(meta: GitHubFileMetadata): Promise<boolean> {
+		try {
+			await getFileContent(meta.owner, meta.repo, meta.path, meta.branch);
+			return true;
+		} catch (e) {
+			return !(e instanceof GitHubApiError && e.status === 404);
+		}
+	}
+
+	/** Moves the design linked to a GitHub file to the file's new id, if nothing here uses it. */
+	async #followGitHubIdChange(linkedId: string, fileId: string): Promise<boolean> {
+		if (!(await this.#isDocIdFree(fileId))) return false;
+		if (!(await this.#moveDesignToNewId(linkedId, fileId, { quiet: true }))) return false;
+		if (linkedId === this.#currentDoc.id) this.#lastDocIdChange = { from: linkedId, to: fileId };
+		notify.info('This file has a new design ID on GitHub', {
+			description: 'Your copy in this browser now uses it, so it stays linked to the file.',
+		});
+		return true;
+	}
+
+	async #isDocIdFree(docId: string): Promise<boolean> {
+		return (
+			!githubMetadataStore.getFileMetadata(docId) &&
+			!githubExplorerStateStore.hasLocalOnlyEntry(docId) &&
+			(await this.#storageManager.loadDocument(docId)) === null
+		);
+	}
+
+	/**
+	 * Gives a stored design a new id: its record, backups, view state, GitHub link and uncommitted
+	 * repo file all follow. Refused while another tab has the design open, since that tab would
+	 * keep saving under the old id.
+	 */
+	async #moveDesignToNewId(
+		oldId: string,
+		newId: string,
+		options: { quiet?: boolean; flushOpenCopy?: boolean } = {}
+	): Promise<boolean> {
+		const isOpenHere = oldId === this.#currentDoc.id && this.isTabOwner;
+		if (!isOpenHere && (await isDocumentLockHeld(oldId))) {
+			if (!options.quiet) {
+				notify.error('Close the other tab first', {
+					description:
+						'The design with this ID is open in another tab. Close it there, then open the file again.',
+				});
+			}
+			return false;
+		}
+		if (isOpenHere && (options.flushOpenCopy ?? true)) {
+			await this.saveDocumentToLocalStorage({ skipPristineBlank: true });
+		}
+		const stored = (await this.#storageManager.loadDocument(oldId)) !== null;
+		if (stored && !(await this.#storageManager.rekeyDocument(oldId, newId))) {
+			if (!options.quiet) notify.error("Couldn't move the saved design to a new ID");
+			return false;
+		}
+		await githubMetadataStore.moveFileMetadata(oldId, newId);
+		githubExplorerStateStore.rekeyLocalOnlyEntries(oldId, newId);
+		return true;
+	}
+
+	/** Opens another repo file's twin as a new uncommitted file next to it, under its own id. */
+	async #openGitHubFileAsRenamedCopy(
+		snapshot: DocSnapshot,
+		owner: string,
+		repo: string,
+		path: string,
+		requestedName: string
+	): Promise<GitHubOpenResult> {
+		const copy = await this.#adoptAsCopy(snapshot, requestedName, {
+			owner,
+			repo,
+			folder: parentFolder(path),
+		});
+		if (!copy) return 'cancelled';
+		notify.success(`Saved a copy as "${copy.file}"`, {
+			history: true,
+			description: `Commit it when you're ready. "${path.split('/').pop()}" on GitHub is unchanged.`,
+		});
+		return 'loaded';
+	}
+
+	/**
+	 * Saves the open design as a new one under its own id and `requestedName`, and opens it. A
+	 * design in a repo gets its copy as an uncommitted file in the same folder. The original is
+	 * saved first and left as it is. Returns the copy's id, or null when refused.
+	 */
+	async saveAsCopy(requestedName: string): Promise<string | null> {
+		if (!this.isTabOwner) {
+			notify.error("Couldn't save a copy", {
+				description: 'This design is open in another tab. Edit it there.',
+			});
+			return null;
+		}
+		this.#isLoading = true;
+		try {
+			const original = this.#currentDoc;
+			const copy = await this.#adoptAsCopy(original.snapshot(), requestedName, this.#copyTarget(), {
+				viewContextFrom: original.id,
+			});
+			if (!copy) return null;
+			notify.success(`Saved a copy as "${copy.name}"`, {
+				history: true,
+				description: copy.file
+					? `"${copy.file}" is a new uncommitted file in this folder. "${original.name}" is unchanged.`
+					: `"${original.name}" is unchanged in Saved Documents.`,
+			});
+			return copy.id;
+		} finally {
+			this.#isLoading = false;
+		}
+	}
+
+	/** The repo folder the open design's file sits in, where a copy of it is filed. */
+	#copyTarget(): CopyTarget | null {
+		const repoCtx = this.#currentRepoContext;
+		if (!repoCtx) return null;
+		const meta = this.#currentFileMetadata;
+		if (meta && meta.owner === repoCtx.owner && meta.repo === repoCtx.repo) {
+			return { owner: repoCtx.owner, repo: repoCtx.repo, folder: parentFolder(meta.path) };
+		}
+		const entry = loadLocalOnlyEntries(repoCtx).find((e) => e.docId === this.#currentDoc.id);
+		return entry
+			? { owner: repoCtx.owner, repo: repoCtx.repo, folder: parentFolder(entry.path) }
+			: null;
+	}
+
+	/**
+	 * Opens `snapshot` as a new design under a fresh id, named `requestedName` (made unique, with a
+	 * warning), filed in `target` as an uncommitted repo file when given. Null when the name is
+	 * invalid.
+	 */
+	async #adoptAsCopy(
+		snapshot: DocSnapshot,
+		requestedName: string,
+		target: CopyTarget | null,
+		options: { viewContextFrom?: string } = {}
+	): Promise<{ id: string; name: string; file: string | null } | null> {
+		const trimmed = normalizeDesignName(requestedName);
+		const invalid = trimmed ? validateDesignName(trimmed) : 'Enter a name for the copy.';
+		if (invalid) {
+			notify.error("Couldn't save the copy", { description: invalid });
+			return null;
+		}
+		const inCurrentRepo =
+			!!target &&
+			this.#currentRepoContext?.owner === target.owner &&
+			this.#currentRepoContext?.repo === target.repo;
+		const name = await this.uniqueImportName(trimmed, inCurrentRepo ? target.folder : null);
+		if (name !== trimmed) {
+			notify.warning(`Saved as "${name}"`, {
+				description: inCurrentRepo
+					? `"${trimmed}${FN_JSON_EXT}" already exists in this folder.`
+					: `A saved design is already named "${trimmed}".`,
+			});
+		}
+
+		const { snapshot: repaired, repairs } = repairDocumentJson({ ...snapshot, id: uuidv4(), name });
+		const doc = FoldnanoDocument.fromJSON(repaired);
+		doc.name = name;
+		await this.saveDocumentToLocalStorage({ skipPristineBlank: true });
+		const viewContext = options.viewContextFrom
+			? await this.#storageManager.loadContext(options.viewContextFrom)
+			: null;
+		await this.#adoptDocument(doc, {
+			fileMetadata: null,
+			lastLocalPersistAt: null,
+			lastGitHubSyncAt: null,
+			loadPersistedContext: false,
+		});
+		if (viewContext) {
+			await this.#storageManager.saveContext(doc.id, viewContext);
+			await this.hooks.loadPersistedContext();
+		}
+		const { persistedAt } = await this.persistCurrentDocumentSnapshot('copy', { force: true });
+		this.#lastLocalPersistAt = persistedAt;
+		await this.#persistRepair(repairs, { backup: false });
+
+		if (!target) return { id: doc.id, name, file: null };
+		const path = target.folder ? `${target.folder}/${name}${FN_JSON_EXT}` : `${name}${FN_JSON_EXT}`;
+		const file = path.split('/').pop()!;
+		githubExplorerStateStore.addLocalOnlyEntry(target.owner, target.repo, {
+			docId: doc.id,
+			path,
+			name: file,
+		});
+		return { id: doc.id, name, file };
 	}
 
 	async commitCurrentDocToGitHub(message: string): Promise<string> {
@@ -910,8 +1245,24 @@ export class EditorDocumentSession {
 		this.#isLoading = true;
 		try {
 			await this.#prepareForGitOperation('overwrite');
-			const pulled = await githubStorageProvider.pullDocument(this.#currentDoc.id, reason);
-			const { snapshot, repairs } = repairDocumentJson(pulled);
+			const localId = this.#currentDoc.id;
+			const pulled = await githubStorageProvider.pullDocument(localId, reason);
+			// The file's id changed on GitHub: follow it when nothing here uses the new id.
+			let docId = localId;
+			if (pulled.id !== localId && (await this.#isDocIdFree(pulled.id))) {
+				const moved = await this.#moveDesignToNewId(localId, pulled.id, {
+					quiet: true,
+					flushOpenCopy: false,
+				});
+				if (moved) {
+					docId = pulled.id;
+					this.#lastDocIdChange = { from: localId, to: docId };
+					notify.info('This file has a new design ID on GitHub', {
+						description: 'Your copy in this browser now uses it, so it stays linked to the file.',
+					});
+				}
+			}
+			const { snapshot, repairs } = repairDocumentJson({ ...pulled, id: docId });
 			const doc = FoldnanoDocument.fromJSON(snapshot);
 			const now = await this.#storedSaveTime(doc.id);
 
@@ -1063,11 +1414,25 @@ export class EditorDocumentSession {
 				return false;
 			}
 		}
-		const ok = await this.#storageManager.saveDocument(docId, resolved, {
-			backup: { reason: 'before_conflict_resolve', github: this.#githubSourceOf(docId) },
-		});
+		const ok = await this.#storageManager.saveDocument(
+			docId,
+			this.#withStoredName(docId, resolved),
+			{
+				backup: { reason: 'before_conflict_resolve', github: this.#githubSourceOf(docId) },
+			}
+		);
 		if (!ok) return false;
 		return this.loadDocumentFromLocalStorage(docId);
+	}
+
+	/** The diff leaves the name out, as files do; the stored copy needs one. */
+	#withStoredName(docId: string, snapshot: object): object {
+		if (typeof (snapshot as { name?: unknown }).name === 'string') return snapshot;
+		const path = githubMetadataStore.getFileMetadata(docId)?.path;
+		const name =
+			(path && designNameFromPath(path)) ||
+			(docId === this.#currentDoc.id ? this.#currentDoc.name : null);
+		return name ? { ...snapshot, name } : snapshot;
 	}
 
 	async loadTransientDocument(doc: FoldnanoDocument, sourceUrl: string): Promise<void> {
@@ -1186,7 +1551,7 @@ export class EditorDocumentSession {
 
 		await this.#prepareForGitOperation('overwrite');
 
-		const ok = await this.loadDocumentFromGitHub(
+		const result = await this.loadDocumentFromGitHub(
 			currentFileMeta.owner,
 			currentFileMeta.repo,
 			currentFileMeta.path,
@@ -1201,7 +1566,7 @@ export class EditorDocumentSession {
 				},
 			}
 		);
-		if (ok) {
+		if (result === 'loaded') {
 			return { reloaded: true, fileMissing: false };
 		}
 
@@ -1291,6 +1656,19 @@ function deriveNewPath(oldPath: string, newName: string): string {
 }
 
 /** A GitHub-backed document is named after its file; the name stored inside the JSON goes stale when the file is renamed. */
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+	return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+async function sameContent(a: unknown, b: unknown): Promise<boolean | null> {
+	const [hashA, hashB] = await Promise.all([normalizedPartsHash(a), normalizedPartsHash(b)]);
+	return hashA === null || hashB === null ? null : hashA === hashB;
+}
+
+function parentFolder(path: string): string {
+	return path.split('/').slice(0, -1).join('/');
+}
+
 function syncNameWithPath(doc: FoldnanoDocument, path: string): void {
 	const pathName = designNameFromPath(path);
 	if (pathName && pathName !== doc.name) doc.name = pathName;

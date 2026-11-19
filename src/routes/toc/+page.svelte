@@ -31,6 +31,8 @@
 	} from '@lucide/svelte';
 	import { onMount } from 'svelte';
 	import { notify } from '$lib/notifications/notify.svelte';
+	import DesignIdChip from '$lib/components/Editor/DesignIdChip.svelte';
+	import { trustedNow } from '$lib/services/serverClock';
 
 	const SORT_OPTIONS = {
 		'modified-desc': 'Last modified (newest)',
@@ -131,11 +133,13 @@
 	async function handleDownloadAll() {
 		isExporting = true;
 		try {
-			const exportedAt = new Date();
+			const now = await trustedNow();
+			const exportedAt = new Date(now.at);
 			const { zip, manifest, skipped } = await exportAllDesigns(
 				storageManager,
 				(docId) => githubMetadataStore.getFileMetadata(docId),
-				exportedAt
+				exportedAt,
+				now.clock
 			);
 			downloadDesignArchive(zip, exportedAt);
 			const count = manifest.designs.length;
@@ -309,6 +313,7 @@
 											<a href={resolve(`/editor/${doc.id}`)} class="hover:underline"
 												>{doc.name || UNTITLED}</a
 											>
+											<DesignIdChip id={doc.id} class="ml-1 hidden font-normal sm:inline" />
 										</td>
 										<td class="hidden px-3 py-1.5 md:table-cell">
 											{#if meta}
@@ -378,7 +383,7 @@
 									</h3>
 									<div class="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
 										<span>Modified: {formatDate(doc.lastModified)}</span>
-										<span class="font-mono">ID: {doc.id.slice(0, 8)}…</span>
+										<span class="flex items-center">ID <DesignIdChip id={doc.id} /></span>
 									</div>
 									{#if meta}
 										<div
