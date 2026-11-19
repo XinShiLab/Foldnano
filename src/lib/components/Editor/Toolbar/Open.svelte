@@ -22,6 +22,7 @@
 		getEditorDocumentSession,
 		type ImportedIdChoice,
 	} from '../context/EditorDocumentSession.svelte';
+	import DesignIdChip from '../DesignIdChip.svelte';
 	import FoldnanoDocument from '../../../model/document.svelte';
 	import { Puzzle } from '@lucide/svelte';
 	import { goto } from '$app/navigation';
@@ -30,6 +31,12 @@
 	import { putFileContent } from '$lib/services/github/api';
 	import { stripDesignExtension } from '$lib/model/io/designFileName';
 	import { summarizeDesign } from '$lib/model/io/designSummary';
+	import {
+		compareWithBrowserCopy,
+		describeFileProvenance,
+		type FileProvenance,
+	} from '$lib/services/storage/fileProvenance';
+	import { serverClockOffset } from '$lib/services/serverClock';
 
 	let { toggleDialog, initialFiles = [] }: { toggleDialog: () => void; initialFiles?: File[] } =
 		$props();
@@ -56,6 +63,10 @@
 		const storedAt = parsed.then((p) =>
 			p instanceof FoldnanoDocument ? session.storageManager.getLastModified(p.id) : null
 		);
+		const comparison = storedAt.then(async (at) => {
+			const p = await parsed;
+			return at !== null && p instanceof FoldnanoDocument ? compareFile(file, p, at) : null;
+		});
 		files.push({
 			name: file.name,
 			type: file.type,
@@ -64,6 +75,7 @@
 			url,
 			parsed,
 			storedAt,
+			comparison,
 			file,
 		});
 	};
@@ -77,8 +89,48 @@
 		parsed: Promise<Part | FoldnanoDocument | LocalPluginZipFile>;
 		/** When this browser last saved a design with the same id, or null if it has none. */
 		storedAt: Promise<number | null>;
+		/** How the file relates to that saved design; null when there is none. */
+		comparison: Promise<BrowserCopyComparison | null>;
 		file: File;
 	};
+
+	interface BrowserCopyComparison {
+		savedName: string | null;
+		/** Null when the comparison failed; the dialog then shows only the save time. */
+		provenance: FileProvenance | null;
+	}
+
+	const formatTime = (ms: number): string =>
+		new Date(ms).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+
+	async function compareFile(
+		file: File,
+		parsed: FoldnanoDocument,
+		storedAt: number
+	): Promise<BrowserCopyComparison> {
+		const stored = await session.storageManager.loadDocument(parsed.id);
+		const name = (stored as { name?: unknown } | null)?.name;
+		const savedName = typeof name === 'string' ? name : null;
+		try {
+			const [text, backups, clockOffset] = await Promise.all([
+				file.text(),
+				session.listBackups(parsed.id),
+				serverClockOffset(),
+			]);
+			const provenance = await compareWithBrowserCopy({
+				rawFile: JSON.parse(text),
+				fileSnapshot: parsed.toJSON(),
+				stored,
+				storedAt,
+				backups,
+				clockOffset,
+			});
+			return { savedName, provenance };
+		} catch (e) {
+			console.warn('[Open] Could not compare the file with the browser copy:', e);
+			return { savedName, provenance: null };
+		}
+	}
 
 	let files = $state<UploadedFile[]>([]);
 	let date = new SvelteDate();
@@ -299,25 +351,45 @@
 								<div class="flex min-w-0 flex-col gap-1 text-xs">
 									<p class="text-muted-foreground">{summarizeDesign(parsed)}</p>
 									{#if storedAt !== null}
-										<p
-											class="rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-amber-800"
+										<div
+											class="flex flex-col gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-amber-800"
 										>
-											This design is already in your browser (last saved {new Date(
-												storedAt
-											).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}).
-											Open the file as a separate copy, or replace the saved design with it (the
-											saved version stays in Backups).
-										</p>
+											<p>
+												This design (ID{#if parsed instanceof FoldnanoDocument}<DesignIdChip
+														id={parsed.id}
+														class="text-amber-800"
+													/>{/if}) is already in your browser{#await file.comparison then c}{#if c?.savedName}
+														as "{c.savedName}"{/if}{/await}.
+											</p>
+											{#await file.comparison}
+												<p class="text-amber-700/80">Comparing with the browser copy…</p>
+											{:then c}
+												<p>
+													{c?.provenance
+														? describeFileProvenance(c.provenance, formatTime)
+														: `The browser copy was last saved ${formatTime(storedAt)}.`}
+												</p>
+											{/await}
+											<p>
+												Open the file as a separate copy, or replace the saved design with it (the
+												saved version stays in Backups).
+											</p>
+										</div>
 									{/if}
 								</div>
 								<div class="flex justify-end gap-2">
 									{#if storedAt !== null}
-										<Button
-											size="sm"
-											variant="outline"
-											disabled={isLoading}
-											onclick={() => onLoadClick(file, parsed, 'replace')}>Replace</Button
-										>
+										{#await file.comparison then c}
+											<Button
+												size="sm"
+												variant="outline"
+												disabled={isLoading}
+												onclick={() => onLoadClick(file, parsed, 'replace')}
+												>{c?.provenance?.relation === 'older'
+													? 'Replace newer browser version'
+													: 'Replace'}</Button
+											>
+										{/await}
 									{/if}
 									<Button
 										size="sm"

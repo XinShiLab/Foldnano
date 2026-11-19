@@ -31,6 +31,38 @@ gate titles, a use-with-caution note); drop the "beta" badge at 1.0.
       required name prompt once a Part appears (`docs/autosave.md` § Reserved blank name). Try:
       add a region in a blank workspace, open an old "Untitled Document" design, rename onto a
       taken name (same folder and elsewhere), publish onto an existing path.
+- [ ] **Same design from GitHub: check in the browser** (landed 2026-11-19 on
+      `feat/doc_ID_edit`; unit-tested, not yet tried in the UI). A GitHub file now always keeps its
+      design id (`docs/storage-architecture.md` § Open from GitHub). Try: (1) download a design,
+      upload the `.fn.json` to the repo outside Foldnano, open it from the Files tab: Open as copy
+      keeps both (the browser design moves to a new id), Replace keeps a backup, Cancel shows no
+      error; (2) copy a committed file to a new path on GitHub, open the copy: only "Save as a
+      copy" with a name, which appears as an uncommitted file in that folder; (3) change a
+      committed file's `id` on GitHub, pull in another browser: the design stays linked and the
+      URL follows the new id; (4) try (1) with the browser design open in a second tab.
+- [x] **Save as a copy and the name field: check in the browser** (tried 2026-11-19, no problems; landed 2026-11-19 on
+      `feat/doc_ID_edit`; session unit-tested, toolbar not tried). Try: edit the name and press
+      Rename, Enter, Esc, Save as a copy; type a name and click the canvas (Rename pulses, Save /
+      Save menu / Commit wait); Save menu → Save as a Copy… on a browser-only design, a committed
+      repo file and an uncommitted repo file (copy appears as an uncommitted file in that folder);
+      a name taken in the folder; narrow window (icon-only buttons); URL moves to the copy.
+- [x] **Design ID chip: check in the browser** (landed 2026-11-19 on `feat/doc_ID_edit`; tried 2026-11-19, no problems).
+      Try: the `#xxxxxxxx` chip after the toolbar name (hover tooltip, click copies, toast; hidden
+      while editing the name, below `lg`, and for Untitled Document); the Open dialog's
+      "already in your browser" note; both GitHub same-design prompts; Saved Documents cards and
+      compact table; light and dark themes.
+- [ ] **Download stamps and the Open dialog comparison: check in the browser** (landed
+      2026-11-19 on `feat/doc_ID_edit`; unit-tested). Try: export a design and open the file
+      again (same content); edit, save, open the old file (older, "Replace newer browser
+      version"); export with unsaved edits and reopen (newer); edit `parts` in a text editor
+      (changed outside Foldnano); a file matching a backup; offline (DevTools) export and open
+      ("seems"); Download All files carry `exported`; GitHub commits don't; a deployed build
+      answers `/api/time`.
+- [ ] **Files no longer store the design name: check in the browser** (landed 2026-11-19 on
+      `feat/doc_ID_edit`; unit-tested). Try: download a design and open it (named after the
+      file); commit, then view the file on GitHub (no top-level `name`); open an older repo file
+      that still has one (no diff shown for it); rename a committed file from the toolbar and from
+      the Files tab; resolve a conflict by hand (name kept); Download All zip.
 - Plugin dev mode follow-ups. Linking, the dev worker, the Dev tab, log streaming and folder
   paths in tracebacks landed 2026-10-23 on `feat/plugin_devMode`
   (`docs/python-plugin-system.md` § Plugin dev mode). (1) Done: tested in Chrome

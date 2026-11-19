@@ -1,5 +1,7 @@
 import { strToU8, zipSync, type Zippable } from 'fflate';
 import { APP_COMMIT, APP_VERSION } from '$lib/appInfo';
+import { stringifyDesignFile } from '$lib/model/documentFormat';
+import { withExportStamp, type ClockSource } from '$lib/model/exportStamp';
 import { exportBaseName, FN_JSON_EXT } from '$lib/model/io/designFileName';
 import type { GitHubFileMetadata } from './githubTypes';
 import type { StorageManager } from './StorageManager';
@@ -9,7 +11,10 @@ export const DESIGN_ARCHIVE_FORMAT = 'foldnano-design-archive';
 export const DESIGN_ARCHIVE_VERSION = 1;
 export const DESIGN_ARCHIVE_MANIFEST = 'manifest.json';
 
-/** One saved design, as stored: the snapshot is written raw so damaged designs still get out. */
+/**
+ * One saved design, as stored: the snapshot is written as-is (bar the name, which is the file's
+ * name) so damaged designs still get out.
+ */
 export interface ArchiveDesign {
 	id: string;
 	name: string;
@@ -80,7 +85,7 @@ export function buildDesignArchive(
 	const entries: DesignArchiveManifestEntry[] = [];
 	for (const design of designs) {
 		const file = uniqueFileName(exportBaseName(design.name), taken);
-		files[file] = strToU8(JSON.stringify(design.snapshot));
+		files[file] = strToU8(stringifyDesignFile(design.snapshot));
 		entries.push({
 			file,
 			id: design.id,
@@ -123,13 +128,22 @@ export function designArchiveFileName(exportedAt: Date): string {
 	return `foldnano-designs-${day}.zip`;
 }
 
+/**
+ * Zips every saved design. Each file is stamped like a single download (time and content hash),
+ * with `clock` saying whether `exportedAt` came from the server.
+ */
 export async function exportAllDesigns(
 	storage: StorageManager,
 	githubFor: (docId: string) => GitHubFileMetadata | null,
-	exportedAt = new Date()
+	exportedAt = new Date(),
+	clock: ClockSource = 'local'
 ): Promise<DesignArchive> {
 	const { designs, skipped } = await collectArchiveDesigns(storage, githubFor);
-	return { ...buildDesignArchive(designs, exportedAt), skipped };
+	const now = { at: exportedAt.getTime(), clock };
+	const stamped = await Promise.all(
+		designs.map(async (d) => ({ ...d, snapshot: await withExportStamp(d.snapshot, now) }))
+	);
+	return { ...buildDesignArchive(stamped, exportedAt), skipped };
 }
 
 export function downloadDesignArchive(zip: Uint8Array, exportedAt: Date): void {

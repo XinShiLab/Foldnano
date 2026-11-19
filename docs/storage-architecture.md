@@ -1,10 +1,15 @@
 ---
 covers:
   - src/lib/services/storage/**
+  - src/lib/services/serverClock.ts
+  - src/lib/model/exportStamp.ts
+  - src/routes/api/time/**
   - src/lib/errorReporting.ts
   - src/lib/components/Editor/ErrorLogDialog.svelte
   - src/lib/components/Editor/DocumentRecoveryScreen.svelte
   - src/lib/components/Editor/context/documentRecovery.ts
+  - src/lib/components/Editor/context/SameDesignGate.svelte.ts
+  - src/lib/components/Editor/SameDesignDialog.svelte
   - src/lib/model/documentRepair.ts
 ---
 
@@ -263,6 +268,44 @@ offers two buttons, passed as `ImportedIdChoice`:
 A plain save under a taken id would replace the design with no backup, so don't add an import
 path that skips this choice.
 
+### Download stamps and comparing a file with the browser copy
+
+Downloads (toolbar **Export as Foldnano JSON**, the save-failed banner, and each file in the
+Download All zip) add an `exported: { at, clock, contentHash }` block through
+`withExportStamp()` (`src/lib/model/exportStamp.ts`). `contentHash` is SHA-256 over the canonical
+JSON (keys sorted at every level) of `parts` only: the name follows the file and the id follows
+any copy, so neither may change it. Nothing else writes the stamp: GitHub commits, backup and
+Files-tab downloads stay unstamped. `migrateDocumentJson()` drops it, so it never reaches the
+model, IndexedDB or a commit (the GitHub fetch fallback in `GitHubStorageProvider.loadDocument`,
+which skips migration, strips it with `withoutExportStamp()`).
+
+`at` comes from `trustedNow()` (`src/lib/services/serverClock.ts`): this computer's clock plus an
+offset measured once per page load against the same-origin `GET /api/time` (round-trip midpoint,
+3 s timeout, retried on the next call after a failure; the toolbar measures it on mount).
+`clock: 'local'` marks a stamp made offline. Stored save times are never rewritten; the offset is
+applied only when comparing.
+
+When an opened `.fn.json` has an id saved here, the Open dialog runs `compareWithBrowserCopy()`
+(`fileProvenance.ts`) and shows `describeFileProvenance()`:
+
+- **identical**: hashes match after the same migrate → repair → `fromJSON` → `toJSON` steps on
+  both sides (`normalizedPartsHash`), so an older-format file still matches the design it became
+- **older / newer**: different content, the file has a stamp and its parts still match it; decided
+  by `at` against the browser copy's save time moved to server time. `approximate` (offline, or a
+  `local` stamp) words it as "seems"; **older** relabels Replace as "Replace newer browser version"
+- **different**: no stamp, or `editedOutside` (the file's raw `parts` no longer match its
+  `contentHash`), whose time no longer describes the content
+- `matchesBackupAt`: the newest backup of the design with the file's content
+
+`editedOutside` is reported even when the relation is **identical**: an edit the loader overrides
+(a base changed in a segment's `slots` but not its `sequence`, which wins in
+`OligoSegment.fromJSON`) leaves the opened content equal to the browser copy, and the dialog says
+the changes are ignored rather than calling the file untouched.
+
+**Open as copy** stays the default button in every case. The GitHub "same design" prompt for a
+browser-only design shows the identical/different part (`sameContent`); GitHub files carry no
+stamp.
+
 If the snapshot exists but `FoldnanoDocument.fromJSON()` throws (damaged data, or a
 `DocumentFormatError` for a file from a newer app), nothing is adopted or written. The session
 sets `loadFailure` (`DocumentLoadFailure` in `context/documentRecovery.ts`: doc id, name, friendly
@@ -327,7 +370,25 @@ The GitHub integration is local-first and explicit.
 
 1. fetches file content through the GitHub API proxy
 2. parses the JSON and validates/upgrades it with `migrateDocumentJson()` (see `dna-model.md` § Document format version); a file from a newer app is refused before anything is written locally
-3. detects local doc ID collisions and can fork to a new local ID
+3. settles the file's id against the designs here (`#planGitHubFileId`) before anything is
+   written. The rule: **a GitHub file keeps its id**, because other people's browsers know it by
+   that id; a design only this browser knows moves aside instead. Questions go through
+   `SameDesignGate` / `SameDesignDialog` (session hook `chooseSameDesignAction`):
+   - the path is linked here under the same id (a pull, branch reload): no question;
+   - the path is linked here under **another** id (the file's id changed on GitHub): that design
+     follows the new id when nothing here uses it, else keeps its own; no question;
+   - the id is linked to **another repo file** still on GitHub: only **Save as a copy** with a
+     new name, an uncommitted file (local-only entry) next to this one with its own id, so neither
+     GitHub file ever needs an id change committed. A link to a file GitHub answers 404 for is
+     stale and is dropped instead;
+   - the id belongs to a design **saved only in this browser**: **Open as copy** moves that design
+     to a new id (`#moveDesignToNewId`) and the file opens under its own; **Replace** writes the
+     file over it with a `before_import` backup, because nothing else keeps it.
+
+   Cancel returns `'cancelled'` before anything is written. Moving a design is refused while
+   another tab has it open (`isDocumentLockHeld`), since that tab would keep saving under the
+   old id.
+
 4. writes the fetched snapshot into IndexedDB; a branch reload passes a `before_branch_reload` backup option (labelled with the old branch) so the replaced copy is kept
 5. stores GitHub file metadata (path, SHA, branch, `lastSyncAt`) via `GitHubMetadataStore`, awaited
 6. loads the document into the editor
@@ -337,7 +398,7 @@ The GitHub integration is local-first and explicit.
 `commitCurrentDocToGitHub(message)`:
 
 1. persists the current in-memory snapshot locally first
-2. derives the commit content via `JSON.stringify(snapshot, null, 2)`
+2. derives the commit content via `stringifyDesignFile(snapshot, 2)`, which leaves the design name out (§ The name stays out of files)
 3. sends that content to GitHub via `PUT /api/github/contents`
 4. stores the new file SHA (awaited inside `GitHubStorageProvider.commitDocument()`)
 5. stamps `lastSyncAt` and the commit SHA (awaited) and clears the remote-ahead flag
@@ -352,6 +413,47 @@ The GitHub integration is local-first and explicit.
 4. overwrites the local working copy with a `backup` option (`before_pull` or `before_accept_remote`), so the replaced copy is kept as a backup **in the same transaction**: there is no window where the overwrite happened but the backup didn't
 5. stores the SHA and sync timestamps, awaited; if that fails the pull reports an error
 6. reloads the editor from the pulled snapshot
+
+`pullDocument` always stores the pull under the **local** id, even when GitHub's copy has a new
+one: a record's key and the id inside it must agree, or the design reopens without its GitHub
+link (`loadDocumentFromLocalStorage` also opens a record under its key, which repairs records an
+older pull stored with GitHub's id inside). The session then follows the new id when nothing here
+uses it, moving the design with `#moveDesignToNewId` and setting `lastDocIdChange` so
+`Editor.svelte` points the URL at the new id.
+
+### The name stays out of files
+
+A design's name is its file name, so every file Foldnano writes leaves the top-level `name` out:
+downloads, the Download All zip, GitHub commits and backup downloads all go through
+`stringifyDesignFile()` (`src/lib/model/documentFormat.ts`), and the GitHub and Backups diffs
+compare that same text, so an old file that still carries a name shows no spurious change.
+IndexedDB keeps the name, since Saved Documents, history and plugins read it there. Every read
+that turns a file into a stored copy sets it: the Open dialog and `?url=` from the file name
+(`foldnanojsonParser`), GitHub open, pull and fetch from the path (`syncNameWithPath`,
+`designNameFromPath` in `GitHubStorageProvider`), and a hand-resolved conflict from the path or
+the current name. Old files' `name` is ignored wherever a file name is known. No format bump: the
+field was always optional to the loader, and the v2 schema now marks it optional.
+
+### Save as a copy
+
+`EditorDocumentSession.saveAsCopy(name)` is the in-app way to fork a design (toolbar name field
+and Save menu → `SaveAsCopyDialog`). It saves the original first, then opens a new design under
+a fresh id with the original's content and stored view context; undo history and backups start
+fresh. The name goes through `normalizeDesignName` / `validateDesignName` and `uniqueImportName`
+(a taken name gets a suffix and a warning). A design whose file is in the connected repo
+(committed, or a local-only entry) gets its copy as a **local-only entry in the same folder**;
+the copy never inherits a GitHub link. `#adoptAsCopy` is shared with the GitHub open path's
+"Save as a copy" for another repo file's twin (§ Open from GitHub). Refused in a tab that doesn't
+own the design.
+
+### Moving a design to a new id
+
+`StorageManager.rekeyDocument(oldId, newId)` (`FoldnanoIndexedDb.rekeyDocument`) moves the record,
+snapshot, view context and backups in one transaction and rewrites the id inside every stored
+snapshot, so a backup restores under the new id. It refuses a taken `newId`. The session's
+`#moveDesignToNewId` adds what lives outside that transaction: the GitHub link
+(`GitHubMetadataStore.moveFileMetadata`) and uncommitted repo files
+(`GitHubExplorerStateStore.rekeyLocalOnlyEntries`).
 
 Explorer **Discard** on a modified file runs the same overwrite with reason `before_discard`: for the open file through `pullCurrentDocFromGitHub('before_discard')` (via `GitHubExplorerState.doPull(reason)`), for any other file through `pullDocument(docId, 'before_discard')` (it used to delete that local copy).
 
@@ -433,8 +535,8 @@ If the deleted document is the currently open document, the editor resets to a f
 `/toc` **Download All** calls `exportAllDesigns()` (`src/lib/services/storage/designArchive.ts`),
 which zips every listed design with `fflate`:
 
-- one `<name>.fn.json` per design, the **stored snapshot as is** (no migrate, no repair), so a
-  design that can't be opened still gets out. Names go through `exportBaseName()`; repeats get
+- one `<name>.fn.json` per design, the **stored snapshot as is** (no migrate, no repair; only the
+  name is left out, as in every file), so a design that can't be opened still gets out. Names go through `exportBaseName()`; repeats get
   ` (2)`, ` (3)` in oldest-first order, compared case-insensitively because unzipping on macOS or
   Windows would merge them.
 - `manifest.json` (`DesignArchiveManifest`, `format: 'foldnano-design-archive'`, `version: 1`):

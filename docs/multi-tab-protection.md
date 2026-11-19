@@ -50,6 +50,8 @@ sync.destroy(); // release the lock, or stop waiting for it
 
 `isOwner` is a Svelte 5 `$state` field, so it can be used directly in reactive contexts.
 
+`isDocumentLockHeld(docId)` asks `navigator.locks.query()` whether any tab, this one included, holds a document's lock. The session uses it before moving a design to a new id (`storage-architecture.md` § Moving a design to a new id): a tab that has the design open would keep saving under the old id. `FakeLockManager.query()` models it in tests.
+
 ## EditorDocumentSession integration
 
 ```typescript

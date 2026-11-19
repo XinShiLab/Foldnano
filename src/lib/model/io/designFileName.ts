@@ -119,3 +119,8 @@ export function exportBaseName(docName: string, suffix = ''): string {
 	const safe = (name: string) => name.replace(/[\\/:*?"<>|]/g, '-');
 	return (safe(docName).trim() || FALLBACK_BASE_NAME) + safe(suffix);
 }
+
+/** The short form of a design ID shown in the UI, like a short git commit: `#3f9a1c2e`. */
+export function shortDesignId(id: string): string {
+	return `#${id.replace(/-/g, '').slice(0, 8).toLowerCase()}`;
+}

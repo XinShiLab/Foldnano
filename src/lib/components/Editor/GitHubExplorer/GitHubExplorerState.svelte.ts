@@ -1,4 +1,5 @@
 import { pushState } from '$app/navigation';
+import { stringifyDesignFile } from '$lib/model/documentFormat';
 import { notify } from '$lib/notifications/notify.svelte';
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import { githubMetadataStore } from '$lib/services/storage';
@@ -168,7 +169,7 @@ export class GitHubExplorerState {
 
 	private async loadPersistedDocumentText(docId: string): Promise<string | null> {
 		const snapshot = await this.session.storageManager.loadDocument(docId);
-		return snapshot ? JSON.stringify(snapshot, null, 2) : null;
+		return snapshot ? stringifyDesignFile(snapshot, 2) : null;
 	}
 
 	// --- Tree ---
@@ -212,18 +213,20 @@ export class GitHubExplorerState {
 		this.beginLoadingFile(node.path);
 		this.error = '';
 		try {
-			const ok = await this.session.loadDocumentFromGitHub(
+			const result = await this.session.loadDocumentFromGitHub(
 				repoCtx.owner,
 				repoCtx.repo,
 				node.path,
 				repoCtx.branch
 			);
-			if (ok) {
+			if (result === 'loaded') {
 				this.localCachedPaths = githubMetadataStore.getLocalCachedPaths(
 					repoCtx.owner,
 					repoCtx.repo
 				);
-			} else {
+				// Opening may add a renamed copy as an uncommitted file, or move a design to a new id.
+				this.localOnlyNodes = entriesToNodes(loadLocalOnlyEntries(repoCtx));
+			} else if (result === 'failed') {
 				this.error = `Failed to load ${node.name}`;
 			}
 		} catch (e) {

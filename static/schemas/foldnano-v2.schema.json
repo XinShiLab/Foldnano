@@ -3,7 +3,7 @@
 	"title": "Foldnano design file, format version 2",
 	"description": "Shape of a Foldnano .fn.json document at formatVersion 2. Field meanings, units and conventions: Foldnano docs, Contributors > File Format.",
 	"type": "object",
-	"required": ["format", "formatVersion", "id", "name", "parts"],
+	"required": ["format", "formatVersion", "id", "parts"],
 	"additionalProperties": false,
 	"properties": {
 		"format": { "const": "foldnano" },
@@ -18,8 +18,22 @@
 			}
 		},
 		"id": { "type": "string" },
-		"name": { "type": "string" },
-		"parts": { "type": "array", "items": { "$ref": "#/$defs/part" } }
+		"name": {
+			"type": "string",
+			"description": "Older files only. The design is named after the file, so files are written without it."
+		},
+		"parts": { "type": "array", "items": { "$ref": "#/$defs/part" } },
+		"exported": {
+			"description": "Written by downloads only: when the file was downloaded and a hash of its parts.",
+			"type": "object",
+			"required": ["at", "clock", "contentHash"],
+			"additionalProperties": false,
+			"properties": {
+				"at": { "type": "string", "description": "ISO 8601, UTC" },
+				"clock": { "enum": ["server", "local"] },
+				"contentHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+			}
+		}
 	},
 	"$defs": {
 		"vec3": {

@@ -107,12 +107,10 @@ describe('GitHubStorageProvider', () => {
 			download_url: null,
 		});
 
-		await expect(provider.loadDocument('doc-123')).resolves.toEqual(SAMPLE_SNAPSHOT);
-		expect(foldnanoIndexedDb.saveDocument).toHaveBeenCalledWith(
-			'doc-123',
-			SAMPLE_SNAPSHOT,
-			undefined
-		);
+		// The stored copy is named after the file, not the name inside it.
+		const named = { ...SAMPLE_SNAPSHOT, name: 'test' };
+		await expect(provider.loadDocument('doc-123')).resolves.toEqual(named);
+		expect(foldnanoIndexedDb.saveDocument).toHaveBeenCalledWith('doc-123', named, undefined);
 		expect(provider.getFileMetadata('doc-123')?.sha).toBe('new-sha');
 	});
 
@@ -127,7 +125,8 @@ describe('GitHubStorageProvider', () => {
 		await expect(provider.commitDocument('doc-123', 'save')).resolves.toBe('commit-sha');
 		const [, , , body] = mockPutFileContent.mock.calls[0];
 		expect(body.sha).toBe('abc123');
-		expect(atob(body.content)).toBe(JSON.stringify(SAMPLE_SNAPSHOT, null, 2));
+		const { name: _name, ...withoutName } = SAMPLE_SNAPSHOT;
+		expect(atob(body.content)).toBe(JSON.stringify(withoutName, null, 2));
 		expect(provider.getFileMetadata('doc-123')?.sha).toBe('updated-sha');
 	});
 
@@ -164,13 +163,42 @@ describe('GitHubStorageProvider', () => {
 		mockRemoteFile(pulledSnapshot);
 
 		await expect(provider.pullDocument('doc-123')).resolves.toEqual(upgraded);
-		expect(foldnanoIndexedDb.saveDocument).toHaveBeenCalledWith('doc-123', upgraded, {
-			backup: {
-				reason: 'before_pull',
-				github: { owner: 'alice', repo: 'designs', branch: 'main', path: SAMPLE_META.path },
-			},
-		});
+		expect(foldnanoIndexedDb.saveDocument).toHaveBeenCalledWith(
+			'doc-123',
+			{ ...upgraded, name: 'test' },
+			{
+				backup: {
+					reason: 'before_pull',
+					github: { owner: 'alice', repo: 'designs', branch: 'main', path: SAMPLE_META.path },
+				},
+			}
+		);
 		expect(provider.getFileMetadata('doc-123')?.sha).toBe('pulled-sha');
+	});
+
+	it('stores a pull under the local id when GitHub has a new one, and returns the new id', async () => {
+		provider.setFileMetadata('doc-123', SAMPLE_META);
+		mockRemoteFile({ id: 'doc-new', name: 'Pulled Design', parts: [] });
+
+		const pulled = await provider.pullDocument('doc-123');
+
+		expect(pulled.id).toBe('doc-new');
+		expect(foldnanoIndexedDb.saveDocument).toHaveBeenCalledWith(
+			'doc-123',
+			expect.objectContaining({ id: 'doc-123' }),
+			expect.anything()
+		);
+	});
+
+	it('names a pulled file without a name after its path', async () => {
+		provider.setFileMetadata('doc-123', SAMPLE_META);
+		mockRemoteFile({ id: 'doc-123', parts: [] });
+
+		await provider.pullDocument('doc-123');
+
+		expect(vi.mocked(foldnanoIndexedDb.saveDocument).mock.calls[0][1]).toMatchObject({
+			name: 'test',
+		});
 	});
 
 	it('labels the backup with the reason it was given', async () => {

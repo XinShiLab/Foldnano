@@ -3,7 +3,8 @@ import path from 'node:path';
 import Ajv2020 from 'ajv/dist/2020';
 import { describe, it, expect } from 'vitest';
 import FoldnanoDocument from '$lib/model/document.svelte';
-import { CURRENT_FORMAT_VERSION } from '$lib/model/documentFormat';
+import { CURRENT_FORMAT_VERSION, stringifyDesignFile } from '$lib/model/documentFormat';
+import { withExportStamp } from '$lib/model/exportStamp';
 import type { WireframeRegion } from '$lib/model/Part/DesignRegion';
 import { addFreeformVh, addLatticeVh } from '$lib/model/test/testHelpers';
 
@@ -102,12 +103,25 @@ describe('published .fn.json schema', () => {
 	});
 
 	it('accepts everything the current app writes', () => {
-		const json = JSON.parse(JSON.stringify(buildFullDocument().toJSON()));
+		const json = JSON.parse(stringifyDesignFile(buildFullDocument().toJSON()));
 
 		expect(json.parts[0].repeatGroups).toHaveLength(1);
 		expect(json.parts[1].virtualHelices[0].localFrame).toBeDefined();
 		expect(json.parts[2].regions[0].referenceGeometry.mesh.faces).toHaveLength(1);
 		expectValid(CURRENT_FORMAT_VERSION, json);
+	});
+
+	it('accepts a downloaded file with its export stamp', async () => {
+		const stamped = await withExportStamp(buildFullDocument().toJSON(), {
+			at: Date.parse('2026-11-18T13:02:11Z'),
+			clock: 'server',
+		});
+
+		expectValid(CURRENT_FORMAT_VERSION, JSON.parse(stringifyDesignFile(stamped)));
+	});
+
+	it('accepts the browser copy, which keeps the design name', () => {
+		expectValid(CURRENT_FORMAT_VERSION, JSON.parse(JSON.stringify(buildFullDocument().toJSON())));
 	});
 
 	it('rejects a field the schema does not define', () => {

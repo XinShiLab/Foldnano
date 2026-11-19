@@ -35,7 +35,6 @@ Every file starts with a header:
 	"formatVersion": 2,
 	"savedWith": { "app": "0.5.1", "commit": "8e358c7" },
 	"id": "…",
-	"name": "…",
 	"parts": []
 }
 ```
@@ -51,6 +50,23 @@ What Foldnano does:
 3. **The version goes up whenever an older app could lose data**, including when a new field is added, because an older app would drop the unknown field when it saved the file again.
 
 If you write a tool that reads `.fn.json`, check `formatVersion` first and refuse versions you don't know, the same way Foldnano does.
+
+### The design name is the file name
+
+A design is named after its file: `tile.fn.json` is the design "tile", and renaming the file renames the design. Files therefore don't store the name. Files written by earlier releases have a top-level `name`; Foldnano ignores it whenever it knows the file's name, and the file stays valid under the same format version, since leaving out an optional field loses nothing.
+
+### The download stamp
+
+A file downloaded from Foldnano (**Export as Foldnano JSON**, or **Download All**) also carries:
+
+```json
+"exported": { "at": "2026-11-18T13:02:11.000Z", "clock": "server", "contentHash": "sha256:…" }
+```
+
+- `at` is when the file was downloaded, in UTC. `clock` is `"server"` when the time came from Foldnano's server, or `"local"` when the computer was offline and its own clock was used.
+- `contentHash` is the SHA-256 of `parts`, written as JSON with the keys of every object sorted and no whitespace. It doesn't cover `id` or the name, so a copy or a renamed file keeps the same hash.
+
+Foldnano uses it when you open the file again, to tell you whether it matches the copy in your browser, is older or newer, or was changed after it was downloaded. Files committed to GitHub don't carry it, and Foldnano doesn't keep it when it opens a file. A tool that edits `parts` should remove the stamp (or leave it: Foldnano then reports the file as changed outside Foldnano).
 
 ## Conventions
 
@@ -68,8 +84,9 @@ If you write a tool that reads `.fn.json`, check `formatVersion` first and refus
 | `format`        | string | Always `"foldnano"`                                      |
 | `formatVersion` | int    | File format version (see above)                          |
 | `savedWith`     | object | `{ app, commit }`: which build last saved the file       |
-| `id`            | string | Document id                                              |
-| `name`          | string | Document name                                            |
+| `id`            | string | Design ID. It stays the same across saves, downloads and commits, so two files with the same `id` are versions of one design; a copy saved with **Save as a copy** gets a new one |
+| `name`          | string | Optional, older files only (see below)                   |
+| `exported`      | object | Optional. Only in downloaded files (see below)           |
 | `parts`         | array  | The designs in this document; most editing works on the first |
 
 ## Part

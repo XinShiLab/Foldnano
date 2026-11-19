@@ -54,6 +54,13 @@ export class FakeLockManager {
 		});
 	}
 
+	async query(): Promise<{ held: { name: string }[]; pending: { name: string }[] }> {
+		return {
+			held: this.heldNames().map((name) => ({ name })),
+			pending: [...this.#queues.values()].flat().map(({ name }) => ({ name })),
+		};
+	}
+
 	/** Names of the locks currently held. */
 	heldNames(): string[] {
 		return [...this.#held.keys()];

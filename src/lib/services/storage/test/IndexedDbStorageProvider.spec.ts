@@ -45,6 +45,10 @@ class FakeIndexedDbBackend implements IndexedDbPersistenceBackend {
 		this.metadata.delete(docId);
 	}
 
+	async rekeyDocument(): Promise<boolean> {
+		return false;
+	}
+
 	async saveContext(docId: string, context: object): Promise<void> {
 		this.contexts.set(docId, context);
 	}

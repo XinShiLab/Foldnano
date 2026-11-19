@@ -11,6 +11,8 @@ covers:
   - src/lib/components/Editor/EmptyEditorState.svelte
   - src/lib/components/Editor/Toolbar/ActiveViewerToolbar.svelte
   - src/lib/components/Editor/Toolbar/AboutDialog.svelte
+  - src/lib/components/Editor/Toolbar/SaveAsCopyDialog.svelte
+  - src/lib/components/Editor/DesignIdChip.svelte
   - src/lib/components/Editor/Toolbar/utils.ts
   - src/lib/components/Editor/ToolPanel/ToolPanel.svelte
   - src/lib/components/Editor/ToolPanel/index.ts
@@ -54,7 +56,8 @@ On narrower screens (such as an iPad), the toolbar buttons show only their icons
 | **Add Region** | Starts adding a **honeycomb** region (see [Adding a region](#adding-a-region)) |
 | **⌄** next to Add Region | **Add Honeycomb Region**, **Add Square Region**, **Add Freeform Region**, **Load Cadnano Design as a Region** |
 | `Auto Staple — [region]` | Generates staples for the active lattice region. Shown only when the active region is a lattice region. See [Creating A Design](/docs/guide/creating-a-design#auto-staple). |
-| Document name | Click to rename; `Enter` confirms, `Escape` cancels. A name already used in the same folder is refused; one used by another saved design asks **Rename Anyway**. For a file already committed to GitHub, a **Rename and Commit** dialog asks for confirmation; commit or discard pending changes first. |
+| Document name | Click to edit the name. Two buttons appear: **Rename** (or `Enter`) renames this design, and **Save as a copy** keeps this design as it is and saves a new one under the typed name. `Escape` cancels. Clicking elsewhere keeps what you typed and highlights **Rename**, and Save, the Save menu and Commit wait until you choose. A name already used in the same folder is refused; one used by another saved design asks **Rename Anyway**. For a file already committed to GitHub, a **Rename and Commit** dialog asks for confirmation; commit or discard pending changes first. |
+| Design ID | The short `#3f9a1c2e` after the name: the first characters of the design ID, which Foldnano uses to recognise the same design across this browser, files and GitHub. Click to copy the full ID. Hidden while you edit the name, on narrow windows, and for an unnamed design. See [How Foldnano tells designs apart](/docs/guide/saving-github#how-foldnano-tells-designs-apart). |
 | Save status | See [Save status](#save-status) |
 | Agent runs badge | Shown while a coding agent may run Python from a linked plugin folder: which folder is connected to which design, the running script, or why runs are paused. **×** stops agent runs. See [Agent Runs](/docs/plugin-development/agent-runs). |
 | **Undo** / **Redo** arrows | Same as `Ctrl/Cmd + Z` / `Ctrl/Cmd + Shift + Z` |
@@ -70,9 +73,10 @@ On narrower screens (such as an iPad), the toolbar buttons show only their icons
 | **View Saved Documents** | Saves, then opens the Saved Documents page (`/toc`) |
 | **View Oligos** | Saves, then opens this design's [Oligo Report](/docs/guide/oligo-report) |
 | **Backups…** | Lists this design's last 5 backups; compare one with your design, download it as `.fn.json`, or restore it (see [Backups](/docs/guide/saving-github#backups)) |
+| **Save as a Copy…** | Asks for a name, then saves this design as a new one with its own design ID and opens it; this design stays as it is. In a repository, the copy is a new uncommitted file in the same folder (see [Saving And GitHub](/docs/guide/saving-github#saved-documents)) |
 | **Save to GitHub Repo** | Publishes this design to your connected repository (see [Saving And GitHub](/docs/guide/saving-github)) |
 | `Export as cadnano JSON — [region]` | Downloads the active lattice region as cadnano JSON (shown only for lattice regions), after listing anything cadnano can't hold. See [Exporting cadnano JSON](/docs/guide/simulation-export#exporting-cadnano-json) |
-| **Export as Foldnano JSON** | Downloads the full design as `.fn.json` |
+| **Export as Foldnano JSON** | Downloads the full design as `.fn.json`, marked with the download time and a fingerprint of its content so that opening it again can compare it with your browser copy (see [Saving and GitHub](/docs/guide/saving-github)) |
 | **Export Oligos of this Part as CSV** | Downloads the oligo/sequence CSV |
 | **Other Save Options** | Placeholder, currently disabled |
 

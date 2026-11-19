@@ -94,6 +94,27 @@ export class GitHubExplorerStateStore {
 		}
 	}
 
+	/** Points uncommitted repo files at a document's new id. */
+	rekeyLocalOnlyEntries(oldId: string, newId: string): void {
+		for (const [repoKey, entries] of this.localOnlyByRepoKey.entries()) {
+			if (!entries.some((entry) => entry.docId === oldId)) continue;
+			const [owner, repo] = repoKey.split('/', 2);
+			this.saveLocalOnlyEntries(
+				owner,
+				repo,
+				entries.map((entry) => (entry.docId === oldId ? { ...entry, docId: newId } : entry))
+			);
+		}
+	}
+
+	/** True when an uncommitted repo file belongs to this document id. */
+	hasLocalOnlyEntry(docId: string): boolean {
+		for (const entries of this.localOnlyByRepoKey.values()) {
+			if (entries.some((entry) => entry.docId === docId)) return true;
+		}
+		return false;
+	}
+
 	getLocalFolderPaths(owner: string, repo: string): string[] {
 		const key = repoKey(owner, repo);
 		return this.localFoldersByRepoKey.get(key) ?? [];

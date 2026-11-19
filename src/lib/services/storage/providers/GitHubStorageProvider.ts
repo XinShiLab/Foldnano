@@ -5,7 +5,9 @@
  * Additional methods: commitDocument(), pullDocument() for GitHub sync.
  */
 import type { DocSnapshot } from '$lib/model/document.svelte';
-import { migrateDocumentJson } from '$lib/model/documentFormat';
+import { migrateDocumentJson, stringifyDesignFile } from '$lib/model/documentFormat';
+import { designNameFromPath } from '$lib/model/io/designFileName';
+import { withoutExportStamp } from '$lib/model/exportStamp';
 import type { StorageProvider } from '../StorageProvider';
 import type {
 	DocumentMetadata,
@@ -124,8 +126,11 @@ export class GitHubStorageProvider implements StorageProvider {
 		try {
 			const file = await getFileContent(meta.owner, meta.repo, meta.path, meta.branch);
 			const content = atob(file.content.replace(/\s/g, ''));
-			const snapshot = JSON.parse(content) as object;
-			// Cache locally
+			// Files carry no name; the stored copy is named after the file.
+			const snapshot = {
+				...withoutExportStamp(JSON.parse(content) as object),
+				name: designNameFromPath(meta.path),
+			};
 			await this.persistWorkingCopy(docId, snapshot);
 			this.setFileMetadata(docId, { ...meta, sha: file.sha });
 			return snapshot;
@@ -208,9 +213,9 @@ export class GitHubStorageProvider implements StorageProvider {
 		const indexedSnapshot =
 			!snapshot && this.canUseIndexedDb() ? await foldnanoIndexedDb.loadDocument(docId) : null;
 		const prettyData = snapshot
-			? JSON.stringify(snapshot, null, 2)
+			? stringifyDesignFile(snapshot, 2)
 			: indexedSnapshot
-				? JSON.stringify(indexedSnapshot, null, 2)
+				? stringifyDesignFile(indexedSnapshot, 2)
 				: null;
 		if (!prettyData) throw new Error('Document not found in IndexedDB');
 
@@ -272,12 +277,20 @@ export class GitHubStorageProvider implements StorageProvider {
 		// Validate before overwriting the working copy, so a file from a newer app is refused intact.
 		const snapshot = migrateDocumentJson(JSON.parse(content));
 
-		await this.persistWorkingCopy(docId, snapshot, {
-			backup: {
-				reason,
-				github: { owner: meta.owner, repo: meta.repo, branch: meta.branch, path: meta.path },
-			},
-		});
+		// Stored under the local id even if GitHub's copy has a new one: a record's key and the id
+		// inside it must agree, or the design reopens without its GitHub link. The caller decides
+		// whether to follow the new id (returned in the snapshot).
+		// Files carry no name; the stored copy is named after the file.
+		await this.persistWorkingCopy(
+			docId,
+			{ ...snapshot, id: docId, name: designNameFromPath(meta.path) },
+			{
+				backup: {
+					reason,
+					github: { owner: meta.owner, repo: meta.repo, branch: meta.branch, path: meta.path },
+				},
+			}
+		);
 		await this.setFileMetadata(docId, { ...meta, sha: file.sha });
 		return snapshot;
 	}

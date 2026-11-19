@@ -75,6 +75,15 @@ export class IndexedDbStorageProvider implements StorageProvider {
 		}
 	}
 
+	async rekeyDocument(oldId: string, newId: string): Promise<boolean> {
+		try {
+			return await this.backend.rekeyDocument(oldId, newId);
+		} catch (e) {
+			reportError(e, 'storage:indexeddb:rekey-document', { notify: false });
+			return false;
+		}
+	}
+
 	async saveContext(docId: string, context: object): Promise<boolean> {
 		try {
 			await this.backend.saveContext(docId, context);

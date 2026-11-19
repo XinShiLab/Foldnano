@@ -87,7 +87,11 @@ the first active part.
 
 A design has one user-facing name: `FoldnanoDocument.name`. For a file-backed
 document it _is_ the file name without its design extension (`syncNameWithPath`
-re-derives it on load; renaming the document renames the file). `Part.name` is
+re-derives it on load; renaming the document renames the file). Files therefore don't
+store it: `stringifyDesignFile` leaves the top-level `name` out of every written file,
+and only IndexedDB keeps it (`docs/storage-architecture.md` § The name stays out of files).
+What identifies a design across copies is `FoldnanoDocument.id`, not the name; the UI shows it
+as `shortDesignId(id)` (`#` plus the first 8 hex characters) through `DesignIdChip.svelte`. `Part.name` is
 internal while a document holds one Part:
 
 - imports overwrite it with the document name (the `"name"` inside a cadnano
@@ -729,6 +733,11 @@ every load path (IndexedDB, GitHub open/pull, file import, undo restore) is chec
 3. refuses malformed input (wrong `format` tag, non-integer version, no `parts`) with
    `reason: 'malformed'`
 4. runs `MIGRATIONS[n]` (version n → n + 1) in order up to the current version
+
+`migrateDocumentJson()` also drops the optional `exported` stamp that downloads carry
+(`src/lib/model/exportStamp.ts`; see `docs/storage-architecture.md` § Download stamps): it
+describes one downloaded file, so it stays out of the model, IndexedDB and commits, and adding it
+needed no version bump.
 
 Paths that write raw JSON to IndexedDB before calling `fromJSON` (GitHub open in
 `EditorDocumentSession.loadDocumentFromGitHub`, `GitHubStorageProvider.pullDocument`) call

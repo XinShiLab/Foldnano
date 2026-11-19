@@ -9,6 +9,7 @@ import {
 	MIGRATIONS,
 	applyMigrations,
 	migrateDocumentJson,
+	stringifyDesignFile,
 	type RawDocumentJson,
 } from '$lib/model/documentFormat';
 import { foldnanojsonParser } from '$lib/components/Editor/Toolbar/parsers/foldnanojsonParser';
@@ -71,6 +72,29 @@ describe('document format versioning', () => {
 			expect(json.formatVersion).toBe(CURRENT_FORMAT_VERSION);
 			expect(typeof json.savedWith?.app).toBe('string');
 			expect(typeof json.savedWith?.commit).toBe('string');
+		});
+
+		it('leaves the design name out of files but keeps nested names', () => {
+			const snapshot = {
+				id: 'd1',
+				name: 'My design',
+				parts: [{ name: 'Part 1', oligos: [{ name: 'staple' }] }],
+			};
+
+			const written = JSON.parse(stringifyDesignFile(snapshot, 2)) as RawDocumentJson;
+
+			expect(written).toEqual({
+				id: 'd1',
+				parts: [{ name: 'Part 1', oligos: [{ name: 'staple' }] }],
+			});
+			expect(snapshot.name).toBe('My design');
+		});
+
+		it('names a file opened without a name after the file', () => {
+			const raw = { format: FOLDNANO_FORMAT, formatVersion: CURRENT_FORMAT_VERSION, parts: [] };
+			const meta = { name: 'tile v2.fn.json', extension: 'json', size: 0, type: '' };
+
+			expect(foldnanojsonParser.parse(raw, meta).name).toBe('tile v2');
 		});
 	});
 

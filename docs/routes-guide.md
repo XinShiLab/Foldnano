@@ -34,6 +34,7 @@ SvelteKit route map for the editor. The runtime working copy lives in **IndexedD
 | `/api/auth/github/install`  | …                                   | GitHub App install/configure redirect           |
 | `/api/auth/github/logout`   | …                                   | Clears auth cookie                              |
 | `/api/auth/github/status`   | …                                   | `{ authenticated, user }`                       |
+| `/api/time`                 | …                                   | `{ now }` server clock for download stamps      |
 | `/api/github/repos`         | …                                   | List repos                                      |
 | `/api/github/repo`          | …                                   | One repo's metadata (default branch)            |
 | `/api/github/contents`      | …                                   | GET / PUT / DELETE file (proxy)                 |

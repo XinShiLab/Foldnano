@@ -110,6 +110,18 @@ export class StorageManager {
 		}
 	}
 
+	/** Moves a document to a new id in the primary provider; false when unsupported or refused. */
+	async rekeyDocument(oldId: string, newId: string): Promise<boolean> {
+		const provider = this.providers.get(this.primaryProvider);
+		if (!provider?.rekeyDocument) return false;
+		try {
+			return await provider.rekeyDocument(oldId, newId);
+		} catch (e) {
+			reportError(e, 'storage:rekey-document', { notify: false });
+			return false;
+		}
+	}
+
 	/**
 	 * Earlier generations of a document from the primary provider, newest first
 	 */

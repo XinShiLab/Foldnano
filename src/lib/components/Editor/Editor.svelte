@@ -61,6 +61,7 @@
 	import { parseDesignRaw, getParseWarnings, type FileMeta } from './Toolbar/parsers';
 	import LatticeChoiceDialog from './Toolbar/LatticeChoiceDialog.svelte';
 	import DesignCheckDialog from './DesignCheckDialog.svelte';
+	import SameDesignDialog from './SameDesignDialog.svelte';
 	import { parseLatticeParam, withLatticeChoice } from './Toolbar/latticeChoice.svelte';
 	import { Part } from '../../model/Part';
 	import FoldnanoDocument from '../../model/document.svelte';
@@ -115,6 +116,15 @@
 		if (session.lastLocalPersistAt === null) return;
 		const id = session.currentDoc.id;
 		if (window.location.pathname === resolve('/editor')) replaceState(resolve(`/editor/${id}`), {});
+	});
+
+	// The open design moved to a new id (its GitHub file's id changed): keep the URL reloadable.
+	$effect(() => {
+		const change = session.lastDocIdChange;
+		if (!change || session.currentDoc.id !== change.to) return;
+		if (window.location.pathname === resolve(`/editor/${change.from}`)) {
+			replaceState(resolve(`/editor/${change.to}`), {});
+		}
 	});
 
 	let urlLoadAttempted = false;
@@ -785,6 +795,7 @@
 <LinkedPluginReviewDialog gate={editorViewContext.linkedPluginReviewGate} />
 <LatticeChoiceDialog />
 <DesignCheckDialog />
+<SameDesignDialog gate={editorViewContext.sameDesignGate} />
 
 {#snippet announcementNotice()}
 	{#if pendingNotice}
