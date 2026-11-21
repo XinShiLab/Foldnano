@@ -46,7 +46,6 @@ export type PartMemento = {
 	oligoOrder: string[];
 	oligos: OligoSnapshot[];
 	virtualHelices: VirtualHelixSnapshot[];
-	maxBase?: number;
 	customModifications?: ModificationDef[];
 };
 
@@ -101,6 +100,12 @@ export type RegionReferenceGeometryChange = {
 	geometry: ReferenceGeometry | undefined;
 };
 
+export type RegionOrderChange = {
+	kind: 'regionOrder';
+	partId: string;
+	regionIds: string[];
+};
+
 export type OverlayPlacementSetChange = {
 	kind: 'overlayPlacementSet';
 	partId: string;
@@ -124,6 +129,7 @@ export type AtomicChange =
 	| RegionAddChange
 	| RegionRemoveChange
 	| RegionReferenceGeometryChange
+	| RegionOrderChange
 	| OverlayPlacementSetChange
 	| OverlayPlacementRemoveChange;
 
@@ -137,7 +143,6 @@ export type PartScopeSeed = {
 	oligoIds?: string[];
 	segmentIds?: string[];
 	vhIndices?: number[];
-	includeMaxBase?: boolean;
 	includeCustomModifications?: boolean;
 };
 
@@ -186,6 +191,12 @@ type RegionReferenceGeometryPatchDraft = {
 	regionId: string;
 	before: ReferenceGeometry | undefined;
 	after: ReferenceGeometry | undefined;
+};
+
+type RegionOrderPatchDraft = {
+	partId: string;
+	before: string[];
+	after: string[];
 };
 
 type OverlayPlacementPatchDraft = {
@@ -309,6 +320,9 @@ function applyAtomicChange(doc: FoldnanoDocument, change: AtomicChange): void {
 		case 'regionReferenceGeometry':
 			resolvePart(doc, change.partId).setRegionReferenceGeometry(change.regionId, change.geometry);
 			break;
+		case 'regionOrder':
+			resolvePart(doc, change.partId).setRegionOrder(change.regionIds);
+			break;
 		case 'overlayPlacementSet':
 			resolvePart(doc, change.partId).setOverlayPlacement(
 				change.placement.id,
@@ -412,6 +426,7 @@ export class HistoryRecorder {
 	#regionAdds: RegionAddPatchDraft[] = [];
 	#regionRemoves: RegionAddPatchDraft[] = [];
 	#regionReferenceGeometries: RegionReferenceGeometryPatchDraft[] = [];
+	#regionOrders: RegionOrderPatchDraft[] = [];
 	#overlayPlacements: OverlayPlacementPatchDraft[] = [];
 
 	#openScopes = new Set<PartScopeCapture>();
@@ -510,6 +525,10 @@ export class HistoryRecorder {
 		this.#regionReferenceGeometries.push({ partId: part.id, regionId, before, after });
 	}
 
+	regionOrder(part: Part, before: string[], after: string[]): void {
+		this.#regionOrders.push({ partId: part.id, before: [...before], after: [...after] });
+	}
+
 	/** Targeted patch for one overlay-placement entry (set/update/clear). */
 	overlayPlacement(
 		part: Part,
@@ -601,6 +620,12 @@ export class HistoryRecorder {
 			redo.push({ kind: 'regionReferenceGeometry', partId, regionId, geometry: after });
 		}
 
+		for (const { partId, before, after } of this.#regionOrders) {
+			if (sameValue(before, after)) continue;
+			undo.push({ kind: 'regionOrder', partId, regionIds: before });
+			redo.push({ kind: 'regionOrder', partId, regionIds: after });
+		}
+
 		for (const patch of this.#overlayPlacements) {
 			if (sameValue(patch.before, patch.after)) continue;
 			undo.push(
@@ -624,7 +649,6 @@ function normalizeSeed(seed: PartScopeSeed): Required<PartScopeSeed> {
 		oligoIds: [...(seed.oligoIds ?? [])],
 		segmentIds: [...(seed.segmentIds ?? [])],
 		vhIndices: [...(seed.vhIndices ?? [])],
-		includeMaxBase: seed.includeMaxBase ?? false,
 		includeCustomModifications: seed.includeCustomModifications ?? false,
 	};
 }
@@ -644,7 +668,6 @@ function capturePartMemento(part: Part, seed: Required<PartScopeSeed>): PartMeme
 		virtualHelices: part.virtualHelices
 			.filter((vh) => resolved.vhIndices.has(vh.index))
 			.map((vh) => vh.toJSON()),
-		maxBase: seed.includeMaxBase ? part.maxBase : undefined,
 		customModifications: seed.includeCustomModifications
 			? JSON.parse(JSON.stringify(part.customModifications))
 			: undefined,
@@ -660,7 +683,6 @@ function capturePartMementoFromResolved(
 ): PartMemento {
 	const currentBefore = capturePartMemento(part, {
 		...expandedSeed,
-		includeMaxBase: originalSeed.includeMaxBase,
 		includeCustomModifications: originalSeed.includeCustomModifications,
 	});
 	const beforeOligos = new Map(before.oligos.map((oligo) => [oligo.id, oligo]));
@@ -866,10 +888,6 @@ function applyPartMemento(part: Part, memento: PartMemento): void {
 	orderedOligos.push(...oligosById.values());
 	part.oligos = new SvelteSet<Oligo>(orderedOligos);
 
-	if (memento.maxBase !== undefined) {
-		const delta = memento.maxBase - part.maxBase;
-		if (delta !== 0) part.increaseVhsLengthBy(delta);
-	}
 	if (memento.customModifications !== undefined) {
 		part.customModifications = memento.customModifications;
 	}

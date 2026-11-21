@@ -402,6 +402,15 @@ const CASES: Record<string, Case> = {
 			regions.splitRegionCmd(history, part, region.id, vh0.id)
 		);
 	},
+	duplicateRegionCmd: () => {
+		const { doc, part, region, history } = latticeScene();
+		expectUndoRoundTrip(doc, history, () => regions.duplicateRegionCmd(history, part, region.id));
+	},
+	moveRegionCmd: () => {
+		const { doc, part, region, history } = latticeScene();
+		regions.duplicateRegionCmd(history, part, region.id);
+		expectUndoRoundTrip(doc, history, () => regions.moveRegionCmd(history, part, region.id, 1));
+	},
 	setRegionReferenceGeometryCmd: () => {
 		const doc = new FoldnanoDocument('doc', 'round-trip');
 		const part = doc.addNewPart('WIREFRAME');

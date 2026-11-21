@@ -290,7 +290,7 @@ describe('HoneycombPart Geometry', () => {
 			const countBefore = sitesBefore[0].length + sitesBefore[1].length;
 
 			// Increase VH length
-			testHoneycombPart.increaseVhsLengthBy(21);
+			testHoneycombPart.getDefaultRegion().increaseVhsLengthBy(21);
 
 			const sitesAfter = testHoneycombPart.potentialXoverSites(vh.index);
 			const countAfter = sitesAfter[0].length + sitesAfter[1].length;

@@ -269,7 +269,7 @@ After `END`, `SEGMENT`, or `OLIGO` handle a `down`, the `WITH_SELECTION` handler
 
 | Handler          | Trigger                                 | What it does                                                                        |
 | ---------------- | --------------------------------------- | ----------------------------------------------------------------------------------- |
-| `onRegionHeader` | click on region collapse/expand strip   | Toggle region collapse; runs first in priority order                                |
+| `onRegionHeader` | click on region collapse/expand strip   | Activate / toggle collapse; plane icon; move up/down buttons; runs first            |
 | `onCsCursor`     | click/drag on cross-section cursor line | Move the cross-section cursor                                                       |
 | `onVhTag`        | click/drag on a VH label                | Select / reorder VHs                                                                |
 | `onGrid`         | pointer on an empty `VH_GRID` cell      | Tracks the active row/bp for the cross-section cursor; does not capture the gesture |

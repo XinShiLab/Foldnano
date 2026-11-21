@@ -79,7 +79,7 @@ Mirrors can only be made from original oligos, never from other mirrors, and a s
 
 ## The Repeat Groups Panel
 
-When the design has at least one repeat group, the **Select** tool panel shows a **Repeat groups** section. Each group lists its name, the number of originals, and one chip per copy with its offset (for example `Copy 1: +42 bp`).
+When the design has at least one repeat group, the **Select** tool panel shows a **Repeat groups** section. Click the section title to collapse or expand the whole list. Each group shows one line with its name, its number of originals and its number of copies; click that line to open the group's copy chips (each with its offset, for example `Copy 1: +42 bp`) and buttons. A design with a single group shows it open; with several, they start collapsed.
 
 | Control | Effect |
 | --- | --- |

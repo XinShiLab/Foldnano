@@ -25,7 +25,7 @@ This page is the end-to-end workflow, from an empty document to a routed, scaffo
 
 ## Start From A New Document
 
-Click **New Document** in the top toolbar. A design starts empty; you then add a region and place virtual helices into it. When you add the first region, Foldnano asks you to name the design; it is saved in this browser from then on (see [Saving And GitHub](/docs/guide/saving-github)).
+Click **New** in the top toolbar. A design starts empty; you then add a region and place virtual helices into it. When you add the first region, Foldnano asks you to name the design; it is saved in this browser from then on (see [Saving And GitHub](/docs/guide/saving-github)).
 
 Every design has a **part** at the top, the container that owns your planes and regions. Starting a design (as honeycomb, square or freeform) creates that part together with a default **plane** and a default **design region**, and you can **Add Region** for more later. See [Mental Model](/docs/guide/mental-model) for what those terms mean.
 
@@ -35,7 +35,7 @@ Every design has a **part** at the top, the container that owns your planes and 
 
 ## Add A Region
 
-Use **Add Region** in the top toolbar. The dropdown offers **Add Honeycomb Region**, **Add Square Region**, **Add Freeform Region**, **Add Wireframe Region** (experimental), and **Load Cadnano Design as a Region** (which imports an existing cadnano file into a new region). Wireframe regions are experimental; see [Wireframe Designs](/docs/guide/wireframe).
+Use **Add Region** in the top toolbar. The dropdown offers **Add Honeycomb Region**, **Add Square Region**, **Add Freeform Region**, **Add Wireframe Region** (experimental), and **Load Cadnano Design as a Region** (which imports an existing cadnano file into a new region). Once a region exists, the same menu also offers **Duplicate *region***, which copies the active region with its helices and strands into a new, independent region. Wireframe regions are experimental; see [Wireframe Designs](/docs/guide/wireframe).
 
 | Choice | Use when |
 | --- | --- |

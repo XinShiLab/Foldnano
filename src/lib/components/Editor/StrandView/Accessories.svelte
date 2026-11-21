@@ -161,7 +161,7 @@
 <Group>
 	{#each d.getVisibleStrandRows() as row (`${row.kind}-${row.displayRow}`)}
 		{#if row.kind === 'REGION_HEADER'}
-			<RegionHeader {row} maxBpIdx={part.maxBase} {part} />
+			<RegionHeader {row} {part} />
 		{:else}
 			<VhTag vh={row.vh} displayRow={row.displayRow} />
 		{/if}

@@ -726,8 +726,8 @@ describe('FoldnanoDocument', () => {
 
 		it('should preserve part properties after serialization', () => {
 			const part = testDoc.addNewPart('HONEYCOMB');
-			// maxBase is read-only, tested via increaseVhsLengthBy
-			part.increaseVhsLengthBy(42); // 2 * 21, increases maxBase
+			// maxBase is read-only; lengthen the region instead
+			part.getDefaultRegion().increaseVhsLengthBy(42); // 2 * 21, increases maxBase
 
 			const json = testDoc.toJSON();
 			const restored = FoldnanoDocument.fromJSON(json);

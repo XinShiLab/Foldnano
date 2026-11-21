@@ -6,24 +6,22 @@
 	import { getEditorViewContext } from '../../context/EditorViewContext.svelte';
 	import { getPlaneColor, planeColorAsCss } from '$lib/model/Part/planeColors';
 	import type { Part } from '$lib/model/Part';
-	import { regionHeaderGeometry } from './regionHeaderGeometry';
+	import { regionHeaderGeometry, regionMaxBpIdx } from './regionHeaderGeometry';
 
 	interface Props {
 		row: VisibleRegionHeaderRow;
-		maxBpIdx: number;
 		part: Part;
 	}
 
-	const { row, maxBpIdx, part }: Props = $props();
+	const { row, part }: Props = $props();
 	const d = getDimensionContext();
 	const editorViewContext = getEditorViewContext();
 	const { radius, strokeWidth } = d.dimensions;
 
-	// Header spans this region's own maxBase (clamped to the global max passed in
-	// for layout consistency), so a shorter region's header doesn't stretch across
-	// the wider canvas.
+	// Header spans this region's own maxBase, so a shorter region's header doesn't
+	// stretch across the wider canvas.
 	const region = $derived(part.regions.find((r) => r.id === row.regionId));
-	const headerMaxBpIdx = $derived(Math.min(maxBpIdx, region ? region.maxBase : maxBpIdx));
+	const headerMaxBpIdx = $derived(regionMaxBpIdx(part, row.regionId));
 	const x = 2 * radius;
 	const geometry = $derived(regionHeaderGeometry(d, row.displayRow, headerMaxBpIdx));
 	const y = $derived(geometry.top);
@@ -49,6 +47,27 @@
 	const planeGlyphInset = 1;
 	const planeGlyphSize = $derived(iconSize - planeGlyphInset * 2);
 	const planeGlyphDotRadius = 1.5;
+
+	// Move buttons only on the active header, so inactive headers stay uncluttered.
+	const regionIndex = $derived(part.regions.findIndex((r) => r.id === row.regionId));
+	const moveButtons = $derived(
+		isActive && part.regions.length > 1
+			? [
+					{
+						dir: 'up',
+						left: geometry.moveUpLeft,
+						enabled: regionIndex > 0,
+					},
+					{
+						dir: 'down',
+						left: geometry.moveDownLeft,
+						enabled: regionIndex < part.regions.length - 1,
+					},
+				]
+			: []
+	);
+	const arrowHalfWidth = 3.5;
+	const arrowHalfHeight = 2;
 	const chevronX = x + 2;
 	const chevronY = $derived(y + height / 2);
 	const chevronHalfWidth = 2.5;
@@ -124,6 +143,40 @@
 		verticalAlign="middle"
 		fill={canvasTheme.colors.vhText}
 	/>
+
+	{#each moveButtons as button (button.dir)}
+		{@const cx = button.left + iconSize / 2}
+		{@const cy = iconY + iconSize / 2}
+		{@const tip = button.dir === 'up' ? -arrowHalfHeight : arrowHalfHeight}
+		{@const buttonId = button.enabled
+			? `REGION_HEADER#${button.dir}#${row.regionId}`
+			: `REGION_HEADER#${row.regionId}`}
+		<Group id={buttonId} kind="REGION_HEADER" category="CONTROL" class="pickable">
+			<Rect
+				id={buttonId}
+				x={button.left}
+				y={iconY}
+				width={iconSize}
+				height={iconSize}
+				fill="rgba(0,0,0,0)"
+				stroke={headerStroke}
+				strokeWidth={1}
+				cornerRadius={2}
+				opacity={button.enabled ? 1 : 0.35}
+			/>
+			<Line
+				id={buttonId}
+				x={cx}
+				y={cy}
+				points={[-arrowHalfWidth, -tip, 0, tip, arrowHalfWidth, -tip]}
+				stroke={canvasTheme.colors.vhText}
+				strokeWidth={1.5}
+				lineCap="round"
+				lineJoin="round"
+				opacity={button.enabled ? 1 : 0.35}
+			/>
+		</Group>
+	{/each}
 
 	<!--
 	  Plane icon: clicking it activates this region, shows the plane gizmo in 3D,

@@ -15,7 +15,7 @@ describe('StrandSet Occupancy', () => {
 		testDoc.addNewPart('HONEYCOMB');
 		testPart = testDoc.parts[0];
 		vh = addLatticeVh(testPart, 0, 0);
-		// testPart.increaseVhsLengthBy(63);
+		// testPart.getDefaultRegion().increaseVhsLengthBy(63);
 	});
 
 	describe('StrandSet basics', () => {

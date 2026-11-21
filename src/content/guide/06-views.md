@@ -37,6 +37,7 @@ The strand view is the routing canvas. Rows are grouped by **design region**, an
 To move around, use the **arrow keys** to pan (hold `Shift` for bigger steps), the **mouse wheel** to zoom, or hold `Option` / `Alt` and drag. **Reset view** in the strand-view toolbar returns to the default zoom, scrolled to the top of the active region, and **Fit** next to it brings the selection (or, with nothing selected, every helix) into view. Arrow keys pan only while the strand view is the active pane (click it first).
 
 - **Click a region header** (Select mode) makes that region the **active region** and moves the cross-section cursor to it; **double-click** it to collapse or expand its rows.
+- **Move a region up or down** with the arrow buttons on the active region's header (next to the plane icon). This only changes the order of regions in the strand view (and the `R2`-style numbers on cross-region crossover labels); helices, strands and the 3D layout are unchanged. Undo reverts it.
 - **Drag a VH tag** (Select mode) reorders that VH within its region. This changes only the *display* row; identity and crossovers are unaffected.
 - **Click a VH grid cell** moves the **cross-section cursor** to that region.
 - **Drag the vertical cursor bar** changes the current base (bp) index.

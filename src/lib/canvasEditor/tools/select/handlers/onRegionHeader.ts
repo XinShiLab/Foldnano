@@ -1,5 +1,6 @@
 import type { HandlerInstance } from '../../types';
 import type { ViewContext } from '../../../core/views';
+import { moveRegionCmd } from '$lib/commands/regions';
 
 function clearHiddenTransientState(ctx: ViewContext): void {
 	const activeAround = ctx.strandCtx.activeAround;
@@ -33,7 +34,7 @@ function clearHiddenTransientState(ctx: ViewContext): void {
 
 type ParsedRegionHeaderHit = {
 	regionId: string;
-	zone: 'body' | 'plane';
+	zone: 'body' | 'plane' | 'up' | 'down';
 };
 
 function parseHitId(id: string): ParsedRegionHeaderHit | null {
@@ -42,8 +43,32 @@ function parseHitId(id: string): ParsedRegionHeaderHit | null {
 	// receive here is the suffix after the first '#'. Possibilities:
 	//   <regionId>            (body click)
 	//   plane#<regionId>      (plane gizmo icon)
-	if (id.startsWith('plane#')) return { regionId: id.slice('plane#'.length), zone: 'plane' };
+	//   up#<regionId>, down#<regionId>  (move buttons on the active header)
+	for (const zone of ['plane', 'up', 'down'] as const) {
+		if (id.startsWith(`${zone}#`)) return { regionId: id.slice(zone.length + 1), zone };
+	}
 	return { regionId: id, zone: 'body' };
+}
+
+function headerWorldY(ctx: ViewContext, regionId: string): number | null {
+	const row = ctx.drawingDimensions
+		.getVisibleStrandRows()
+		.find((r) => r.kind === 'REGION_HEADER' && r.regionId === regionId);
+	return row ? ctx.drawingDimensions.getRowYByRowIdx(row.displayRow) : null;
+}
+
+/** Moves the region one slot and pans so its header stays under the pointer for repeat clicks. */
+function moveRegionByOne(ctx: ViewContext, regionId: string, step: -1 | 1): void {
+	const from = ctx.part.regions.findIndex((r) => r.id === regionId);
+	if (from < 0) return;
+	const before = headerWorldY(ctx, regionId);
+	moveRegionCmd(ctx.history, ctx.part, regionId, from + step);
+	const after = headerWorldY(ctx, regionId);
+	const controller = ctx.editorCtx.strandToolbarController;
+	const scale = controller?.stage?.node.scaleY() ?? 1;
+	if (before !== null && after !== null && after !== before) {
+		controller?.panBy(0, (before - after) * scale);
+	}
 }
 
 const DOUBLE_CLICK_MS = 350;
@@ -68,6 +93,12 @@ export function createRegionHeaderHandler(): HandlerInstance {
 				const ctrl = editorCtx.view3DToolbarController;
 				if (ctrl) ctrl.showPlanes = true;
 				editorCtx.view3DToolbarController?.onFrameActivePlane?.();
+				return true;
+			}
+
+			if (zone === 'up' || zone === 'down') {
+				moveRegionByOne(ctx, regionId, zone === 'up' ? -1 : 1);
+				lastClickRegionId = null;
 				return true;
 			}
 

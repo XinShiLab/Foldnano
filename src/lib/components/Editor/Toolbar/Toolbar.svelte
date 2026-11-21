@@ -36,6 +36,7 @@
 		FolderOpen,
 		GitBranch,
 		GitCommitHorizontal,
+		Download,
 		HardDriveDownload,
 		Hexagon,
 		History,
@@ -56,11 +57,14 @@
 		Workflow,
 	} from '@lucide/svelte';
 	import { autoStapleCmd } from '$lib/commands/strands';
+	import { duplicateRegionCmd } from '$lib/commands/regions';
 	import { CadnanoJSON } from '$lib/model/io/cadnanoJSON';
 	import { checkCadnanoProfile } from '$lib/model/checks/cadnano';
 	import { designCheckPrompt, needsDesignCheck } from '../designCheckPrompt.svelte';
 	import { LatticedDesignRegion } from '$lib/model/Part/DesignRegion';
 	import { downloadFoldnanoJson, downloadJsonAsTextFile } from './utils';
+	import { formatRelativeTime } from '$lib/relativeTime';
+	import type { DocumentMetadata } from '$lib/services/storage/types';
 	import { Input } from '../../ui/input';
 	import { getEditorViewContext } from '../context/EditorViewContext.svelte';
 	import {
@@ -149,6 +153,29 @@
 	let renameNudgeTimer: ReturnType<typeof setTimeout> | undefined;
 	let saveMenuOpen = $state(false);
 	let saveAsCopyDialogOpen = $state(false);
+	let openMenuOpen = $state(false);
+	/** null while loading; read fresh each time the Open menu opens. */
+	let recentDocs = $state<DocumentMetadata[] | null>(null);
+	const RECENT_DOCS_LIMIT = 5;
+
+	async function loadRecentDocs() {
+		recentDocs = null;
+		const list = await session.storageManager.getDocumentList();
+		recentDocs = list
+			.filter((d) => d.id !== session.currentDoc.id)
+			.sort((a, b) => b.lastModified - a.lastModified)
+			.slice(0, RECENT_DOCS_LIMIT);
+	}
+
+	async function openSavedDocument(id: string) {
+		await session.saveDocumentToLocalStorage({ skipPristineBlank: true });
+		goto(resolve(`/editor/${id}`));
+	}
+
+	async function viewSavedDocuments() {
+		await session.saveDocumentToLocalStorage({ skipPristineBlank: true });
+		goto(resolve('/toc'));
+	}
 
 	function nudgeRename() {
 		renameNudge = true;
@@ -276,6 +303,21 @@
 	const startAddRegion = (kind: 'HONEYCOMB' | 'SQUARE' | 'FREEFORM' | 'WIREFRAME') => {
 		addPartMenuOpen = false;
 		editorViewContext.enterPlaneSelectionMode(kind);
+	};
+
+	const onDuplicateRegion = () => {
+		addPartMenuOpen = false;
+		const part = foldnanoDoc.parts[0];
+		const region = editorViewContext.activeRegion;
+		if (!part || !region) return;
+		try {
+			const copy = duplicateRegionCmd(history, part, region.id, `Duplicate ${region.name}`);
+			if (copy) editorViewContext.setActiveRegion(copy.id);
+		} catch (err) {
+			notify.error(`Couldn't duplicate ${region.name}`, {
+				description: err instanceof Error ? err.message : String(err),
+			});
+		}
 	};
 
 	const undo = () => {
@@ -460,7 +502,7 @@
 											text: 'Start an empty design, as a new file in the connected repository or saved only in this browser. Your current one stays saved in this browser.',
 										})}
 									>
-										<FilePlusCorner /><span class="hidden xl:inline">New Document</span>
+										<FilePlusCorner /><span class="hidden xl:inline">New</span>
 									</Button>
 								{/snippet}
 							</DropdownMenu.Trigger>
@@ -485,7 +527,7 @@
 							{@attach help({
 								title: 'New Document',
 								text: 'Start an empty design. Your current one stays saved in this browser.',
-							})}><FilePlusCorner /><span class="hidden xl:inline">New Document</span></Button
+							})}><FilePlusCorner /><span class="hidden xl:inline">New</span></Button
 						>
 					{/if}
 
@@ -496,7 +538,7 @@
 							aria-label="Open"
 							{@attach help({
 								title: 'Open',
-								text: 'Open a Foldnano .fn.json or cadnano .json design, or a design saved in this browser.',
+								text: 'Open a Foldnano .fn.json or cadnano .json design file. The arrow menu lists the designs saved in this browser.',
 								doc: 'creating-a-design',
 							})}><FolderOpen /><span class="hidden xl:inline">Open</span></Dialog.Trigger
 						>
@@ -511,12 +553,86 @@
 								</Dialog.Description>
 							</Dialog.Header>
 							<Open {toggleDialog} />
-							<!-- <Dialog.Footer>
-            <Button type="submit">Load</Button>
-          </Dialog.Footer> -->
+							<p class="text-sm text-muted-foreground">
+								Looking for a design you worked on in this browser?
+								<button
+									type="button"
+									class="cursor-pointer font-medium text-foreground underline underline-offset-2"
+									onclick={viewSavedDocuments}>Saved Documents</button
+								>
+							</p>
 						</Dialog.Content>
 					</Dialog.Root>
+					<DropdownMenu.Root
+						bind:open={
+							() => openMenuOpen,
+							(open) => {
+								openMenuOpen = open && !holdForNameDraft();
+								if (openMenuOpen) void loadRecentDocs();
+							}
+						}
+					>
+						<DropdownMenu.Trigger>
+							{#snippet child({ props })}
+								<Button
+									{...props}
+									variant="outline"
+									size="sm"
+									class="!pl-2"
+									aria-label="Open menu"
+									{@attach help({
+										title: 'Open menu',
+										text: 'Your most recent designs saved in this browser, and the full Saved Documents list.',
+										doc: 'saving-github',
+									})}
+								>
+									<ChevronDown />
+								</Button>
+							{/snippet}
+						</DropdownMenu.Trigger>
+						<DropdownMenu.Content align="start" class="max-w-80 min-w-64 [--radius:1rem]">
+							<DropdownMenu.Group>
+								<DropdownMenu.Item onclick={() => (isDialogOpen = true)}>
+									<FolderOpen />Open File…
+								</DropdownMenu.Item>
+							</DropdownMenu.Group>
+							<DropdownMenu.Separator />
+							<DropdownMenu.Group>
+								<DropdownMenu.GroupHeading class="text-xs font-normal text-muted-foreground">
+									Recent in this browser
+								</DropdownMenu.GroupHeading>
+								{#if recentDocs === null}
+									<DropdownMenu.Item disabled>
+										<LoaderCircle class="animate-spin" />Loading…
+									</DropdownMenu.Item>
+								{:else if recentDocs.length === 0}
+									<DropdownMenu.Item disabled>No other saved designs yet</DropdownMenu.Item>
+								{:else}
+									{#each recentDocs as doc (doc.id)}
+										<DropdownMenu.Item
+											onclick={() => openSavedDocument(doc.id)}
+											title={doc.name || 'Untitled Document'}
+										>
+											<FileBracesCorner />
+											<span class="min-w-0 flex-1 truncate">{doc.name || 'Untitled Document'}</span>
+											<span class="ml-2 shrink-0 text-xs text-muted-foreground"
+												>{formatRelativeTime(doc.lastModified)}</span
+											>
+										</DropdownMenu.Item>
+									{/each}
+								{/if}
+							</DropdownMenu.Group>
+							<DropdownMenu.Separator />
+							<DropdownMenu.Group>
+								<DropdownMenu.Item onclick={viewSavedDocuments}>
+									<Database />All Saved Documents…
+								</DropdownMenu.Item>
+							</DropdownMenu.Group>
+						</DropdownMenu.Content>
+					</DropdownMenu.Root>
+				</ButtonGroup.Root>
 
+				<ButtonGroup.Root>
 					<Button
 						variant="outline"
 						size="sm"
@@ -533,6 +649,24 @@
 						})}
 					>
 						<Save /><span class="hidden xl:inline">Save</span>
+					</Button>
+					<Button
+						variant="outline"
+						size="sm"
+						class="!px-2"
+						onclick={() => {
+							if (holdForNameDraft()) return;
+							void exportToFoldnanoJson();
+						}}
+						title="Download as Foldnano JSON (.fn.json)"
+						aria-label="Download as Foldnano JSON"
+						{@attach help({
+							title: 'Download .fn.json',
+							text: 'Download the whole design as a Foldnano file, a backup on your disk that survives clearing browser data.',
+							doc: 'saving-github',
+						})}
+					>
+						<Download />
 					</Button>
 					<DropdownMenu.Root
 						bind:open={
@@ -561,12 +695,7 @@
 						</DropdownMenu.Trigger>
 						<DropdownMenu.Content align="end" class="min-w-60 [--radius:1rem]">
 							<DropdownMenu.Group>
-								<DropdownMenu.Item
-									onclick={async () => {
-										await session.saveDocumentToLocalStorage({ skipPristineBlank: true });
-										goto(resolve('/toc'));
-									}}
-								>
+								<DropdownMenu.Item onclick={viewSavedDocuments}>
 									<Database />View Saved Documents
 								</DropdownMenu.Item>
 								<DropdownMenu.Item
@@ -593,7 +722,7 @@
 									</DropdownMenu.Item>
 								{/if}
 								<DropdownMenu.Item onclick={() => exportToFoldnanoJson()}>
-									<FileBracesCorner />Export as Foldnano JSON
+									<FileBracesCorner />Download as Foldnano JSON
 								</DropdownMenu.Item>
 								<DropdownMenu.Item onclick={exportOligoSequencesToCSV}>
 									<FileSpreadsheet />Export Oligos of this Part as CSV
@@ -633,7 +762,7 @@
 									class="!pl-2"
 									{@attach help({
 										title: 'Region types',
-										text: 'Add a honeycomb, square or freeform region, or load a cadnano design as a new region of this part.',
+										text: 'Add a honeycomb, square or freeform region, load a cadnano design as a new region of this part, or duplicate the active region.',
 										doc: 'creating-a-design',
 									})}
 								>
@@ -664,6 +793,12 @@
 								>
 									<FileBracesCorner />Load Cadnano Design as a Region
 								</DropdownMenu.Item>
+								{#if editorViewContext.activeRegion}
+									<DropdownMenu.Separator />
+									<DropdownMenu.Item onclick={onDuplicateRegion}>
+										<CopyPlus />Duplicate {editorViewContext.activeRegion.name}
+									</DropdownMenu.Item>
+								{/if}
 							</DropdownMenu.Group>
 						</DropdownMenu.Content>
 					</DropdownMenu.Root>

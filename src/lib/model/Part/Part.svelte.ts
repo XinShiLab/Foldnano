@@ -593,6 +593,29 @@ export class Part {
 		this.syncListRows();
 	}
 
+	/** Moves a region to `toIndex` in `regions` (clamped); listRows follow the new order. */
+	moveRegion(regionId: string, toIndex: number): void {
+		const from = this.regions.findIndex((r) => r.id === regionId);
+		if (from < 0) return;
+		const target = Math.max(0, Math.min(this.regions.length - 1, toIndex));
+		if (target === from) return;
+		const [region] = this.regions.splice(from, 1);
+		this.regions.splice(target, 0, region);
+		this.syncListRows();
+	}
+
+	/** Reorders `regions` to match `regionIds`; regions not listed keep their relative order at the end. */
+	setRegionOrder(regionIds: readonly string[]): void {
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity
+		const rank = new Map(regionIds.map((id, i) => [id, i]));
+		const last = regionIds.length;
+		const ordered = [...this.regions].sort(
+			(a, b) => (rank.get(a.id) ?? last) - (rank.get(b.id) ?? last)
+		);
+		this.regions.splice(0, this.regions.length, ...ordered);
+		this.syncListRows();
+	}
+
 	setRegionReferenceGeometry(regionId: string, geometry: ReferenceGeometry | undefined): void {
 		const region = this.getRegionById(regionId);
 		if (!(region instanceof WireframeRegion)) {
@@ -1033,11 +1056,6 @@ export class Part {
 		this._virtualHelices.push(newVh);
 		this.syncListRows();
 		return newVh;
-	}
-
-	increaseVhsLengthBy(deltaLength: number): void {
-		const region = this.getDefaultRegion();
-		region.increaseVhsLengthBy(deltaLength);
 	}
 
 	createOligo(

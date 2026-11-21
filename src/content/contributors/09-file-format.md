@@ -8,7 +8,7 @@ slug: file-format
 
 # File Format (.fn.json)
 
-A Foldnano design file (`.fn.json`) is a single JSON document. It is what Foldnano commits to GitHub, what **Export as Foldnano JSON** downloads, and what you could share with other researchers. This page is the contract for that file: what each field means, its units and conventions, and what stays stable between versions.
+A Foldnano design file (`.fn.json`) is a single JSON document. It is what Foldnano commits to GitHub, what **Download as Foldnano JSON** downloads, and what you could share with other researchers. This page is the contract for that file: what each field means, its units and conventions, and what stays stable between versions.
 
 It is written for anyone who reads or writes these files outside the editor: analysis scripts, other design tools, reviewers checking supplementary data, and contributors changing the model.
 
@@ -57,7 +57,7 @@ A design is named after its file: `tile.fn.json` is the design "tile", and renam
 
 ### The download stamp
 
-A file downloaded from Foldnano (**Export as Foldnano JSON**, or **Download All**) also carries:
+A file downloaded from Foldnano (**Download as Foldnano JSON**, or **Download All**) also carries:
 
 ```json
 "exported": { "at": "2026-11-18T13:02:11.000Z", "clock": "server", "contentHash": "sha256:…" }

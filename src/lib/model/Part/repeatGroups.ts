@@ -138,7 +138,7 @@ export function syncRepeatGroups(part: Part): boolean {
 
 // ── Group operations (mirrors themselves are created/removed by the sync) ──
 
-function nextGroupName(part: Part): string {
+export function nextGroupName(part: Pick<Part, 'repeatGroups'>): string {
 	const used = new Set(part.repeatGroups.map((g) => g.name));
 	let n = 1;
 	while (used.has(`Repeat ${n}`)) n++;

@@ -4,7 +4,7 @@ import { registerCanvasHelp, type CanvasHelpAnchor } from '$lib/components/help/
 import type { Rect } from '$lib/components/help/helpLayout';
 import type { Part } from '$lib/model/Part';
 import type { DrawingDimensions } from './drawingDimensions';
-import { regionHeaderGeometry } from './Grid/regionHeaderGeometry';
+import { regionHeaderGeometry, regionMaxBpIdx } from './Grid/regionHeaderGeometry';
 import type { VisibleStrandRow } from './strandRowLayout';
 
 // getRect runs every frame while help is open: scan a bounded window from the viewport top so
@@ -64,9 +64,7 @@ export function registerStrandCanvasHelp(
 	function headerGeometry() {
 		const row = firstRowInView('REGION_HEADER');
 		if (!row) return null;
-		const region = part.regions.find((r) => r.id === row.regionId);
-		const maxBpIdx = Math.min(part.maxBase, region?.maxBase ?? part.maxBase);
-		return regionHeaderGeometry(d, row.displayRow, maxBpIdx);
+		return regionHeaderGeometry(d, row.displayRow, regionMaxBpIdx(part, row.regionId));
 	}
 
 	const header: CanvasHelpAnchor = {
