@@ -143,6 +143,12 @@ oligo ids change on break / crossover / ligation, so a flag that travels with
 the oligo is the stable anchor. Rule 3 (no mirror of a mirror) falls out:
 sources are never mirrors.
 
+**Duplicate region** (`Part/duplicateRegion.ts`, see `docs/dna-model.md`) copies a group only
+when all its originals and mirrors lie wholly in the region: the copy gets a new group (fresh ids,
+`nextGroupName`, same offsets), its copied mirrors are re-tagged to the copied sources with
+`structure` re-derived (the fingerprint includes the VH index), and the sync then finds them up to
+date. Groups reaching outside the region are copied as plain oligos.
+
 **Persistence:** groups, `repeatGroupId` and `mirrorOf` are serialized only
 when set, so files without repeat groups are byte-identical to before. Mirrors
 themselves are persisted as ordinary oligos (load path and undo snapshots are
@@ -300,7 +306,9 @@ exist.
 ## Repeat group panel
 
 `ToolPanel/RepeatGroupPanel.svelte`, inside the Select tool panel when the part
-has groups. Per group: originals count, one chip per copy (offset, remove ✕),
+has groups. The section and each group collapse (component-local state; a lone group
+starts open, several start collapsed); the collapsed group row shows name, originals and
+copy counts. Expanded per group: one chip per copy (offset, remove ✕),
 **Select originals**, **Add copy** (linked placement for that group),
 **Detach** (mirrors become independent oligos, group dissolved), **Delete**
 (mirrors removed; originals stay as normal oligos). Removing the last copy

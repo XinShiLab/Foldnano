@@ -1,6 +1,7 @@
 import type { HandlerInstance } from '../../types';
 import type { ViewContext } from '../../../core/views';
 import { reorderVirtualHelixCmd } from '$lib/commands/virtualHelices';
+import { regionMaxBpIdx } from '$lib/components/Editor/StrandView/Grid/regionHeaderGeometry';
 import { removeTempPartsByType } from './drawTempPartsOps';
 
 export function createVhTagHandler(): HandlerInstance {
@@ -62,7 +63,7 @@ export function createVhTagHandler(): HandlerInstance {
 				type: 'VhDragPreview',
 				props: {
 					targetRowIdx: startRow.displayRow,
-					maxBpIdx: ctx.part.maxBase,
+					maxBpIdx: regionMaxBpIdx(ctx.part, draggedRegionId),
 				},
 			});
 
@@ -113,7 +114,7 @@ export function createVhTagHandler(): HandlerInstance {
 						type: 'VhDragPreview',
 						props: {
 							targetRowIdx: targetDisplayRow,
-							maxBpIdx: ctx.part.maxBase,
+							maxBpIdx: regionMaxBpIdx(ctx.part, draggedRegionId),
 						},
 					};
 				}

@@ -49,14 +49,16 @@ On narrower screens (such as an iPad), the toolbar buttons show only their icons
 | Control | What it does |
 | --- | --- |
 | **Foldnano** (with *beta* badge) | Opens the **About** dialog: the version and build, **What's New** (the last 3 months of changes, some with a **Learn more** link to the guide, and **Show earlier updates** for older ones), the author, the licenses (MIT for the code, CC BY 4.0 for this documentation), and third-party licenses. A small blue dot before the name means What's New has entries you haven't opened yet, and inside What's New those entries carry the same dot and darker text until you next reload; some major changes are also announced once in a card at the bottom right |
-| **New Document** | Creates a new, empty document. With a GitHub repository connected, it asks whether to create a **New File** in that repository or a **Local-Only Design** kept in this browser |
+| **New** | Creates a new, empty document. With a GitHub repository connected, it asks whether to create a **New File** in that repository or a **Local-Only Design** kept in this browser |
 | **Open** | Opens the **Open file** dialog (see [Open dialog](#open-dialog)) |
+| **⌄** next to Open | **Open File…** (the same dialog), your five most recently changed designs saved in this browser (click one to open it), and **All Saved Documents…** (the Saved Documents page). The design you have open saves first |
 | **Save** | Saves the working copy to browser storage now |
+| Download arrow next to Save | Downloads the whole design as a `.fn.json` file, same as **Download as Foldnano JSON** in the Save menu |
 | **⌄** next to Save | Save menu (see below) |
 | **Add Region** | Starts adding a **honeycomb** region (see [Adding a region](#adding-a-region)) |
-| **⌄** next to Add Region | **Add Honeycomb Region**, **Add Square Region**, **Add Freeform Region**, **Load Cadnano Design as a Region** |
+| **⌄** next to Add Region | **Add Honeycomb Region**, **Add Square Region**, **Add Freeform Region**, **Load Cadnano Design as a Region**, **Duplicate *region*** (the active region) |
 | `Auto Staple — [region]` | Generates staples for the active lattice region. Shown only when the active region is a lattice region. See [Creating A Design](/docs/guide/creating-a-design#auto-staple). |
-| Document name | Click to edit the name. Two buttons appear: **Rename** (or `Enter`) renames this design, and **Save as a copy** keeps this design as it is and saves a new one under the typed name. `Escape` cancels. Clicking elsewhere keeps what you typed and highlights **Rename**, and Save, the Save menu and Commit wait until you choose. A name already used in the same folder is refused; one used by another saved design asks **Rename Anyway**. For a file already committed to GitHub, a **Rename and Commit** dialog asks for confirmation; commit or discard pending changes first. |
+| Document name | Click to edit the name. Two buttons appear: **Rename** (or `Enter`) renames this design, and **Save as a copy** keeps this design as it is and saves a new one under the typed name. `Escape` cancels. Clicking elsewhere keeps what you typed and highlights **Rename**, and Save, Download, the Save menu and Commit wait until you choose. A name already used in the same folder is refused; one used by another saved design asks **Rename Anyway**. For a file already committed to GitHub, a **Rename and Commit** dialog asks for confirmation; commit or discard pending changes first. |
 | Design ID | The short `#3f9a1c2e` after the name: the first characters of the design ID, which Foldnano uses to recognise the same design across this browser, files and GitHub. Click to copy the full ID. Hidden while you edit the name, on narrow windows, and for an unnamed design. See [How Foldnano tells designs apart](/docs/guide/saving-github#how-foldnano-tells-designs-apart). |
 | Save status | See [Save status](#save-status) |
 | Agent runs badge | Shown while a coding agent may run Python from a linked plugin folder: which folder is connected to which design, the running script, or why runs are paused. **×** stops agent runs. See [Agent Runs](/docs/plugin-development/agent-runs). |
@@ -76,7 +78,7 @@ On narrower screens (such as an iPad), the toolbar buttons show only their icons
 | **Save as a Copy…** | Asks for a name, then saves this design as a new one with its own design ID and opens it; this design stays as it is. In a repository, the copy is a new uncommitted file in the same folder (see [Saving And GitHub](/docs/guide/saving-github#saved-documents)) |
 | **Save to GitHub Repo** | Publishes this design to your connected repository (see [Saving And GitHub](/docs/guide/saving-github)) |
 | `Export as cadnano JSON — [region]` | Downloads the active lattice region as cadnano JSON (shown only for lattice regions), after listing anything cadnano can't hold. See [Exporting cadnano JSON](/docs/guide/simulation-export#exporting-cadnano-json) |
-| **Export as Foldnano JSON** | Downloads the full design as `.fn.json`, marked with the download time and a fingerprint of its content so that opening it again can compare it with your browser copy (see [Saving and GitHub](/docs/guide/saving-github)) |
+| **Download as Foldnano JSON** | Downloads the full design as `.fn.json`, marked with the download time and a fingerprint of its content so that opening it again can compare it with your browser copy (see [Saving and GitHub](/docs/guide/saving-github)) |
 | **Export Oligos of this Part as CSV** | Downloads the oligo/sequence CSV |
 | **Other Save Options** | Placeholder, currently disabled |
 
@@ -105,6 +107,8 @@ The **ⓘ** next to it (*Storage info*) explains that designs are saved in this 
 
 **Load Cadnano Design as a Region** opens a dialog where you drop a cadnano `.json` / `.cadnano.json`, choose the same **Base Plane** options, and click **Load**. The file becomes a new region in the current part.
 
+**Duplicate *region*** copies the active region, with its helices and strands, into a new region on its own plane, placed beside the original in 3D. The copy is independent: editing it never changes the original region. Linked mirror copies inside the region come along as a new repeat group of their own (shown as a separate group in the Repeat panel); if a repeat group reaches outside the region, its strands are copied as ordinary strands. A strand that crosses into another region is copied only up to the region's edge, so the copied crossover ends become free ends.
+
 ### Open dialog
 
 **Open** accepts the same files as the start screen, except a `.ply` mesh. Each dropped file is listed with an action:
@@ -112,6 +116,8 @@ The **ⓘ** next to it (*Storage info*) explains that designs are saved in this 
 - **Foldnano `.fn.json`**: a one-line summary (regions, helices, scaffold length, staples), then **Load** opens it, named after the file. If this browser already has the same design (for example one you exported and kept editing), a note says when it was last saved and you choose: **Open as copy** opens the file as a separate design and leaves the saved one as it is; **Replace** puts the file's content in the saved design, and the replaced version stays in **Backups**.
 - **cadnano `.json`**: **Open** creates a **new `.fn.json` document** from it; the original `.json` isn't changed. When a GitHub repository is connected, **Add original to current repo folder** also stores the original file there. If the file could be either lattice, you're asked whether it is honeycomb or square.
 - **Local plugin `.zip`**: shows the plugin's details and an **Install** button (see [Plugins For Users](/docs/guide/plugins-for-users)). A plugin manifest on its own (`fplugin.json`) is refused; install the plugin's `.zip` instead.
+
+Designs you already worked on in this browser aren't files: open them from the **Saved Documents** link at the bottom of the dialog, or from the **⌄** next to Open.
 
 ### Loading from a URL
 
@@ -250,7 +256,7 @@ See [Views And Regions](/docs/guide/views#plane-gizmo) for plane editing.
 
 ## Strand View: Rows And Context Menu
 
-- **Region header**: click to make the region active; double-click to collapse or expand it. The **plane icon** on the header switches the left pane to 3D, shows the planes, and frames that region's plane.
+- **Region header**: click to make the region active; double-click to collapse or expand it. The **plane icon** on the header switches the left pane to 3D, shows the planes, and frames that region's plane. The active header's **up / down arrows** move the region one place in the strand view's region order.
 - **VH tag** (left edge of each row): drag to reorder helices within the region.
 - **Cross-region arrows** mark connections that continue in another region.
 - The **status bar** at the bottom right shows details of whatever is under the pointer.

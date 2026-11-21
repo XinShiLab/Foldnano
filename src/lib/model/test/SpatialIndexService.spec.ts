@@ -229,7 +229,7 @@ describe('SpatialIndexService', () => {
 	describe('O(1) lookup performance', () => {
 		it('should maintain constant lookup time as segment count scales', () => {
 			testPart = testDoc.parts[0];
-			testPart.increaseVhsLengthBy(210); // Ensure enough length for many segments
+			testPart.getDefaultRegion().increaseVhsLengthBy(210); // Ensure enough length for many segments
 			// Measure lookup time with few segments
 			const smallSegmentCount = 10;
 			for (let i = 0; i < smallSegmentCount; i++) {
@@ -270,7 +270,7 @@ describe('SpatialIndexService', () => {
 		});
 
 		it('should have direct hash-based access without iteration', () => {
-			testPart.increaseVhsLengthBy(210); // Ensure enough length for sparse segments
+			testPart.getDefaultRegion().increaseVhsLengthBy(210); // Ensure enough length for sparse segments
 			// Create segments at sparse positions
 			testPart.createOligo(vh1, 0, 5, '#ff0000');
 			testPart.createOligo(vh1, 100, 105, '#00ff00'); // Far apart
@@ -362,7 +362,7 @@ describe('SpatialIndexService', () => {
 
 		it('should handle large bp indices', () => {
 			// Increase VH length (must be multiple of step=21)
-			testPart.increaseVhsLengthBy(105); // 5 * 21
+			testPart.getDefaultRegion().increaseVhsLengthBy(105); // 5 * 21
 
 			const oligo = testPart.createOligo(vh1, 100, 120, '#ff0000');
 			const segment = oligo.segments.values().next().value!;

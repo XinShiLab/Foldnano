@@ -58,6 +58,15 @@ gate titles, a use-with-caution note); drop the "beta" badge at 1.0.
       (changed outside Foldnano); a file matching a backup; offline (DevTools) export and open
       ("seems"); Download All files carry `exported`; GitHub commits don't; a deployed build
       answers `/api/time`.
+- [ ] **Download button next to Save: check in the browser** (landed 2026-11-21 on
+      `feat/doc_ID_edit`). Try: the ⬇ between Save and ⌄ downloads a stamped `.fn.json` (same as
+      Save menu → Download as Foldnano JSON); while editing the name it waits like Save does;
+      narrow window (all three segments icon-only).
+- [ ] **Open menu with recent designs: check in the browser** (landed 2026-11-21 on
+      `feat/doc_ID_edit`). Try: ⌄ next to Open lists up to 5 other designs by last change (not the
+      open one), each opens after the current design saves; empty browser shows "No other saved
+      designs yet"; while editing the name the menu waits; **All Saved Documents…** and the link
+      in the Open dialog go to `/toc`; New shows as "New" at `xl`.
 - [ ] **Files no longer store the design name: check in the browser** (landed 2026-11-19 on
       `feat/doc_ID_edit`; unit-tested). Try: download a design and open it (named after the
       file); commit, then view the file on GitHub (no top-level `name`); open an older repo file

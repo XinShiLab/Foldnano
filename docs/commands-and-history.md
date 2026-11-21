@@ -23,7 +23,7 @@ src/lib/commands/
 ├── virtualHelix.ts      # lattice + freeform VH commands
 ├── virtualHelices.ts    # region-local VH reordering
 ├── planes.ts            # 3D plane transform commands
-├── regions.ts           # region + plane add/remove commands
+├── regions.ts           # region + plane add/remove/split/duplicate/move commands
 ├── overlays.ts          # external-structure overlay placement commands
 └── repeatGroups.ts      # repeat-group definition commands
 ```
@@ -164,6 +164,7 @@ The recorder emits targeted patch kinds, including:
 | `PlaneTransformChange` / `PlaneAdd`/`Remove` | Undoable transform / add / remove of a persisted `Plane`                                                            |
 | `RegionAdd`/`RegionRemove`                   | Undoable add / remove of a `DesignRegion`                                                                           |
 | `RegionReferenceGeometryChange`              | Undoable set / clear of a wireframe region's `referenceGeometry`                                                    |
+| `RegionOrderChange`                          | Undoable reorder of `part.regions` (`moveRegionCmd`); replays via `Part.setRegionOrder`, which resyncs listRows     |
 | `OverlayPlacementSet`/`Remove`               | Undoable upsert / clear of one external-structure overlay placement (`Part.overlayPlacements`); see `overlays.ts`   |
 
 ### `PartScopeCapture`
@@ -177,7 +178,6 @@ The seed can name affected:
 - `vhIndices`
 - `oligoIds`
 - `segmentIds`
-- `includeMaxBase`
 - `includeCustomModifications`
 
 On commit, the recorder expands that seed to include newly created or newly

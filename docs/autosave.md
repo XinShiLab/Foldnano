@@ -159,7 +159,7 @@ button reports through `reportError()`, always notifying since it's a direct use
 While `autoSaveStatus.error` is set on the owner tab, `Editor.svelte` renders
 `SaveFailedBanner.svelte`: a persistent red banner with **Retry** (a forced
 `saveDocumentToLocalStorage()`) and **Download .json** (`downloadFoldnanoJson()` in
-`Toolbar/utils.ts`, the same serialization as _Export as Foldnano JSON_). The download is the escape
+`Toolbar/utils.ts`, the same serialization as _Download as Foldnano JSON_). The download is the escape
 hatch when IndexedDB itself is broken (quota, private browsing, eviction). It is hidden while a
 URL-loaded design is still pending its first save.
 

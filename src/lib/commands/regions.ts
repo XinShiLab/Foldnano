@@ -6,6 +6,7 @@ import {
 	type ReferenceGeometry,
 } from '$lib/model/Part/DesignRegion';
 import { Plane } from '$lib/model/Part/Plane.svelte';
+import { duplicateRegion } from '$lib/model/Part/duplicateRegion';
 import type { HistoryStack } from './history.svelte';
 
 export function addRegionAndPlaneCmd(
@@ -82,6 +83,39 @@ export function splitRegionCmd(
 		}
 
 		part.syncListRows();
+	});
+}
+
+/** Adds an independent copy of the region (its plane, helices and strands) right after it.
+ * Returns the new region, or null if the region no longer exists. */
+export function duplicateRegionCmd(
+	historyStack: HistoryStack,
+	part: Part,
+	regionId: string,
+	label = 'Duplicate region'
+): DesignRegion | null {
+	if (!part.getRegionById(regionId)) return null;
+	return historyStack.snapshotTx(label, () => duplicateRegion(part, regionId));
+}
+
+/** Moves a region to `toIndex` in the part's region order (strand-view row order). */
+export function moveRegionCmd(
+	historyStack: HistoryStack,
+	part: Part,
+	regionId: string,
+	toIndex: number,
+	label = 'Move region'
+): void {
+	const before = part.regions.map((r) => r.id);
+	const from = before.indexOf(regionId);
+	if (from < 0 || from === Math.max(0, Math.min(before.length - 1, toIndex))) return;
+	historyStack.tx(label, (rec) => {
+		part.moveRegion(regionId, toIndex);
+		rec.regionOrder(
+			part,
+			before,
+			part.regions.map((r) => r.id)
+		);
 	});
 }
 

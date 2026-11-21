@@ -554,7 +554,7 @@ describe('DNA Sequence Operations with Oligos', () => {
 		});
 
 		it('should handle very long sequence', () => {
-			testPart.increaseVhsLengthBy(4200); // Increase to accommodate 4000+ bases (multiple of 21)
+			testPart.getDefaultRegion().increaseVhsLengthBy(4200); // Increase to accommodate 4000+ bases (multiple of 21)
 
 			const oligo = testPart.createOligo(vh1, 0, 3999, '#ff0000');
 			const longSeq = generateRandomDNA(4000, 0.5, { seed: 202 });

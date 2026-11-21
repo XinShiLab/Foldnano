@@ -30,7 +30,7 @@ The editor has three coordinated areas that stay in sync, so an edit in one is i
 
 | Area | What lives here |
 | --- | --- |
-| **Top toolbar** | New Document, Open, Save, the save/export menu, Add Region, Auto Staple, document name, Undo/Redo, and the GitHub controls |
+| **Top toolbar** | New, Open (with your recent designs), Save, the save/export menu, Add Region, Auto Staple, document name, Undo/Redo, and the GitHub controls |
 | **Left pane** | The **Plane** view (lattice or freeform placement) or the **3D** view, switched with the `Plane / 3D` toggle in the left-pane toolbar |
 | **Right pane** | The **strand viewer**, the main routing canvas where you draw scaffold and staple paths |
 | **Icon rail** (far left) | Opens the **Source Control** (GitHub) and **Plugins** side panels, plus panels added by plugins |
@@ -44,7 +44,7 @@ The left pane is for *placing* helices and *inspecting* the structure in 3D. The
 
 The fastest way to learn Foldnano is to build a tiny design end to end. The whole loop takes a couple of minutes.
 
-1. Open the editor (the **Open App** link, or `/editor`) and click **New Document** in the top toolbar.
+1. Open the editor (the **Open App** link, or `/editor`) and click **New** in the top toolbar.
 2. On the start screen, pick **Honeycomb**, **Square**, or **Freeform** (or use the toolbar's **Add Region** menu), choose a base plane in the **New Region** panel, and click **Create … Region Here**. Start with honeycomb or square for a cadnano-style lattice; choose freeform when helices should *not* snap to honeycomb or square coordinates.
 3. With the left pane on **Plane** and the **Draw** tool (`n`) active, click empty lattice cells to add virtual helices.
 4. Move to the strand viewer to route DNA: pick **Draw**, drag across a helix row to lay down a strand, then drag between compatible ends to add crossovers.

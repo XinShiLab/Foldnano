@@ -270,7 +270,7 @@ path that skips this choice.
 
 ### Download stamps and comparing a file with the browser copy
 
-Downloads (toolbar **Export as Foldnano JSON**, the save-failed banner, and each file in the
+Downloads (toolbar download button / **Download as Foldnano JSON**, the save-failed banner, and each file in the
 Download All zip) add an `exported: { at, clock, contentHash }` block through
 `withExportStamp()` (`src/lib/model/exportStamp.ts`). `contentHash` is SHA-256 over the canonical
 JSON (keys sorted at every level) of `parts` only: the name follows the file and the id follows
