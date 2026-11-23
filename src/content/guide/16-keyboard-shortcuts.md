@@ -56,7 +56,9 @@ strand viewer is the active viewer.
 | `Ctrl/Cmd + Shift + D` | place linked mirror copies of the selected oligos |
 | hold `Option` / `Alt` | temporary **pan** modifier for the active canvas |
 | arrow keys | pan the strand view (hold `Shift` for bigger steps; not while placing a duplicate) |
-| mouse wheel | zoom the active canvas |
+| mouse wheel | zoom the active canvas; in **Pan** mode or while holding `Option` / `Alt`, scroll it instead |
+| horizontal wheel or `Shift` + wheel | pan the active canvas sideways |
+| `Ctrl/Cmd` + wheel or trackpad pinch | zoom the active canvas, in any mode |
 | `?` | toggle the workspace help |
 
 ![In-app shortcut overlay, opened with the ? key, listing Global and Editor Modes shortcuts](/screenshots/guide/keyboard-shortcuts/01-shortcut-overlay.webp)

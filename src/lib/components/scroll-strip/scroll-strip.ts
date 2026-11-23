@@ -1,22 +1,14 @@
 import type { Attachment } from 'svelte/attachments';
+import { wheelDeltaPx } from '$lib/utils/wheel';
 
 /** Width of the edge fade that hints at clipped content, in CSS pixels. */
 const FADE_PX = 20;
-/** Pixels a `DOM_DELTA_LINE` wheel step scrolls (Firefox / some Windows mice). */
-const LINE_PX = 16;
 
 /** Pixel distance `event` asks to scroll `el` horizontally; 0 when it is not a vertical-wheel gesture. */
 export function verticalWheelToHorizontalPx(event: WheelEvent, el: HTMLElement): number {
 	// Trackpad pinch-zoom arrives as ctrl+wheel; horizontal gestures scroll natively.
 	if (event.ctrlKey || Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return 0;
-	switch (event.deltaMode) {
-		case WheelEvent.DOM_DELTA_LINE:
-			return event.deltaY * LINE_PX;
-		case WheelEvent.DOM_DELTA_PAGE:
-			return event.deltaY * el.clientWidth;
-		default:
-			return event.deltaY;
-	}
+	return wheelDeltaPx(event.deltaY, event.deltaMode, el.clientWidth);
 }
 
 /** Mask that fades whichever edges of `el` have content scrolled past them; `''` when none. */

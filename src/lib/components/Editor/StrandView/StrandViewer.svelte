@@ -506,7 +506,7 @@
 		height={viewerHeight || 800}
 		bind:this={stage}
 		onwheel={(e) => {
-			handleWheel(e, stage);
+			handleWheel(e, stage, editorViewContext.editorMode === 'PAN');
 			updateViewportBounds();
 			updateViewportScale();
 		}}

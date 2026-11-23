@@ -1233,7 +1233,7 @@
 		width={CANVAS_W}
 		height={CANVAS_H}
 		bind:this={stageRef}
-		onwheel={(e) => handleWheel(e, stageRef)}
+		onwheel={(e) => handleWheel(e, stageRef, editorMode === 'PAN')}
 		onpointermove={onStagePointerMove}
 		onpointerup={onStagePointerUp}
 		onpointercancel={onStagePointerCancel}
