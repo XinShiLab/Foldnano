@@ -99,7 +99,7 @@ For honeycomb and square regions:
 
 The stage supports:
 
-- wheel zoom
+- wheel zoom and wheel pan, by the shared `handleWheel` rules (see `docs/editor-strand-viewer.md`)
 - stage drag in `PAN` mode
 - toolbar reset via the helix viewer controller
 

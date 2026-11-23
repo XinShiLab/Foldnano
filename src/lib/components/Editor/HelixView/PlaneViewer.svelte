@@ -83,7 +83,7 @@
 				width={paneWidth || latticeCanvasWidth}
 				height={paneHeight || latticeCanvasHeight}
 				bind:this={stageRef}
-				onwheel={(e) => handleWheel(e, stageRef)}
+				onwheel={(e) => handleWheel(e, stageRef, editorMode === 'PAN')}
 				onpointerdown={(e) => latticeViewer?.onStagePointerDown(e)}
 				onpointermove={(e) => latticeViewer?.onPointerMove(e)}
 				onpointerup={(e) => latticeViewer?.onPointerUp(e)}

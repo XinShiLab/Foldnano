@@ -8,8 +8,10 @@ import {
 	applyRigidFit,
 	bestFitRigid,
 	buildReplayReference,
+	dominantEigenvector4,
 	poseFrame,
 	unwrapStrandsInPlace,
+	type Quat,
 } from '$lib/model/oxdnaReplay/framePose';
 import { OxDnaTopologyParseError, parseOxDnaTopology } from '$lib/model/oxdnaReplay/oxdnaTopology';
 import {
@@ -124,6 +126,70 @@ describe('bestFitRigid', () => {
 		const fit = bestFitRigid(moving, ref, ref.length / 3);
 		applyRigidFit(moving, fit);
 		for (let i = 0; i < ref.length; i++) expect(moving[i]).toBeCloseTo(ref[i], 4);
+	});
+
+	// Deterministic pseudo-random numbers in [-1, 1).
+	const lcg = (seed: number) => () => {
+		seed = (seed * 1664525 + 1013904223) % 4294967296;
+		return (seed / 4294967296) * 2 - 1;
+	};
+	const rotate = (points: Float32Array, q: Quat, shift: [number, number, number]) => {
+		const out = Float32Array.from(points);
+		applyRigidFit(out, { rotation: q, fromCenter: [0, 0, 0], toCenter: shift });
+		return out;
+	};
+	const unitQuat = (w: number, x: number, y: number, z: number): Quat => {
+		const n = Math.hypot(w, x, y, z);
+		return [w / n, x / n, y / n, z / n];
+	};
+	const rmsd = (a: Float32Array, b: Float32Array) =>
+		Math.sqrt(a.reduce((s, v, i) => s + (v - b[i]) ** 2, 0) / (a.length / 3));
+
+	it('recovers arbitrary rotations, including 180° turns', () => {
+		const next = lcg(7);
+		const ref = Float32Array.from({ length: 60 }, () => next() * 20);
+		const rotations = [
+			unitQuat(1, 0, 0, 0),
+			unitQuat(0, 1, 0, 0),
+			unitQuat(0, 0.3, -0.5, 0.8),
+			...Array.from({ length: 20 }, () => unitQuat(next(), next(), next(), next())),
+		];
+		for (const q of rotations) {
+			const moving = rotate(ref, q, [5, -3, 12]);
+			applyRigidFit(moving, bestFitRigid(moving, ref, ref.length / 3));
+			expect(rmsd(moving, ref)).toBeLessThan(1e-3);
+		}
+	});
+
+	it('fits collinear and planar sets, where the rotation is not unique', () => {
+		const line = Float32Array.from({ length: 30 }, (_, i) => (i % 3 === 0 ? i : 0));
+		const plane = Float32Array.from({ length: 30 }, (_, i) => (i % 3 === 2 ? 0 : (i * 7) % 11));
+		for (const ref of [line, plane]) {
+			const moving = rotate(ref, unitQuat(0.2, 0.9, -0.4, 0.1), [1, 2, 3]);
+			applyRigidFit(moving, bestFitRigid(moving, ref, ref.length / 3));
+			expect(rmsd(moving, ref)).toBeLessThan(1e-3);
+		}
+	});
+
+	it('does no worse than the true rotation on noisy points', () => {
+		const next = lcg(42);
+		const ref = Float32Array.from({ length: 300 }, () => next() * 30);
+		const q = unitQuat(0.6, -0.2, 0.7, 0.3);
+		const moving = rotate(ref, q, [0, 0, 0]).map((v) => v + next() * 0.5);
+		const truth = Float32Array.from(moving);
+		applyRigidFit(truth, {
+			rotation: [q[0], -q[1], -q[2], -q[3]],
+			fromCenter: [0, 0, 0],
+			toCenter: [0, 0, 0],
+		});
+		applyRigidFit(moving, bestFitRigid(moving, ref, ref.length / 3));
+		expect(rmsd(moving, ref)).toBeLessThanOrEqual(rmsd(truth, ref) + 1e-4);
+	});
+
+	it('returns the identity for a single point or no spread', () => {
+		const fit = bestFitRigid([1, 2, 3], [4, 5, 6], 1);
+		expect(fit.rotation).toEqual([1, 0, 0, 0]);
+		expect(dominantEigenvector4(new Array(16).fill(0))).toEqual([1, 0, 0, 0]);
 	});
 });
 

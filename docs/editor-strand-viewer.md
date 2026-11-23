@@ -2,6 +2,8 @@
 covers:
   - src/lib/components/Editor/StrandView/**
   - src/lib/components/Editor/context/firstPressActivates.ts
+  - src/lib/components/Editor/mouseHandler.ts
+  - src/lib/utils/wheel.ts
 ---
 
 # Editor - Strand Viewer
@@ -326,6 +328,13 @@ refactor:
   nothing; `viewportBounds` changes on every step and would re-run all of them.
   `StrandViewer.updateViewportBounds` maintains both, on wheel, on stage `dragmove` (so a
   long pan never shows blank canvas) and on `dragend`.
+- **Wheel gestures go through `handleWheel` (`mouseHandler.ts`)**, shared with the plane and
+  freeform viewers; each caller passes whether the PAN tool is active. `classifyWheel` decides pan
+  vs zoom: Ctrl/Cmd + wheel (and trackpad pinch, which arrives as ctrl+wheel) always zooms; in PAN
+  mode or with `altKey` the wheel scrolls both axes (Alt keydown already switches to PAN, but
+  `altKey` also covers a wheel over the unfocused pane); otherwise a vertical wheel zooms and only
+  horizontal-dominant deltas or Shift + vertical wheel scroll sideways. Don't derive zoom direction
+  from `deltaY` alone: a pure-`deltaX` event used to fall into the zoom-out branch.
 - **Zoom thresholds go through `strandViewContext.isDetailZoom`** (a derived boolean), not
   a per-node comparison with `viewportScale`, for the same reason.
 - `OligoSegmentInPart` always mounts (for every segment in the part) but toggles

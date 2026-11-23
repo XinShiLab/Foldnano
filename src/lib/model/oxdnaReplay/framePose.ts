@@ -143,52 +143,61 @@ export function unwrapStrandsInPlace(
 /** Unit quaternion (w, x, y, z) as a plain tuple. */
 export type Quat = [number, number, number, number];
 
-// Cyclic Jacobi on a symmetric 4×4; returns the eigenvector of the largest eigenvalue.
-function largestEigenvector4(m: number[][]): Quat {
-	const a = m.map((row) => row.slice());
-	const v = [
-		[1, 0, 0, 0],
-		[0, 1, 0, 0],
-		[0, 0, 1, 0],
-		[0, 0, 0, 1],
-	];
-	for (let sweep = 0; sweep < 50; sweep++) {
-		let off = 0;
-		for (let p = 0; p < 3; p++) for (let q = p + 1; q < 4; q++) off += a[p][q] * a[p][q];
-		if (off < 1e-20) break;
-		for (let p = 0; p < 3; p++) {
-			for (let q = p + 1; q < 4; q++) {
-				if (Math.abs(a[p][q]) < 1e-30) continue;
-				const theta = (a[q][q] - a[p][p]) / (2 * a[p][q]);
-				const t = Math.sign(theta || 1) / (Math.abs(theta) + Math.sqrt(theta * theta + 1));
-				const c = 1 / Math.sqrt(t * t + 1);
-				const s = t * c;
-				for (let k = 0; k < 4; k++) {
-					const akp = a[k][p];
-					const akq = a[k][q];
-					a[k][p] = c * akp - s * akq;
-					a[k][q] = s * akp + c * akq;
-				}
-				for (let k = 0; k < 4; k++) {
-					const apk = a[p][k];
-					const aqk = a[q][k];
-					a[p][k] = c * apk - s * aqk;
-					a[q][k] = s * apk + c * aqk;
-				}
-				for (let k = 0; k < 4; k++) {
-					const vkp = v[k][p];
-					const vkq = v[k][q];
-					v[k][p] = c * vkp - s * vkq;
-					v[k][q] = s * vkp + c * vkq;
-				}
-			}
+const SQUARINGS = 40;
+
+/** `m · m` for a row-major 4×4, rescaled so its largest entry is 1 (keeps powers finite). */
+function squareScaled4(m: Float64Array): Float64Array {
+	const out = new Float64Array(16);
+	let peak = 0;
+	for (let r = 0; r < 4; r++) {
+		for (let c = 0; c < 4; c++) {
+			const v =
+				m[r * 4] * m[c] +
+				m[r * 4 + 1] * m[4 + c] +
+				m[r * 4 + 2] * m[8 + c] +
+				m[r * 4 + 3] * m[12 + c];
+			out[r * 4 + c] = v;
+			peak = Math.max(peak, Math.abs(v));
 		}
 	}
-	let best = 0;
-	for (let i = 1; i < 4; i++) if (a[i][i] > a[best][best]) best = i;
-	const q: Quat = [v[0][best], v[1][best], v[2][best], v[3][best]];
-	const norm = Math.hypot(...q) || 1;
-	return [q[0] / norm, q[1] / norm, q[2] / norm, q[3] / norm];
+	if (peak > 0) for (let i = 0; i < 16; i++) out[i] /= peak;
+	return out;
+}
+
+/**
+ * Eigenvector of the largest eigenvalue of a symmetric row-major 4×4 (Horn's matrix), as a unit
+ * quaternion. Shifting by the Frobenius norm makes every eigenvalue non-negative, so repeatedly
+ * squaring the shifted matrix converges to a projector onto the top eigenvector; when the top
+ * eigenvalue is repeated, any vector of that eigenspace is an equally good fit.
+ */
+export function dominantEigenvector4(horn: ArrayLike<number>): Quat {
+	let frob = 0;
+	for (let i = 0; i < 16; i++) frob += horn[i] * horn[i];
+	frob = Math.sqrt(frob);
+	if (!(frob > 0) || !Number.isFinite(frob)) return [1, 0, 0, 0];
+
+	const shifted = Float64Array.from({ length: 16 }, (_, i) => horn[i] + (i % 5 === 0 ? frob : 0));
+	let power: Float64Array = shifted;
+	for (let k = 0; k < SQUARINGS; k++) power = squareScaled4(power);
+
+	// A projector's column with the largest diagonal entry lies furthest along the eigenvector.
+	let col = 0;
+	for (let c = 1; c < 4; c++) if (power[c * 5] > power[col * 5]) col = c;
+	let vec = [power[col], power[4 + col], power[8 + col], power[12 + col]];
+	// Two plain power steps on the unsquared matrix wash out rounding left by the squarings.
+	for (let step = 0; step < 2; step++) {
+		vec = [0, 1, 2, 3].map(
+			(r) =>
+				shifted[r * 4] * vec[0] +
+				shifted[r * 4 + 1] * vec[1] +
+				shifted[r * 4 + 2] * vec[2] +
+				shifted[r * 4 + 3] * vec[3]
+		);
+		const len = Math.hypot(...vec);
+		if (!(len > 0)) return [1, 0, 0, 0];
+		vec = vec.map((x) => x / len);
+	}
+	return [vec[0], vec[1], vec[2], vec[3]];
 }
 
 export interface RigidFit {
@@ -220,39 +229,27 @@ export function bestFitRigid(
 ): RigidFit {
 	const pc = centroid3(moving, count);
 	const qc = centroid3(reference, count);
-	let sxx = 0,
-		sxy = 0,
-		sxz = 0,
-		syx = 0,
-		syy = 0,
-		syz = 0,
-		szx = 0,
-		szy = 0,
-		szz = 0;
+	// Cross-covariance, row-major: cov[3a + b] = Σ (moving − pc)_a · (reference − qc)_b.
+	const cov = new Float64Array(9);
+	const d = new Float64Array(6);
 	for (let i = 0; i < count; i++) {
-		const px = moving[i * 3] - pc[0];
-		const py = moving[i * 3 + 1] - pc[1];
-		const pz = moving[i * 3 + 2] - pc[2];
-		const qx = reference[i * 3] - qc[0];
-		const qy = reference[i * 3 + 1] - qc[1];
-		const qz = reference[i * 3 + 2] - qc[2];
-		sxx += px * qx;
-		sxy += px * qy;
-		sxz += px * qz;
-		syx += py * qx;
-		syy += py * qy;
-		syz += py * qz;
-		szx += pz * qx;
-		szy += pz * qy;
-		szz += pz * qz;
+		for (let a = 0; a < 3; a++) {
+			d[a] = moving[i * 3 + a] - pc[a];
+			d[3 + a] = reference[i * 3 + a] - qc[a];
+		}
+		for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) cov[a * 3 + b] += d[a] * d[3 + b];
 	}
-	const rotation = largestEigenvector4([
-		[sxx + syy + szz, syz - szy, szx - sxz, sxy - syx],
-		[syz - szy, sxx - syy - szz, sxy + syx, szx + sxz],
-		[szx - sxz, sxy + syx, -sxx + syy - szz, syz + szy],
-		[sxy - syx, szx + sxz, syz + szy, -sxx - syy + szz],
-	]);
-	return { rotation, fromCenter: pc, toCenter: qc };
+	const [xx, xy, xz, yx, yy, yz, zx, zy, zz] = cov;
+	const tr = xx + yy + zz;
+	// Horn's (1987) symmetric N matrix, row-major.
+	// prettier-ignore
+	const horn = [
+		tr, yz - zy, zx - xz, xy - yx,
+		yz - zy, 2 * xx - tr, xy + yx, zx + xz,
+		zx - xz, xy + yx, 2 * yy - tr, yz + zy,
+		xy - yx, zx + xz, yz + zy, 2 * zz - tr,
+	];
+	return { rotation: dominantEigenvector4(horn), fromCenter: pc, toCenter: qc };
 }
 
 /** Applies `fit` to every point of `points` in place. */
