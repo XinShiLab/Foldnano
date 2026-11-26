@@ -180,8 +180,7 @@ const sets: ScreenshotSet[] = [
 			});
 			await page.keyboard.press('Escape');
 
-			await page.getByRole('button', { name: 'New Part' }).click();
-			await page.getByRole('menuitem', { name: 'Insert Part from…' }).click();
+			await page.getByRole('button', { name: 'Link Part' }).click();
 			const dialog = page.getByRole('dialog');
 			await dialog.waitFor();
 			await page.waitForTimeout(800);

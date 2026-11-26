@@ -31,7 +31,7 @@ Hover over any icon button in the app to see its name in a tooltip, and press `?
 
 ## Start Screen
 
-A new, empty document shows **Start a new design** with **Honeycomb**, **Square** and **Freeform** buttons. Each opens the **New Region** panel for that type, where you choose its base plane (see [Adding a region](#adding-a-region)). The **Wireframe** card, marked **Experimental**, starts a [wireframe region](/docs/guide/wireframe), and hovering it links to the current status of wireframe support. The **Assembly** card below them starts a design with no Part of its own: it opens **Insert Part from…** to link designs saved in this browser (see [Assemblies And Parts](/docs/guide/assemblies#starting-an-assembly)).
+A new, empty document shows **Start a new design** with **Honeycomb**, **Square** and **Freeform** buttons. Each opens the **New Region** panel for that type, where you choose its base plane (see [Adding a region](#adding-a-region)). The **Wireframe** card, marked **Experimental**, starts a [wireframe region](/docs/guide/wireframe), and hovering it links to the current status of wireframe support. The **Assembly** card below them starts a design with no Part of its own: it opens **Link Part from…** to link designs saved in this browser (see [Assemblies And Parts](/docs/guide/assemblies#starting-an-assembly)).
 
 Below it, **or load an existing design** lists the files you can drop anywhere on the start screen or pick with **Open file…**:
 
@@ -55,10 +55,11 @@ On narrower screens (such as an iPad), the toolbar buttons show only their icons
 | **Save** | Saves the working copy to browser storage now |
 | Download arrow next to Save | Downloads the whole design as a `.fn.json` file, same as **Download as Foldnano JSON** in the Save menu |
 | **⌄** next to Save | Save menu (see below) |
-| **Add Region** | Starts adding a **honeycomb** region (see [Adding a region](#adding-a-region)) |
+| **Add Region** | Starts adding a **honeycomb** region (see [Adding a region](#adding-a-region)). Hidden while the active Part is linked from another design, since it is read-only |
 | **⌄** next to Add Region | **Add Honeycomb Region**, **Add Square Region**, **Add Freeform Region**, **Load Cadnano Design as a Region**, **Duplicate *region*** (the active region) |
-| `Auto Staple — [region]` | Generates staples for the active lattice region. Shown only when the active region is a lattice region. See [Creating A Design](/docs/guide/creating-a-design#auto-staple). |
+| `Auto Staple — [region]` | Generates staples for the active lattice region. Shown only when the active region is a lattice region of a Part you can edit (not a linked one). See [Creating A Design](/docs/guide/creating-a-design#auto-staple). |
 | Document name | Click to edit the name. Two buttons appear: **Rename** (or `Enter`) renames this design, and **Save as a copy** keeps this design as it is and saves a new one under the typed name. `Escape` cancels. Clicking elsewhere keeps what you typed and highlights **Rename**, and Save, Download, the Save menu and Commit wait until you choose. A name already used in the same folder is refused; one used by another saved design asks **Rename Anyway**. For a file already committed to GitHub, a **Rename and Commit** dialog asks for confirmation; commit or discard pending changes first. |
+| **Assembly** | Shown before the name when every Part in the design is linked from another design: an assembly file, which only places them. Click it to open the **Assembly** panel. It is saved in the same format as any design; see [What An Assembly File Is](/docs/guide/assemblies#what-an-assembly-file-is). |
 | Design ID | The short `#3f9a1c2e` after the name: the first characters of the design ID, which Foldnano uses to recognise the same design across this browser, files and GitHub. Click to copy the full ID. Hidden while you edit the name, on narrow windows, and for an unnamed design. See [How Foldnano tells designs apart](/docs/guide/saving-github#how-foldnano-tells-designs-apart). |
 | Save status | See [Save status](#save-status) |
 | Agent runs badge | Shown while a coding agent may run Python from a linked plugin folder: which folder is connected to which design, the running script, or why runs are paused. **×** stops agent runs. See [Agent Runs](/docs/plugin-development/agent-runs). |
@@ -139,7 +140,7 @@ Click an active icon again to close its panel.
 
 ### Several Parts
 
-A design can hold several **Parts**, each designed and folded on its own. The **Assembly** panel lists them with their instances (placements in 3D): click a Part to edit it, add a Part with **New Part**, or insert a read-only Part linked from another design with **New Part** › **Insert Part from…**. With more than one Part, a bar above the strand view shows the design, the active Part and the active region; click the Part name to switch Parts. See [Assemblies And Parts](/docs/guide/assemblies) for the whole story: instances, placing them in 3D, linked Parts and exports.
+A design can hold several **Parts**, each designed and folded on its own. The **Assembly** panel lists them with their instances (placements in 3D): click a Part to edit it, start a new assembly file with **New assembly** (it offers to link the current design first), link a read-only Part from another design with **Link Part**, or add an editable Part with **New Part in this design**. The button at the top shows whichever of the first two fits the design; the arrow next to it holds the rest. With more than one Part, a bar above the strand view shows the design, the active Part and the active region; click the Part name to switch Parts. See [Assemblies And Parts](/docs/guide/assemblies) for the whole story: instances, placing them in 3D, linked Parts and exports.
 
 ## Viewer Toolbar
 
@@ -289,7 +290,7 @@ The **Properties** item, and the **Paste** and **Export as SVG** items on empty 
 
 ## Status Bar
 
-The strip along the bottom of the editor. On the left, where the design is kept and how it stands:
+The strip along the bottom of the editor. It is blue, or teal for an assembly file (every Part linked from another design), which then reads **Assembly file** first; click that to open the Assembly panel. On the left, where the design is kept and how it stands:
 
 - For a GitHub file: the **branch**, the **repository and file path**, and the short **commit ID**. Then its sync state:
   - *Saved in browser · not committed* (amber dot): your changes are safe in this browser but not on GitHub yet. Commit to save them there. While a browser save is still pending it reads *Not committed*.

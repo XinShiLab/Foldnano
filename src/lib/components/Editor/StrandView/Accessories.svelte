@@ -27,6 +27,37 @@
 	const { sideLength } = d.dimensions;
 
 	const renderBounds = $derived(editorViewContext.strandViewContext.renderBounds);
+
+	const SPLIT_OK_COLOR = '#d4af37';
+	const SPLIT_BLOCKED_COLOR = '#e5484d';
+	const splitPreview = $derived(editorViewContext.strandViewContext.splitPreviewState);
+
+	/** Vertical cut line spanning the region's visible helices, plus the strands blocking it. */
+	const bpCutLine = $derived.by(() => {
+		if (splitPreview?.kind !== 'bp') return null;
+		const rows = d
+			.getVisibleStrandRows()
+			.filter((row) => row.kind === 'VH' && row.regionId === splitPreview.regionId)
+			.map((row) => row.displayRow);
+		if (rows.length === 0) return null;
+		const blocking = splitPreview.blockingSegmentIds.flatMap((id) => {
+			const segment = part.getSegmentById(id);
+			const row = segment ? d.getDisplayRowForVh(segment.inVirtualHelix.id) : null;
+			if (!segment || row === null) return [];
+			const y = d.getRowYByRowIdx(row);
+			return segment.inStrandIndex === 0
+				? [{ y1: y - sideLength, y2: y }]
+				: [{ y1: y, y2: y + sideLength }];
+		});
+		const step = part.getRegionById(splitPreview.regionId)?.step ?? 0;
+		return {
+			x: d.getXByBpIdx(splitPreview.cut),
+			onStepBoundary: step > 0 && splitPreview.cut % step === 0,
+			y1: d.getRowYByRowIdx(Math.min(...rows)) - sideLength - 8,
+			y2: d.getRowYByRowIdx(Math.max(...rows)) + sideLength + 8,
+			blocking,
+		};
+	});
 </script>
 
 <!-- @component
@@ -169,17 +200,18 @@
 </Group>
 
 <!-- Split region preview overlay -->
-{#if editorViewContext.strandViewContext.splitPreviewState}
-	{@const preview = editorViewContext.strandViewContext.splitPreviewState}
+{#if splitPreview?.kind === 'rows'}
 	{@const gapY =
-		(d.getRowYByRowIdx(preview.gapDisplayRow) + d.getRowYByRowIdx(preview.gapDisplayRow + 1)) / 2}
+		(d.getRowYByRowIdx(splitPreview.gapDisplayRow) +
+			d.getRowYByRowIdx(splitPreview.gapDisplayRow + 1)) /
+		2}
 	{@const vb = editorViewContext.strandViewContext.viewportBounds}
 	{@const lineX1 = vb.x - 200}
 	{@const lineX2 = vb.x + vb.width + 200}
 	<Group>
 		<Line
 			points={[lineX1, gapY, lineX2, gapY]}
-			stroke="#d4af37"
+			stroke={SPLIT_OK_COLOR}
 			strokeWidth={1.5}
 			dash={[8, 5]}
 			listening={false}
@@ -187,9 +219,40 @@
 		<Text
 			x={lineX2 - 260}
 			y={gapY + 4}
-			text={`→ New: ${preview.newRegionName}`}
+			text={`→ New: ${splitPreview.newRegionName}`}
 			fontSize={11}
-			fill="#d4af37"
+			fill={SPLIT_OK_COLOR}
+			listening={false}
+		/>
+	</Group>
+{:else if splitPreview?.kind === 'bp' && bpCutLine}
+	{@const color = splitPreview.ok ? SPLIT_OK_COLOR : SPLIT_BLOCKED_COLOR}
+	<Group>
+		<Line
+			points={[bpCutLine.x, bpCutLine.y1, bpCutLine.x, bpCutLine.y2]}
+			stroke={color}
+			strokeWidth={bpCutLine.onStepBoundary ? 3 : 1.5}
+			dash={bpCutLine.onStepBoundary ? undefined : [8, 5]}
+			listening={false}
+		/>
+		{#each bpCutLine.blocking as band, i (i)}
+			<Line
+				points={[bpCutLine.x, band.y1, bpCutLine.x, band.y2]}
+				stroke={SPLIT_BLOCKED_COLOR}
+				strokeWidth={4}
+				listening={false}
+			/>
+		{/each}
+		<Text
+			x={bpCutLine.x + 6}
+			y={bpCutLine.y1 - 14}
+			text={(bpCutLine.onStepBoundary ? `Step boundary (bp ${splitPreview.cut}) · ` : '') +
+				(splitPreview.ok
+					? `→ New: ${splitPreview.newRegionName}` +
+						(splitPreview.shift > 0 ? ` (renumbered from bp ${splitPreview.shift})` : '')
+					: splitPreview.reason)}
+			fontSize={11}
+			fill={color}
 			listening={false}
 		/>
 	</Group>

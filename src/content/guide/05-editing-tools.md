@@ -40,7 +40,7 @@ Export fallback: the toolbar contains pan, select, draw, break, skip, insert, pa
 | `PAINT` | `p` | recolor oligos |
 | `MODIFICATION` | `m` | apply or clear terminal modifications |
 | `SEQUENCE` | `a` | assign or clear sequences |
-| `SPLIT_REGION` | `r` | split one region into two between helix rows |
+| `SPLIT_REGION` | `r` | split one region into two, between helix rows or across the helices |
 
 <Callout type="tip">
 
@@ -193,10 +193,15 @@ The same status appears as the **S** badge in the strand-view toolbar; click it 
 
 ## Split Region
 
-The **Split region** tool (`r`) divides one region into two between helix rows:
+The **Split region** tool (`r`) divides one region into two. Where you point decides how:
 
-1. Choose the tool. Move the pointer over the strand view; the gap between two rows of the same region nearest the pointer is highlighted, with the name the new region will get.
-2. Click to split. The rows above the gap stay in the original region; the rows below move into a **new region** with its own copy of the plane.
-3. The tool switches back to **Select**. `Escape` cancels without splitting.
+- **Between two rows:** the gap nearest the pointer is highlighted, with the name the new region will get. Click to split there. The rows above stay in the original region; the rows below move into a **new region** with its own copy of the plane.
+- **On a helix's strands:** a vertical line marks a cut across all the region's helices at that base. On a lattice step boundary (every 21 bases on honeycomb, 32 on square) the line turns solid and thicker, and its label says so. Click to split there. Everything right of the line moves into a **new region** on its own copies of the helices, so each side can be moved or rotated separately in 3D. Use this to pull apart units placed side by side along the helices.
+
+After a split the tool switches back to **Select**. `Escape` cancels without splitting.
+
+A cut across the helices needs an empty column: no strand may run through it. If one does, the line turns red with the reason, the strands in the way are marked, and clicking does not split. Break them there first, or pick another column. Crossovers that jump over the cut are kept; they now connect the two regions.
+
+The new region is renumbered so it starts close to base 0, always by whole lattice steps (21 bases on honeycomb, 32 on square). That keeps every helix in the same rotation, so crossovers inside the moved part stay at valid crossover sites. A unit cut off this way lines up with the first unit's columns. The original region is shortened to the cut. If a repeat group has copies on both sides of the cut, it is detached and its copies become plain oligos. Cutting across the helices works in honeycomb and square regions only.
 
 Splitting doesn't change any routing. It's useful when part of a design should get its own plane (to move or rotate it separately in 3D) or its own length.

@@ -61,6 +61,36 @@ export function renamePartCmd(history: HistoryStack, part: Part, name: string): 
 	});
 }
 
+/**
+ * In a design with one Part of its own, renaming the design renames that Part too while its name
+ * still follows the design (a default `Part N`, or the old design name), and its instance names
+ * built from it (`<Part> 1`). A name the user chose, or a linked Part's, is left alone.
+ * Returns whether anything was renamed.
+ */
+export function followDesignRenameCmd(
+	history: HistoryStack,
+	doc: FoldnanoDocument,
+	oldName: string,
+	newName: string
+): boolean {
+	const [part, ...rest] = doc.parts;
+	if (!part || rest.length || part.source || part.name === newName) return false;
+	if (part.name !== oldName && !/^Part \d+$/.test(part.name)) return false;
+	const from = part.name;
+	history.tx('Rename Part with the design', (rec) => {
+		rec.field(partRef(part), 'name', from, newName);
+		part.name = newName;
+		for (const occurrence of doc.assembly.occurrencesOf(part.id)) {
+			const n = occurrence.name.startsWith(`${from} `) && occurrence.name.slice(from.length + 1);
+			if (!n || !/^\d+$/.test(n)) continue;
+			const before = doc.assembly.stateOf(occurrence.id);
+			occurrence.name = `${newName} ${n}`;
+			rec.occurrence(occurrence.id, before, doc.assembly.stateOf(occurrence.id));
+		}
+	});
+	return true;
+}
+
 /** Places the Part once more. Every occurrence shows the same definition, so edits show in all. */
 export function addOccurrenceCmd(
 	history: HistoryStack,

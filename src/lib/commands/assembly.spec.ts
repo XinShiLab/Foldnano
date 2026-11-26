@@ -15,6 +15,7 @@ import {
 	deleteOccurrenceCmd,
 	deletePartCmd,
 	duplicatePartCmd,
+	followDesignRenameCmd,
 	relinkOccurrenceCmd,
 	renameOccurrenceCmd,
 	renamePartCmd,
@@ -52,6 +53,16 @@ const MOVED = {
 };
 
 describe('FoldnanoDocument assembly', () => {
+	it('is an assembly file only when every Part is linked', () => {
+		const { doc, part } = setup();
+		expect(new FoldnanoDocument(undefined, 'Empty').isAssembly).toBe(false);
+		expect(doc.isAssembly).toBe(false);
+		part.source = { docId: 'elsewhere', partId: 'p', contentHash: 'h', linkedAt: '' };
+		expect(doc.isAssembly).toBe(true);
+		doc.addNewPart('SQUARE');
+		expect(doc.isAssembly).toBe(false);
+	});
+
 	it('places a new Part once, named after it', () => {
 		const { doc, part } = setup();
 		expect(doc.assembly.occurrences.map((o) => [o.partId, o.name])).toEqual([
@@ -126,6 +137,36 @@ describe('assembly commands', () => {
 		expect(part.name).toBe('Brick');
 		renamePartCmd(history, part, '   ');
 		expect(part.name).toBe('Brick');
+	});
+
+	it("renames a one-Part design's Part and its instances with the design, with undo", () => {
+		const { doc, part, history } = setup();
+		addOccurrenceCmd(history, doc, part.id);
+		renameOccurrenceCmd(history, doc, doc.assembly.occurrences[1].id, 'Left');
+		expectUndoable(doc, history, () =>
+			expect(followDesignRenameCmd(history, doc, 'Assembly', 'Hinge')).toBe(true)
+		);
+		expect(part.name).toBe('Hinge');
+		expect(doc.assembly.occurrences.map((o) => o.name)).toEqual(['Hinge 1', 'Left']);
+		// Now named after the design, it follows the next rename too.
+		expect(followDesignRenameCmd(history, doc, 'Hinge', 'Hinge v2')).toBe(true);
+		expect(part.name).toBe('Hinge v2');
+	});
+
+	it('leaves a chosen Part name, a linked Part and a design with several Parts alone', () => {
+		const chosen = setup();
+		renamePartCmd(chosen.history, chosen.part, 'Core');
+		expect(followDesignRenameCmd(chosen.history, chosen.doc, 'Assembly', 'Hinge')).toBe(false);
+		expect(chosen.part.name).toBe('Core');
+
+		const linked = setup();
+		linked.part.source = { docId: 'elsewhere', partId: 'p', contentHash: 'h', linkedAt: '' };
+		expect(followDesignRenameCmd(linked.history, linked.doc, 'Assembly', 'Hinge')).toBe(false);
+
+		const several = setup();
+		addPartCmd(several.history, several.doc, 'SQUARE');
+		expect(followDesignRenameCmd(several.history, several.doc, 'Assembly', 'Hinge')).toBe(false);
+		expect(several.doc.parts.map((p) => p.name)).toEqual(['Part 1', 'Part 2']);
 	});
 
 	it('adds, edits and deletes occurrences with undo', () => {

@@ -402,6 +402,15 @@ const CASES: Record<string, Case> = {
 			regions.splitRegionCmd(history, part, region.id, vh0.id)
 		);
 	},
+	splitRegionAtBpCmd: () => {
+		const { doc, part, region, vh0, vh1, history } = emptyLatticeScene();
+		const up = part.createOligo(vh0, 2, 15);
+		const down = part.createOligo(vh1, 30, 25);
+		part.connectSegmentEnds(firstSegment(up), firstSegment(down));
+		expectUndoRoundTrip(doc, history, () =>
+			regions.splitRegionAtBpCmd(history, part, region.id, 21)
+		);
+	},
 	duplicateRegionCmd: () => {
 		const { doc, part, region, history } = latticeScene();
 		expectUndoRoundTrip(doc, history, () => regions.duplicateRegionCmd(history, part, region.id));

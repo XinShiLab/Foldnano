@@ -64,6 +64,16 @@ describe('PartLinkService', () => {
 		expect(service.statusOf(updated)?.state).toBe('upToDate');
 	});
 
+	it('a renamed source stays up to date and reports its new name; the copy keeps its own', async () => {
+		const { source, stored, status, service, linked } = await setup({ docId: 'hinge-doc' });
+		source.doc.name = 'Hinge v2';
+		source.part.name = 'Hinge v2';
+		stored.set(source.doc.id, source.doc.snapshot());
+		expect(await status()).toBe('upToDate');
+		expect(service.statusOf(linked)?.sourceName).toBe('Hinge v2');
+		expect(linked.name).toBe('Hinge');
+	});
+
 	it('a deleted source is missing; the copy stays', async () => {
 		const { stored, status, linked } = await setup({ docId: 'hinge-doc' });
 		stored.clear();

@@ -7,6 +7,7 @@ import {
 } from '$lib/model/Part/DesignRegion';
 import { Plane } from '$lib/model/Part/Plane.svelte';
 import { duplicateRegion } from '$lib/model/Part/duplicateRegion';
+import { splitRegionAtBp, type BpSplitResult } from '$lib/model/Part/splitRegionAtBp';
 import type { HistoryStack } from './history.svelte';
 
 export function addRegionAndPlaneCmd(
@@ -84,6 +85,18 @@ export function splitRegionCmd(
 
 		part.syncListRows();
 	});
+}
+
+/** Splits a lattice region along the helix axis at bp `cut` (see `splitRegionAtBp`). Throws an
+ * `InvalidOperationError`, leaving the design as it was, when the cut isn't allowed. */
+export function splitRegionAtBpCmd(
+	historyStack: HistoryStack,
+	part: Part,
+	regionId: string,
+	cut: number,
+	label = 'Split region'
+): BpSplitResult {
+	return historyStack.partSnapshotTx(label, part, () => splitRegionAtBp(part, regionId, cut));
 }
 
 /** Adds an independent copy of the region (its plane, helices and strands) right after it.

@@ -344,6 +344,7 @@ history verifier see the true pre-drag pose).
 | `deletePartCmd(history, doc, partId)`                                           | Remove a Part and its occurrences (`snapshotTx`)                         |
 | `duplicatePartCmd(history, doc, partId)`                                        | Independent copy with fresh ids, placed like the original (`snapshotTx`) |
 | `renamePartCmd(history, part, name)`                                            | `FieldChange` on `part.name`                                             |
+| `followDesignRenameCmd(history, doc, oldName, newName)`                         | A one-Part design's Part (and its numbered occurrences) follows a rename |
 | `addOccurrenceCmd(history, doc, partId, transform?)`                            | Place a Part once more (an instance of the same definition)              |
 | `deleteOccurrenceCmd(history, doc, occurrenceId)`                               | Remove one placement; refuses (returns false) a Part's last one          |
 | `relinkOccurrenceCmd(history, doc, occurrenceId, partId)`                       | Point an occurrence (usually a broken one) at another Part               |

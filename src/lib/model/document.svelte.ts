@@ -103,6 +103,15 @@ export default class FoldnanoDocument {
 		return part;
 	}
 
+	/**
+	 * An assembly file: every Part is linked from another design, so the file only places them. A
+	 * reading of the Parts, not a stored flag (the format is that of any design); Parts that only
+	 * join others, should they come, would count as well.
+	 */
+	get isAssembly(): boolean {
+		return this.parts.length > 0 && this.parts.every((part) => part.source);
+	}
+
 	addNewPart(type: PartType): Part {
 		const KNOWN_TYPES: PartType[] = ['HONEYCOMB', 'SQUARE', 'FREEFORM', 'WIREFRAME'];
 		if (!KNOWN_TYPES.includes(type)) throw new Error(`Part type "${type}" not implemented`);

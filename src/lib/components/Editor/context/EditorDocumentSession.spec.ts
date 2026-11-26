@@ -1503,6 +1503,8 @@ describe('EditorDocumentSession design names', () => {
 
 		await session.renameDocument('Box');
 		expect(session.needsName).toBe(false);
+		// The design's only Part, still "Part 1", takes the name too.
+		expect(session.currentDoc.parts.map((p) => p.name)).toEqual(['Box']);
 		expect((provider.docs.get('doc-untitled') as { name: string }).name).toBe('Box');
 	});
 

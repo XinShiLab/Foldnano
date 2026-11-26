@@ -13,9 +13,11 @@ covers:
 # Linked Parts
 
 A linked Part is a **read-only cached copy** of the single Part of another design (its _source_),
-inserted into an assembly with **New Part ▸ Insert Part from…** in the Assembly panel, or from the
-start screen's **Assembly** card, which opens the same dialog on a design with no Parts (an
-"assembly" is an ordinary document; no flag marks it). The dialog is mounted once in `Editor.svelte`
+inserted into an assembly with **Link Part** in the Assembly panel (the header's main button in a
+design that is empty or already links Parts, else under its arrow), by **New assembly** there (a blank document via `openBlankDocument`, then the dialog with the design it came from
+listed first: `EditorViewContext.insertLinkedPartFromDocId`, cleared when the dialog closes), or
+from the start screen's **Assembly** card, which opens the same dialog on a design with no Parts (an
+"assembly" is an ordinary document; no flag marks it, `FoldnanoDocument.isAssembly` reads it from the Parts). The dialog is mounted once in `Editor.svelte`
 and opened through `EditorViewContext.insertLinkedPartDialogOpen`. The copy is
 what the assembly draws, exports and saves; the link (`Part.source`, a `PartSource`) says where it
 came from and lets the assembly notice and pull in later changes. The assembly model itself
@@ -69,6 +71,10 @@ and dangerous (an Update could bring in geometry nobody reviewed). So, on purpos
 - **Change detection hashes the source, never the copy.** `canonicalPartJson` is the Part's JSON
   with sorted keys and without `id`, `name` and `source`; both sides are read through
   `Part.fromJSON` first, so load-time normalisation can't make them differ.
+- **Names belong to the assembly.** A copy is named after the source design when linked, and
+  neither renaming the source nor updating changes it or makes the link outdated. The status
+  carries the source's current name (`PartLinkStatus.sourceName`) so the link icon's tooltip
+  shows it.
 - **Read-only is enforced in `HistoryStack`, not only in the UI** (`linkedPartGuard.ts`). After a
   `tx`, `snapshotTx` or `partSnapshotTx` runs, `linkedPartEditedBy` looks at the entry: any
   targeted change carrying a linked Part's `partId`, or a snapshot in which a linked Part's

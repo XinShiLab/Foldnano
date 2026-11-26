@@ -10,6 +10,13 @@ import { BACKBONE_RADIUS_NM, BACKBONE_RISE_NM } from '../geometry3d/dnaGeometry'
 
 type SegmentJSON = OligoJSON['segments'][number];
 
+/** An offset that moves every VH index past the part's current ones. Even, so lattice parity
+ * conventions tied to the index (cadnano IO) carry over to the copies. */
+export function evenVhIndexOffset(part: Part): number {
+	const maxIndex = Math.max(-1, ...part.virtualHelices.map((vh) => vh.index));
+	return (maxIndex + 1) % 2 === 0 ? maxIndex + 1 : maxIndex + 2;
+}
+
 /** Clearance (nm) between the original region and its copy, past the helix surfaces. */
 const COPY_GAP_NM = 5;
 const EMPTY_REGION_SHIFT_NM = 10;
@@ -33,9 +40,7 @@ export function duplicateRegion(part: Part, regionId: string): DesignRegion {
 		.map((id) => part.getVhById(id))
 		.filter((vh): vh is VirtualHelix => vh !== null);
 
-	const maxIndex = Math.max(-1, ...part.virtualHelices.map((vh) => vh.index));
-	// Even, so lattice parity conventions tied to the index (cadnano IO) carry over.
-	const indexOffset = (maxIndex + 1) % 2 === 0 ? maxIndex + 1 : maxIndex + 2;
+	const indexOffset = evenVhIndexOffset(part);
 	const vhIndexMap = new Map(sourceVhs.map((vh) => [vh.index, vh.index + indexOffset]));
 	const vhIdMap = new Map(sourceVhs.map((vh) => [vh.id, uuidv4()]));
 

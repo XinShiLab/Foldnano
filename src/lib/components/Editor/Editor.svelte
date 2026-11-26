@@ -67,7 +67,7 @@
 	import { parseLatticeParam, withLatticeChoice } from './Toolbar/latticeChoice.svelte';
 	import { Part } from '../../model/Part';
 	import FoldnanoDocument from '../../model/document.svelte';
-	import { stripDesignExtension } from '$lib/model/io/designFileName';
+	import { isReservedDesignName, stripDesignExtension } from '$lib/model/io/designFileName';
 	import { onDestroy } from 'svelte';
 	import Sidebar from './Sidebar.svelte';
 	import EmptyEditorState from './EmptyEditorState.svelte';
@@ -131,6 +131,15 @@
 
 	let urlLoadAttempted = false;
 	let urlLoading = $state(false);
+
+	// The Editor owns the tab title: /editor/[docId] has none of its own, so it would otherwise keep
+	// the previous page's title (client-side navigation) or show the URL (fresh load).
+	const pageTitle = $derived.by(() => {
+		if (urlLoading || session.isLoading) return 'Loading… · Foldnano';
+		const name = session.currentDoc.name.trim();
+		if (!name || isReservedDesignName(name)) return 'Untitled design · Foldnano';
+		return `${name} · Foldnano`;
+	});
 
 	$effect(() => {
 		if (urlLoadAttempted || !storesHydrated) return;
@@ -667,6 +676,10 @@
 	ononline={() => session.recheckRemote()}
 />
 <svelte:document onvisibilitychange={handleVisibilityChange} />
+
+<svelte:head>
+	<title>{pageTitle}</title>
+</svelte:head>
 
 <svelte:body onkeydown={handleCtrlKeyDown} onkeyup={handleKeyUp} />
 
