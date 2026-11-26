@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { help } from '$lib/components/help/help';
 	import { getEditorViewContext } from '../context/EditorViewContext.svelte';
-	import { getEditorDocumentSession } from '../context/EditorDocumentSession.svelte';
 	import type { PythonPlugin } from '$lib/plugin/types';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { toPluginSidePanelId } from '../sidePanels';
@@ -45,7 +44,6 @@
 	const editorCtx = getEditorViewContext();
 	const registry = $derived(editorCtx.pluginRegistry);
 	const coordinator = $derived(editorCtx.pluginCoordinator);
-	const session = getEditorDocumentSession();
 
 	// Linked (dev mode) plugins live in the Dev tab.
 	let plugins = $derived(registry.all.filter((p) => p.origin !== 'linked'));
@@ -459,7 +457,7 @@
 							{@const activeRegion = editorCtx.activeRegion}
 							{@const isCadnanoPlugin = plugin.manifest.format === 'cadnano_json'}
 							{@const activeRegionIdx = activeRegion
-								? (session.currentDoc.parts[0]?.regions.indexOf(activeRegion) ?? -1)
+								? (editorCtx.activePart?.regions.indexOf(activeRegion) ?? -1)
 								: -1}
 							<Button
 								variant="outline"

@@ -71,7 +71,11 @@
 		getEditorDocumentSession,
 		type RenameDocumentResult,
 	} from '../context/EditorDocumentSession.svelte';
-	import { exportPartSequencesToCSV } from '../../../model/io/sequenceCSV';
+	import {
+		documentNeedsQuantities,
+		exportDocumentSequencesToCSV,
+		exportPartSequencesToCSV,
+	} from '../../../model/io/sequenceCSV';
 	import { exportBaseName } from '$lib/model/io/designFileName';
 	import { help } from '$lib/components/help/help';
 	import { modKeySymbol } from '$lib/utils/platform';
@@ -334,7 +338,7 @@
 	);
 
 	const onAutoStaple = () => {
-		const part = foldnanoDoc.parts[0];
+		const part = editorViewContext.activePart;
 		if (!part) return;
 		const region = activeLatticeRegion;
 		if (!region) {
@@ -348,7 +352,7 @@
 	};
 
 	const exportToCadnanoJson = async () => {
-		const part = foldnanoDoc.parts[0];
+		const part = editorViewContext.activePart;
 		if (!part) return;
 		const region = activeLatticeRegion;
 		if (!region) {
@@ -369,9 +373,11 @@
 		}
 		const { json: cadnanoJSON } = CadnanoJSON.fromRegion(region, part);
 		const latticeRegionCount = part.getLatticedRegions().length;
+		// With several Parts, the file names the Part it came from too.
+		const partSuffix = foldnanoDoc.parts.length > 1 ? `.${part.name}` : '';
 		const fileName = exportBaseName(
 			foldnanoDoc.name,
-			latticeRegionCount === 1 ? '.cadnano.json' : `.${region.name}.cadnano.json`
+			partSuffix + (latticeRegionCount === 1 ? '.cadnano.json' : `.${region.name}.cadnano.json`)
 		);
 		// cadnano2 stores the file's own name here.
 		cadnanoJSON.name = fileName;
@@ -382,11 +388,14 @@
 
 	const exportToFoldnanoJson = () => downloadFoldnanoJson(foldnanoDoc);
 
-	const exportOligoSequencesToCSV = () => {
-		const part = foldnanoDoc.parts[0];
+	const exportOligoSequencesToCSV = (scope: 'part' | 'design' = 'part') => {
+		const part = editorViewContext.activePart;
 		if (!part) return;
 		try {
-			exportPartSequencesToCSV(part, foldnanoDoc.name);
+			if (scope === 'design') exportDocumentSequencesToCSV(foldnanoDoc);
+			else if (foldnanoDoc.parts.length > 1) {
+				exportPartSequencesToCSV(part, exportBaseName(foldnanoDoc.name, `.${part.name}`));
+			} else exportPartSequencesToCSV(part, foldnanoDoc.name);
 		} catch (error) {
 			editorViewContext.strandViewContext.highlightContext.circular_strand = true;
 			notify.error('Cannot export oligo CSV', {
@@ -724,12 +733,14 @@
 								<DropdownMenu.Item onclick={() => exportToFoldnanoJson()}>
 									<FileBracesCorner />Download as Foldnano JSON
 								</DropdownMenu.Item>
-								<DropdownMenu.Item onclick={exportOligoSequencesToCSV}>
+								<DropdownMenu.Item onclick={() => exportOligoSequencesToCSV('part')}>
 									<FileSpreadsheet />Export Oligos of this Part as CSV
 								</DropdownMenu.Item>
-								<!-- <DropdownMenu.Item onclick={() => exportDocumentSequencesToCSV(foldnanoDoc)}>
-									<FileSpreadsheet />Export Oligos entire Doc as CSV
-								</DropdownMenu.Item> -->
+								{#if documentNeedsQuantities(foldnanoDoc)}
+									<DropdownMenu.Item onclick={() => exportOligoSequencesToCSV('design')}>
+										<FileSpreadsheet />Export Oligos of all Parts as CSV, with quantities
+									</DropdownMenu.Item>
+								{/if}
 								<DropdownMenu.Item disabled>
 									<HardDriveDownload />Other Save Options
 								</DropdownMenu.Item>

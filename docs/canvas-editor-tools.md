@@ -155,6 +155,8 @@ handlePointer(evt):
 
 `setMode(m)` is not called explicitly — the controller reads `getMode()` on each event and detects transitions automatically. This means `onExit` / `onEnter` fire lazily on the next pointer event after a mode change.
 
+A mode with no registered tool (`PAN`) leaves the controller **suspended**: events are ignored until a mode with a tool comes back. That holds at construction too, so a strand view mounted while the editor is in Pan mode (switching Parts remounts it) starts suspended instead of throwing.
+
 ---
 
 ## Pointer Event Lifecycle
@@ -263,7 +265,7 @@ REGION_HEADER → CS_CURSOR → VH_TAG → VH_GRID → END → XOVER → OLIGO �
 
 `REGION_HEADER` runs first so clicks on the collapse/expand affordance never fall through to strand-body selection.
 
-After `END`, `SEGMENT`, or `OLIGO` handle a `down`, the `WITH_SELECTION` handler is also tried — it manages drag-to-move for whatever was just selected.
+After `END`, `SEGMENT`, or `OLIGO` handle a `down`, the `WITH_SELECTION` handler is also tried — it manages drag-to-move for whatever was just selected. It is skipped when `editorViewContext.canEditActivePart` is false (a linked, read-only Part; `docs/linked-parts.md`), so Select there only selects.
 
 ### Sub-handler responsibilities
 

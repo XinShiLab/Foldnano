@@ -48,6 +48,25 @@ export interface OverlayPlacement {
 	};
 }
 
+/**
+ * Where a linked Part's definition comes from (docs/dna-model.md § Assembly). Present only on a
+ * Part linked from another design; the Part's own content is then a cached copy of that source.
+ */
+export interface PartSource {
+	/** Repo-relative path of the source design, for a design in the same GitHub repo. */
+	repoPath?: string;
+	/** Local document id of the source; the only reference for a design kept in this browser. */
+	docId?: string;
+	/** Id of the Part inside the source design. */
+	partId: string;
+	/** GitHub blob SHA of the source file when it was last copied. */
+	blobSha?: string;
+	/** Hash of the copied Part JSON, to tell whether the source has changed since. */
+	contentHash: string;
+	/** ISO time the copy was taken. */
+	linkedAt: string;
+}
+
 export interface RspCoord {
 	rowIdx: number;
 	strandIdx: 0 | 1;
@@ -124,7 +143,7 @@ export class Part {
 	// eslint-disable-next-line svelte/prefer-svelte-reactivity
 	private _vhByIndex = new Map<number, VirtualHelix>();
 
-	name: string = 'New_Part';
+	name: string = $state('New_Part');
 	readonly id: string;
 	planes = $state<Plane[]>([]);
 	regions = $state<DesignRegion[]>([]);
@@ -137,6 +156,8 @@ export class Part {
 	customModifications: ModificationDef[] = $state([]);
 	overlayPlacements = $state<OverlayPlacement[]>([]);
 	repeatGroups = $state<RepeatGroup[]>([]);
+	/** Set on a linked Part only; kept through load and save so no app version drops it. */
+	source: PartSource | null = $state.raw(null);
 	/** True only while `syncRepeatGroups` rewrites mirrors — the one writer allowed to. */
 	_repeatSyncing = false;
 
@@ -354,6 +375,7 @@ export class Part {
 							instances: g.instances.map((i) => ({ ...i })),
 						}))
 					: undefined,
+			source: this.source ? { ...this.source } : undefined,
 		};
 	}
 
@@ -367,6 +389,12 @@ export class Part {
 		const part = new Part(name, id);
 		part.initializeDefaultPlaneAndRegion(type, { maxBase, step: options?.step });
 		return part;
+	}
+
+	/** Deep, detached copy of `toJSON()`; see `FoldnanoDocument.snapshot()` for why not
+	 * `$state.snapshot`. */
+	snapshot(): ReturnType<Part['toJSON']> {
+		return JSON.parse(JSON.stringify(this.toJSON()));
 	}
 
 	static fromJSON(json: ReturnType<Part['toJSON']>): Part {
@@ -406,6 +434,7 @@ export class Part {
 			}));
 		}
 		if (json.repeatGroups) part.repeatGroups = json.repeatGroups;
+		if (json.source) part.source = { ...json.source };
 		part.rebuildRspCaches();
 		part.normalizeVhLengthsToRegion();
 		return part;

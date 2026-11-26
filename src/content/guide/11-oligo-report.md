@@ -26,7 +26,7 @@ The **oligo report** is a full-page table of every oligo in a design: its name, 
 
 <Callout type="note">
 
-The report covers the **first part** of a document, and only **real oligos**: [mirror copies](/docs/guide/duplicates-repeat-groups) are left out, as they are in every export.
+The report covers one part of a document at a time (pick it at the top when the design has several), and only **real oligos**: [mirror copies](/docs/guide/duplicates-repeat-groups) are left out, as they are in every export.
 
 </Callout>
 
@@ -39,6 +39,8 @@ The header shows the document name and ID, with three buttons:
 | **All Oligos** | Back to the Oligos list |
 | **Open Editor** | Open this design in the editor |
 | **Download CSV** | Download the same CSV as the editor's **Export Oligos of this Part as CSV** |
+| Part picker | Shown when the design has several parts: choose the part to report |
+| **All Parts CSV, with quantities** | Shown when the design has several parts, or places one part more than once: every part's oligos with `Part` and `Quantity` columns (`Quantity` is how many instances of that part the design has) |
 
 The table has one row per oligo, with the text tinted in the oligo's own color. Click any column header to sort by it; click again to reverse.
 
@@ -116,6 +118,8 @@ The diff matches oligos by their **positions** (the same segments on the same he
 Below the summary, a table lists every oligo that isn't unchanged, with its **Status**, the **Changed fields**, and the **Left values** / **Right values** side by side. If everything matches it says *No oligo report differences*.
 
 Each side also has a **Download CSV** button for that document's report, and you can change either document and click **Compare** again at the top of the page.
+
+A design with several parts is compared one part at a time: each side shows a **Part** picker under the document name (the first part is picked to begin with), and its **Download CSV** downloads that part.
 
 <Callout type="tip">
 

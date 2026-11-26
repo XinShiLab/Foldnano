@@ -1,4 +1,6 @@
 import type { Part } from '$lib/model/Part';
+import type FoldnanoDocument from '$lib/model/document.svelte';
+import { buildAssemblyNtModel, type AssemblyNtOptions } from './assemblyNtModel';
 import { applyTransform, rotateVec } from '$lib/model/geometry3d/dnaGeometry';
 import type { Vec3 } from '$lib/model/geometry3d/types';
 import type { BlockTransformOverride } from '$lib/model/rbs/rbsTypes';
@@ -253,6 +255,33 @@ export function exportPartToMrdna(
 	const model = buildSimulationNtModel(part, { fallbackBase, includeMirrors });
 	const nts = collectMrdnaNucleotidesFromModel(model.nucleotides, segPositionOverrides);
 
+	return {
+		txt: formatTxt(nts, includeSequence, includeOrientation),
+		nucleotideCount: nts.length,
+		strandCount: model.strandCount,
+	};
+}
+
+/**
+ * Every visible instance of the design in one file (`buildAssemblyNtModel`), each
+ * Part relaxed where `relaxedParts` has a result for it.
+ */
+export function exportAssemblyToMrdna(
+	doc: FoldnanoDocument,
+	options: AssemblyNtOptions & { includeSequence?: boolean; includeOrientation?: boolean } = {}
+): MrdnaExportResult {
+	const { includeSequence = true, includeOrientation = false, ...modelOptions } = options;
+	const model = buildAssemblyNtModel(doc, { fallbackBase: 'T', ...modelOptions });
+	// Pairing and stacking come from the unrelaxed placement, as in `exportPartToMrdna`: relaxing
+	// moves blocks apart, which must not change which bases stack. A placement is rigid, so it
+	// keeps them. Both models list the same nucleotides in the same order.
+	const rigid = modelOptions.relaxedParts?.size
+		? buildAssemblyNtModel(doc, { fallbackBase: 'T', ...modelOptions, relaxedParts: undefined })
+		: model;
+	const nts = collectMrdnaNucleotidesFromModel(rigid.nucleotides).map((nt, i) => {
+		const { positionNm, a1, a3 } = model.nucleotides[i];
+		return { ...nt, position: positionNm, a1, a3 };
+	});
 	return {
 		txt: formatTxt(nts, includeSequence, includeOrientation),
 		nucleotideCount: nts.length,

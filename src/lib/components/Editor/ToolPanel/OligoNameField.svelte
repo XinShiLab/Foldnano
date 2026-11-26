@@ -12,7 +12,7 @@
 	let editing = $state<Oligo | null>(null);
 	let draft = $state('');
 	const isMirror = $derived(oligo.mirrorOf !== null);
-	const readOnly = $derived(isMirror || !ctx.isTabOwner);
+	const readOnly = $derived(isMirror || !ctx.canEditActivePart);
 
 	function onfocus() {
 		if (readOnly) return;

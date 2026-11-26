@@ -315,6 +315,15 @@ The toolbar "Commit" button opens the **Changes tab** of the GitHub Explorer pan
 
 The Changes tab lists all pending files split into **Staged** and **Unstaged** sections. Users stage individual files (or all at once), then enter a message and click "Commit N files" to commit only the staged subset. See [Changes Tab](#changes-tab-sourcecontrolpanelsvelte) above.
 
+### Linked Parts and commits
+
+A design whose assembly holds linked Parts without a `repoPath` (their source lives only in this
+browser), or linked from a file in another repo than the assembly's, shows `LocalOnlyLinksNotice`
+in the Changes tab, `CommitDialog` and `PublishToGitHubDialog`: the commit carries the cached
+copies, but nobody else can follow those links. Links never fetch from GitHub; they follow the
+local copy of the source. It offers to embed the copies (break the links); publishing the source and running
+**Update from source** gives the link a repo path instead. See `docs/linked-parts.md`.
+
 ### Repo Setup Dialog
 
 **`src/lib/components/Editor/GitHubSetup/RepoSetupDialog.svelte`**

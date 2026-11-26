@@ -28,6 +28,12 @@ Foldnano plugins run in a browser Python runtime ([Pyodide](https://pyodide.org/
 
 If `run()` raises, the run ends with an error: the panel shows the traceback, and the log keeps every line written before the exception. Nothing is applied. To report a problem more readably, catch it and log a message instead, for example around `ctx.get_part_as_foldnano_json()`, which raises `RuntimeError` when the manifest declares another format. A result can also be refused after a clean run; see [When a Result Can't Be Applied](/docs/plugin-development/plugin-formats#when-a-result-cant-be-applied).
 
+## Designs With Several Parts
+
+A design can hold several parts (see [Assemblies And Parts](/docs/guide/assemblies)). A plugin always works on the **active part**, the one the user is editing when they start the run: `ctx` holds only that part, and every apply strategy (including `replacePart` and the replay strategies) changes only that part. The result is applied to the part the plugin ran on, even if the user switched to another part while it was running. Other parts and their placements in 3D are never visible to the plugin and never changed by it.
+
+A part linked from another design is read-only. A plugin can run on it, and its output, logs and preview are shown as usual, but the result can't be applied there; the preview says so and **Apply** is disabled. To change a linked part, run the plugin on its source design.
+
 Plugins installed under the old, pre-unification shapes (inline `entrypoint` on a normal plugin, or a raw `.py` `entrypointUrl`) are flagged `needs-reinstall` and cannot be activated. Re-import the zip to fix.
 
 ## Environment Tiers

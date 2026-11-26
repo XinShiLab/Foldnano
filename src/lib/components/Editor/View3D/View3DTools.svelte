@@ -38,6 +38,12 @@
 		type RbsDiagnostics,
 	} from './view3DToolbarState';
 	import { help } from '$lib/components/help/help';
+	import {
+		offersAssemblyExport,
+		simulationExportParts,
+		type SimulationExportRequest,
+		type SimulationExportScope,
+	} from '$lib/model/io/assemblyNtModel';
 	import { scrollStrip } from '$lib/components/scroll-strip/scroll-strip';
 	import {
 		getEditorViewContext,
@@ -45,10 +51,21 @@
 	} from '../context/EditorViewContext.svelte';
 
 	const editorCtx = getEditorViewContext();
-	const hasMirrors = $derived(
-		[...(editorCtx.currentDoc?.parts[0]?.oligos ?? [])].some((o) => o.isMirror)
+	const hasAssembly = $derived(offersAssemblyExport(editorCtx.currentDoc));
+	let wholeAssembly = $state(true);
+	const exportScope = $derived<SimulationExportScope>(
+		hasAssembly && wholeAssembly ? 'assembly' : 'activePart'
 	);
+	const exportParts = $derived(
+		simulationExportParts(editorCtx.currentDoc, exportScope, editorCtx.activePart)
+	);
+	// Offered for whatever the export holds, so mirrors in another visible Part can be included.
+	const hasMirrors = $derived(exportParts.some((p) => [...p.oligos].some((o) => o.isMirror)));
 	let includeMirrors = $state(false);
+	const simulationRequest = $derived<SimulationExportRequest>({
+		includeMirrors: hasMirrors && includeMirrors,
+		scope: exportScope,
+	});
 
 	interface Props {
 		showVH: boolean;
@@ -75,8 +92,8 @@
 		onClearRelaxed?: () => void;
 		onDownload?: () => void;
 		onExportGlb?: () => void;
-		onExportOxDna?: (opts?: { includeMirrors?: boolean }) => void;
-		onExportMrdna?: (opts?: { includeMirrors?: boolean }) => void;
+		onExportOxDna?: (request?: SimulationExportRequest) => void;
+		onExportMrdna?: (request?: SimulationExportRequest) => void;
 	}
 
 	let {
@@ -562,21 +579,33 @@
 						<span>GLB</span>
 					</DropdownMenu.Item>
 					<DropdownMenu.Item
-						onclick={() => onExportOxDna?.({ includeMirrors })}
-						disabled={!onExportOxDna}
+						onclick={() => onExportOxDna?.(simulationRequest)}
+						disabled={!onExportOxDna || exportParts.length === 0}
 					>
 						<FileDown />
 						<span>oxDNA</span>
 					</DropdownMenu.Item>
 					<DropdownMenu.Item
-						onclick={() => onExportMrdna?.({ includeMirrors })}
-						disabled={!onExportMrdna}
+						onclick={() => onExportMrdna?.(simulationRequest)}
+						disabled={!onExportMrdna || exportParts.length === 0}
 					>
 						<FileDown />
 						<span>mrDNA</span>
 					</DropdownMenu.Item>
-					{#if hasMirrors}
+					{#if hasMirrors || hasAssembly}
 						<DropdownMenu.Separator />
+					{/if}
+					{#if hasAssembly}
+						<DropdownMenu.CheckboxItem bind:checked={wholeAssembly} closeOnSelect={false}>
+							All visible instances (oxDNA / mrDNA)
+						</DropdownMenu.CheckboxItem>
+						{#if exportParts.length === 0}
+							<DropdownMenu.Label class="text-xs font-normal text-muted-foreground">
+								No instance is visible: show one to export it.
+							</DropdownMenu.Label>
+						{/if}
+					{/if}
+					{#if hasMirrors}
 						<DropdownMenu.CheckboxItem bind:checked={includeMirrors} closeOnSelect={false}>
 							Include mirror copies (oxDNA / mrDNA)
 						</DropdownMenu.CheckboxItem>

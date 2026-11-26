@@ -1,6 +1,7 @@
 ---
 covers:
   - src/lib/model/io/simulationNtModel.ts
+  - src/lib/model/io/assemblyNtModel.ts
   - src/lib/model/checks/simulation.ts
 ---
 
@@ -240,6 +241,25 @@ unconstrained; they cause `mergeAdjacentRanges` to join the two coverage ranges
 rather than treating the gap as a span boundary.
 
 ---
+
+## Assembly Model
+
+`buildAssemblyNtModel(doc, options)` (`assemblyNtModel.ts`) is the whole-design
+model the "All visible instances" exports use. For each exported instance
+(`exportedOccurrences`: visible, Part present; broken and hidden instances are
+left out, so exports follow the 3D view) it takes that Part's model (built once
+per Part, so both instances of a Part get the same random fill), applies RBS
+overrides in Part space (`relaxedParts`, a result per Part id, so every
+instance of a relaxed Part is relaxed), then the instance transform, and renumbers: `id`, `prev`/`next` and
+`strandId` are offset; `vhId`, `pairKey` and `spanId` get `<occurrenceId>:`
+as a prefix so two instances never pair or stack with each other. `segmentId`
+stays the Part's own, and `occurrenceId` says which instance a row belongs to.
+Rows of one instance are contiguous, in `doc.assembly` order.
+
+The same file holds the export scope the 3D Export menu and `View3D` share:
+`SimulationExportScope`, `offersAssemblyExport` (when to offer the assembly at
+all) and `simulationExportParts` (which Parts an export of a scope holds, for the
+mirror checkbox and the unassigned-sequence prompt).
 
 ## 3D View vs Export
 

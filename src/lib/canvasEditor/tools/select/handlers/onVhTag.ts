@@ -45,6 +45,8 @@ export function createVhTagHandler(): HandlerInstance {
 					ctx.editorCtx.setSelectedFreeformVhs([vhIdx]);
 				}
 			}
+			// Dragging the tag reorders helices: not on a read-only (linked) Part.
+			if (!ctx.editorCtx.canEditActivePart) return true;
 			const regionRows = ctx.drawingDimensions
 				.getVisibleVhRows()
 				.filter((row) => row.regionId === vh.regionId);

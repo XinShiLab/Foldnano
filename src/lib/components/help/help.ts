@@ -21,7 +21,8 @@ export type GuideSlug =
 	| 'plugins-for-users'
 	| 'script-lab'
 	| 'interface-reference'
-	| 'keyboard-shortcuts';
+	| 'keyboard-shortcuts'
+	| 'assemblies';
 
 /** A guide page, optionally with a heading anchor (rehype-slug id, e.g. `'views#3d-view'`). */
 export type GuideLink = GuideSlug | `${GuideSlug}#${string}`;

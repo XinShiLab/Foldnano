@@ -95,7 +95,7 @@ Implementation (reuse these for Feature 2):
   (`movingEndsOps.canBatchMoveByDelta`); checks positions past the VH end `step`s back.
 - `Part/duplicateOffsets.ts` — `duplicateSnapStep` (LCM of region steps),
   `findNextValidDuplicateDelta`.
-- `commands/strands.ts` — `duplicateOligosCmd` (`snapshotTx`, since it may grow a region).
+- `commands/strands.ts` — `duplicateOligosCmd` (`partSnapshotTx`, since it may grow a region).
 - `canvasEditor/tools/duplicate.ts` — `DuplicateTool` (DUPLICATE mode);
   `strandActions.startDuplicate` enters it; `StrandView/temporalLayer/DuplicatePreview.svelte`
   draws the ghost; state is `strandViewContext.duplicateState` (`$state.raw`, cleared on
@@ -197,7 +197,8 @@ Segments always stay on the same VH; only the bp position changes.
 ## Mirror regeneration (sync)
 
 `syncRepeatGroups(part)` runs from `HistoryStack` at the end of **every**
-`tx` / `snapshotTx`, after the edit and before the entry is recorded:
+`tx` / `snapshotTx` (and on the edited Part at the end of every `partSnapshotTx`), after
+the edit and before the entry is recorded:
 
 1. Mirrors whose group, instance or source is gone (or whose source left the
    group) are removed.
@@ -224,10 +225,10 @@ modification, slot sequence), because `foldnano.edit` rebuilds mirrors after eac
 in Python: a later op in the log may use bases a mirror just left. Without it, that
 op would hit the stale mirror on the host.
 
-**History recording:** a targeted `tx` whose sync changed anything is recorded
-as a `documentSnapshot(before, after)` instead of its targeted patches (`before`
-is already captured at the start of `tx`), so the sync never has to express
-itself as patches. Undo/redo replay does not sync; restored state is consistent.
+**History recording:** when a targeted `tx`'s sync changes a Part, that Part is
+recorded as a `partSnapshot(before, after)` instead of its targeted patches
+(`tx` copies every Part with repeat-group state up front), so the sync never has
+to express itself as patches. Patches on other Parts stay targeted. Undo/redo replay does not sync; restored state is consistent.
 
 `Part._repeatSyncing` is set while the sync runs; outside it,
 `Part.breakOligoAt`, `removeOligo`, `connectTwoOligos` and `connectSegmentEnds`

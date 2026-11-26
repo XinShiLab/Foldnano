@@ -4,6 +4,10 @@ import type { DocSnapshot } from '$lib/model/document.svelte';
 import type Oligo from '$lib/model/Oligo';
 import OligoClass, { type OligoSegment, type SegmentEnd } from '$lib/model/Oligo';
 import type { Part } from '$lib/model/Part';
+
+import type { OccurrenceJSON } from '$lib/model/Assembly';
+
+type PartJSON = ReturnType<Part['toJSON']>;
 import { DesignRegion } from '$lib/model/Part';
 import type { ReferenceGeometry } from '$lib/model/Part/DesignRegion';
 import { Plane, type PlaneVec3 } from '$lib/model/Part/Plane.svelte';
@@ -57,6 +61,26 @@ export type PartMementoChange = {
 export type DocumentSnapshotChange = {
 	kind: 'documentSnapshot';
 	snapshot: DocSnapshot;
+};
+
+/** One Part's whole state. Undo and redo name the Part to swap out by id, since a replace
+ * (e.g. a plugin result) may give the new Part a different id than the old one. */
+export type PartSnapshotChange = {
+	kind: 'partSnapshot';
+	replacePartId: string;
+	snapshot: PartJSON;
+};
+
+/** Puts one assembly occurrence back as `occurrence`, at list position `index`. */
+export type OccurrenceSetChange = {
+	kind: 'occurrenceSet';
+	occurrence: OccurrenceJSON;
+	index: number;
+};
+
+export type OccurrenceRemoveChange = {
+	kind: 'occurrenceRemove';
+	id: string;
 };
 
 export type PlaneTransformChange = {
@@ -123,6 +147,9 @@ export type AtomicChange =
 	| SlotSeqChange
 	| PartMementoChange
 	| DocumentSnapshotChange
+	| PartSnapshotChange
+	| OccurrenceSetChange
+	| OccurrenceRemoveChange
 	| PlaneTransformChange
 	| PlaneAddChange
 	| PlaneRemoveChange
@@ -297,6 +324,15 @@ function applyAtomicChange(doc: FoldnanoDocument, change: AtomicChange): void {
 		case 'documentSnapshot':
 			doc.restore(change.snapshot);
 			break;
+		case 'partSnapshot':
+			doc.replacePartFromJSON(change.replacePartId, change.snapshot);
+			break;
+		case 'occurrenceSet':
+			doc.assembly.put(change.occurrence, change.index);
+			break;
+		case 'occurrenceRemove':
+			doc.assembly.remove(change.id);
+			break;
 		case 'planeTransform':
 			resolvePart(doc, change.partId).setPlaneTransform(change.planeId, {
 				origin: change.origin,
@@ -415,11 +451,15 @@ export class PartScopeCapture {
 	}
 }
 
+type OccurrencePatchState = { json: OccurrenceJSON; index: number } | null;
+
 export class HistoryRecorder {
 	#fields: FieldPatchDraft[] = [];
 	#slots: SlotPatchDraft[] = [];
 	#mementos: MementoPatchDraft[] = [];
 	#snapshots: SnapshotPatchDraft[] = [];
+	#partSnapshots: { before: PartJSON; after: PartJSON }[] = [];
+	#occurrences: { id: string; before: OccurrencePatchState; after: OccurrencePatchState }[] = [];
 	#planeTransforms: PlaneTransformPatchDraft[] = [];
 	#planeAdds: PlaneAddPatchDraft[] = [];
 	#planeRemoves: PlaneAddPatchDraft[] = [];
@@ -489,6 +529,15 @@ export class HistoryRecorder {
 
 	documentSnapshot(before: DocSnapshot, after: DocSnapshot): void {
 		this.#snapshots.push({ before, after });
+	}
+
+	partSnapshot(before: PartJSON, after: PartJSON): void {
+		this.#partSnapshots.push({ before, after });
+	}
+
+	/** Targeted patch for one assembly occurrence: add (`before` null), change, or remove. */
+	occurrence(id: string, before: OccurrencePatchState, after: OccurrencePatchState): void {
+		this.#occurrences.push({ id, before, after });
 	}
 
 	planeTransform(
@@ -564,6 +613,23 @@ export class HistoryRecorder {
 			if (sameValue(patch.before, patch.after)) continue;
 			undo.push({ kind: 'documentSnapshot', snapshot: patch.before });
 			redo.push({ kind: 'documentSnapshot', snapshot: patch.after });
+		}
+
+		const occurrenceChange = (id: string, state: OccurrencePatchState): AtomicChange =>
+			state
+				? { kind: 'occurrenceSet', occurrence: state.json, index: state.index }
+				: { kind: 'occurrenceRemove', id };
+		const occurrencePatches = this.#occurrences.filter((p) => !sameValue(p.before, p.after));
+		// List positions are only right when patches unwind in reverse.
+		for (const patch of occurrencePatches) redo.push(occurrenceChange(patch.id, patch.after));
+		for (const patch of [...occurrencePatches].reverse()) {
+			undo.push(occurrenceChange(patch.id, patch.before));
+		}
+
+		for (const patch of this.#partSnapshots) {
+			if (sameValue(patch.before, patch.after)) continue;
+			undo.push({ kind: 'partSnapshot', replacePartId: patch.after.id, snapshot: patch.before });
+			redo.push({ kind: 'partSnapshot', replacePartId: patch.before.id, snapshot: patch.after });
 		}
 
 		for (const patch of this.#fields) {

@@ -23,8 +23,52 @@ export interface DocumentRepairResult {
 export function repairDocumentJson(snapshot: DocSnapshot): DocumentRepairResult {
 	const repairs: string[] = [];
 	const parts = snapshot.parts.map((part) => repairPart(part, repairs));
+	const assembly = repairAssembly(snapshot, repairs);
 	if (repairs.length === 0) return { snapshot, repairs };
-	return { snapshot: { ...snapshot, parts }, repairs };
+	return { snapshot: { ...snapshot, parts, assembly }, repairs };
+}
+
+type AssemblyJson = DocSnapshot['assembly'];
+
+/**
+ * Every Part must be placed at least once (docs/dna-model.md § Assembly): a Part left without an
+ * occurrence is placed at the origin. An occurrence whose Part is missing is kept: it is the
+ * user's placement (name, transform) and can be relinked to a Part later; the `occurrence-part`
+ * integrity rule keeps reporting it until then. Duplicate occurrence ids get fresh ones.
+ */
+function repairAssembly(snapshot: DocSnapshot, repairs: string[]): AssemblyJson {
+	const usedIds = new Set<string>();
+	let reIded = 0;
+	const occurrences = snapshot.assembly.occurrences.map((occurrence) => {
+		if (!usedIds.has(occurrence.id)) {
+			usedIds.add(occurrence.id);
+			return occurrence;
+		}
+		reIded++;
+		return { ...occurrence, id: uuidv4() };
+	});
+	if (reIded) repairs.push(`Gave ${reIded} instance(s) sharing an id a new one`);
+
+	const placed = new Set(occurrences.map((o) => o.partId));
+	const names = new Set(occurrences.map((o) => o.name));
+	let unplaced = 0;
+	for (const part of snapshot.parts) {
+		if (placed.has(part.id)) continue;
+		let n = 1;
+		while (names.has(`${part.name} ${n}`)) n++;
+		names.add(`${part.name} ${n}`);
+		occurrences.push({
+			id: uuidv4(),
+			partId: part.id,
+			name: `${part.name} ${n}`,
+			transform: { position: { x: 0, y: 0, z: 0 }, quaternion: [0, 0, 0, 1] },
+			visible: true,
+		});
+		unplaced++;
+	}
+	if (unplaced) repairs.push(`Placed ${unplaced} Part(s) that had no instance at the origin`);
+
+	return reIded || unplaced ? { occurrences } : snapshot.assembly;
 }
 
 const strandIndexOf = (segment: SegmentJson): 0 | 1 =>

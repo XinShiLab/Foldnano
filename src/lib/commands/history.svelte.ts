@@ -1,9 +1,18 @@
 import type FoldnanoDocument from '../model/document.svelte';
+import type { Part } from '../model/Part';
 import { reportError } from '../errorReporting';
 import type { StorageManager } from '../services/storage';
-import { applyAtomicChanges, HistoryRecorder, type HistoryEntry } from './historyChanges';
+import {
+	applyAtomicChanges,
+	HistoryRecorder,
+	type AtomicChange,
+	type HistoryEntry,
+} from './historyChanges';
 import { syncRepeatGroups } from '../model/Part/repeatGroups';
 import { findDerivedStateMismatch, verifyHistoryEntry } from './historyVerification';
+import { linkedPartEditedBy, linkedPartRefusal } from './linkedPartGuard';
+
+type PartJSON = ReturnType<Part['toJSON']>;
 
 /** Replay every targeted `tx()` entry on a scratch copy right after it commits (see
  * `verifyHistoryEntry`), and check derived state (spatial index, segment lookup) against a
@@ -13,7 +22,9 @@ const VERIFY_HISTORY =
 	import.meta.env.MODE === 'test' || import.meta.env.VITE_VERIFY_UNDO === 'true';
 
 const isWholeDocumentEntry = (entry: HistoryEntry): boolean =>
-	entry.redo.every((change) => change.kind === 'documentSnapshot');
+	entry.redo.every(
+		(change) => change.kind === 'documentSnapshot' || change.kind === 'partSnapshot'
+	);
 
 /** Oldest undo entries are dropped beyond either limit. `maxBytes` counts the entries' JSON
  * length, a rough proxy for memory: whole-document snapshot entries dominate it. */
@@ -114,6 +125,11 @@ export class HistoryStack {
 
 	get numberOfUndos() {
 		return this.#undo.length;
+	}
+	/** The entry the next undo reverts; compare by identity to tell whether anything was
+	 * committed (or undone) since. */
+	get lastUndoEntry(): HistoryEntry | undefined {
+		return this.#undo.at(-1);
 	}
 	get numberOfRedos() {
 		return this.#redo.length;
@@ -465,39 +481,57 @@ export class HistoryStack {
 
 		const recorder = new HistoryRecorder(this.doc);
 		const label = labelOrFn;
-		// A whole-document copy costs O(total nt), so a targeted edit takes one only when the
-		// repeat-group fallback below may need it (or the verifier does).
-		const mayRebuildMirrors = this.#hasRepeatGroupState();
-		const before = mayRebuildMirrors || VERIFY_HISTORY ? this.doc.snapshot() : null;
+		// Mirror rebuilds aren't expressed as targeted patches, so a Part whose mirrors the sync
+		// rebuilds is recorded as a Part snapshot. Only Parts with repeat-group state can be
+		// rebuilt, so only they are copied up front: an edit elsewhere stays O(patch).
+		const repeatBefore = this.#repeatPartSnapshots();
+		const before = VERIFY_HISTORY ? this.doc.snapshot() : null;
 		let result: R;
 		let entry: HistoryEntry | null;
+		/** The edit's own patches, set once `fn` has finished. */
+		let edit: HistoryEntry | null | undefined;
 		try {
 			result = maybeFn!(recorder);
-			if (this.#syncRepeatGroups() && before) {
-				// Mirror rebuilds aren't expressed as targeted patches; record the whole edit
-				// as a document snapshot instead (`before` is already in hand).
-				const snapshot = new HistoryRecorder(this.doc);
-				snapshot.documentSnapshot(before, this.doc.snapshot());
-				entry = snapshot.commit(label);
-			} else {
-				entry = recorder.commit(label);
-			}
+			edit = recorder.commit(label);
+			const synced = this.#syncRepeatGroupsIn();
+			entry = synced.length ? withPartSnapshots(this.doc, edit, label, synced, repeatBefore) : edit;
 		} catch (err) {
-			if (mayRebuildMirrors && before) {
-				this.doc.restore(before);
+			if (edit !== undefined) {
+				// The sync failed after the edit: undo the edit's patches outside the repeat Parts
+				// (the copies below restore those whole).
+				for (const change of edit?.undo ?? []) {
+					if (repeatBefore.has(changedPartId(change) ?? '')) continue;
+					try {
+						applyAtomicChanges(this.doc, [change]);
+					} catch (stepErr) {
+						console.error('History rollback step failed:', stepErr);
+					}
+				}
 			} else {
 				recorder.rollback();
-				if (before && JSON.stringify(this.doc.snapshot()) !== JSON.stringify(before)) {
-					this.doc.restore(before);
-					this.onMutation?.();
-					throw new Error(
-						`Rollback of "${label}" left the document changed (the command mutates something it captures no scope or onRollback step for). Original error: ${err instanceof Error ? err.message : String(err)}`
-					);
-				}
-				this.#assertDerivedState(`rollback of "${label}"`);
 			}
+			for (const [partId, json] of repeatBefore) {
+				const part = this.doc.parts.find((p) => p.id === partId);
+				if (!part || JSON.stringify(part.snapshot()) !== JSON.stringify(json)) {
+					this.doc.replacePartFromJSON(partId, json);
+				}
+			}
+			if (before && JSON.stringify(this.doc.snapshot()) !== JSON.stringify(before)) {
+				this.doc.restore(before);
+				this.onMutation?.();
+				throw new Error(
+					`Rollback of "${label}" left the document changed (the command mutates something it captures no scope or onRollback step for). Original error: ${err instanceof Error ? err.message : String(err)}`
+				);
+			}
+			this.#assertDerivedState(`rollback of "${label}"`);
 			this.onMutation?.();
 			throw err;
+		}
+		const linked = entry && this.#linkedPartEdited(entry);
+		if (entry && linked) {
+			applyAtomicChanges(this.doc, entry.undo);
+			this.onMutation?.();
+			throw linkedPartRefusal(linked);
 		}
 		this.pushEntry(entry);
 		if (entry && before && VERIFY_HISTORY && !isWholeDocumentEntry(entry)) {
@@ -512,22 +546,24 @@ export class HistoryStack {
 		return result;
 	}
 
-	/** Whether `syncRepeatGroups` could change anything: a group, a grouped source or a mirror. */
-	#hasRepeatGroupState(): boolean {
+	/** A copy of each Part `syncRepeatGroups` could change (a group, a grouped source or a
+	 * mirror), by Part id. */
+	#repeatPartSnapshots(): Map<string, PartJSON> {
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- a local, per-edit copy
+		const snapshots = new Map<string, PartJSON>();
 		for (const part of this.doc.parts) {
-			if (part.repeatGroups.length > 0) return true;
-			for (const oligo of part.oligos) {
-				if (oligo.repeatGroupId !== null || oligo.mirrorOf !== null) return true;
-			}
+			const hasState =
+				part.repeatGroups.length > 0 ||
+				[...part.oligos].some((o) => o.repeatGroupId !== null || o.mirrorOf !== null);
+			if (hasState) snapshots.set(part.id, part.snapshot());
 		}
-		return false;
+		return snapshots;
 	}
 
-	/** Rebuilds mirror oligos whose originals this edit changed (docs/repeat-units.md). */
-	#syncRepeatGroups(): boolean {
-		let changed = false;
-		for (const part of this.doc.parts) changed = syncRepeatGroups(part) || changed;
-		return changed;
+	/** Rebuilds mirror oligos whose originals this edit changed (docs/repeat-units.md); returns
+	 * the Parts it changed. */
+	#syncRepeatGroupsIn(): Part[] {
+		return this.doc.parts.filter((part) => syncRepeatGroups(part));
 	}
 
 	snapshotTx<R>(label: string, fn: () => R): R {
@@ -535,7 +571,7 @@ export class HistoryStack {
 		let result: R;
 		try {
 			result = fn();
-			this.#syncRepeatGroups();
+			this.#syncRepeatGroupsIn();
 		} catch (err) {
 			this.doc.restore(before);
 			throw err;
@@ -544,9 +580,80 @@ export class HistoryStack {
 		const recorder = new HistoryRecorder(this.doc);
 		recorder.documentSnapshot(before, after);
 		const entry = recorder.commit(label);
+		const linked = entry && this.#linkedPartEdited(entry);
+		if (linked) {
+			this.doc.restore(before);
+			throw linkedPartRefusal(linked);
+		}
 		this.pushEntry(entry);
 		if (entry) this.#assertDerivedState(`"${label}"`);
 		return result;
+	}
+
+	/**
+	 * Like `snapshotTx`, but copies only `part`: cost and undo memory scale with that Part, and
+	 * undo swaps just its slot, leaving the other Part objects (and their views) alone. `fn` may
+	 * replace the Part object in its slot (plugin results do) but must not touch any other Part,
+	 * the assembly, or add/remove Parts; use `snapshotTx` or the assembly commands for those.
+	 */
+	partSnapshotTx<R>(label: string, part: Part, fn: () => R): R {
+		const doc = this.doc;
+		const index = doc.parts.indexOf(part);
+		if (index < 0) throw new Error(`"${label}": Part ${part.id} is not in the document`);
+		const others = doc.parts.filter((_, i) => i !== index);
+		const outside = () =>
+			JSON.stringify({ parts: others.map((p) => p.toJSON()), assembly: doc.assembly.toJSON() });
+		const outsideBefore = VERIFY_HISTORY ? outside() : null;
+		const before = part.snapshot();
+		let result: R;
+		try {
+			result = fn();
+			syncRepeatGroups(doc.parts[index]);
+		} catch (err) {
+			doc.replacePartFromJSON(doc.parts[index].id, before);
+			throw err;
+		}
+		const sameOthers =
+			doc.parts.length === others.length + 1 &&
+			others.every((other, i) => doc.parts[i < index ? i : i + 1] === other);
+		if (!sameOthers || (outsideBefore !== null && outside() !== outsideBefore)) {
+			// Undo would miss whatever happened outside the slot: a command bug, so fail loudly.
+			throw new Error(`"${label}" changed Parts outside its Part-scoped snapshot`);
+		}
+		const recorder = new HistoryRecorder(doc);
+		recorder.partSnapshot(before, doc.parts[index].snapshot());
+		const entry = recorder.commit(label);
+		const linked = entry && this.#linkedPartEdited(entry);
+		if (linked) {
+			doc.replacePartFromJSON(doc.parts[index].id, before);
+			throw linkedPartRefusal(linked);
+		}
+		this.pushEntry(entry);
+		if (entry) this.#assertDerivedState(`"${label}"`);
+		return result;
+	}
+
+	#allowLinkedPartEdits = false;
+
+	/** Name of a linked Part the entry edits, unless a link command is running (see
+	 * `withLinkedPartEdits`). */
+	#linkedPartEdited(entry: HistoryEntry): string | null {
+		return this.#allowLinkedPartEdits ? null : linkedPartEditedBy(this.doc, entry);
+	}
+
+	/**
+	 * Runs `fn` with the linked-Part guard off. Only for the link commands, which replace a linked
+	 * Part's cached copy (update) or turn it into a plain Part; every other edit of a linked Part
+	 * is refused with an `InvalidOperationError` and leaves the document as it was.
+	 */
+	withLinkedPartEdits<R>(fn: () => R): R {
+		const previous = this.#allowLinkedPartEdits;
+		this.#allowLinkedPartEdits = true;
+		try {
+			return fn();
+		} finally {
+			this.#allowLinkedPartEdits = previous;
+		}
 	}
 
 	undoOnce() {
@@ -570,4 +677,55 @@ export class HistoryStack {
 		this.onMutation?.();
 		this.#assertDerivedState(`redo of "${entry.label}"`);
 	}
+}
+
+/** The Part a change edits, or null for a document-level change (assembly, document fields). */
+function changedPartId(change: AtomicChange): string | null {
+	switch (change.kind) {
+		case 'field':
+		case 'slotSeq':
+			return change.ref.kind === 'doc' ? null : change.ref.partId;
+		case 'partMemento':
+			return change.memento.partId;
+		case 'partSnapshot':
+			return change.replacePartId;
+		case 'documentSnapshot':
+		case 'occurrenceSet':
+		case 'occurrenceRemove':
+			return null;
+		default:
+			return change.partId;
+	}
+}
+
+/**
+ * `edit` with each synced Part's patches replaced by a snapshot of that Part (its copy from before
+ * the edit, and its state now). Patches on other Parts and on the document stay as they are.
+ */
+function withPartSnapshots(
+	doc: FoldnanoDocument,
+	edit: HistoryEntry | null,
+	label: string,
+	synced: Part[],
+	before: ReadonlyMap<string, PartJSON>
+): HistoryEntry {
+	const ids = new Set(synced.map((part) => part.id));
+	if (edit?.redo.some((change) => change.kind === 'documentSnapshot')) {
+		throw new Error(`"${label}" records a document snapshot inside a targeted edit`);
+	}
+	const snapshots = new HistoryRecorder(doc);
+	for (const part of synced) {
+		const copy = before.get(part.id);
+		if (!copy) {
+			throw new Error(`"${label}": mirrors rebuilt on Part ${part.id}, which had no repeat group`);
+		}
+		snapshots.partSnapshot(copy, part.snapshot());
+	}
+	const parts = snapshots.commit(label) ?? { label, undo: [], redo: [] };
+	const outside = (change: AtomicChange) => !ids.has(changedPartId(change) ?? '');
+	return {
+		label,
+		undo: [...parts.undo, ...(edit?.undo ?? []).filter(outside)],
+		redo: [...(edit?.redo ?? []).filter(outside), ...parts.redo],
+	};
 }

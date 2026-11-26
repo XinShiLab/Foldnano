@@ -11,6 +11,7 @@ import type { PluginManifest } from './types';
 function makeFakeHistoryStack(): HistoryStack {
 	return {
 		snapshotTx: (_label: string, fn: () => unknown) => fn(),
+		partSnapshotTx: (_label: string, _part: unknown, fn: () => unknown) => fn(),
 	} as unknown as HistoryStack;
 }
 

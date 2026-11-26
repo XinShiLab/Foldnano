@@ -7,6 +7,7 @@
 	import { githubExplorerStateStore } from '$lib/services/storage';
 	import type { FileNode } from './types';
 	import { validateDesignName } from '$lib/model/io/designFileName';
+	import LocalOnlyLinksNotice from '../Assembly/LocalOnlyLinksNotice.svelte';
 
 	interface Props {
 		open: boolean;
@@ -163,6 +164,8 @@
 					}}
 				/>
 			</div>
+
+			<LocalOnlyLinksNotice />
 
 			{#if error}
 				<p class="text-xs text-red-500">{error}</p>

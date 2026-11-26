@@ -44,7 +44,7 @@
 	);
 
 	const selectedFreeformVhsInActiveRegion = $derived.by(() => {
-		const part = session.currentDoc.parts[0];
+		const part = ctx.activePart;
 		const activeRegion = ctx.activeRegion;
 		if (!part || !activeRegion?.supportsFreeformPlacement) return [];
 		return Array.from(ctx.selectedFreeformVhIndices)
@@ -52,7 +52,7 @@
 			.filter((vh): vh is VirtualHelix => vh?.regionId === activeRegion.id);
 	});
 	const canDistributeRadially = $derived(
-		ctx.isTabOwner &&
+		ctx.canEditActivePart &&
 			planeEditable &&
 			planRadialDistribute(selectedFreeformVhsInActiveRegion) !== null
 	);
@@ -70,7 +70,7 @@
 	}
 
 	function deleteSelectedVhs() {
-		const part = session.currentDoc.parts[0];
+		const part = ctx.activePart;
 		if (!part) return;
 		if (ctx.selectedLatticeVhIndices.size > 0) {
 			deleteLatticeVirtualHelicesCmd(

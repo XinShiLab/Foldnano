@@ -21,6 +21,7 @@ import { LinkedPluginReviewGate } from '../Plugin/LinkedPluginReviewGate.svelte'
 import type { SegmentEnd, OligoSegment } from '$lib/model/Oligo';
 import type Oligo from '$lib/model/Oligo';
 import type { Part } from '$lib/model/Part';
+import type { Occurrence } from '$lib/model/Assembly';
 import type { DuplicateCheck } from '$lib/model/Part/Part.svelte';
 import {
 	type DesignRegion,
@@ -42,6 +43,9 @@ import type { OxDnaReplay } from '../View3D/replay/OxDnaReplay.svelte';
 import type { ReplayFrameRenderer, VideoSize } from '../View3D/replay/replayVideoExport';
 import { addPlaneCmd, removePlaneCmd } from '$lib/commands/planes';
 import { addRegionAndPlaneCmd, setRegionReferenceGeometryCmd } from '$lib/commands/regions';
+import { addPartCmd, deletePartCmd } from '$lib/commands/assembly';
+import { transformPlaneCmd } from '$lib/commands/planes';
+import type { HistoryEntry } from '$lib/commands/historyChanges';
 import { BUILTIN_MODIFICATIONS } from '$lib/model/modifications';
 import FoldnanoDocument from '$lib/model/document.svelte';
 import { CadnanoJSON } from '$lib/model/io/cadnanoJSON';
@@ -62,6 +66,7 @@ import type {
 import { EditorDocumentSession } from './EditorDocumentSession.svelte';
 import type { StorageManager } from '$lib/services/storage';
 import type { SidePanelId } from '../sidePanels';
+import type { SimulationExportRequest } from '$lib/model/io/assemblyNtModel';
 
 export type ActiveViewer = 'STRAND' | 'HELIX' | 'VIEW3D';
 
@@ -152,8 +157,8 @@ export interface View3DToolbarController {
 	/** Offscreen renderer of the shown replay for video export (null size = the 3D view's). */
 	onCreateReplayFrameRenderer?: (size: VideoSize | null) => ReplayFrameRenderer | null;
 	onExportGlb?: () => void;
-	onExportOxDna?: (opts?: { includeMirrors?: boolean }) => void;
-	onExportMrdna?: (opts?: { includeMirrors?: boolean }) => void;
+	onExportOxDna?: (request?: SimulationExportRequest) => void;
+	onExportMrdna?: (request?: SimulationExportRequest) => void;
 	onLoadOverlay?: (file: File) => Promise<void>;
 	onDuplicateOverlay?: (id: string) => void;
 	onClearOverlay?: (id: string) => void;
@@ -336,6 +341,7 @@ export interface SerializableStrandViewContext {
 	collapsedRegionIds: string[];
 	csCursorIdx: number;
 	activeCsRegionId: string | null;
+	activePartId?: string | null;
 }
 
 export interface MeshDraft {
@@ -364,6 +370,8 @@ export class EditorViewContext {
 	/** Owned plugins whose editor panel has a sidebar icon; open editors stay mounted off-tab. */
 	pluginEditorIds: SvelteSet<string> = new SvelteSet();
 	newFileDialogOpen: boolean = $state(false);
+	/** Insert Part from… (linked Parts); opened from the Assembly panel and the start screen. */
+	insertLinkedPartDialogOpen: boolean = $state(false);
 	publishToGitHubDialogOpen: boolean = $state(false);
 	activeGitHubTab: 'files' | 'changes' | 'graph' = $state('files');
 	localOnlyEntriesVersion: number = $state(0);
@@ -382,7 +390,23 @@ export class EditorViewContext {
 	hiddenReferenceMeshRegionIds = new SvelteSet<string>();
 	hidden3DRegionIds = new SvelteSet<string>();
 	isAddingRegionToExistingPart: boolean = $state(false);
+	/** The Part that was active before `startNewPart`, restored if the plane picker is cancelled. */
+	#partBeforeNewPart: string | null = null;
+	/**
+	 * The Part the open plane picker created (a new Part, or a new design's first one), and the
+	 * history entry that added it. The picker previews the chosen plane on this Part only, and
+	 * cancel or confirm act on it by id, never on whatever Part is active by then.
+	 */
+	#draftPart: DraftPart | null = null;
+	/** The Part an open Add Region picker adds to; confirm refuses any other. */
+	#regionTargetPartId: string | null = null;
 	activeRegionId: string | null = $state(null);
+	/** The Part the editor works on; null means the document's first Part. See `activePart`. */
+	activePartId: string | null = $state(null);
+	/** Which instance of the active Part the 3D view edits; null means its first one. */
+	editedOccurrenceId: string | null = $state(null);
+	/** The instance the 3D gizmo is moving, if any (any Part's, not only the active one). */
+	movingOccurrenceId: string | null = $state(null);
 	footnote: string = $derived(`${this.otherFootnote} | ${this.strandViewContext.footnote}`);
 
 	pluginRegistry: PluginRegistry = new PluginRegistry();
@@ -412,6 +436,7 @@ export class EditorViewContext {
 		);
 		this.pluginRegistry.setBusyCheck((id) => this.pluginCoordinator.isPluginBusyOrPending(id));
 		this.pluginCoordinator.setEditGate(() => this.session.isTabOwner);
+		this.pluginCoordinator.setActivePartGetter(() => this.activePart);
 		this.pluginCoordinator.setCadnanoInputReviewer((pluginName, issues) =>
 			designCheckPrompt.ask({
 				title: `Run "${pluginName}" on this region?`,
@@ -433,10 +458,10 @@ export class EditorViewContext {
 			getDocName: () => this.session.currentDoc.name,
 			isAwaitingUser: () => this.linkedPluginReviewGate.pending !== null,
 			getPartJson: () => {
-				const part = this.currentDoc.parts[0];
+				const part = this.activePart;
 				return part ? JSON.stringify(part.toJSON()) : null;
 			},
-			getOverview: (part = this.currentDoc.parts[0]) =>
+			getOverview: (part = this.activePart ?? undefined) =>
 				part ? buildDesignOverview(part, this.activeRegionId) : null,
 			canEdit: () => this.session.isTabOwner,
 			origin: typeof window === 'undefined' ? '' : window.location.origin,
@@ -493,6 +518,20 @@ export class EditorViewContext {
 		return this.session.isTabOwner;
 	}
 
+	/** Whether the helix and strand tools may edit the active Part: this tab owns the document
+	 * and the Part isn't linked from another design (the history guard refuses those edits). */
+	get canEditActivePart(): boolean {
+		return this.session.isTabOwner && !this.activePart?.source;
+	}
+
+	/** Pan always; Select in the owning tab (it only selects on a linked Part); the editing
+	 * modes only where `canEditActivePart`. */
+	isModeEnabled(mode: EditorMode): boolean {
+		if (mode === 'PAN') return true;
+		if (mode === 'SELECT') return this.session.isTabOwner;
+		return this.canEditActivePart;
+	}
+
 	openSidePanel(tab: SidePanelId): void {
 		this.sidePanelTab = tab;
 		this.showSidePanel = true;
@@ -542,11 +581,12 @@ export class EditorViewContext {
 			$effect(() => {
 				const { integrity, simulation, cadnano } = this.strandViewContext.designChecks;
 				void this.historyStack.revision;
-				const part = this.currentDoc.parts[0];
+				const part = this.activePart ?? undefined;
 				const region = this.activeRegion;
+				const linkState = part ? this.session.partLinks.statusOf(part)?.state : null;
 				const run = () => {
 					this.#designIssues = untrack(() =>
-						collectDesignIssues(part, region, { integrity, simulation, cadnano })
+						collectDesignIssues(part, region, { integrity, simulation, cadnano }, linkState)
 					);
 				};
 				if (typeof window === 'undefined') return run();
@@ -573,15 +613,78 @@ export class EditorViewContext {
 		return fill.revision === this.historyStack.revision ? fill : null;
 	}
 
+	/**
+	 * The one Part the 2D views, tools and plugins edit. Falls back to the first Part while
+	 * `activePartId` is unset or names a Part the document no longer has.
+	 */
+	get activePart(): Part | null {
+		const parts = this.currentDoc.parts;
+		if (this.activePartId) {
+			const part = parts.find((p) => p.id === this.activePartId);
+			if (part) return part;
+		}
+		return parts[0] ?? null;
+	}
+
+	/** The placement of the active Part the 3D view edits in; null only for an unplaced Part. */
+	get activeOccurrence(): Occurrence | null {
+		const part = this.activePart;
+		if (!part) return null;
+		const occurrences = this.currentDoc.assembly.occurrencesOf(part.id);
+		return occurrences.find((o) => o.id === this.editedOccurrenceId) ?? occurrences[0] ?? null;
+	}
+
+	/** Makes the instance's Part active and edits it in that instance's placement. */
+	editOccurrence(occurrenceId: string): void {
+		const occurrence = this.currentDoc.assembly.getById(occurrenceId);
+		if (!occurrence || !this.currentDoc.parts.some((p) => p.id === occurrence.partId)) return;
+		this.setActivePart(occurrence.partId);
+		this.editedOccurrenceId = occurrenceId;
+	}
+
+	/** Shows the 3D view with the move gizmo on this instance. */
+	startMovingOccurrence(occurrenceId: string): void {
+		if (!this.currentDoc.assembly.getById(occurrenceId)) return;
+		this.movingOccurrenceId = occurrenceId;
+		if (this.view3DToolbarController) this.view3DToolbarController.activeOverlayId = null;
+		this.show3D = true;
+		this.setActiveViewer('VIEW3D');
+	}
+
+	stopMovingOccurrence(): void {
+		this.movingOccurrenceId = null;
+	}
+
+	/** Switches the edited Part. Selections, the active region and pending previews belong to the
+	 * old Part, so they are dropped here rather than left pointing into it. */
+	setActivePart(partId: string | null): void {
+		// Switching Parts abandons a plane picker that is open for a new Part or region.
+		if (this.planeSelectionMode && partId !== this.activePart?.id) this.cancelRegionCreation();
+		const before = this.activePart;
+		this.activePartId = this.currentDoc.parts.find((p) => p.id === partId)?.id ?? null;
+		if (this.activePart === before) return;
+		this.editedOccurrenceId = null;
+		this.#clearStaleSelectionsAfterReplay();
+		this.strandViewContext.recentFill = null;
+		this.strandViewContext.splitPreviewState = null;
+		this.strandViewContext.activeCsRegionId = null;
+		if (this.view3DToolbarController) this.view3DToolbarController.selectedPlaneId = null;
+		this.pluginCoordinator.pendingApply = null;
+		this.activeRegionId = null;
+		this.repairActiveRegion();
+		// A linked Part is read-only: only Pan and Select stay enabled (`isModeEnabled`).
+		if (!this.isModeEnabled(this.editorMode)) this.editorMode = 'SELECT';
+	}
+
 	get activeRegion(): DesignRegion | null {
-		const part = this.currentDoc.parts[0];
+		const part = this.activePart;
 		if (!part || !this.activeRegionId) return null;
 		return part.regions.find((region) => region.id === this.activeRegionId) ?? null;
 	}
 
 	get activePlane(): Plane | null {
 		const region = this.activeRegion;
-		const part = this.currentDoc.parts[0];
+		const part = this.activePart;
 		if (!region || !part) return null;
 		return part.getPlaneById(region.planeId);
 	}
@@ -600,14 +703,26 @@ export class EditorViewContext {
 	private moveCsCursorToRegion(regionId: string): void {
 		const strandCtx = this.strandViewContext;
 		strandCtx.activeCsRegionId = regionId;
-		const region = this.currentDoc.parts[0]?.regions.find((r) => r.id === regionId);
+		const region = this.activePart?.regions.find((r) => r.id === regionId);
 		if (region && strandCtx.csCursorIdx >= region.maxBase) {
 			strandCtx.csCursorIdx = Math.max(0, region.maxBase - 1);
 		}
 	}
 
+	/**
+	 * After a Part's object was replaced outside undo/redo (a linked Part's Update): selections hold
+	 * the old Part's objects, and its active region may be gone. Same cleanup as after a replay.
+	 */
+	afterPartReplaced(partId: string): void {
+		if (this.activePart?.id === partId) this.#clearStaleSelectionsAfterReplay();
+		this.repairActiveRegion();
+	}
+
 	repairActiveRegion(): void {
-		const part = this.currentDoc.parts[0];
+		if (this.activePartId && !this.currentDoc.parts.some((p) => p.id === this.activePartId)) {
+			this.activePartId = null;
+		}
+		const part = this.activePart;
 		if (!part || part.regions.length === 0) {
 			this.setActiveRegion(null);
 			return;
@@ -655,7 +770,13 @@ export class EditorViewContext {
 	}
 
 	#resetEphemeralEditorState(): void {
+		// An open plane picker belongs to the old document (its draft Part, its history), so it is
+		// dropped without touching either.
+		if (this.planeSelectionMode) this.#finishRegionCreation(true);
 		this.#clearStaleSelectionsAfterReplay();
+		this.activePartId = null;
+		this.editedOccurrenceId = null;
+		this.movingOccurrenceId = null;
 		this.#resetViewerChrome();
 	}
 
@@ -713,13 +834,31 @@ export class EditorViewContext {
 
 	enterPlaneSelectionMode(kind: RegionKind): void {
 		if (this.currentDoc.parts.length === 0) {
-			this.historyStack.tx(() => {
-				this.currentDoc.addNewPart(kind);
-			});
+			const part = addPartCmd(this.historyStack, this.currentDoc, kind);
+			this.#draftPart = this.#draftOf(part);
 			this.isAddingRegionToExistingPart = false;
 		} else {
 			this.isAddingRegionToExistingPart = true;
+			this.#regionTargetPartId = this.activePart?.id ?? null;
 		}
+		this.#openPlaneSelection(kind);
+	}
+
+	/**
+	 * Adds a Part whose first region is `kind`, makes it the active Part and opens the plane picker
+	 * for it. Cancelling the picker removes the Part again and goes back to the previous Part.
+	 */
+	startNewPart(kind: RegionKind): void {
+		const previous = this.activePart?.id ?? null;
+		const part = addPartCmd(this.historyStack, this.currentDoc, kind);
+		this.#draftPart = this.#draftOf(part);
+		this.setActivePart(part.id);
+		this.#partBeforeNewPart = previous;
+		this.isAddingRegionToExistingPart = false;
+		this.#openPlaneSelection(kind);
+	}
+
+	#openPlaneSelection(kind: RegionKind): void {
 		this.pendingRegionKind = kind;
 		this.pendingBasePlane = 'XY';
 		this.meshDraft = null;
@@ -780,10 +919,26 @@ export class EditorViewContext {
 		}
 	}
 
+	#draftOf(part: Part): DraftPart {
+		const { origin, u, v, normal } = part.getDefaultPlane();
+		return {
+			partId: part.id,
+			entry: this.historyStack.lastUndoEntry,
+			initialPlane: { origin: { ...origin }, u: { ...u }, v: { ...v }, normal: { ...normal } },
+		};
+	}
+
+	/** The draft Part of the open plane picker, while it is still in the design. */
+	#draftPartInDoc(): Part | null {
+		const draft = this.#draftPart;
+		return draft ? (this.currentDoc.parts.find((p) => p.id === draft.partId) ?? null) : null;
+	}
+
 	selectPendingBasePlane(plane: 'XY' | 'XZ' | 'YZ'): void {
 		this.pendingBasePlane = plane;
 		if (this.isAddingRegionToExistingPart) return;
-		const part = this.currentDoc.parts[0];
+		// A live preview outside history: confirm records it, cancel removes the Part.
+		const part = this.#draftPartInDoc();
 		if (!part) return;
 		part.setPlaneTransform(part.getDefaultPlane().id, BASIS_PLANE_TRANSFORMS[plane]);
 	}
@@ -792,9 +947,23 @@ export class EditorViewContext {
 		this.planeSelectionMode = false;
 		this.pendingRegionKind = null;
 		this.meshDraft = null;
-		if (!this.isAddingRegionToExistingPart) {
-			this.historyStack.undoOnce();
+		const draft = this.#draftPart;
+		const draftPart = this.#draftPartInDoc();
+		this.#draftPart = null;
+		if (!this.isAddingRegionToExistingPart && draft) {
+			if (draftPart) {
+				// Nothing committed since: undo the add itself. Otherwise remove the Part as its own
+				// step, so the edits made meanwhile stay.
+				if (draft.entry && this.historyStack.lastUndoEntry === draft.entry) {
+					this.historyStack.undoOnce();
+				} else {
+					deletePartCmd(this.historyStack, this.currentDoc, draft.partId);
+				}
+			}
+			if (this.#partBeforeNewPart) this.setActivePart(this.#partBeforeNewPart);
 		}
+		this.#partBeforeNewPart = null;
+		this.#regionTargetPartId = null;
 		this.isAddingRegionToExistingPart = false;
 	}
 
@@ -805,15 +974,19 @@ export class EditorViewContext {
 	): void {
 		const transform = BASIS_PLANE_TRANSFORMS[basePlane];
 		let loaded: { part: Part; regionId: string } | null = null;
-		this.historyStack.snapshotTx('Load Cadnano as region', () => {
-			let part = this.currentDoc.parts[0];
-			if (!part) {
-				part = cadnano.toPart({ lattice });
-				this.currentDoc.parts.push(part);
+		const existing = this.activePart;
+		if (!existing) {
+			// A new Part changes the Part list, so this one needs the whole-document snapshot.
+			this.historyStack.snapshotTx('Load Cadnano as region', () => {
+				const part = cadnano.toPart({ lattice });
+				this.currentDoc.addPart(part);
 				part.setPlaneTransform(part.getDefaultPlane().id, transform);
 				this.setActiveRegion(part.getDefaultRegion().id);
 				loaded = { part, regionId: part.getDefaultRegion().id };
-			} else {
+			});
+		} else {
+			this.historyStack.partSnapshotTx('Load Cadnano as region', existing, () => {
+				const part = existing;
 				const plane = new Plane(
 					part.nextPlaneName(),
 					undefined,
@@ -825,8 +998,8 @@ export class EditorViewContext {
 				const region = cadnano.toRegionInPart(part, plane, { lattice });
 				this.setActiveRegion(region.id);
 				loaded = { part, regionId: region.id };
-			}
-		});
+			});
+		}
 		if (loaded) {
 			const { part, regionId } = loaded;
 			// eslint-disable-next-line svelte/prefer-svelte-reactivity -- one-off scope, not state
@@ -838,8 +1011,15 @@ export class EditorViewContext {
 	}
 
 	confirmRegionCreation(): void {
-		const part = this.currentDoc.parts[0];
-		if (!part) return;
+		if (!this.isAddingRegionToExistingPart) {
+			this.#confirmDraftPart();
+			return;
+		}
+		const part = this.activePart;
+		if (!part || part.id !== this.#regionTargetPartId) {
+			this.cancelRegionCreation();
+			return;
+		}
 		const meshDraft = this.scaledMeshDraft;
 		const geometry: ReferenceGeometry | undefined = meshDraft
 			? { unit: 'nm', mesh: meshDraft }
@@ -870,25 +1050,82 @@ export class EditorViewContext {
 			if (region instanceof WireframeRegion) region.referenceGeometry = geometry;
 			addRegionAndPlaneCmd(this.historyStack, part, plane, region);
 			this.setActiveRegion(region.id);
-		} else {
-			const regionId = part.getDefaultRegion().id;
-			if (geometry) setRegionReferenceGeometryCmd(this.historyStack, part, regionId, geometry);
-			this.setActiveRegion(regionId);
 		}
+		this.#finishRegionCreation(!!geometry);
+	}
 
+	/**
+	 * Confirms the picker's new Part: its chosen plane (and reference mesh) become part of the
+	 * history. When nothing was committed since the Part was added, the add is redone with them as
+	 * one undo step; otherwise they are recorded as their own steps on that Part.
+	 */
+	#confirmDraftPart(): void {
+		const draft = this.#draftPart;
+		const draftPart = this.#draftPartInDoc();
+		const kind = this.pendingRegionKind;
+		const meshDraft = this.scaledMeshDraft;
+		const geometry: ReferenceGeometry | undefined = meshDraft
+			? { unit: 'nm', mesh: meshDraft }
+			: undefined;
+		const chosen = BASIS_PLANE_TRANSFORMS[this.pendingBasePlane];
+		this.planeSelectionMode = false;
+		if (!draft || !draftPart || !kind) {
+			// The new Part was undone while the picker was open; there is nothing to confirm.
+			this.#finishRegionCreation(false);
+			return;
+		}
+		let part: Part;
+		if (draft.entry && this.historyStack.lastUndoEntry === draft.entry) {
+			this.historyStack.undoOnce();
+			part = this.historyStack.snapshotTx('Add Part', () => {
+				const added = this.currentDoc.addNewPart(kind);
+				added.setPlaneTransform(added.getDefaultPlane().id, chosen);
+				const region = added.getDefaultRegion();
+				if (geometry && region instanceof WireframeRegion) region.referenceGeometry = geometry;
+				return added;
+			});
+		} else {
+			part = draftPart;
+			const planeId = part.getDefaultPlane().id;
+			transformPlaneCmd(
+				this.historyStack,
+				part,
+				planeId,
+				draft.initialPlane,
+				chosen,
+				'Set base plane'
+			);
+			if (geometry) {
+				setRegionReferenceGeometryCmd(
+					this.historyStack,
+					part,
+					part.getDefaultRegion().id,
+					geometry
+				);
+			}
+		}
+		this.setActivePart(part.id);
+		this.setActiveRegion(part.getDefaultRegion().id);
+		this.#finishRegionCreation(!!geometry);
+	}
+
+	#finishRegionCreation(keep3D: boolean): void {
 		this.planeSelectionMode = false;
 		this.pendingRegionKind = null;
 		this.meshDraft = null;
 		this.isAddingRegionToExistingPart = false;
+		this.#partBeforeNewPart = null;
+		this.#regionTargetPartId = null;
+		this.#draftPart = null;
 		// A reference mesh is drawn only in 3D, so leaving 3D here would hide what was just added.
-		if (!geometry) {
+		if (!keep3D) {
 			this.show3D = false;
 			this.setActiveViewer('HELIX');
 		}
 	}
 
 	addPlaneBasedOnSelected(): void {
-		const part = this.currentDoc.parts[0];
+		const part = this.activePart;
 		if (!part) return;
 		const ctrl = this.view3DToolbarController;
 		const srcId = ctrl?.selectedPlaneId;
@@ -909,7 +1146,7 @@ export class EditorViewContext {
 	}
 
 	addPlaneFromAxisPlane(axisPlane: 'xy' | 'xz' | 'yz'): void {
-		const part = this.currentDoc.parts[0];
+		const part = this.activePart;
 		if (!part) return;
 		const ctrl = this.view3DToolbarController;
 		const key = axisPlane.toUpperCase() as 'XY' | 'XZ' | 'YZ';
@@ -930,7 +1167,7 @@ export class EditorViewContext {
 	}
 
 	removePlaneIfEmpty(): void {
-		const part = this.currentDoc.parts[0];
+		const part = this.activePart;
 		if (!part) return;
 		const ctrl = this.view3DToolbarController;
 		const planeId = ctrl?.selectedPlaneId;
@@ -962,10 +1199,13 @@ export class EditorViewContext {
 			collapsedRegionIds: this.strandViewContext.collapsedRegionIds,
 			csCursorIdx: this.strandViewContext.csCursorIdx,
 			activeCsRegionId: this.strandViewContext.activeCsRegionId,
+			activePartId: this.activePartId,
 		};
 	}
 
 	private applySerializedContext(data: SerializableStrandViewContext): void {
+		// First: switching Part clears Part-scoped state, which the lines below then restore.
+		if (data.activePartId) this.setActivePart(data.activePartId);
 		this.strandViewContext.colorContext = data.colorContext;
 		this.strandViewContext.sequenceContext = data.sequenceContext;
 		if (data.modificationContext) {
@@ -1052,6 +1292,13 @@ export class EditorViewContext {
 
 type PlaneVec3 = { x: number; y: number; z: number };
 type PlaneTransformDef = { origin: PlaneVec3; u: PlaneVec3; v: PlaneVec3; normal: PlaneVec3 };
+
+/** A Part the plane picker added, with the history entry that added it and its first plane. */
+interface DraftPart {
+	partId: string;
+	entry: HistoryEntry | undefined;
+	initialPlane: PlaneTransformDef;
+}
 
 // Every basis must be right-handed (u × v = normal; `isRightHandedBasis`): a mirrored plane
 // reverses the helix twist in 3D and export relative to the 2D layout.

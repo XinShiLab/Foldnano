@@ -5,7 +5,13 @@
 	import { Button } from '$lib/components/ui/button';
 	import OligosTable from '$lib/components/Oligos/OligosTable.svelte';
 	import { collectPartOligoReportRows, type OligoReportRow } from '$lib/model/io/oligoReport';
-	import { exportPartSequencesToCSV } from '$lib/model/io/sequenceCSV';
+	import {
+		documentNeedsQuantities,
+		exportDocumentSequencesToCSV,
+		exportPartSequencesToCSV,
+	} from '$lib/model/io/sequenceCSV';
+	import { exportBaseName } from '$lib/model/io/designFileName';
+	import * as Select from '$lib/components/ui/select/index.js';
 	import FoldnanoDocument from '$lib/model/document.svelte';
 	import {
 		IndexedDbStorageProvider,
@@ -21,7 +27,10 @@
 
 	let doc = $state<FoldnanoDocument | null>(null);
 	let docMeta = $state<DocumentMetadata | null>(null);
-	let rows = $state<OligoReportRow[]>([]);
+	// The report shows one Part at a time; a design with several gets a picker.
+	let partId = $state<string | null>(null);
+	const part = $derived(doc?.parts.find((p) => p.id === partId) ?? doc?.parts[0] ?? null);
+	const rows = $derived<OligoReportRow[]>(part ? collectPartOligoReportRows(part) : []);
 	let loading = $state(true);
 	let error = $state('');
 
@@ -46,8 +55,7 @@
 			doc = restored;
 			const docs = await storageManager.getDocumentList();
 			docMeta = docs.find((entry) => entry.id === restored.id) ?? null;
-			const part = restored.parts[0];
-			rows = part ? collectPartOligoReportRows(part) : [];
+			partId = restored.parts[0]?.id ?? null;
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to load document.';
 		} finally {
@@ -55,11 +63,13 @@
 		}
 	}
 
-	function downloadCsv(): void {
-		const part = doc?.parts[0];
+	function downloadCsv(scope: 'part' | 'design' = 'part'): void {
 		if (!doc || !part) return;
 		try {
-			exportPartSequencesToCSV(part, doc.name);
+			if (scope === 'design') exportDocumentSequencesToCSV(doc);
+			else if (doc.parts.length > 1) {
+				exportPartSequencesToCSV(part, exportBaseName(doc.name, `.${part.name}`));
+			} else exportPartSequencesToCSV(part, doc.name);
 		} catch (e) {
 			notify.error('Cannot export oligo CSV', {
 				description: e instanceof Error ? e.message : 'The design cannot be exported.',
@@ -91,7 +101,29 @@
 					<PencilRuler class="size-4" />
 					Open Editor
 				</Button>
-				<Button onclick={downloadCsv} disabled={!doc || !doc.parts[0]}>
+				{#if doc && doc.parts.length > 1}
+					<Select.Root type="single" bind:value={() => part?.id ?? '', (v) => (partId = v || null)}>
+						<Select.Trigger class="w-48" title="Part shown in the report">
+							<span class="truncate">{part?.name ?? 'Part'}</span>
+						</Select.Trigger>
+						<Select.Content>
+							{#each doc.parts as option (option.id)}
+								<Select.Item value={option.id} label={option.name}>{option.name}</Select.Item>
+							{/each}
+						</Select.Content>
+					</Select.Root>
+				{/if}
+				{#if doc && documentNeedsQuantities(doc)}
+					<Button
+						variant="outline"
+						onclick={() => downloadCsv('design')}
+						title="Every Part's oligos, with how many instances of each Part the design has"
+					>
+						<Download class="size-4" />
+						All Parts CSV, with quantities
+					</Button>
+				{/if}
+				<Button onclick={() => downloadCsv('part')} disabled={!part}>
 					<Download class="size-4" />
 					Download CSV
 				</Button>
@@ -109,19 +141,19 @@
 					Back to Oligos
 				</Button>
 			</div>
-		{:else if !doc?.parts[0]}
+		{:else if !doc || !part}
 			<div class="border border-border p-10 text-center">
 				<p class="text-sm font-medium">No part found</p>
-				<p class="mt-1 text-sm text-muted-foreground">
-					The oligos page currently reports the first part of a document.
-				</p>
+				<p class="mt-1 text-sm text-muted-foreground">This design has no Part to report.</p>
 			</div>
 		{:else}
 			<section class="flex flex-col gap-3">
 				<div class="flex flex-wrap items-center justify-between gap-2">
 					<p class="text-sm text-muted-foreground">
 						{rows.length} oligo{rows.length === 1 ? '' : 's'} from
-						<span class="font-medium text-foreground">{doc.name}</span>
+						<span class="font-medium text-foreground"
+							>{doc.name}{doc.parts.length > 1 ? ` › ${part.name}` : ''}</span
+						>
 						·
 						<a
 							href="{resolve('/docs/[...slug]', {

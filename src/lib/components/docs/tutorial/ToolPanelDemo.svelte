@@ -9,7 +9,7 @@
 
 	const editorViewContext = getEditorViewContext();
 	const tutorial = getTutorialState();
-	const part = $derived(editorViewContext.currentDoc.parts[0]);
+	const part = $derived(editorViewContext.activePart);
 	const panel = $derived(tutorial.activePanel ?? getTutorialModeInfo(tutorial.activeMode).panel);
 </script>
 

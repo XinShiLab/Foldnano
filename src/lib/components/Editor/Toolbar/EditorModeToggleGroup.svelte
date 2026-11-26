@@ -41,7 +41,6 @@
 	}: Props = $props();
 
 	const ctx = getEditorViewContext();
-	const isReadOnly = $derived(!ctx.isTabOwner);
 
 	const shortcutByMode: Record<EditorMode, string> = {
 		PAN: panKeySymbol(),
@@ -92,7 +91,7 @@
 			<ToggleGroup.Item
 				value={mode}
 				title={titleByMode[mode]}
-				disabled={(mode !== 'PAN' && isReadOnly) || disabledModes.includes(mode)}
+				disabled={!ctx.isModeEnabled(mode) || disabledModes.includes(mode)}
 				data-tutorial-id={tutorialId}
 				class={activeTutorialId === tutorialId
 					? 'relative z-20 outline-2 outline-offset-2 outline-primary'

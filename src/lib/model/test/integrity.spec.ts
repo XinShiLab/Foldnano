@@ -141,7 +141,7 @@ describe('negative lattice cells', () => {
 		const part = duplexPart();
 		const vh = part.virtualHelices[0];
 		const doc = new FoldnanoDocument();
-		doc.parts.push(part);
+		doc.addPart(part);
 		const snapshot = JSON.parse(JSON.stringify(doc.toJSON()));
 		snapshot.parts[0].virtualHelices[0].latticeCoords = { row: -1, col: -3 };
 		const before = FoldnanoDocument.fromJSON(JSON.parse(JSON.stringify(snapshot))).parts[0];

@@ -12,6 +12,7 @@
 	const PANEL_HELP: Record<string, string> = {
 		GITHUB: 'GitHub files, uncommitted changes and history for designs synced to a repository.',
 		PLUGIN: 'Browse, install and run plugins that generate or modify designs.',
+		ASSEMBLY: 'The Parts in this design: switch the one you edit, add, rename or place them.',
 	};
 
 	$effect(() => {
@@ -25,7 +26,7 @@
 	class="flex w-10 shrink-0 flex-col items-center gap-0.5 border-r border-border bg-muted py-2"
 	{@attach help({
 		title: 'Side panels',
-		text: 'Source Control (GitHub files and sync), Plugins, and panels added by plugins. Click an icon to open or close its panel.',
+		text: 'Source Control (GitHub files and sync), Plugins, Assembly (the Parts in the design), and panels added by plugins. Click an icon to open or close its panel.',
 		doc: 'saving-github',
 	})}
 >

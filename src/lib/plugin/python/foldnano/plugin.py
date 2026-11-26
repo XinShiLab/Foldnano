@@ -97,7 +97,7 @@ class PluginContext:
         if self._cadnano_json_in is None:
             raise RuntimeError("No cadnano JSON input was provided to this PluginContext.")
         if part_index != 0:
-            raise NotImplementedError("Multi-part documents are not yet supported (part_index > 0).")
+            raise NotImplementedError("Only the active part can be read (part_index must be 0).")
         return self._cadnano_json_in
 
     def set_result_cadnano_json(self, json_str: str) -> None:
@@ -129,7 +129,7 @@ class PluginContext:
         if self._foldnano_json_in is None:
             raise RuntimeError("No Foldnano JSON input was provided to this PluginContext.")
         if part_index != 0:
-            raise NotImplementedError("Multi-part documents are not yet supported (part_index > 0).")
+            raise NotImplementedError("Only the active part can be read (part_index must be 0).")
         return self._foldnano_json_in
 
     def set_result_foldnano_json(self, json_str: str) -> None:

@@ -6,6 +6,7 @@ covers:
   - scripts/docs-check.ts
   - scripts/lint-changed.sh
   - scripts/screenshots-to-webp.sh
+  - scripts/docs-screenshots.ts
   - scripts/vite-third-party-licenses.ts
   - scripts/vite-sandbox-worker.ts
   - scripts/vite-pyodide.ts
@@ -112,8 +113,18 @@ its environment at runtime (`$env/dynamic/private`), and Vercel deploys separate
   on uncommitted files, or on everything since the merge-base with a given ref.
 - **`scripts/screenshots-to-webp.sh`** (`pnpm screenshots:webp [files…]`) — converts doc-site
   screenshots under `static/screenshots/` to lossless WebP (needs `cwebp`) and deletes the PNGs.
-  Screenshots are WebP, committed without Git LFS (only `*.png` is LFS-tracked); point guide
-  image links at the `.webp` file.
+  Screenshots are WebP and, like the other binaries in `.gitattributes` (`*.png`, `*.pdf`, …),
+  stored with Git LFS; point guide image links at the `.webp` file.
+- **`scripts/docs-screenshots.ts`** (`pnpm screenshots:capture [set…]`) — retakes scripted
+  doc-site screenshots from the running dev server (`BASE_URL`, default `localhost:5173`; it never
+  starts one). Playwright drives its own Chromium, or the installed Chrome when that isn't
+  downloaded, in a fresh profile: no designs, cookies or sign-ins of the developer's browser are
+  used. Each set seeds its fixture through the app's own modules (`import('/src/…')` served by
+  Vite), so fixtures follow the current model and format; it closes the first-visit welcome and
+  privacy notice, captures, and converts to WebP under `static/screenshots/guide/<set>/`.
+  `SCREENSHOTS_OUT=<dir>` keeps PNGs elsewhere for trying a set out. Only the `assemblies` set is
+  scripted so far; older guide images were taken by hand. Rerun a set when its page's UI changes
+  and review the image diff.
 
 ## Boundaries / Don'ts
 
@@ -126,4 +137,7 @@ its environment at runtime (`$env/dynamic/private`), and Vercel deploys separate
   must stay a classic, self-contained string for the opaque-origin sandbox.
 - Don't add steps to CI that the local commands don't have. CI should run exactly what a
   contributor can run before pushing, so a red check is reproducible locally.
+- Don't hard-code cookie versions or fixed screen coordinates in the screenshot script; dismiss
+  notices and find controls through the UI (roles, labels), and place pointer actions relative to
+  elements, so a set breaks loudly instead of capturing a stale state.
 - Keep the docs-check hook a warning. Blocking commits on docs makes people skip the hook.

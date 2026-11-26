@@ -35,6 +35,7 @@
 	import { isChromiumBrowser } from '$lib/browserSupport';
 	import { page } from '$app/state';
 	import SidePanel from './SidePanel/SidePanel.svelte';
+	import PartBreadcrumb from './Assembly/PartBreadcrumb.svelte';
 	// import { HistoryStack } from '../../commands/history.svelte';
 	// import { createSelection } from '$lib/canvasEditor/services/selection';
 	// import { setColorsContext, type ColorContext } from './StrandView/drawingContext';
@@ -62,6 +63,7 @@
 	import LatticeChoiceDialog from './Toolbar/LatticeChoiceDialog.svelte';
 	import DesignCheckDialog from './DesignCheckDialog.svelte';
 	import SameDesignDialog from './SameDesignDialog.svelte';
+	import InsertLinkedPartDialog from './Assembly/InsertLinkedPartDialog.svelte';
 	import { parseLatticeParam, withLatticeChoice } from './Toolbar/latticeChoice.svelte';
 	import { Part } from '../../model/Part';
 	import FoldnanoDocument from '../../model/document.svelte';
@@ -80,7 +82,7 @@
 	setEditorViewContext(editorViewContext);
 	setEditorDocumentSession(editorViewContext.session);
 	const session = editorViewContext.session;
-	let foldnanoDoc = $derived(session.currentDoc);
+	let activePart = $derived(editorViewContext.activePart);
 
 	// Becomes true after IndexedDB stores are hydrated. The document-load $effect
 	// waits for this flag so GitHub metadata is available when the doc is loaded,
@@ -200,7 +202,7 @@
 				doc.name = stripDesignExtension(filename);
 				const part = result as Part;
 				part.name = doc.name;
-				doc.parts.push(part);
+				doc.addPart(part);
 			}
 
 			await session.loadTransientDocument(doc, rawUrl);
@@ -498,7 +500,7 @@
 
 		if ((e.metaKey || e.ctrlKey) && key === 'd') {
 			e.preventDefault();
-			const part = session.currentDoc.parts[0];
+			const part = editorViewContext.activePart;
 			if (part) startDuplicate(part, editorViewContext, { linked: e.shiftKey });
 			return;
 		}
@@ -518,7 +520,7 @@
 		// Delete selection
 		if (key === 'Backspace' || key === 'Delete') {
 			e.preventDefault();
-			const part = session.currentDoc.parts[0];
+			const part = editorViewContext.activePart;
 			if (part) {
 				const activeRegion = editorViewContext.activeRegion;
 				const activeKind = activeRegion?.kind;
@@ -602,7 +604,7 @@
 			const mode = modeKeyMap[key];
 			if (mode) {
 				e.preventDefault();
-				editorViewContext.editorMode = mode;
+				if (editorViewContext.isModeEnabled(mode)) editorViewContext.editorMode = mode;
 				return;
 			}
 		}
@@ -749,22 +751,33 @@
 				<SidePanel />
 			</Resizable.Pane>
 			<Resizable.HighlightHandle class={editorViewContext.showSidePanel ? '' : 'hidden'} />
-			{#if foldnanoDoc.parts[0]}
+			{#if activePart}
 				<Resizable.Pane defaultSize={25}>
 					<div class="relative h-full overflow-hidden rounded-md border border-transparent">
 						<div
 							class={`absolute inset-x-0 top-0 z-10 h-0.5 ${helixPaneActive ? 'bg-primary/70' : 'bg-transparent'}`}
 						></div>
-						<HelixViewer part={foldnanoDoc.parts[0]} />
+						<!-- Follows the active Part without remounting, so the 3D view keeps its camera and
+						     toolbar state; HelixViewer remounts only its plane view per Part. -->
+						<HelixViewer part={activePart} />
 					</div>
 				</Resizable.Pane>
 				<Resizable.HighlightHandle />
 				<Resizable.Pane defaultSize={75}>
-					<div class="relative h-full overflow-hidden rounded-md border border-transparent">
+					<div
+						class="relative flex h-full flex-col overflow-hidden rounded-md border border-transparent"
+					>
 						<div
 							class={`absolute inset-x-0 top-0 z-10 h-0.5 ${strandPaneActive ? 'bg-primary/70' : 'bg-transparent'}`}
 						></div>
-						<StrandViewer part={foldnanoDoc.parts[0]} />
+						{#if session.currentDoc.parts.length > 1 || activePart.source}
+							<PartBreadcrumb />
+						{/if}
+						<div class="relative min-h-0 flex-1">
+							{#key activePart.id}
+								<StrandViewer part={activePart} />
+							{/key}
+						</div>
 					</div>
 				</Resizable.Pane>
 			{:else}
@@ -776,8 +789,10 @@
       <Resizable.Pane defaultSize={40}><DocViewer /></Resizable.Pane> -->
 		</Resizable.PaneGroup>
 	</div>
-	{#if foldnanoDoc.parts[0]}
-		<ToolPanel part={foldnanoDoc.parts[0]} />
+	{#if activePart}
+		{#key activePart.id}
+			<ToolPanel part={activePart} />
+		{/key}
 	{/if}
 
 	<StatusBar />
@@ -794,6 +809,7 @@
 <PluginInstallConfirmDialog gate={editorViewContext.pluginInstallGate} />
 <LinkedPluginReviewDialog gate={editorViewContext.linkedPluginReviewGate} />
 <LatticeChoiceDialog />
+<InsertLinkedPartDialog bind:open={editorViewContext.insertLinkedPartDialogOpen} />
 <DesignCheckDialog />
 <SameDesignDialog gate={editorViewContext.sameDesignGate} />
 

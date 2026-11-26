@@ -65,6 +65,11 @@ In the current app:
 
 `StorageManager` has no fallback layer. All operations go to the primary provider; errors are logged and the operation returns a failure result.
 
+After every successful save (any provider but `memory`), `saveDocument` posts `{ docId }` on the
+`foldnano-doc-saved` `BroadcastChannel` (`docSavedChannel.ts`). Tabs whose assembly links that
+design compare their cached copy again (`docs/linked-parts.md`). Pulls and opens from GitHub save
+through the same method, so they announce too.
+
 ### `IndexedDbStorageProvider`
 
 The runtime document/context store. It delegates to the shared `FoldnanoIndexedDb` Dexie instance:
@@ -272,9 +277,11 @@ path that skips this choice.
 
 Downloads (toolbar download button / **Download as Foldnano JSON**, the save-failed banner, and each file in the
 Download All zip) add an `exported: { at, clock, contentHash }` block through
-`withExportStamp()` (`src/lib/model/exportStamp.ts`). `contentHash` is SHA-256 over the canonical
-JSON (keys sorted at every level) of `parts` only: the name follows the file and the id follows
-any copy, so neither may change it. Nothing else writes the stamp: GitHub commits, backup and
+`withExportStamp()` (`src/lib/model/exportStamp.ts`). `contentHash` is `designContentHash()`:
+SHA-256 over the canonical JSON (keys sorted at every level) of `{ parts, assembly }`, so moving,
+hiding or adding an instance counts as a change. The name follows the file and the id follows any
+copy, so neither may change it. A design with no `assembly` (v2 and older) hashes `parts` alone,
+which keeps stamps written before format v3 checking out; don't drop that branch. Nothing else writes the stamp: GitHub commits, backup and
 Files-tab downloads stay unstamped. `migrateDocumentJson()` drops it, so it never reaches the
 model, IndexedDB or a commit (the GitHub fetch fallback in `GitHubStorageProvider.loadDocument`,
 which skips migration, strips it with `withoutExportStamp()`).
@@ -289,12 +296,12 @@ When an opened `.fn.json` has an id saved here, the Open dialog runs `compareWit
 (`fileProvenance.ts`) and shows `describeFileProvenance()`:
 
 - **identical**: hashes match after the same migrate → repair → `fromJSON` → `toJSON` steps on
-  both sides (`normalizedPartsHash`), so an older-format file still matches the design it became
-- **older / newer**: different content, the file has a stamp and its parts still match it; decided
+  both sides (`normalizedContentHash`), so an older-format file still matches the design it became
+- **older / newer**: different content, the file has a stamp and its content still matches it; decided
   by `at` against the browser copy's save time moved to server time. `approximate` (offline, or a
   `local` stamp) words it as "seems"; **older** relabels Replace as "Replace newer browser version"
-- **different**: no stamp, or `editedOutside` (the file's raw `parts` no longer match its
-  `contentHash`), whose time no longer describes the content
+- **different**: no stamp, or `editedOutside` (the file's raw `parts` and `assembly` no longer
+  match its `contentHash`), whose time no longer describes the content
 - `matchesBackupAt`: the newest backup of the design with the file's content
 
 `editedOutside` is reported even when the relation is **identical**: an edit the loader overrides
@@ -337,6 +344,9 @@ returns the fixed snapshot plus one line per kind of fix:
 - crossover links that aren't reciprocal within one oligo are cleared, then any oligo that is no
   longer one connected piece is split (the first piece keeps the id; split-off pieces lose
   repeat-group membership)
+- a Part with no assembly occurrence is placed once at the origin; occurrences sharing an id get
+  fresh ids. An occurrence whose Part is missing is kept (the user can relink it) and only
+  reported by the integrity check
 - a lattice region with a helix at a negative row/col is shifted up/right by an even number of
   rows/cols (cell parity kept) and its plane moved back by the same lattice distance, so the
   design stays put in 3D; a plane another region shares is copied first
@@ -409,7 +419,7 @@ The GitHub integration is local-first and explicit.
 
 1. persists the current local snapshot first, so unsaved edits are in the copy about to be replaced
 2. fetches the latest remote file (`GitHubStorageProvider.pullDocument(docId, reason)`)
-3. parses the JSON and validates/upgrades it with `migrateDocumentJson()`; a file from a newer app throws `DocumentFormatError` here, leaving the working copy untouched
+3. parses the JSON, validates/upgrades it with `migrateDocumentJson()` and builds a document from it (after `repairDocumentJson`) as a trial; a file from a newer app, or one that wouldn't open, throws here and leaves the working copy untouched
 4. overwrites the local working copy with a `backup` option (`before_pull` or `before_accept_remote`), so the replaced copy is kept as a backup **in the same transaction**: there is no window where the overwrite happened but the backup didn't
 5. stores the SHA and sync timestamps, awaited; if that fails the pull reports an error
 6. reloads the editor from the pulled snapshot

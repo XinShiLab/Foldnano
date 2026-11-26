@@ -48,7 +48,7 @@ export function splitRegionCmd(
 	splitAfterVhId: string,
 	label = 'Split region'
 ): void {
-	historyStack.snapshotTx(label, () => {
+	historyStack.partSnapshotTx(label, part, () => {
 		const region = part.getRegionById(regionId);
 		if (!region) return;
 		const plane = part.getPlaneById(region.planeId);
@@ -144,7 +144,9 @@ export function changeRegionLengthCmd(
 	label = 'Change region length'
 ): void {
 	if (deltaLength === 0) return;
-	historyStack.snapshotTx(label, () => {
+	const part = region.inPart;
+	if (!part) throw new Error(`Region ${region.id} is not attached to a Part`);
+	historyStack.partSnapshotTx(label, part, () => {
 		region.increaseVhsLengthBy(deltaLength);
 	});
 }

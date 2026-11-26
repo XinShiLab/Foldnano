@@ -194,6 +194,10 @@ Key rules in the current implementation:
 That all-or-nothing-delta rule preserves the relative shape of the selected
 routing fragment during drag.
 
+On a linked (read-only) Part, `SelectTool` never calls this handler
+(`canEditActivePart` is false), so clicks and marquee still select but nothing
+drags; see `docs/linked-parts.md`.
+
 Commit path:
 
 ```ts
@@ -219,7 +223,8 @@ select mode.
 
 `onVhTag.ts`
 
-- drag reorders a VH inside its region-local row order
+- drag reorders a VH inside its region-local row order (not on a linked,
+  read-only Part: the handler returns after selecting)
 - preview is shown with `VhDragPreview`
 - commit calls `reorderVirtualHelixCmd(...)`
 - on a freeform VH (has `localFrame`), pointer-down also selects it in

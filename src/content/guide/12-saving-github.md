@@ -186,6 +186,12 @@ Click a file to see its diff. Right-click a file for **Discard changes** (your l
 
 Below the lists, enter a **Commit message** and click **Commit**. Each staged file becomes its own commit, so if some files can't be committed (for example because they changed on GitHub), the rest still go through; a message lists which files were left and why, and they stay in **Changes** with your message kept for another try. The current **Branch** is shown; when you're committing straight to `main` or `master` a warning appears, with **New branch** to create and switch to a branch first.
 
+### Assemblies with linked Parts
+
+An assembly saves a copy of each [linked Part](/docs/guide/assemblies#linked-parts), so it opens anywhere. Others can follow its links only when the source designs are files in the same repository, since a design from the repository is linked by its path. When you commit or publish an assembly with sources kept only in this browser, or from another repository, a warning lists them. Either publish those sources to this repository and choose **Update from source** in the Assembly panel (the link then uses the repository path), or click **Embed copies (break links)**.
+
+Links never read files from GitHub; they follow the source as it is in this browser. To bring in a newer version of a source, open it and pull it first, then update the link.
+
 ### Graph tab
 
 The Graph tab shows the commit history as a graph, with uncommitted local changes at the top. Click a branch label to switch to that branch, **+** to create a new branch, **Load more** for older commits, and **Refresh** to update.

@@ -60,6 +60,14 @@ describe('compareWithBrowserCopy', () => {
 		expect(p).toMatchObject({ relation: 'identical', editedOutside: false, approximate: false });
 	});
 
+	it('tells a download apart from a browser copy whose instance was moved since', async () => {
+		const moved = design();
+		moved.assembly.occurrences[0].visible = false;
+		const p = await compare(await download(design(), T0 - DAY), moved);
+
+		expect(p.relation).toBe('older');
+	});
+
 	it('calls a download older when the browser copy was saved after it', async () => {
 		const p = await compare(await download(design('old'), T0 - DAY), design('new'));
 

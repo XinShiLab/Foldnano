@@ -142,6 +142,12 @@ scene from those transient overrides. This gives a live folding preview while
 the simulation runs. The toolbar button changes from "Relax" to "Stop"; stop
 requests worker cancellation and leaves partial results transient.
 
+`RbsSimulation.cancel()` abandons a run instead: the 3D view calls it when the
+results no longer apply (another Part, or the user cleared them). It replaces the
+worker, so a progress or done message already on its way is dropped (handlers
+ignore messages from a worker that isn't current), and a local run stops at its
+next chunk without reporting (a run generation).
+
 If worker creation or messaging fails, `View3D.svelte` falls back to local
 chunked simulation. There is also a 1500 ms watchdog timer: if the worker is
 started but no progress response is received within 1500 ms, the fallback kicks
@@ -168,6 +174,11 @@ The 3D toolbar exposes the user-facing controls:
 The relaxed layout toggle switches between lattice geometry and the latest
 transient RBS overrides. Clear removes the transient overrides. Results are not
 persisted to the model or to `.fn.json`.
+
+In a design with several Parts each Part keeps its own result while another is
+active (`PartRelaxation`; `keptRelaxedPoses` and `relaxedPartPoses` in
+`view3dSimulationState.ts` decide which results draw and export). The solver
+still sees one Part at a time. See `docs/editor-3d-view.md` § Assembly.
 
 ### Crossover Stress
 
@@ -361,4 +372,5 @@ Worker messages (`View3D/rbs/rbsWorker.ts`):
 - **Don't bypass `buildBlocksAndConstraints`.** The block partition (union-find over complementary VH spans + constrained crossovers) is what makes the solver tractable; ad-hoc block construction will tear at crossovers.
 - **Don't treat `getStressMap()` as an absolute force value.** It is a relative residual map for visualization, not a physical Newton.
 - **Don't keep stale `simOverrides` after a topology edit.** The 3D effect already invalidates via `isSimStale`; preserve that flag when adding new triggers.
+- **Don't stamp results with the live Part.** `RbsSimulation` takes `solverInputSignature` of the input it builds when a run starts and hands that to `onResults`; signing at delivery would make a result computed before an edit look fresh. Don't hand-pick design fields for freshness either: compare solver inputs (`computeSimulationFreshnessSignature`), so anything new the solver reads is covered (see `docs/editor-3d-view.md` § `isSimStale`).
 - **Don't run RBS over a part with cross-region oligos and expect identical relaxation.** The block builder operates per-part; cross-region behavior follows the active region's geometry.

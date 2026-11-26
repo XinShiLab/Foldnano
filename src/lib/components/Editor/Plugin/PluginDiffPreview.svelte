@@ -8,12 +8,15 @@
 		onConfirm,
 		onCancel,
 		readOnly = false,
+		linkedPartName = null,
 	}: {
 		pending: PendingApply;
 		onConfirm: () => void;
 		onCancel: () => void;
 		/** Another tab owns the document, so the result can't be applied here. */
 		readOnly?: boolean;
+		/** The result targets a linked Part, which can't be changed in this design. */
+		linkedPartName?: string | null;
 	} = $props();
 
 	const isReplacePart = $derived(pending.manifest.applyStrategy === 'replacePart');
@@ -54,12 +57,21 @@
 		<p class="mb-2 text-amber-700 dark:text-amber-400">
 			This file is open in another tab. Take back control to apply this result.
 		</p>
+	{:else if linkedPartName}
+		<p class="mb-2 text-amber-700 dark:text-amber-400">
+			"{linkedPartName}" is linked from another design, so this result can't be applied here. Run
+			the plugin in the source design, or break the link in the Assembly panel and run it again.
+		</p>
 	{/if}
 
 	<!-- Actions -->
 	<div class="flex justify-end gap-2">
 		<Button variant="outline" size="sm" class="h-6 px-2 text-xs" onclick={onCancel}>Cancel</Button>
-		<Button size="sm" class="h-6 px-2 text-xs" disabled={readOnly} onclick={onConfirm}>Apply</Button
+		<Button
+			size="sm"
+			class="h-6 px-2 text-xs"
+			disabled={readOnly || !!linkedPartName}
+			onclick={onConfirm}>Apply</Button
 		>
 	</div>
 </div>

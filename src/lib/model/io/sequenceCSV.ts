@@ -73,30 +73,68 @@ export function collectPartOligoSequences(part: Part): OligoSequenceRecord[] {
 	return rows;
 }
 
-/** Collect sequence records from entire Document (all Parts concatenated) */
-export function collectDocumentOligoSequences(doc: FoldnanoDocument): OligoSequenceRecord[] {
-	const all: OligoSequenceRecord[] = [];
-	for (const part of doc.parts) {
-		all.push(...collectPartOligoSequences(part));
-	}
-	return all;
+/** A row of a design with several Parts: which Part, and how many times the design places it. */
+interface AssemblyOligoSequenceRecord extends OligoSequenceRecord {
+	Part: string;
+	Quantity: number;
+}
+
+/**
+ * Every Part's oligos, each row tagged with its Part and how many instances of that Part the
+ * design places (hidden ones too: the order list is what you build, not what 3D shows).
+ */
+export function collectDocumentOligoSequences(
+	doc: FoldnanoDocument
+): AssemblyOligoSequenceRecord[] {
+	return doc.parts.flatMap((part) => {
+		const quantity = doc.assembly.occurrencesOf(part.id).length;
+		return collectPartOligoSequences(part).map((record) => ({
+			Part: part.name,
+			Quantity: quantity,
+			...record,
+		}));
+	});
 }
 
 /** Quote a CSV field if needed */
 function csvEscape(field: string | number): string {
 	const s = String(field);
-	return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+	return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+const PLAIN_COLUMNS = [
+	'Name',
+	'Start',
+	'End',
+	'Sequence',
+	'Length',
+	'Color',
+	'Mod5Prime',
+	'Mod3Prime',
+] as const satisfies readonly (keyof OligoSequenceRecord)[];
+
+const ASSEMBLY_COLUMNS = [
+	'Part',
+	'Quantity',
+	...PLAIN_COLUMNS,
+] as const satisfies readonly (keyof AssemblyOligoSequenceRecord)[];
+
+// One serializer for every row: a quoted field may hold a line break, so rows are never split.
+function toCSV<R>(columns: readonly (keyof R & string)[], records: R[]): string {
+	const rows = records.map((record) =>
+		columns.map((column) => csvEscape(record[column] as string | number)).join(',')
+	);
+	return [columns.join(','), ...rows].join('\n');
+}
+
+/** Header Part,Quantity,Name,… : `sequencesToCSV` with the two assembly columns first. */
+export function assemblySequencesToCSV(records: AssemblyOligoSequenceRecord[]): string {
+	return toCSV(ASSEMBLY_COLUMNS, records);
 }
 
 /** Turn records into CSV string with header Name,Start,End,Sequence,Length,Color,Mod5Prime,Mod3Prime */
 export function sequencesToCSV(records: OligoSequenceRecord[]): string {
-	const header = 'Name,Start,End,Sequence,Length,Color,Mod5Prime,Mod3Prime';
-	const lines = records.map((r) =>
-		[r.Name, r.Start, r.End, r.Sequence, r.Length, r.Color, r.Mod5Prime, r.Mod3Prime]
-			.map(csvEscape)
-			.join(',')
-	);
-	return [header, ...lines].join('\n');
+	return toCSV(PLAIN_COLUMNS, records);
 }
 
 /** Convenience: export one Part to CSV, named after its document (`docName`). */
@@ -106,11 +144,28 @@ export function exportPartSequencesToCSV(part: Part, docName: string) {
 	return;
 }
 
-/** Convenience: export entire Document to CSV */
+/**
+ * True when an order list needs `Part` and `Quantity` columns: the design has several Parts, or
+ * places one more than once. A single Part placed once keeps the plain format.
+ */
+export function documentNeedsQuantities(doc: FoldnanoDocument): boolean {
+	return doc.parts.length > 1 || doc.parts.some((p) => doc.assembly.occurrencesOf(p.id).length > 1);
+}
+
+/**
+ * The design's oligo CSV: the plain one-Part format for a single Part placed once, else every
+ * Part's rows with `Part` and `Quantity` columns (see `documentNeedsQuantities`).
+ */
+export function documentSequencesCSV(doc: FoldnanoDocument): string {
+	if (!documentNeedsQuantities(doc)) {
+		return sequencesToCSV(doc.parts[0] ? collectPartOligoSequences(doc.parts[0]) : []);
+	}
+	return assemblySequencesToCSV(collectDocumentOligoSequences(doc));
+}
+
+/** Convenience: export the whole design to CSV (see `documentSequencesCSV`). */
 export function exportDocumentSequencesToCSV(doc: FoldnanoDocument) {
-	const csvString = sequencesToCSV(collectDocumentOligoSequences(doc));
-	downloadCSVAsTextFile(exportBaseName(doc.name), csvString);
-	return;
+	downloadCSVAsTextFile(exportBaseName(doc.name), documentSequencesCSV(doc));
 }
 
 /** Trigger a download of the provided CSV text as a .csv file (browser only). */

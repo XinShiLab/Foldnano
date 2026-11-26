@@ -35,7 +35,8 @@ src/lib/commands/
 Commands are plain functions, not classes. The common shape is:
 
 1. Accept typed parameters plus a `HistoryStack`.
-2. Mutate the live model only inside `history.tx(...)` or `history.snapshotTx(...)`.
+2. Mutate the live model only inside `history.tx(...)`, `history.partSnapshotTx(...)` or
+   `history.snapshotTx(...)`.
 3. Delegate real topology changes to `Part` methods.
 
 ```ts
@@ -46,9 +47,9 @@ export function someCmd(args: Args, history: HistoryStack): void {
 }
 ```
 
-Use `tx()` when the command can record targeted patches. Use `snapshotTx()` for
-broader structural edits where a whole-document snapshot is still the safest
-representation.
+Use `tx()` when the command can record targeted patches. Use `partSnapshotTx()` for
+broader structural edits inside one Part, where a snapshot is still the safest
+representation. Use `snapshotTx()` only for edits that add or remove Parts.
 
 ---
 
@@ -85,19 +86,36 @@ several times that in memory. Converting frequent snapshot commands to
 
 ```ts
 history.tx(label, (recorder) => { ... })
+history.partSnapshotTx(label, part, () => { ... })
 history.snapshotTx(label, () => { ... })
 ```
 
 `tx()` creates a `HistoryRecorder`, runs the mutation, then commits only if the
 recorded before/after state differs.
 
-`snapshotTx()` captures `before = doc.snapshot()` and `after = doc.snapshot()`
-around the mutation and stores a `DocumentSnapshotChange`.
+`partSnapshotTx()` captures `part.snapshot()` before and the same slot's Part after,
+and stores a `PartSnapshotChange`. Its cost and undo memory scale with that Part, and
+undo/redo swap only that slot (`FoldnanoDocument.replacePartFromJSON`), so the other
+Part objects, and the views showing them, are untouched. The change names the Part to
+replace by id, so an edit may swap the Part object for one with another id (plugin
+`replacePart*` results do). The edit must not touch any other Part or add/remove Parts:
+it throws `changed Parts outside its Part-scoped snapshot` when the Part list changed
+(always checked) or another Part's JSON changed (checked under the history verifier, so
+in tests). On a throw, the slot is restored from the `before` copy. Repeat-group sync
+runs on that Part only. Every structural command uses it: lattice/freeform VH creation
+and deletion, region split and length changes, oligo duplication, auto-staple, repeat
+groups, cadnano import into an existing Part, and plugin results.
 
-A targeted `tx()` takes no document copy on the normal path: `doc.snapshot()` costs
-O(total nt), which every paint or drag-end would pay. It takes one only when the
-design holds repeat-group state (a group, a grouped source or a mirror), because the
-repeat-group fallback below needs a `before`, and under the history verifier.
+`snapshotTx()` captures `before = doc.snapshot()` and `after = doc.snapshot()`
+around the mutation and stores a `DocumentSnapshotChange`. It is left for edits that
+change the Part list (the first Part of a cadnano import, the legacy `tx(fn)`).
+
+A targeted `tx()` takes no document copy: `doc.snapshot()` costs O(total nt), which
+every paint or drag-end would pay. It copies only the
+Parts holding repeat-group state (a group, a grouped source or a mirror;
+`#repeatPartSnapshots`), because the repeat-group fallback below needs their `before`,
+so a group on one Part never slows edits on another. The history verifier also takes a
+document copy.
 
 **Rollback when the mutation throws.** Without a copy, `tx()` calls
 `HistoryRecorder.rollback()`, which closes the `PartScopeCapture`s still open,
@@ -107,8 +125,10 @@ and re-indexing an oligo). So a command must make its pre-mutation state known t
 the recorder _before_ it mutates: open the scope first, call `rec.field(...)` before
 the assignment, and for diffs recorded afterwards register a restore with
 `rec.onRollback(...)` (the `captureSegmentSlots` / `captureOligoFieldState` helpers
-in `strands.ts` do this when handed `rec`). With repeat-group state the copy exists
-and rollback is `doc.restore(before)` as before. In tests the verifier compares the
+in `strands.ts` do this when handed `rec`). Each Part with repeat-group state is then
+put back from its copy if it differs (a failed sync may have half-rebuilt its mirrors;
+when the sync is what threw, the edit's own patches on those Parts are skipped and
+only its other patches are undone). In tests the verifier compares the
 rolled-back document with the copy and checks derived state, and throws
 `Rollback of "<label>" left the document changed` on a miss.
 
@@ -121,12 +141,21 @@ restored the already-mutated document.
 The legacy `history.tx(fn)` overload still exists and is treated as
 `snapshotTx('Unnamed edit', fn)`.
 
+**Linked-Part guard:** all three transaction kinds check the finished entry with
+`linkedPartEditedBy` (`linkedPartGuard.ts`) before pushing it. An entry that edits a
+linked Part (`Part.source` set: a read-only copy of another design) is undone and
+thrown as an `InvalidOperationError`, so a refused edit leaves the document as it was
+and records nothing. Its `name` and `source` fields, and deleting or duplicating it,
+pass. `withLinkedPartEdits(fn)` turns the guard off for the link commands only. See
+`docs/linked-parts.md`.
+
 **Repeat-group sync:** both `tx()` and `snapshotTx()` call `syncRepeatGroups(part)`
 (`model/Part/repeatGroups.ts`) after the mutation and before recording, to rebuild
 mirror oligos whose originals changed; a throw there rolls the edit back like any
-other. When the sync changes anything inside a targeted `tx()`, the entry is
-recorded as a `DocumentSnapshotChange` (`before` → current) instead of the targeted
-patches. Commands in `commands/repeatGroups.ts` edit only group definitions and let
+other. When the sync changes a Part inside a targeted `tx()`, that Part's patches are
+replaced in the entry by a `PartSnapshotChange` (its copy → current;
+`withPartSnapshots`), and patches on other Parts and the document stay targeted, so
+undo swaps only that Part's object. Commands in `commands/repeatGroups.ts` edit only group definitions and let
 the sync create/remove the mirrors. See `docs/repeat-units.md`.
 
 ### Undo / Redo Flow
@@ -147,6 +176,10 @@ Undo and redo both mutate the live document and then call the optional
 `onMutation` callback. The editor uses that callback to clear stale strand,
 freeform-VH, and lattice-VH selections after history replay.
 
+`lastUndoEntry` is the entry the next undo reverts. A flow that spans several user actions (the
+New Part plane picker) keeps the entry it committed and compares by identity before undoing it,
+so it never undoes an edit made in between.
+
 ---
 
 ## Recorded Patch Types
@@ -160,7 +193,9 @@ The recorder emits targeted patch kinds, including:
 | `FieldChange`                                | Scalar fields such as oligo color, scaffold flag, sequence lock, names, or `vh.localFrame`                          |
 | `SlotSeqChange`                              | Per-slot sequence text changes                                                                                      |
 | `PartMementoChange`                          | Localized structural restoration of affected VHs, oligos, segments, region ordering, and optional part-level extras |
-| `DocumentSnapshotChange`                     | Whole-document fallback for large or awkward edits                                                                  |
+| `PartSnapshotChange`                         | One Part's whole state, swapped by id (`partSnapshotTx`)                                                            |
+| `OccurrenceSet`/`OccurrenceRemove`           | Put back / remove one assembly occurrence at its list position; undo unwinds several in reverse                     |
+| `DocumentSnapshotChange`                     | Whole-document fallback (edits that add or remove Parts; repeat-group fallback in `tx()`)                           |
 | `PlaneTransformChange` / `PlaneAdd`/`Remove` | Undoable transform / add / remove of a persisted `Plane`                                                            |
 | `RegionAdd`/`RegionRemove`                   | Undoable add / remove of a `DesignRegion`                                                                           |
 | `RegionReferenceGeometryChange`              | Undoable set / clear of a wireframe region's `referenceGeometry`                                                    |
@@ -299,6 +334,33 @@ while dragging, then records a single `PlaneTransformChange` on pointer-up.
 inside its `tx()`, so the transaction itself makes the change (rollback and the
 history verifier see the true pre-drag pose).
 
+### Assembly Commands
+
+**File:** `assembly.ts`
+
+| Command                                                                         | Description                                                              |
+| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `addPartCmd(history, doc, kind)`                                                | New empty Part, placed once at the origin (`snapshotTx`)                 |
+| `deletePartCmd(history, doc, partId)`                                           | Remove a Part and its occurrences (`snapshotTx`)                         |
+| `duplicatePartCmd(history, doc, partId)`                                        | Independent copy with fresh ids, placed like the original (`snapshotTx`) |
+| `renamePartCmd(history, part, name)`                                            | `FieldChange` on `part.name`                                             |
+| `addOccurrenceCmd(history, doc, partId, transform?)`                            | Place a Part once more (an instance of the same definition)              |
+| `deleteOccurrenceCmd(history, doc, occurrenceId)`                               | Remove one placement; refuses (returns false) a Part's last one          |
+| `relinkOccurrenceCmd(history, doc, occurrenceId, partId)`                       | Point an occurrence (usually a broken one) at another Part               |
+| `setOccurrenceTransformCmd` / `renameOccurrenceCmd` / `setOccurrenceVisibleCmd` | Targeted occurrence edits                                                |
+| `transformOccurrenceCmd(history, doc, occurrenceId, start, end)`                | Record a gizmo drag already applied live (rewinds to `start` first)      |
+
+**Linked Parts** (`partLinks.ts`): `insertLinkedPartCmd` (`snapshotTx`),
+`updateLinkedPartCmd` (`partSnapshotTx` inside `withLinkedPartEdits`) and
+`breakPartLinkCmd` (`FieldChange` on `part.source`); see `docs/linked-parts.md`.
+
+A broken occurrence (its Part is missing) is never a "last one", so it can always
+be deleted; relinking refuses to move a Part's last placement away.
+
+Part add/remove/duplicate change the Part list, so they take the whole-document
+snapshot; occurrence edits record `OccurrenceSet`/`OccurrenceRemove` through
+`rec.occurrence(id, before, after)` with `assembly.stateOf(id)`.
+
 ### Strand / Oligo Commands
 
 **File:** `strands.ts`
@@ -386,8 +448,8 @@ five≤three / five≥three direction check against a not-yet-moved end).
 
 Not every command uses fine-grained patch recording yet.
 
-`snapshotTx()` is still used for commands where the implementation is simpler or
-safer with a full document snapshot, including:
+`partSnapshotTx()` is still used for commands where the implementation is simpler or
+safer with a whole-Part snapshot, including:
 
 - lattice VH creation
 - some freeform VH creation flows
@@ -396,7 +458,8 @@ safer with a full document snapshot, including:
 The current model is therefore mixed:
 
 - targeted field / slot / memento patches for most routine edits
-- document snapshots for a smaller set of broad structural operations
+- Part snapshots for a smaller set of broad structural operations
+- document snapshots only when the Part list changes
 
 That split is intentional and reflects the present implementation, not an
 outdated transition state.

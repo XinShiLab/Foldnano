@@ -1,6 +1,6 @@
 /**
  * The `exported` stamp a downloaded design file carries: when it was downloaded and a hash of its
- * parts, so opening it again can tell whether it is the same as, older or newer than the copy in
+ * content (parts and assembly), so opening it again can tell whether it is the same as, older or newer than the copy in
  * this browser, and whether it was edited outside Foldnano. Only downloads write it; it never
  * enters the model, IndexedDB or GitHub commits.
  */
@@ -14,7 +14,7 @@ export interface ExportStamp {
 	/** ISO 8601 UTC. */
 	at: string;
 	clock: ClockSource;
-	/** `sha256:<hex>` of the file's `parts`, as canonical JSON. */
+	/** `sha256:<hex>` of the file's content (`designContentHash`). */
 	contentHash: string;
 }
 
@@ -39,9 +39,19 @@ export function canonicalJson(value: unknown): string {
 	return JSON.stringify(value) ?? 'null';
 }
 
-/** Hash of a design's content. Only the parts: the name follows the file and the id any copy. */
-export async function partsHash(parts: unknown): Promise<string> {
-	const bytes = new TextEncoder().encode(canonicalJson(parts));
+/** The fields a content hash covers: the name follows the file and the id any copy. */
+export interface DesignContent {
+	parts: unknown;
+	assembly?: unknown;
+}
+
+/**
+ * Hash of a design's parts and assembly. A design without an assembly (format v2 and older)
+ * hashes its parts alone, so stamps written before v3 still check out.
+ */
+export async function designContentHash({ parts, assembly }: DesignContent): Promise<string> {
+	const content = assembly === undefined ? parts : { parts, assembly };
+	const bytes = new TextEncoder().encode(canonicalJson(content));
 	const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
 	return HASH_PREFIX + Array.from(digest, (b) => b.toString(16).padStart(2, '0')).join('');
 }
@@ -74,14 +84,16 @@ export async function withExportStamp(
 	const stamp: ExportStamp = {
 		at: new Date(now.at).toISOString(),
 		clock: now.clock,
-		contentHash: await partsHash(parts),
+		contentHash: await designContentHash({ parts, assembly: (snapshot as DesignContent).assembly }),
 	};
 	return { ...withoutExportStamp(snapshot), [EXPORT_STAMP_KEY]: stamp };
 }
 
-/** Whether the parts were changed after the stamp was written; null without a stamp. */
+/** Whether the content was changed after the stamp was written; null without a stamp. */
 export async function editedSinceExport(raw: unknown): Promise<boolean | null> {
 	const stamp = readExportStamp(raw);
 	if (!stamp || !isRecord(raw)) return null;
-	return (await partsHash(raw.parts)) !== stamp.contentHash;
+	return (
+		(await designContentHash({ parts: raw.parts, assembly: raw.assembly })) !== stamp.contentHash
+	);
 }

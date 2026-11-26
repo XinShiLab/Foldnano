@@ -11,6 +11,7 @@
 		Square,
 		LineSquiggle,
 		Pyramid,
+		Boxes,
 	} from '@lucide/svelte';
 	import { resolve } from '$app/paths';
 	import { notify } from '$lib/notifications/notify.svelte';
@@ -116,7 +117,7 @@
 				area: true,
 				placement: 'left',
 				title: 'Start with a region',
-				text: 'A design is one part made of regions. Each region has its own lattice (or none) and its own base plane; you can add more regions later.',
+				text: 'A design starts as one Part made of regions. Each region has its own lattice (or none) and its own base plane; you can add more regions and Parts later. An assembly instead starts from Parts linked from your other designs.',
 				doc: 'mental-model',
 				newVsCadnano: true,
 			})}
@@ -176,6 +177,23 @@
 					</div>
 				</div>
 			</div>
+			<button
+				class="mt-2 flex w-full items-center gap-3 rounded-md border border-border p-3 text-left text-xs transition-colors
+					enabled:hover:border-primary enabled:hover:bg-accent disabled:opacity-50 pointer-coarse:mt-9"
+				disabled={!editorViewContext.isTabOwner}
+				onclick={() => (editorViewContext.insertLinkedPartDialogOpen = true)}
+				{@attach help({
+					title: 'Assembly',
+					text: 'Start with no Part of your own: pick designs saved in this browser to link in as read-only Parts, then place them in 3D. You can still add editable Parts later.',
+					doc: 'assemblies',
+				})}
+			>
+				<Boxes size={20} class="shrink-0 text-teal-500" />
+				<span class="flex flex-col gap-0.5">
+					<span class="font-medium">Assembly</span>
+					<span class="text-muted-foreground">Link Parts from your other designs</span>
+				</span>
+			</button>
 		</div>
 
 		<div class="flex w-full items-center gap-2">

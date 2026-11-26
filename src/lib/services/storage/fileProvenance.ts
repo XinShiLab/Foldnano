@@ -6,7 +6,12 @@
 import FoldnanoDocument from '$lib/model/document.svelte';
 import { migrateDocumentJson } from '$lib/model/documentFormat';
 import { repairDocumentJson } from '$lib/model/documentRepair';
-import { editedSinceExport, partsHash, readExportStamp } from '$lib/model/exportStamp';
+import {
+	designContentHash,
+	editedSinceExport,
+	readExportStamp,
+	type DesignContent,
+} from '$lib/model/exportStamp';
 
 export type FileRelation = 'identical' | 'older' | 'newer' | 'different';
 
@@ -28,7 +33,7 @@ export interface ProvenanceInput {
 	/** The file as read from disk, before migration. */
 	rawFile: unknown;
 	/** The file as the editor would open it (`FoldnanoDocument.toJSON()` of the parsed file). */
-	fileSnapshot: { parts: unknown };
+	fileSnapshot: DesignContent;
 	/** The browser copy as stored. */
 	stored: unknown;
 	/** The browser copy's save time, on this computer's clock. */
@@ -42,12 +47,12 @@ export interface ProvenanceInput {
  * Content hash after the same load steps the editor runs, so a file from an older format version
  * or one an older release wrote still matches the design it became. Null if it can't be opened.
  */
-export async function normalizedPartsHash(raw: unknown): Promise<string | null> {
+export async function normalizedContentHash(raw: unknown): Promise<string | null> {
 	try {
 		// Plain data first: repair clones, and a snapshot taken from a live document holds proxies.
 		const plain: unknown = JSON.parse(JSON.stringify(raw));
 		const { snapshot } = repairDocumentJson(migrateDocumentJson(plain));
-		return await partsHash(FoldnanoDocument.fromJSON(snapshot).toJSON().parts);
+		return await designContentHash(FoldnanoDocument.fromJSON(snapshot).toJSON());
 	} catch {
 		return null;
 	}
@@ -60,7 +65,7 @@ export async function compareWithBrowserCopy(input: ProvenanceInput): Promise<Fi
 	const browserSavedAt = input.storedAt + (input.clockOffset ?? 0);
 	const approximate = input.clockOffset === null || stamp?.clock === 'local';
 
-	const fileHash = await partsHash(input.fileSnapshot.parts);
+	const fileHash = await designContentHash(input.fileSnapshot);
 	const result = (relation: FileRelation, matchesBackupAt: number | null = null) => ({
 		relation,
 		editedOutside,
@@ -70,12 +75,12 @@ export async function compareWithBrowserCopy(input: ProvenanceInput): Promise<Fi
 		matchesBackupAt,
 	});
 
-	if ((await normalizedPartsHash(input.stored)) === fileHash) return result('identical');
+	if ((await normalizedContentHash(input.stored)) === fileHash) return result('identical');
 
 	let matchesBackupAt: number | null = null;
 	for (const backup of input.backups) {
 		if (matchesBackupAt !== null && backup.createdAt <= matchesBackupAt) continue;
-		if ((await normalizedPartsHash(backup.snapshot)) === fileHash) {
+		if ((await normalizedContentHash(backup.snapshot)) === fileHash) {
 			matchesBackupAt = backup.createdAt;
 		}
 	}

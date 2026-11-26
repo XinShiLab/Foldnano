@@ -477,6 +477,9 @@ This is the model used by the built-in Script Lab plugin. See [script-lab.md](sc
 | `replayMutationLogInRegion`                | As above, but every target VH must stay inside the recorded active region or the replay aborts cleanly.                                                                                  |
 | `previewOnly`                              | Output shown as a diff only; never written to the model. Suitable for analysis plugins.                                                                                                  |
 
+A `replacePart*` result keeps the replaced Part's `id` whatever id the plugin's JSON carries
+(`keepPartIdentity`): the assembly's occurrences and the editor's active Part refer to the Part by id.
+
 Install-time validation rejects unsupported format/strategy pairs:
 
 - `cadnano_json`: `previewOnly`, `replaceRegion`, `replaceRegionKeepAnnotationsWhereMatched`
@@ -530,6 +533,9 @@ ctx.get_part_as_cadnano_json(part_index: int = 0) -> str
 ctx.get_part_as_foldnano_json(part_index: int = 0) -> str
     # Returns the active part as a Foldnano JSON string (Part.toJSON() schema).
     # Only valid when format == "foldnano_json", "foldnano_edit", or "live".
+    # part_index must be 0 (the active Part); a multi-Part design's other Parts are never sent.
+    # The result applies to the Part the run started on (`pendingApply.partId`); a linked
+    # (read-only) Part previews with Apply disabled.
 
 ctx.format -> str
     # "cadnano_json" | "foldnano_json" | "foldnano_edit" | "live"
@@ -649,7 +655,7 @@ Defined in `src/lib/plugin/worker/protocol.ts`.
     format: 'cadnano_json' | 'foldnano_json' | 'foldnano_edit' | 'live';
     cadnanoJsonIn?: string;
     foldnanoJsonIn?: string;
-    activePartIndex: number;
+    activePartIndex: number;  // always 0: foldnanoJsonIn already holds just the active Part; the worker ignores it
     paramsJson?: string;      // JSON-encoded Record<string, unknown>; omitted when no parameters
     activeRegionId?: string | null;
     loadImports?: boolean;    // load distribution packages pluginCode imports first (code-editor runs);
@@ -893,8 +899,8 @@ async run(pluginId: string): Promise<void>
    - **Design verification** (`design-verification.ts`) then reconstructs the result with the same `perform*` ops `ResultApplicator` uses, but against a **detached scratch `Part`** — never `doc.parts`, never inside a `tx` — and checks the rebuilt part for dangling plane/region/segment references, out-of-bounds segments, broken reciprocal connections, and (for region strategies) an unchanged active-region VH index set. It then runs the integrity check (`checkPartIntegrity`, `docs/design-guards.md`) over the replaced scope and rejects any `error` (e.g. `asymmetric-skip-insert`, `shared-cell`, `negative-cell`) with the rule name as `invariantCategory`.
    - If either check throws (`PluginValidationError`), `plugin.status = 'error'` is set with that message and **no** `pendingApply` is created for that run.
      `replayMutationLog[InRegion]` results skip both checks and go straight to step 8 once the log is non-empty — op-level validation happens at replay time via `dispatchOp` instead.
-8. If checks pass, the (possibly repaired) result is stored in `coordinator.pendingApply` along with a fresh `resultToken`. The UI shows a diff summary; the user must call `confirmApply()` (or `cancelApply()`) before the model is mutated.
-9. `confirmApply(pluginId)` calls `ResultApplicator.applyResult()` inside `historyStack.snapshotTx` (undoable) — this is the only path that writes to `doc.parts`. Snapshot strategies consume `primaryArtifact`; mutation-log strategies consume `mutationLog`. If `applyResult()` itself throws, `pendingApply` is cleared and a `PluginApplyError` is reported instead of leaving a half-applied result. After a successful apply it compares `Part.countMismatchedBasePairs()` before and after and raises a warning notification when the result added mismatches: sequence writes from plugins (`fill_sequence`, `slot.seq`) never fill the opposite strand, so this is how the user hears about pairs the plugin left unmatched. `cancelApply(pluginId)` discards the pending result without applying. While another tab owns the document (`setEditGate`, wired to `isTabOwner`), `confirmApply()` does nothing and keeps the result, and the Apply button is disabled; runs stay allowed (see `docs/multi-tab-protection.md`).
+8. If checks pass, the (possibly repaired) result is stored in `coordinator.pendingApply` along with a fresh `resultToken` and the `partId` of the Part it ran on (the editor's active Part, via `setActivePartGetter`; the first Part without an editor). Apply and preview write back to that Part by id; the result goes stale if the Part is gone or changed, and switching the active Part discards it. The UI shows a diff summary; the user must call `confirmApply()` (or `cancelApply()`) before the model is mutated.
+9. `confirmApply(pluginId)` calls `ResultApplicator.applyResult()` inside `historyStack.partSnapshotTx` on the Part the plugin ran on (undoable) — this is the only path that writes to `doc.parts`. Snapshot strategies consume `primaryArtifact`; mutation-log strategies consume `mutationLog`. If `applyResult()` itself throws, `pendingApply` is cleared and a `PluginApplyError` is reported instead of leaving a half-applied result. After a successful apply it compares `Part.countMismatchedBasePairs()` before and after and raises a warning notification when the result added mismatches: sequence writes from plugins (`fill_sequence`, `slot.seq`) never fill the opposite strand, so this is how the user hears about pairs the plugin left unmatched. `cancelApply(pluginId)` discards the pending result without applying. While another tab owns the document (`setEditGate`, wired to `isTabOwner`), `confirmApply()` does nothing and keeps the result, and the Apply button is disabled; runs stay allowed (see `docs/multi-tab-protection.md`).
 10. On run failure: sets status to `'error'`, sets `plugin.errorMessage`. Logs captured before the error are preserved. The run harness catches `BaseException`, not just `Exception`: plugins written as command-line tools call `sys.exit()`, and an uncaught `SystemExit` shuts the whole Pyodide runtime down with no message (pyOrigamiBreak does this when the scaffold is too short or no solution exists). It reports the failure as Python's one-line summary (`traceback.format_exception_only`, e.g. `SystemExit: …` or `KeyError: 'x'`), because `str(exc)` is empty for many exceptions. Failures outside the plugin's Python report the JavaScript stack instead of a traceback; an empty message falls back to `RUN_FAILED_WITHOUT_MESSAGE`, and `PluginRunOutput` shows the error box and traceback whenever the status is `'error'`, so a failed run is never just a red icon.
 
 ### `remove(pluginId)`

@@ -60,6 +60,7 @@ export function matchTopologyToDesign(part: Part, top: OxDnaTopology): ReplayMap
 	}
 	return {
 		ok: false,
-		reason: `${reason} Was the design edited after the oxDNA export?`,
+		// Replay maps rows back to one Part, so an export of several instances can't match.
+		reason: `${reason} Was the design edited after the oxDNA export, or exported with all instances? Replay needs an export of this Part alone.`,
 	};
 }

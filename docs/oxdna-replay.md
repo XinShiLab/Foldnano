@@ -31,9 +31,11 @@ nucleotide and strand counts, strand id, `next`/`prev` links, and the base where
 assigns one (unassigned bases were a fallback, possibly random). It tries `includeMirrors: false`
 first (the export default), then `true` if the part has mirrors. Any mismatch refuses the replay
 with the first differing row; there is deliberately no fuzzy matching or support for trajectories
-from other tools.
+from other tools. An export of all instances (`exportAssemblyToOxDna`) never matches, since the
+mapping is one Part; the refusal message says so.
 
-After loading, `OxDnaReplay` keeps `computeSimulationFreshnessSignature(part)`; when an edit changes
+After loading, `OxDnaReplay` keeps `designLayoutSignature(part)` (planes, helix frames, segment
+ranges, skips/inserts, crossovers: what the nucleotide mapping depends on); when an edit changes
 it, the 3D view hides the replay and the panel says the nucleotides no longer line up.
 
 ---

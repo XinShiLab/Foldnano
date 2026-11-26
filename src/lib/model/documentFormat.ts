@@ -1,5 +1,6 @@
 import type { DocSnapshot } from './document.svelte';
 import { withoutExportStamp } from './exportStamp';
+import { quaternionLength } from './Assembly/Occurrence.svelte';
 
 export const FOLDNANO_FORMAT = 'foldnano';
 
@@ -7,7 +8,7 @@ export const FOLDNANO_FORMAT = 'foldnano';
  * Bump when an older app would misread the saved JSON or silently drop part of it on re-save,
  * which includes adding new fields. Register the upgrade from the old version in MIGRATIONS.
  */
-export const CURRENT_FORMAT_VERSION = 2;
+export const CURRENT_FORMAT_VERSION = 3;
 
 export interface SavedWith {
 	app: string;
@@ -28,6 +29,28 @@ export type DocumentMigration = (raw: RawDocumentJson) => RawDocumentJson;
 export const MIGRATIONS: Readonly<Record<number, DocumentMigration>> = {
 	// v2 adds the WIREFRAME region kind and optional referenceGeometry; v1 content is unchanged.
 	1: (raw) => raw,
+	// v3 adds the assembly: every v2 Part is placed once, at the origin. Occurrence names follow
+	// `Assembly.nextOccurrenceName` (`<part name> 1`); v2 Part names are unique per document in
+	// practice, but duplicates still get distinct numbers.
+	2: (raw) => {
+		const parts = Array.isArray(raw.parts) ? (raw.parts as RawDocumentJson[]) : [];
+		const taken = new Set<string>();
+		const occurrences = parts.map((part, i) => {
+			const base = typeof part.name === 'string' ? part.name : `Part ${i + 1}`;
+			let n = 1;
+			while (taken.has(`${base} ${n}`)) n++;
+			const name = `${base} ${n}`;
+			taken.add(name);
+			return {
+				id: `occurrence-${String(part.id)}`,
+				partId: part.id,
+				name,
+				transform: { position: { x: 0, y: 0, z: 0 }, quaternion: [0, 0, 0, 1] },
+				visible: true,
+			};
+		});
+		return { ...raw, assembly: { occurrences } };
+	},
 };
 
 export type DocumentFormatErrorReason = 'too-new' | 'malformed';
@@ -45,6 +68,32 @@ export class DocumentFormatError extends Error {
 
 function isRecord(value: unknown): value is RawDocumentJson {
 	return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/** The format version that added the assembly (occurrences) to the file. */
+const ASSEMBLY_FORMAT_VERSION = 3;
+
+const isFiniteNumber = (value: unknown): value is number =>
+	typeof value === 'number' && Number.isFinite(value);
+
+/** An occurrence in the shape `Occurrence.fromJSON` reads (a missing Part is allowed). */
+function isOccurrenceJson(value: unknown): boolean {
+	if (!isRecord(value)) return false;
+	const { id, partId, name, visible, transform } = value;
+	if (typeof id !== 'string' || typeof partId !== 'string' || typeof name !== 'string') {
+		return false;
+	}
+	if (typeof visible !== 'boolean' || !isRecord(transform)) return false;
+	const { position, quaternion } = transform;
+	return (
+		isRecord(position) &&
+		[position.x, position.y, position.z].every(isFiniteNumber) &&
+		Array.isArray(quaternion) &&
+		quaternion.length === 4 &&
+		quaternion.every(isFiniteNumber) &&
+		// A zero quaternion is no rotation at all; any other length is normalized on load.
+		quaternionLength(quaternion) > 1e-9
+	);
 }
 
 function readFormatVersion(raw: RawDocumentJson): number {
@@ -106,6 +155,22 @@ export function migrateDocumentJson(raw: unknown): DocSnapshot {
 	const migrated = applyMigrations(raw, version);
 	if (!Array.isArray(migrated.parts)) {
 		throw new DocumentFormatError('malformed', 'This Foldnano design has no parts list.');
+	}
+	const assembly = migrated.assembly;
+	if (!isRecord(assembly) || !Array.isArray(assembly.occurrences)) {
+		throw new DocumentFormatError('malformed', 'This Foldnano design has no assembly.');
+	}
+	// Only a file's own occurrences are checked; a migration builds them from the Parts, which are
+	// checked when the document is built.
+	const badIndex =
+		version >= ASSEMBLY_FORMAT_VERSION
+			? assembly.occurrences.findIndex((occurrence) => !isOccurrenceJson(occurrence))
+			: -1;
+	if (badIndex >= 0) {
+		throw new DocumentFormatError(
+			'malformed',
+			`Instance ${badIndex + 1} of this Foldnano design can't be read (it needs an id, a Part id, a name, a visibility and a finite placement).`
+		);
 	}
 	// A download stamp describes that one file; every stored or committed copy goes through here.
 	return {

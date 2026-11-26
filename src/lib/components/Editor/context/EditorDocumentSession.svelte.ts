@@ -30,7 +30,7 @@ import {
 	type GitHubRepoContext,
 	type OverwriteBackupReason,
 } from '$lib/services/storage';
-import { normalizedPartsHash } from '$lib/services/storage/fileProvenance';
+import { normalizedContentHash } from '$lib/services/storage/fileProvenance';
 import { githubStorageProvider } from '$lib/services/storage/providers/GitHubStorageProvider';
 import {
 	GitHubApiError,
@@ -49,6 +49,7 @@ import {
 	saveLocalOnlyEntries,
 } from '../GitHubExplorer/localPersistence';
 import { isDocumentLockHeld, isTabSyncSupported, TabSync } from '$lib/services/tabSync.svelte';
+import { PartLinkService } from '$lib/services/partLinks/PartLinkService.svelte';
 import { reportError } from '$lib/errorReporting';
 import {
 	describeLoadFailure,
@@ -183,11 +184,44 @@ export class EditorDocumentSession {
 	#pendingUrlSave: boolean = $state(false);
 	#sourceUrl: string | null = $state(null);
 
+	/** Linked Parts of the open document: where each source is and whether it changed. */
+	readonly partLinks: PartLinkService;
+	#stopPartLinks: () => void;
+
 	constructor(private readonly hooks: EditorDocumentSessionHooks) {
 		this.#storageManager = new StorageManager('indexedDB');
 		this.#storageManager.registerProvider('indexedDB', new IndexedDbStorageProvider());
 		this.#historyStack = $state(this.#makeHistoryStack());
+		this.partLinks = new PartLinkService(() => this.#currentDoc, {
+			loadDocument: (docId) => this.#storageManager.loadDocument(docId),
+			findDocIdByRepoPath: (path) => {
+				const repo = this.#linkRepo();
+				return repo ? githubMetadataStore.findDocIdByPath(repo.owner, repo.repo, path) : null;
+			},
+			repoPathOf: (docId) => {
+				const repo = this.#linkRepo();
+				const file = githubMetadataStore.getFileMetadata(docId);
+				return repo && file?.owner === repo.owner && file.repo === repo.repo ? file.path : null;
+			},
+			blobShaOf: (docId) => githubMetadataStore.getFileMetadata(docId)?.sha,
+			otherRepoOf: (docId) => {
+				const repo = this.#linkRepo();
+				const file = githubMetadataStore.getFileMetadata(docId);
+				if (!repo || !file || (file.owner === repo.owner && file.repo === repo.repo)) return null;
+				return `${file.owner}/${file.repo}`;
+			},
+		});
+		this.#stopPartLinks = this.partLinks.start();
 		void checkStoragePersistence().then((state) => (this.#storagePersistence = state));
+	}
+
+	/**
+	 * The repo linked Parts' repo paths are relative to: the open design's own repo when it is a
+	 * file there, else the connected one (a design kept only in this browser).
+	 */
+	#linkRepo(): { owner: string; repo: string } | null {
+		const own = githubMetadataStore.getFileMetadata(this.#currentDoc.id);
+		return own ?? githubMetadataStore.getRepoContext();
 	}
 
 	/** Whether the browser may evict this origin's IndexedDB under storage pressure. */
@@ -338,6 +372,7 @@ export class EditorDocumentSession {
 		}
 
 		this.#initTabSync(doc.id);
+		void this.partLinks.refresh();
 		if (options.loadPersistedContext) {
 			await this.hooks.loadPersistedContext();
 		}
@@ -1334,7 +1369,7 @@ export class EditorDocumentSession {
 			newDoc.name = name;
 			// The name inside a cadnano file is often a stale file name; keep one name per document.
 			part.name = name;
-			newDoc.parts.push(part);
+			newDoc.addPart(part);
 
 			await this.#adoptDocument(newDoc, {
 				fileMetadata: null,
@@ -1642,6 +1677,7 @@ export class EditorDocumentSession {
 	}
 
 	destroy(): void {
+		this.#stopPartLinks();
 		this.#historyStack.destroy();
 		this.#tabSync?.destroy();
 		this.#tabSync = null;
@@ -1661,7 +1697,7 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 }
 
 async function sameContent(a: unknown, b: unknown): Promise<boolean | null> {
-	const [hashA, hashB] = await Promise.all([normalizedPartsHash(a), normalizedPartsHash(b)]);
+	const [hashA, hashB] = await Promise.all([normalizedContentHash(a), normalizedContentHash(b)]);
 	return hashA === null || hashB === null ? null : hashA === hashB;
 }
 

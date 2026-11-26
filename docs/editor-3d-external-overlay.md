@@ -101,7 +101,8 @@ is a global master toggle gating every instance.
 
 1. **Load** — `View3DOverlayPanel.svelte` (in `ToolPanel/`) hosts the file drop
    zone (`accept=".txt,.pdb,…"`). On drop, `HelixViewer.svelte`'s
-   `onLoadOverlay(file)` picks the parser by extension (`.pdb` → `parsePdbOverlay`,
+   `onLoadOverlay(file)` notes the document and Part it was opened for and drops the file
+   (with a toast) if either changed while it was read. It picks the parser by extension (`.pdb` → `parsePdbOverlay`,
    else `parseMrdnaOverlay`), then **rehydrates** instances from any saved
    placements (or creates one — see Remembered placement) and flips
    `show3DOverlays = true`. Parse failures surface as a toast
@@ -181,7 +182,7 @@ don't rebuild geometry:
   change, so load / undo / redo reposition every copy. The write is `untrack`ed and
   skips the instance currently being dragged.
 - **gizmo visibility + pose** — the **single owner** of
-  `transformGizmo.group.visible` (`activeOverlay() || planeActive`) and gizmo pose
+  `transformGizmo.group.visible` (overlay, moving instance or selected plane) and gizmo pose
   sync. Plane-cleanup effects must not write gizmo visibility.
 
 So a Hide/Show toggle, a gizmo drag, and a ghost toggle each touch only what they
@@ -197,7 +198,11 @@ placement with loaded data that isn't live yet, and **removes** any PDB instance
 whose placement is gone. It runs on load, undo, and redo — so add / duplicate /
 remove can flow purely through `snapshotTx` and stay undo/redo-consistent (the
 restore effect alone could only fix transforms, not existence). mrDNA instances
-(`sourceKey === ''`) are session-only and never reconciled.
+(`sourceKey === ''`) are session-only and never reconciled; they were lined up with the
+active Part's frame, so switching to another Part (another `part.id`) drops them. Since
+placements live on the Part, PDB instances follow the Part switch through the reconcile.
+On a linked (read-only) Part an overlay can still be moved, but the gizmo commit skips
+`setOverlayPlacementCmd` (`canEditActivePart`), so the move isn't remembered.
 
 ---
 
@@ -214,9 +219,12 @@ The drag math runs in `PlaneTransform` terms; the edit **target** is behind a
 - `PlaneGizmoTarget` — persisted design plane; `commit()` records `transformPlaneCmd`.
 - `OverlayGizmoTarget` — writes the active instance's `transform` live; `commit()`
   calls back to persist its final pose (PDB only — see below).
+- `OccurrenceGizmoTarget` — an assembly instance's placement (`docs/editor-3d-view.md` § Assembly).
 
-`View3D` binds the gizmo to the **active instance** (`activeOverlayId`), else to a
-selected plane. Overlay placement and plane selection are **mutually exclusive**
+Overlays and planes are stored in the active Part's frame, so `View3D` wraps their
+targets in `FramedGizmoTarget` (Part space ↔ world). `View3D` binds the gizmo to the
+**active instance** (`activeOverlayId`), else to an assembly instance being moved,
+else to a selected plane. Overlay placement and plane selection are **mutually exclusive**
 (the active overlay wins; clicking a plane clears `activeOverlayId`). Rotate vs.
 translate is the shared 3D-toolbar `gizmoMode`, also exposed on the active card.
 

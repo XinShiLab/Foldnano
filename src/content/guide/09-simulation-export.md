@@ -92,6 +92,10 @@ Before exporting to oxDNA, confirm:
 
 If the design contains [linked mirror copies](/docs/guide/duplicates-repeat-groups#mirror-copies), check **Include mirror copies** in the **Export** menu to include them in oxDNA and mrDNA output, for example to simulate the assembled repeat structure. They're left out otherwise.
 
+### Several Parts
+
+If the design places more than one instance, or has moved or hidden its only one (see [Assemblies And Parts](/docs/guide/assemblies)), the **Export** menu shows **All visible instances**, checked by default. oxDNA and mrDNA export then write every visible instance, each at its placement, into one file. Uncheck it to export only the Part you are editing, in its own coordinates; that file is named after the design and the Part. Hidden instances are left out; when none is visible, the two exports are disabled until you show one. Each Part keeps its own relaxation while you edit another, and every Part whose relaxed layout is shown is exported relaxed, in every instance. **Include mirror copies** is shown when any Part in the export has mirror copies, not only the Part you are editing. Replay needs an export of one Part.
+
 ## Replaying an oxDNA Trajectory
 
 After simulating an oxDNA export, you can play the trajectory back in the 3D view, drawn over your design in your oligo colors. That makes it easy to see which strand of the design is moving, bending or coming apart.

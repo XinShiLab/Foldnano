@@ -13,9 +13,9 @@
 	import type { RepeatGroup } from '$lib/model/Part/Part.svelte';
 
 	const ctx = getEditorViewContext();
-	const part = $derived(ctx.currentDoc?.parts[0]);
+	const part = $derived(ctx.activePart);
 	const groups = $derived(part?.repeatGroups ?? []);
-	const isReadOnly = $derived(!ctx.isTabOwner);
+	const isReadOnly = $derived(!ctx.canEditActivePart);
 
 	let sectionOpen = $state(true);
 	// Groups the user toggled away from the default (open when it's the only group).
