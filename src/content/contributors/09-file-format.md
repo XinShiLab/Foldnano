@@ -20,6 +20,7 @@ Each format version has a JSON Schema (draft 2020-12), published with the app:
 | -------------- | -------------------------------------------------------------------- |
 | 1              | [`/schemas/foldnano-v1.schema.json`](/schemas/foldnano-v1.schema.json) |
 | 2              | [`/schemas/foldnano-v2.schema.json`](/schemas/foldnano-v2.schema.json) |
+| 3              | [`/schemas/foldnano-v3.schema.json`](/schemas/foldnano-v3.schema.json) |
 
 The schema checks structure and types. It does not check cross-references (for example that a segment's helix exists) or the conventions described below, so a file can pass the schema and still fail to load. The schema is also stricter than the app: it rejects fields it doesn't define, while Foldnano ignores them when loading and drops them on the next save.
 
@@ -32,10 +33,11 @@ Every file starts with a header:
 ```json
 {
 	"format": "foldnano",
-	"formatVersion": 2,
+	"formatVersion": 3,
 	"savedWith": { "app": "0.5.1", "commit": "8e358c7" },
 	"id": "…",
-	"parts": []
+	"parts": [],
+	"assembly": { "occurrences": [] }
 }
 ```
 
@@ -64,9 +66,9 @@ A file downloaded from Foldnano (**Download as Foldnano JSON**, or **Download Al
 ```
 
 - `at` is when the file was downloaded, in UTC. `clock` is `"server"` when the time came from Foldnano's server, or `"local"` when the computer was offline and its own clock was used.
-- `contentHash` is the SHA-256 of `parts`, written as JSON with the keys of every object sorted and no whitespace. It doesn't cover `id` or the name, so a copy or a renamed file keeps the same hash.
+- `contentHash` is the SHA-256 of `{ "parts": …, "assembly": … }`, written as JSON with the keys of every object sorted and no whitespace. It doesn't cover `id` or the name, so a copy or a renamed file keeps the same hash. Files from format version 2 and older have no `assembly`; their hash covers `parts` alone (the array itself, not wrapped in an object).
 
-Foldnano uses it when you open the file again, to tell you whether it matches the copy in your browser, is older or newer, or was changed after it was downloaded. Files committed to GitHub don't carry it, and Foldnano doesn't keep it when it opens a file. A tool that edits `parts` should remove the stamp (or leave it: Foldnano then reports the file as changed outside Foldnano).
+Foldnano uses it when you open the file again, to tell you whether it matches the copy in your browser, is older or newer, or was changed after it was downloaded. Files committed to GitHub don't carry it, and Foldnano doesn't keep it when it opens a file. A tool that edits `parts` or `assembly` should remove the stamp (or leave it: Foldnano then reports the file as changed outside Foldnano).
 
 ## Conventions
 
@@ -87,7 +89,8 @@ Foldnano uses it when you open the file again, to tell you whether it matches th
 | `id`            | string | Design ID. It stays the same across saves, downloads and commits, so two files with the same `id` are versions of one design; a copy saved with **Save as a copy** gets a new one |
 | `name`          | string | Optional, older files only (see below)                   |
 | `exported`      | object | Optional. Only in downloaded files (see below)           |
-| `parts`         | array  | The designs in this document; most editing works on the first |
+| `parts`         | array  | Part definitions: the designs in this document           |
+| `assembly`      | object | Where the parts are placed; see [Assembly](#assembly)    |
 
 ## Part
 
@@ -103,8 +106,11 @@ A part is one DNA origami design: its helices, strands and layout.
 | `customModifications` | array  | Optional. User-defined end modifications, `{ name, color }`                       |
 | `overlayPlacements`   | array  | Optional. Where external 3D structures were placed; display only                  |
 | `repeatGroups`        | array  | Optional. Repeat units; see [Repeat groups](#repeat-groups-and-mirror-oligos)      |
+| `source`              | object | Optional. Only on a part linked from another design; see [Linked parts](#linked-parts) |
 
 Optional arrays are left out when empty.
+
+A part is a definition: its coordinates are the part's own. Where the part sits in the shared 3D space, and how many copies of it there are, is recorded in the [assembly](#assembly).
 
 ## Planes
 
@@ -228,6 +234,22 @@ Foldnano's staple exports leave mirror oligos out. If you build a staple list fr
 ## Overlay placements
 
 Where the user placed external 3D structures (PDB or mrDNA files) next to the design: `{ id, sourceKey, transform }`, with `transform.position` in nm and `transform.quaternion` as `[x, y, z, w]`. `sourceKey` is the PDB accession or file name. Only the placement is stored, not the structure itself, and it has no effect on the design.
+
+## Assembly
+
+`assembly.occurrences` lists the placed copies of the parts. Each occurrence is `{ id, partId, name, transform, visible }`:
+
+- `partId` is the `id` of the part it places. Several occurrences can place the same part; they all show the same design, so an edit to the part shows in each copy.
+- `transform` places the part's own coordinates in the shared 3D space: rotate by `quaternion` (`[x, y, z, w]`), then move by `position` (nm). A part at the origin has position `{ x: 0, y: 0, z: 0 }` and quaternion `[0, 0, 0, 1]`.
+- `visible: false` hides that copy in the 3D view. It is display state; the copy is still part of the design.
+
+Every part has at least one occurrence. When Foldnano opens a file where a part has none, it adds one at the origin. An occurrence whose `partId` names no part in the file is kept (so it can be pointed at a part again) and reported as a design issue; tools reading the file should skip it. Files from format version 2 and older get one occurrence per part, at the origin, when they are opened.
+
+To build the full 3D structure, take each occurrence, transform its part's helices by the occurrence transform, and combine the results.
+
+## Linked parts
+
+A part copied from another design carries `source`: `{ partId, contentHash, linkedAt }`, plus `repoPath` (the source file's path in the same GitHub repository), `docId` (a local document id) and `blobSha` when known. The part's own fields are a full copy of the source as of `linkedAt`, so the file opens on its own even when the source is unavailable. `contentHash` lets a tool tell whether the source has changed since.
 
 ## For contributors: changing the format
 

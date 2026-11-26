@@ -41,7 +41,7 @@ To read the design as objects instead of a JSON string, pass `ctx.get_part_as_fo
 | `ctx.side_panel_type` | read‑only | `'form'` or `'codeEditor'` when the run started from a side panel, else `None`. |
 | `ctx.get_side_panel_code(default="")` | query | The code-editor side panel's contents, or `default` when there is none. |
 
-Documents hold one part, so `part_index` must be 0; any other value raises `NotImplementedError`.
+`part_index` must be 0, which is always the active part: a plugin sees only the part being edited, even when the design holds several (see [Runtime Model](/docs/plugin-development/runtime-model#designs-with-several-parts)). Any other value raises `NotImplementedError`.
 
 ## Output
 

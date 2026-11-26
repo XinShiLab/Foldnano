@@ -4,20 +4,18 @@
 	import * as Separator from '$lib/components/ui/separator/index.js';
 	import * as ToggleGroup from '$lib/components/ui/toggle-group/index.js';
 	import { getEditorViewContext } from '../context/EditorViewContext.svelte';
-	import { getEditorDocumentSession } from '../context/EditorDocumentSession.svelte';
 	import HelixViewerTools from '../HelixView/HelixViewerTools.svelte';
 	import StrandViewerTools from '../StrandView/StrandViewerTools.svelte';
 	import View3DTools from '../View3D/View3DTools.svelte';
 	import { help } from '$lib/components/help/help';
 
 	const editorViewContext = getEditorViewContext();
-	const session = getEditorDocumentSession();
 
 	let activeViewer = $derived(editorViewContext.activeViewer);
 	let strandToolbar = $derived(editorViewContext.strandToolbarController);
 	let helixToolbar = $derived(editorViewContext.helixToolbarController);
 	let view3DToolbar = $derived(editorViewContext.view3DToolbarController);
-	let hasPart = $derived(Boolean(session.currentDoc.parts[0]));
+	let hasPart = $derived(Boolean(editorViewContext.activePart));
 	let helixPaneActive = $derived(activeViewer === 'HELIX' || activeViewer === 'VIEW3D');
 
 	let activeLabel = $derived.by(() => {

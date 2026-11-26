@@ -27,6 +27,7 @@ on `vh.id` where a Part exists, like the spatial index, so display reordering ne
 | Shape          | parsed JSON, before a Part  | `shape/cadnanoJsonShape.ts`, `shape/foldnanoJsonShape.ts` |
 | Integrity      | a Part / region             | `integrity.ts`                                            |
 | Target profile | a Part / region, per format | `simulation.ts`, `cadnano.ts`                             |
+| Links          | a linked Part + its status  | `links.ts`                                                |
 
 **Shape** checks fail fast: they throw `DesignCheckError` (carrying the issue) on the first error,
 because later shape checks index into structures the earlier ones verified. Non-fatal repairs come
@@ -46,6 +47,7 @@ every issue and never throw:
 | `asymmetric-skip-insert`   | error    | both strands present at a base with different slot lengths; `addSkipOrInsertion` always edits both                                                                    |
 | `skip-insert-on-crossover` | error    | skip/insert on a constrained crossover site; the editor refuses it (`_assertCanModifySkipOrInsertionAt`)                                                              |
 | `freeform-frame`           | warning  | a freeform `localFrame` whose axis/`radial0` aren't unit length or perpendicular (`isFrameOrthonormal`); editor and plugin ops always `normalizeFrame`, files may not |
+| `occurrence-part`          | error    | an assembly occurrence places a Part the document doesn't have (kept on load so it can be relinked), or a Part has no occurrence; the editor never creates either     |
 
 A skip/insert on a base whose other strand is **absent** is not an integrity issue: deleting the
 partner strand leaves it there in normal editing. Simulation export refuses it through the
@@ -70,6 +72,13 @@ faithfully:
 | `cadnano-cross-region`   | warning         | connections to other regions are cut (one issue with the count)                                                                                                                                                                                                                        |
 | `cadnano-mirror-oligo`   | warning         | repeat-group copies are left out                                                                                                                                                                                                                                                       |
 | `cadnano-metadata`       | info            | sequences, modifications, oligo names, the scaffold label                                                                                                                                                                                                                              |
+
+**Links** (`checkPartLink(part, linkState)`) warn about a linked Part whose source changed since
+the copy was taken or now holds a different Part (`link-outdated`), or that can't be found in
+this browser or can't be linked any more (`link-missing`). The status
+comes from `PartLinkService` (async, so the caller passes it in); `collectDesignIssues` takes it
+as an optional argument and always runs this check. Exports use the cached copy either way. See
+`docs/linked-parts.md`.
 
 It also includes the region's integrity issues that matter to cadnano (`helix-cell-parity`,
 `negative-cell`, `shared-cell`, and `asymmetric-skip-insert`, because cadnano's `loop`/`skip` are

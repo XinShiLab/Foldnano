@@ -4,6 +4,8 @@ import { checkCadnanoProfile } from './cadnano';
 import type { DesignIssue, DesignIssueSeverity } from './designIssue';
 import { checkPartIntegrity } from './integrity';
 import { checkSimulationProfile } from './simulation';
+import { checkPartLink } from './links';
+import type { PartLinkState } from '../partLinks';
 
 /** Which checks the editor's issue overlay runs. */
 export interface DesignCheckSelection {
@@ -27,10 +29,12 @@ const issueKey = (issue: DesignIssue) => {
 export function collectDesignIssues(
 	part: Part | undefined,
 	activeRegion: DesignRegion | null,
-	selection: DesignCheckSelection
+	selection: DesignCheckSelection,
+	/** The Part's link status, when it is a linked Part; always checked. */
+	linkState?: PartLinkState | null
 ): DesignIssue[] {
 	if (!part) return [];
-	const issues: DesignIssue[] = [];
+	const issues: DesignIssue[] = [...checkPartLink(part, linkState)];
 	if (selection.integrity) issues.push(...checkPartIntegrity(part));
 	if (selection.simulation) issues.push(...checkSimulationProfile(part));
 	if (selection.cadnano && activeRegion) issues.push(...checkCadnanoProfile(part, activeRegion));

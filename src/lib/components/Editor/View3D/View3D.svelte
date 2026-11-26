@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
+	import { SvelteMap } from 'svelte/reactivity';
 	import { notify } from '$lib/notifications/notify.svelte';
 	import type { Part } from '$lib/model/Part';
 	import { setupScene } from './sceneSetup';
@@ -33,11 +34,21 @@
 	import type { SolverParams } from '$lib/model/rbs/rbsTypes';
 	import type { BlockTransformOverride } from '$lib/model/rbs/rbsTypes';
 	import {
+		exportAssemblyToOxDna,
 		exportPartToOxDna,
 		hasUnassignedSequence,
 		type OxDnaFallbackBase,
 	} from '$lib/model/io/oxdnaExport';
-	import { exportPartToMrdna, type MrdnaFallbackBase } from '$lib/model/io/mrdnaExport';
+	import {
+		exportAssemblyToMrdna,
+		exportPartToMrdna,
+		type MrdnaFallbackBase,
+	} from '$lib/model/io/mrdnaExport';
+	import {
+		assemblyHasUnassignedSequence,
+		type SimulationExportRequest,
+		type SimulationExportScope,
+	} from '$lib/model/io/assemblyNtModel';
 	import OxDnaExportDialog from './OxDnaExportDialog.svelte';
 	import { canvasTheme } from '$lib/canvasEditor/theme.svelte';
 	import {
@@ -58,6 +69,19 @@
 		type CubeDir,
 	} from './cameraViews';
 	import ViewCube from './ViewCube.svelte';
+	import PartGhost from './PartGhost.svelte';
+	import { Button } from '$lib/components/ui/button/index.js';
+	import { Move3d, Rotate3d } from '@lucide/svelte';
+	import {
+		CYLINDERS_NAME,
+		LABELS_NAME,
+		applyOccurrencePose,
+		instanceCopy,
+		occurrenceIdOf,
+		occurrenceMatrix,
+	} from './assemblyScene';
+	import { IDENTITY_TRANSFORM } from '$lib/model/Assembly';
+	import { setOccurrenceTransformCmd } from '$lib/commands/assembly';
 	import {
 		createTransformGizmo,
 		type GizmoMode,
@@ -85,14 +109,21 @@
 		type ReferenceMeshOverlay,
 	} from './referenceMeshOverlay';
 	import {
+		FramedGizmoTarget,
 		GizmoDragController,
+		OccurrenceGizmoTarget,
 		OverlayGizmoTarget,
 		PlaneGizmoTarget,
 		type GizmoTarget,
 	} from './gizmoDragController';
 	import { RbsSimulation, type RbsDiagnostics } from './rbs/rbsSimulation';
 	import { DEFAULT_SOLVER_PARAMS } from '$lib/model/rbs/rbsEngine';
-	import { computeSimulationFreshnessSignature } from './view3dSimulationState';
+	import {
+		computeSimulationFreshnessSignature,
+		keptRelaxedPoses,
+		relaxedPartPoses,
+		type PartRelaxation,
+	} from './view3dSimulationState';
 	import { buildExternalStructureOverlayGroup } from './externalStructureOverlayGeometry';
 	import {
 		applyOverlayTransform,
@@ -140,8 +171,8 @@
 		downloadFn?: (() => void) | undefined;
 		replayFrameRendererFn?: ((size: VideoSize | null) => ReplayFrameRenderer | null) | undefined;
 		exportGlbFn?: (() => void) | undefined;
-		exportOxDnaFn?: ((opts?: { includeMirrors?: boolean }) => void) | undefined;
-		exportMrdnaFn?: ((opts?: { includeMirrors?: boolean }) => void) | undefined;
+		exportOxDnaFn?: ((request?: SimulationExportRequest) => void) | undefined;
+		exportMrdnaFn?: ((request?: SimulationExportRequest) => void) | undefined;
 		frameOverlayFn?: ((id: string) => void) | undefined;
 		showDesign?: boolean;
 		showCoordinateAxis?: boolean;
@@ -220,6 +251,13 @@
 	let _activeCamera: THREE.PerspectiveCamera | undefined;
 	let _controls: TrackballControls | undefined;
 	let currentGroup: THREE.Group | null = null;
+	// The active Part's edited instance placement; every Part-space object (design, planes,
+	// cursor, overlays, replay) lives under it so tools keep working in Part coordinates.
+	let partFrame: THREE.Group | undefined;
+	// Lab-space copies: other Parts (ghosted) and the active Part's other instances.
+	let assemblyRoot = $state.raw<THREE.Group | undefined>(undefined);
+	// Bumped after each rebuild so the active Part's instance copies re-clone the new scene.
+	let sceneVersion = $state(0);
 	let replayGeometry: ReplayGeometry | null = null;
 	// One THREE.Group per overlay instance, keyed by instance id. `ghost` is cached
 	// so the reconcile effect knows when a rebuild is needed.
@@ -257,12 +295,16 @@
 	let simProgressTotal = $state(0);
 	let simSig = $state<string | null>(null);
 	let sim: RbsSimulation | undefined;
+	/** Results of the Parts not active, by Part id; the active Part's lives in the state above. */
+	const keptRelaxations = new SvelteMap<string, PartRelaxation>();
 
 	// ── simulation export dialog state ────────────────────────────────────────
 	let oxDnaDialogOpen = $state(false);
 	let mrdnaDialogOpen = $state(false);
 	let pendingExportOverrides = $state<Map<string, BlockTransformOverride> | undefined>(undefined);
 	let pendingIncludeMirrors = $state(false);
+	let pendingScope = $state<SimulationExportScope>('activePart');
+	const pendingWholeAssembly = $derived(pendingScope === 'assembly');
 
 	const _raycaster = new THREE.Raycaster();
 	const _mouse = new THREE.Vector2();
@@ -272,7 +314,73 @@
 	const planeTransformOf = ({ origin, u, v, normal }: PlaneTransform) => ({ origin, u, v, normal });
 
 	const editorViewContext = getEditorViewContext();
+	const doc = $derived(editorViewContext.currentDoc);
+	const ghostParts = $derived(
+		doc.parts
+			.filter((p) => p.id !== part.id)
+			.map((p) => ({
+				part: p,
+				occurrences: doc.assembly.occurrencesOf(p.id),
+				relaxed: keptRelaxedPoses(p, keptRelaxations.get(p.id)),
+			}))
+	);
+	const movingOccurrence = $derived(
+		editorViewContext.movingOccurrenceId
+			? (doc.assembly.getById(editorViewContext.movingOccurrenceId) ?? null)
+			: null
+	);
+
+	/** Part space → world for the active Part (its edited instance's placement). */
+	function partFrameMatrix(): THREE.Matrix4 {
+		return occurrenceMatrix(editorViewContext.activeOccurrence?.transform);
+	}
+
+	function framed(target: GizmoTarget): GizmoTarget {
+		return new FramedGizmoTarget(target, partFrameMatrix);
+	}
 	const exportFileBase = $derived(exportBaseName(editorViewContext.currentDoc.name));
+	// A one-Part export of a design with several Parts says which Part it holds.
+	const simulationFileBase = $derived(
+		pendingWholeAssembly || doc.parts.length <= 1
+			? exportFileBase
+			: exportBaseName(doc.name, `.${part.name}`)
+	);
+
+	function needsFallbackBase(): boolean {
+		return pendingWholeAssembly
+			? assemblyHasUnassignedSequence(doc, hasUnassignedSequence)
+			: hasUnassignedSequence(part);
+	}
+
+	function buildOxDnaExport(
+		overrides: Map<string, BlockTransformOverride> | undefined,
+		fallbackBase: OxDnaFallbackBase
+	) {
+		return pendingWholeAssembly
+			? exportAssemblyToOxDna(doc, {
+					fallbackBase,
+					includeMirrors: pendingIncludeMirrors,
+					relaxedParts: exportRelaxedParts(overrides),
+				})
+			: exportPartToOxDna(part, overrides, fallbackBase, pendingIncludeMirrors);
+	}
+
+	function buildMrdnaExport(
+		overrides: Map<string, BlockTransformOverride> | undefined,
+		fallbackBase: MrdnaFallbackBase
+	) {
+		return pendingWholeAssembly
+			? exportAssemblyToMrdna(doc, {
+					fallbackBase,
+					includeMirrors: pendingIncludeMirrors,
+					relaxedParts: exportRelaxedParts(overrides),
+				})
+			: exportPartToMrdna(part, {
+					fallbackBase,
+					segPositionOverrides: overrides,
+					includeMirrors: pendingIncludeMirrors,
+				});
+	}
 
 	// ── Mouse / raycasting helpers ────────────────────────────────────────────
 
@@ -307,20 +415,19 @@
 		activePointerId = null;
 	}
 
-	function resetCameraToDesign(group: THREE.Object3D, center: THREE.Vector3): void {
+	function resetCameraToDesign(box: THREE.Box3, center: THREE.Vector3): void {
 		if (!_activeCamera || !_controls) return;
 		const camera = _activeCamera;
 		const controls = _controls;
 
 		controls.target.copy(center);
 
-		const box = new THREE.Box3().setFromObject(group);
-		const size = box.getSize(new THREE.Vector3());
-		const maxDim = Math.max(size.x, size.y, size.z);
-		if (maxDim > 0) {
-			const fov = camera.fov * (Math.PI / 180);
-			const dist = (maxDim / 2 / Math.tan(fov / 2)) * 1.5;
-			camera.position.copy(center).add(new THREE.Vector3(0, -dist * 0.4, dist));
+		const up = new THREE.Vector3(0, 0, 1);
+		if (!box.isEmpty()) {
+			// From above and a little in front; the distance fits the pane's width as well as height.
+			const fromDir = new THREE.Vector3(0, -0.4, 1).normalize();
+			const dist = fitDistance(box, fromDir, up, camera.fov, camera.aspect, 1.3);
+			camera.position.copy(center).addScaledVector(fromDir, dist);
 		} else {
 			camera.position.set(0, -40, 80);
 		}
@@ -348,7 +455,8 @@
 	// ── Clear simulation results ───────────────────────────────────────────────
 
 	function clearSim(): void {
-		sim?.requestStop();
+		// Cancel, not stop: a result already on its way must not bring the cleared state back.
+		sim?.cancel();
 		simOverrides = null;
 		simStressMap = null;
 		useRelaxedPositions = false;
@@ -360,19 +468,85 @@
 		simSig = null;
 	}
 
+	/** Keeps the active Part's result (if any) under `partId` before another Part becomes active. */
+	function keepRelaxation(partId: string): void {
+		for (const id of keptRelaxations.keys()) {
+			if (!doc.parts.some((p) => p.id === id)) keptRelaxations.delete(id);
+		}
+		if (!simOverrides?.size || simSig === null || !doc.parts.some((p) => p.id === partId)) {
+			keptRelaxations.delete(partId);
+			return;
+		}
+		keptRelaxations.set(partId, {
+			overrides: simOverrides,
+			stressMap: simStressMap ?? new Map(),
+			sig: simSig,
+			diagnostics: simDiagnostics,
+			shown: useRelaxedPositions,
+		});
+	}
+
+	/** Brings back the result kept for `partId`, once `clearSim` has emptied the state. */
+	function restoreRelaxation(partId: string): void {
+		const kept = keptRelaxations.get(partId);
+		if (!kept) return;
+		keptRelaxations.delete(partId);
+		simOverrides = kept.overrides;
+		simStressMap = kept.stressMap;
+		simSig = kept.sig;
+		simDiagnostics = kept.diagnostics;
+		hasRelaxedPositions = true;
+		useRelaxedPositions = kept.shown;
+	}
+
+	/** What an assembly export relaxes: every Part with a relaxed result on screen. */
+	function exportRelaxedParts(activeOverrides: Map<string, BlockTransformOverride> | undefined) {
+		return relaxedPartPoses(
+			doc.parts,
+			{ partId: part.id, overrides: activeOverrides },
+			keptRelaxations
+		);
+	}
+
 	// ── Bindable function props wired before mount ────────────────────────────
 
 	simulateFn = () => sim?.simulate(part, solverParams);
+	/**
+	 * What Fit and the view cube frame: everything drawn (the active Part and every other visible
+	 * instance), in world space. Hidden instances don't count; with nothing drawn, the active Part.
+	 */
+	function designBounds(): THREE.Box3 {
+		const box = new THREE.Box3();
+		const piece = new THREE.Box3();
+		for (const root of [currentGroup, assemblyRoot]) {
+			if (!root) continue;
+			root.updateWorldMatrix(true, true);
+			root.traverseVisible((object) => {
+				if (object instanceof THREE.InstancedMesh) {
+					if (object.count === 0) return;
+					object.computeBoundingBox();
+					box.union(piece.copy(object.boundingBox!).applyMatrix4(object.matrixWorld));
+					return;
+				}
+				const geometry = (object as THREE.Mesh).geometry as THREE.BufferGeometry | undefined;
+				if (!geometry?.attributes?.position) return;
+				if (!geometry.boundingBox) geometry.computeBoundingBox();
+				box.union(piece.copy(geometry.boundingBox!).applyMatrix4(object.matrixWorld));
+			});
+		}
+		return box.isEmpty() && currentGroup ? box.setFromObject(currentGroup) : box;
+	}
+
 	resetCameraFn = () => {
 		if (!currentGroup) return;
-		const box = new THREE.Box3().setFromObject(currentGroup);
+		const box = designBounds();
 		// A wireframe region can hold a mesh and no helices yet.
 		if (box.isEmpty() && referenceMeshOverlay && !referenceMeshOverlay.bounds().isEmpty()) {
 			frameBox(referenceMeshOverlay.bounds());
 			return;
 		}
 		const center = box.isEmpty() ? new THREE.Vector3(0, 0, 0) : box.getCenter(new THREE.Vector3());
-		resetCameraToDesign(currentGroup, center);
+		resetCameraToDesign(box, center);
 	};
 	// ── View cube: turn the camera to a face, edge or corner ─────────────────
 
@@ -383,7 +557,7 @@
 
 	function viewFromCube(dir: CubeDir): void {
 		if (!currentGroup || !_activeCamera || !_controls) return;
-		let box = new THREE.Box3().setFromObject(currentGroup);
+		let box = designBounds();
 		if (box.isEmpty() && referenceMeshOverlay) box = referenceMeshOverlay.bounds();
 		if (box.isEmpty())
 			box = new THREE.Box3(new THREE.Vector3(-10, -10, -10), new THREE.Vector3(10, 10, 10));
@@ -428,6 +602,11 @@
 		const t = (now - cameraTween.startMs) / CUBE_TURN_MS;
 		const pose = t >= 1 ? cameraTween.to : tweenPose(cameraTween.from, cameraTween.to, t);
 		if (t >= 1) cameraTween = null;
+		setCameraPose(pose);
+	}
+
+	function setCameraPose(pose: CameraPose): void {
+		if (!_activeCamera || !_controls) return;
 		const camera = _activeCamera;
 		_controls.target.copy(pose.target);
 		camera.quaternion.copy(pose.quaternion);
@@ -448,9 +627,13 @@
 		const center = sphere.center;
 		const radius = Math.max(sphere.radius, 1);
 		const plane = part.getPlaneById(planeId);
-		const normal = plane
-			? new THREE.Vector3(plane.normal.x, plane.normal.y, plane.normal.z).normalize()
-			: new THREE.Vector3(0, 0, 1);
+		const normal = (
+			plane
+				? new THREE.Vector3(plane.normal.x, plane.normal.y, plane.normal.z)
+				: new THREE.Vector3(0, 0, 1)
+		)
+			.transformDirection(partFrameMatrix())
+			.normalize();
 		const camera = _activeCamera;
 		const controls = _controls;
 		const fov = camera.fov * (Math.PI / 180);
@@ -519,7 +702,8 @@
 	// Persist a PDB instance's final pose so reloading the same file restores it.
 	// mrDNA instances have an empty sourceKey and are never remembered.
 	function saveOverlayPlacement(instance: OverlayInstance): void {
-		if (!instance.sourceKey) return;
+		// A linked Part is read-only: the overlay still moves, but its placement isn't remembered.
+		if (!instance.sourceKey || !editorViewContext.canEditActivePart) return;
 		setOverlayPlacementCmd(
 			editorViewContext.historyStack,
 			part,
@@ -531,14 +715,25 @@
 	}
 
 	function makePlaneTarget(planeId: string): GizmoTarget | null {
-		if (!planeOverlay) return null;
+		// Gate before the gesture: a plane drag writes live, so a read-only Part never gets one.
+		if (!planeOverlay || !editorViewContext.canEditActivePart) return null;
 		return new PlaneGizmoTarget(part, planeId, editorViewContext.historyStack, planeOverlay);
+	}
+
+	function makeMovingOccurrenceTarget(): GizmoTarget | null {
+		if (!movingOccurrence) return null;
+		return new OccurrenceGizmoTarget(doc, movingOccurrence.id, editorViewContext.historyStack);
 	}
 
 	function currentGizmoTarget(): GizmoTarget | null {
 		const instance = activeOverlay();
-		if (instance) return makeOverlayTarget(instance);
-		if (showPlanes && selectedPlaneId) return makePlaneTarget(selectedPlaneId);
+		if (instance) return framed(makeOverlayTarget(instance));
+		const moving = makeMovingOccurrenceTarget();
+		if (moving) return moving;
+		if (showPlanes && selectedPlaneId) {
+			const target = makePlaneTarget(selectedPlaneId);
+			return target ? framed(target) : null;
+		}
 		return null;
 	}
 
@@ -548,7 +743,8 @@
 		const backbone = replay?.displayPose?.backboneNm;
 		if (!replayShown || !backbone || !_activeCamera) return -1;
 		_raycaster.setFromCamera(_mouse, _activeCamera);
-		return pickNucleotide(_raycaster.ray, backbone, replayVisibleRows);
+		const ray = _raycaster.ray.clone().applyMatrix4(partFrameMatrix().invert());
+		return pickNucleotide(ray, backbone, replayVisibleRows);
 	}
 
 	// Clicking a replayed nucleotide selects its oligo in the strand view and scrolls to it.
@@ -582,8 +778,10 @@
 			(showXovers || item.kind !== 'xover') && isPickable(item, filter);
 	}
 
+	/** Part space → clip space: pick indices hold Part-space points. */
 	function updateViewProjection(camera: THREE.PerspectiveCamera): THREE.Matrix4 {
-		return _viewProjection.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+		_viewProjection.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+		return _viewProjection.multiply(partFrameMatrix());
 	}
 
 	function pickLineAt(e: { clientX: number; clientY: number }, sticky = false) {
@@ -806,13 +1004,52 @@
 			endBox(true);
 			return;
 		}
-		if (dragController?.isActive) dragController.commit();
+		try {
+			if (dragController?.isActive) dragController.commit();
+		} catch (error) {
+			notify.error('The move could not be saved', {
+				description: error instanceof Error ? error.message : undefined,
+			});
+		}
 		releaseCapturedPointer();
 	}
 
 	function handlePointerCancel() {
 		endBox(false);
 		dragController?.cancel();
+	}
+
+	/** Double-clicking another instance (a ghost Part or a copy of this one) edits it there. */
+	// The nearest shown helix wins, the edited instance's included: double-clicking it keeps it.
+	function handleDoubleClick(): void {
+		if (!assemblyRoot?.visible || !_activeCamera) return;
+		const cylinders: THREE.Object3D[] = [];
+		for (const root of [currentGroup, assemblyRoot]) {
+			root?.traverseVisible((o) => {
+				if (o.name === CYLINDERS_NAME) cylinders.push(o);
+			});
+		}
+		_raycaster.setFromCamera(_mouse, _activeCamera);
+		const id = occurrenceIdOf(_raycaster.intersectObjects(cylinders, true)[0]?.object ?? null);
+		if (id) editorViewContext.editOccurrence(id);
+	}
+
+	function handleWindowKeydown(e: KeyboardEvent): void {
+		if (e.key !== 'Escape' || !movingOccurrence || dragController?.isActive) return;
+		const target = e.target as HTMLElement | null;
+		if (target?.closest('input, textarea, [contenteditable="true"]')) return;
+		editorViewContext.stopMovingOccurrence();
+	}
+
+	function resetMovingOccurrence(): void {
+		if (!movingOccurrence) return;
+		setOccurrenceTransformCmd(
+			editorViewContext.historyStack,
+			doc,
+			movingOccurrence.id,
+			IDENTITY_TRANSFORM,
+			'Reset instance placement'
+		);
 	}
 
 	function handleClick(e: MouseEvent) {
@@ -965,21 +1202,32 @@
 	$effect(() => {
 		if (!threeRenderer || !transformGizmo) return;
 		const instance = activeOverlay();
-		const planeActive = showPlanes && !!selectedPlaneId;
-		transformGizmo.group.visible = !!instance || planeActive;
+		const moving = movingOccurrence;
+		// A read-only Part's planes can be selected and framed, but not moved.
+		const planeActive = showPlanes && !!selectedPlaneId && editorViewContext.canEditActivePart;
+		transformGizmo.group.visible = !!instance || !!moving || planeActive;
+		// Planes and overlays sit in the active Part's frame; follow it when that instance moves.
+		const frame = partFrameMatrix();
 		if (!dragController?.isActive) {
 			if (instance) {
 				// Sync the gizmo from the persisted placement for PDB (so undo/redo move
 				// the gizmo too — history mutates the model), else the live transform
 				// (mrDNA / session-only). Reading the values keeps this effect subscribed.
-				const stored = instance.sourceKey
-					? part.overlayPlacements.find((p) => p.id === instance.id)
-					: undefined;
+				const stored =
+					instance.sourceKey && editorViewContext.canEditActivePart
+						? part.overlayPlacements.find((p) => p.id === instance.id)
+						: undefined;
 				const t = stored ? stored.transform : instance.transform;
-				transformGizmo.setPosition(new THREE.Vector3(t.position.x, t.position.y, t.position.z));
-				transformGizmo.setQuaternion(
-					new THREE.Quaternion(t.quaternion[0], t.quaternion[1], t.quaternion[2], t.quaternion[3])
-				);
+				const world = occurrenceMatrix(t).premultiply(frame);
+				const position = new THREE.Vector3();
+				const quaternion = new THREE.Quaternion();
+				world.decompose(position, quaternion, new THREE.Vector3());
+				transformGizmo.setPosition(position);
+				transformGizmo.setQuaternion(quaternion);
+			} else if (moving) {
+				void moving.transform;
+				const target = makeMovingOccurrenceTarget();
+				if (target) dragController?.syncPose(target);
 			} else if (planeActive) {
 				const plane = part.getPlaneById(selectedPlaneId!);
 				if (plane) {
@@ -987,7 +1235,7 @@
 					void plane.origin;
 				}
 				const target = makePlaneTarget(selectedPlaneId!);
-				if (target) dragController?.syncPose(target);
+				if (target) dragController?.syncPose(framed(target));
 			}
 		}
 		transformGizmo.setMode(gizmoMode);
@@ -1038,11 +1286,31 @@
 		_markDirty?.();
 	});
 
-	// Reset camera whenever the part reference itself changes (document switch)
+	// Another document refits the camera and drops every relaxation result. Another Part of the
+	// same design keeps the camera; the old Part's result is kept for it (a run still going is
+	// cancelled) and the new Part's comes back. A drag in progress belongs to the old Part object,
+	// so it ends even when undo only rebuilt the same Part.
+	let shownPart: Part | null = null;
+	let shownDocId: string | null = null;
 	$effect(() => {
 		if (!threeRenderer) return;
-		void part;
-		isFirstBuild = true;
+		const current = part;
+		const docId = doc.id;
+		untrack(() => {
+			const otherDoc = shownDocId !== docId;
+			if (otherDoc) keptRelaxations.clear();
+			if (shownPart && shownPart !== current) {
+				dragController?.cancel();
+				if (otherDoc || shownPart.id !== current.id) {
+					if (!otherDoc) keepRelaxation(shownPart.id);
+					clearSim();
+					restoreRelaxation(current.id);
+				}
+			}
+			if (otherDoc) isFirstBuild = true;
+			shownPart = current;
+			shownDocId = docId;
+		});
 	});
 
 	// Rebuild geometry whenever the part model or rendering options change.
@@ -1051,7 +1319,7 @@
 	// edits) fold into one rebuild, and a small design still rebuilds on the next task. While
 	// waiting, the effect is subscribed to `rebuildTick` only; the build run re-reads everything.
 	$effect(() => {
-		if (!threeRenderer || !scene || !cursor) return;
+		if (!threeRenderer || !scene || !cursor || !partFrame) return;
 		void rebuildTick;
 		if (!rebuildDue) {
 			rebuildTimer ??= window.setTimeout(
@@ -1085,7 +1353,7 @@
 		}
 
 		if (currentGroup) {
-			scene.remove(currentGroup);
+			partFrame.remove(currentGroup);
 			disposeGroup(currentGroup);
 		}
 
@@ -1125,6 +1393,8 @@
 			);
 		}
 		const { group, cylinders, labels, crossovers, center, pickIndex } = built;
+		labels.name = LABELS_NAME;
+		cylinders.name = CYLINDERS_NAME;
 		statsBuildMs = performance.now() - _buildStart;
 		currentGroup = group;
 		currentPickIndex = pickIndex;
@@ -1136,20 +1406,72 @@
 		// Use untrack to set initial visibility without tracking showVH/hideContext
 		// as rebuild dependencies — the dedicated effects below handle subsequent changes.
 		untrack(() => {
-			group.visible = designVisible;
+			group.visible = activeDesignVisible;
 			cylinders.visible = showVH;
 			labels.visible = showVH;
 			crossovers.visible = !hideContext.crossovers;
 		});
 
-		scene.add(group);
+		partFrame.add(group);
+		sceneVersion = untrack(() => sceneVersion) + 1;
 
 		untrack(updateCursor);
 
 		if (isFirstBuild) {
 			isFirstBuild = false;
-			resetCameraToDesign(group, center);
+			// The frame-pose effect runs after this one; pose the frame now so the fit sees it.
+			const frame = partFrame;
+			untrack(() =>
+				applyOccurrencePose(
+					frame,
+					editorViewContext.activeOccurrence?.transform ?? IDENTITY_TRANSFORM
+				)
+			);
+			resetCameraToDesign(
+				new THREE.Box3().setFromObject(group),
+				center.clone().applyMatrix4(frame.matrixWorld)
+			);
 		}
+		_markDirty?.();
+	});
+
+	// The active Part's frame follows its edited instance (moved by the gizmo, undo, or switching
+	// instance). Hiding that instance hides the design, not the planes or cursor.
+	$effect(() => {
+		if (!threeRenderer || !partFrame) return;
+		applyOccurrencePose(
+			partFrame,
+			editorViewContext.activeOccurrence?.transform ?? IDENTITY_TRANSFORM
+		);
+		_markDirty?.();
+	});
+
+	// The active Part's other visible instances: copies of the scene just built, sharing its
+	// geometry and materials, so edits and selection show on every instance.
+	$effect(() => {
+		if (!threeRenderer || !assemblyRoot) return;
+		void sceneVersion;
+		void showVH;
+		void hideContext.crossovers;
+		const source = currentGroup;
+		if (!source) return;
+		const root = assemblyRoot;
+		const edited = editorViewContext.activeOccurrence;
+		const copies = doc.assembly
+			.occurrencesOf(part.id)
+			.filter((o) => o.visible && o.id !== edited?.id)
+			.map((o) => instanceCopy(source, o.transform, o.id));
+		for (const copy of copies) root.add(copy);
+		_markDirty?.();
+		return () => {
+			for (const copy of copies) root.remove(copy);
+			_markDirty?.();
+		};
+	});
+
+	$effect(() => {
+		if (!threeRenderer || !assemblyRoot) return;
+		assemblyRoot.visible = designVisible;
 		_markDirty?.();
 	});
 
@@ -1157,7 +1479,7 @@
 	// instance's `ghost` (or data) changes; transform + visibility are handled in the
 	// next effect so a drag or Hide/Show never rebuilds GPU buffers.
 	$effect(() => {
-		if (!threeRenderer || !scene) return;
+		if (!threeRenderer || !partFrame) return;
 		const list = overlays;
 		// eslint-disable-next-line svelte/prefer-svelte-reactivity
 		const seen = new Set<string>();
@@ -1169,20 +1491,20 @@
 				const existing = overlayGroups.get(inst.id);
 				if (existing && existing.data === data && existing.ghost === ghost) return;
 				if (existing) {
-					scene!.remove(existing.group);
+					partFrame!.remove(existing.group);
 					disposeGroup(existing.group);
 				}
 				const group = buildExternalStructureOverlayGroup(data, ghost);
 				applyOverlayTransform(group, inst.transform);
 				group.visible = show3DOverlays && inst.visible;
-				scene!.add(group);
+				partFrame!.add(group);
 				overlayGroups.set(inst.id, { group, data, ghost });
 			});
 		}
 		untrack(() => {
 			for (const [id, entry] of overlayGroups) {
 				if (seen.has(id)) continue;
-				scene!.remove(entry.group);
+				partFrame!.remove(entry.group);
 				disposeGroup(entry.group);
 				overlayGroups.delete(id);
 			}
@@ -1230,8 +1552,11 @@
 		if (!threeRenderer) return;
 		void part.oligos.size;
 		void part.virtualHelices.length;
-		const sig = computeSimulationFreshnessSignature(part);
-		isSimStale = hasRelaxedPositions && simSig !== null && simSig !== sig;
+		// Building the solver input is real work: skip it while there is no result to compare.
+		isSimStale =
+			hasRelaxedPositions &&
+			simSig !== null &&
+			simSig !== computeSimulationFreshnessSignature(part);
 	});
 
 	// Toggle cylinder + label visibility
@@ -1245,7 +1570,9 @@
 	// Toggle all main design geometry without affecting overlays or scene helpers.
 	$effect(() => {
 		if (!threeRenderer) return;
-		if (currentGroup) currentGroup.visible = designVisible;
+		if (currentGroup) {
+			currentGroup.visible = activeDesignVisible;
+		}
 		_markDirty?.();
 	});
 
@@ -1257,11 +1584,15 @@
 		return !replay.isStale(part);
 	});
 	let designVisible = $derived(showDesign && (!replayShown || !!replay?.showDesign));
+	// The active Part as drawn: hiding its edited instance hides it, and picking follows.
+	let activeDesignVisible = $derived(
+		designVisible && (editorViewContext.activeOccurrence?.visible ?? true)
+	);
 	// Picking follows the editor's Select mode; Pan (or any other mode) leaves 3D view-only.
 	let linePickActive = $derived(
-		editorViewContext.editorMode === 'SELECT' && designVisible && !showNtModel && !replayShown
+		editorViewContext.editorMode === 'SELECT' && activeDesignVisible && !showNtModel && !replayShown
 	);
-	// A mode or filter change makes the current glow wrong; the next pointer move redraws it.
+	// A mode, filter or visibility change makes the current glow wrong; the next move redraws it.
 	$effect(() => {
 		void linePickActive;
 		void editorViewContext.strandViewContext.selectionFilter;
@@ -1284,14 +1615,15 @@
 
 	// Build the replay mesh once per loaded trajectory; frames only rewrite its buffers.
 	$effect(() => {
-		if (!threeRenderer || !scene) return;
+		if (!threeRenderer || !partFrame) return;
 		const mapping = replay?.mapping;
 		if (!mapping) return;
+		const frame = partFrame;
 		const geometry = buildReplayGeometry(mapping.nucleotides);
 		replayGeometry = geometry;
-		scene.add(geometry.group);
+		frame.add(geometry.group);
 		return () => {
-			scene?.remove(geometry.group);
+			frame.remove(geometry.group);
 			disposeGroup(geometry.group);
 			if (replayGeometry === geometry) replayGeometry = null;
 			_markDirty?.();
@@ -1410,6 +1742,11 @@
 		scene = localScene;
 		_activeCamera = camera;
 		_controls = controls;
+		partFrame = new THREE.Group();
+		partFrame.matrixAutoUpdate = false;
+		scene.add(partFrame);
+		assemblyRoot = new THREE.Group();
+		scene.add(assemblyRoot);
 		// Hover follows the pointer, not the camera: rotate, pan and zoom drop it until the next move.
 		controls.addEventListener('start', () => {
 			cameraTween = null; // grabbing the view stops a view-cube turn
@@ -1419,7 +1756,7 @@
 			if (hoveredItem >= 0) clearHover();
 		});
 		hoverGlow = createHoverGlow();
-		scene.add(hoverGlow.group);
+		partFrame.add(hoverGlow.group);
 
 		const w = canvas.clientWidth;
 		const h = canvas.clientHeight;
@@ -1431,19 +1768,19 @@
 
 		// ── Cursor indicators ──────────────────────────────────────────────────
 		cursor = createCursor();
-		scene.add(cursor.rings);
-		scene.add(cursor.markers);
+		partFrame.add(cursor.rings);
+		partFrame.add(cursor.markers);
 
 		// ── Coordinate axis ────────────────────────────────────────────────────
 		axisObjects = createCoordinateAxis(20);
 		axisObjects.group.visible = false;
-		scene.add(axisObjects.group);
+		partFrame.add(axisObjects.group);
 		planeAxes = createPlaneAxes(10);
-		scene.add(planeAxes.group);
+		partFrame.add(planeAxes.group);
 
 		// ── Plane overlay ──────────────────────────────────────────────────────
 		planeOverlay = createPlaneOverlay();
-		scene.add(planeOverlay.group);
+		partFrame.add(planeOverlay.group);
 
 		transformGizmo = createTransformGizmo();
 		scene.add(transformGizmo.group);
@@ -1460,9 +1797,9 @@
 
 		// ── Basis-plane selector ───────────────────────────────────────────────
 		planeSelector = createPlaneSelector();
-		scene.add(planeSelector.group);
+		partFrame.add(planeSelector.group);
 		referenceMeshOverlay = createReferenceMeshOverlay();
-		scene.add(referenceMeshOverlay.group);
+		partFrame.add(referenceMeshOverlay.group);
 
 		// ── Expose scene-dependent functions to parent ─────────────────────────
 		downloadFn = () => downloadScreenshot(renderer, localScene, camera, `${exportFileBase}.png`);
@@ -1529,41 +1866,36 @@
 			exportGlb(exportGroup, `${exportFileBase}.glb`);
 		};
 
-		exportOxDnaFn = (opts) => {
+		exportOxDnaFn = (request) => {
 			const overrides = useRelaxedPositions ? (simOverrides ?? undefined) : undefined;
-			pendingIncludeMirrors = opts?.includeMirrors ?? false;
-			if (hasUnassignedSequence(part)) {
+			pendingIncludeMirrors = request?.includeMirrors ?? false;
+			pendingScope = request?.scope ?? 'activePart';
+			if (needsFallbackBase()) {
 				pendingExportOverrides = overrides;
 				oxDnaDialogOpen = true;
 			} else {
-				downloadOxDnaFiles(
-					exportFileBase,
-					exportPartToOxDna(part, overrides, 'T', pendingIncludeMirrors)
-				);
+				downloadOxDnaFiles(simulationFileBase, buildOxDnaExport(overrides, 'T'));
 			}
 		};
 
-		exportMrdnaFn = (opts) => {
+		exportMrdnaFn = (request) => {
 			const overrides = useRelaxedPositions ? (simOverrides ?? undefined) : undefined;
-			pendingIncludeMirrors = opts?.includeMirrors ?? false;
-			if (hasUnassignedSequence(part)) {
+			pendingIncludeMirrors = request?.includeMirrors ?? false;
+			pendingScope = request?.scope ?? 'activePart';
+			if (needsFallbackBase()) {
 				pendingExportOverrides = overrides;
 				mrdnaDialogOpen = true;
 			} else {
-				downloadMrdnaFile(
-					exportFileBase,
-					exportPartToMrdna(part, {
-						segPositionOverrides: overrides,
-						includeMirrors: pendingIncludeMirrors,
-					})
-				);
+				downloadMrdnaFile(simulationFileBase, buildMrdnaExport(overrides, 'T'));
 			}
 		};
 
 		frameOverlayFn = (id: string) => {
 			const inst = overlays.find((o) => o.id === id);
 			if (!inst) return;
-			frameBox(transformedBoundsBox(inst.data.bounds, inst.transform));
+			frameBox(
+				transformedBoundsBox(inst.data.bounds, inst.transform).applyMatrix4(partFrameMatrix())
+			);
 		};
 
 		// Activate all module-level $effect blocks (they gate on threeRenderer)
@@ -1619,7 +1951,7 @@
 
 			clearHover();
 			if (hoverGlow) {
-				scene!.remove(hoverGlow.group);
+				partFrame?.remove(hoverGlow.group);
 				hoverGlow.dispose();
 				hoverGlow = undefined;
 			}
@@ -1668,14 +2000,16 @@
 			}
 
 			if (currentGroup) {
-				scene!.remove(currentGroup);
+				partFrame?.remove(currentGroup);
 				disposeGroup(currentGroup);
 			}
 			for (const entry of overlayGroups.values()) {
-				scene!.remove(entry.group);
+				partFrame?.remove(entry.group);
 				disposeGroup(entry.group);
 			}
 			overlayGroups.clear();
+			partFrame = undefined;
+			assemblyRoot = undefined;
 
 			// Deactivate all module-level $effect blocks
 			scene = undefined;
@@ -1684,6 +2018,8 @@
 		};
 	});
 </script>
+
+<svelte:window onkeydown={handleWindowKeydown} />
 
 <div class="relative h-full w-full overflow-hidden" onpointerdowncapture={handlePointerDownCapture}>
 	<canvas
@@ -1703,7 +2039,58 @@
 		onpointerup={handlePointerUp}
 		onpointercancel={handlePointerCancel}
 		onclick={handleClick}
+		ondblclick={handleDoubleClick}
 	></canvas>
+	{#if threeRenderer && assemblyRoot}
+		{#each ghostParts as ghost (ghost.part)}
+			<PartGhost
+				parent={assemblyRoot}
+				part={ghost.part}
+				occurrences={ghost.occurrences}
+				relaxed={ghost.relaxed}
+				onChange={() => _markDirty?.()}
+			/>
+		{/each}
+	{/if}
+	{#if movingOccurrence}
+		<div
+			class="absolute top-2 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1 rounded-md border border-border bg-background/95 px-2 py-1 text-xs shadow-sm"
+		>
+			<span class="mr-1 text-muted-foreground"
+				>Moving <span class="font-medium text-foreground">{movingOccurrence.name}</span></span
+			>
+			<Button
+				variant={gizmoMode === 'translate' ? 'secondary' : 'ghost'}
+				size="icon"
+				class="size-6"
+				title="Move along an axis"
+				aria-label="Move along an axis"
+				onclick={() => (gizmoMode = 'translate')}><Move3d size={13} /></Button
+			>
+			<Button
+				variant={gizmoMode === 'rotate' ? 'secondary' : 'ghost'}
+				size="icon"
+				class="size-6"
+				title="Rotate about an axis"
+				aria-label="Rotate about an axis"
+				onclick={() => (gizmoMode = 'rotate')}><Rotate3d size={13} /></Button
+			>
+			<Button
+				variant="ghost"
+				size="sm"
+				class="h-6 px-2 text-xs"
+				title="Put this instance back at the origin"
+				onclick={resetMovingOccurrence}>Reset</Button
+			>
+			<Button
+				variant="outline"
+				size="sm"
+				class="h-6 px-2 text-xs"
+				title="Stop moving (Esc)"
+				onclick={() => editorViewContext.stopMovingOccurrence()}>Done</Button
+			>
+		</div>
+	{/if}
 	{#if selectBox}
 		<div
 			class="pointer-events-none absolute border border-primary bg-primary/10"
@@ -1778,10 +2165,7 @@
 <OxDnaExportDialog
 	bind:open={oxDnaDialogOpen}
 	onConfirm={(fallback: OxDnaFallbackBase) => {
-		downloadOxDnaFiles(
-			exportFileBase,
-			exportPartToOxDna(part, pendingExportOverrides, fallback, pendingIncludeMirrors)
-		);
+		downloadOxDnaFiles(simulationFileBase, buildOxDnaExport(pendingExportOverrides, fallback));
 		pendingExportOverrides = undefined;
 	}}
 	onCancel={() => {
@@ -1792,14 +2176,7 @@
 <OxDnaExportDialog
 	bind:open={mrdnaDialogOpen}
 	onConfirm={(fallback: MrdnaFallbackBase) => {
-		downloadMrdnaFile(
-			exportFileBase,
-			exportPartToMrdna(part, {
-				fallbackBase: fallback,
-				segPositionOverrides: pendingExportOverrides,
-				includeMirrors: pendingIncludeMirrors,
-			})
-		);
+		downloadMrdnaFile(simulationFileBase, buildMrdnaExport(pendingExportOverrides, fallback));
 		pendingExportOverrides = undefined;
 	}}
 	onCancel={() => {

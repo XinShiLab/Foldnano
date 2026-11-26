@@ -28,7 +28,6 @@
 	}
 
 	const editorViewContext = getEditorViewContext();
-	const foldnanoDoc = $derived(editorViewContext.currentDoc);
 
 	let el = $state<Line>();
 
@@ -41,8 +40,7 @@
 	}: OligoSegmentProps = $props();
 
 	const segmentToRender = $derived.by(() => {
-		if (!foldnanoDoc) return null;
-		const part = foldnanoDoc.parts[0];
+		const part = editorViewContext.activePart;
 		if (!part) return null;
 		const oligoSegment = part.getSegmentById(id);
 		return oligoSegment;

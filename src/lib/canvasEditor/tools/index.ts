@@ -52,9 +52,12 @@ export class ToolController {
 		behaviors: ToolBehavior[] = []
 	) {
 		this.registry = new Map(tools.map((t) => [t.name, t]));
-		this.active = this.require(getMode());
-		this.active.onEnter?.(ctx);
 		this.ctx = ctx;
+		// A mode without a tool (PAN) starts suspended, as `syncMode` would leave it.
+		const initial = this.registry.get(getMode());
+		this.active = initial ?? tools[0];
+		if (initial) this.active.onEnter?.(ctx);
+		else this.suspended = true;
 		this.getMode = getMode;
 		this.behaviors = behaviors; // store behaviors
 	}

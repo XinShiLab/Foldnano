@@ -35,6 +35,17 @@ export const WHATS_NEW_REVIEWED_THROUGH = '2026-11-15T23:39:51+01:00';
 // Newest first. Edit freely; the draft script only inserts new entries at the top.
 export const WHATS_NEW: readonly WhatsNewEntry[] = [
 	{
+		date: '2026-11-17',
+		area: 'Assemblies',
+		text: 'A design can now hold several Parts, each folded on its own, and place them in 3D: add Parts and instances in the new Assembly panel, move instances with a gizmo, and export every visible instance to oxDNA or mrDNA in one file. A Part can also be linked from another design as a read-only copy that you update when its source changes.',
+		link: 'assemblies',
+		announce: {
+			id: '2026-11-17-assemblies',
+			title: 'Several Parts in one design',
+			body: 'Build assemblies from separately folded Parts, place them in 3D, and link Parts from your other designs. Existing designs open as one Part and work as before.',
+		},
+	},
+	{
 		date: '2026-11-15',
 		area: '3D view',
 		text: 'Select in the 3D view: in Select mode, click a strand, crossover or oligo in the line view to select it in the strand view, which scrolls to it. Shift-click toggles, Shift-drag a box to add everything it touches, and hovering glows what a click would select and shows its helix, base and oligo in the status bar.',

@@ -158,6 +158,7 @@ describe('GitHubStorageProvider', () => {
 			...pulledSnapshot,
 			format: FOLDNANO_FORMAT,
 			formatVersion: CURRENT_FORMAT_VERSION,
+			assembly: { occurrences: [] },
 		};
 		provider.setFileMetadata('doc-123', SAMPLE_META);
 		mockRemoteFile(pulledSnapshot);

@@ -58,7 +58,7 @@
 
 	const ctx = getEditorViewContext();
 	const strandCtx = $derived(ctx.strandViewContext);
-	const isReadOnly = $derived(!ctx.isTabOwner);
+	const isReadOnly = $derived(!ctx.canEditActivePart);
 
 	let history = $derived(ctx.historyStack);
 	let hasScaffold = $derived(Array.from(part.oligos).some((o) => o.isScaffold));

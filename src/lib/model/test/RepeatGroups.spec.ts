@@ -398,3 +398,57 @@ describe('repeat groups: mirror oligos', () => {
 		});
 	});
 });
+
+describe('repeat groups in a design with several Parts', () => {
+	/** `setup()` plus a second, plain Part with one oligo, after the repeat Part. */
+	function twoParts() {
+		const base = setup();
+		const src = base.part().createOligo(base.vh, 0, 9);
+		createRepeatGroupCmd({ part: base.part(), oligos: [src], bpOffset: 21 }, base.history);
+		const plain = base.doc.addNewPart('FREEFORM');
+		const plainRegion = plain.getDefaultRegion() as FreeformRegion;
+		const plainVh = plainRegion.addVhAt(plain, [0, 0, 0], [0, 0, 1]);
+		const other = plain.createOligo(plainVh, 0, 9);
+		return { ...base, src, plain, other };
+	}
+
+	it('records an edit on a Part without groups as patches, and keeps the repeat Part object', () => {
+		const { doc, history, part, plain, other } = twoParts();
+		const repeatPart = part();
+		renameOligoCmd({ oligo: other, name: 'renamed' }, history);
+		const kinds = history.lastUndoEntry!.redo.map((c) => c.kind);
+		expect(kinds).not.toContain('documentSnapshot');
+		expect(kinds).not.toContain('partSnapshot');
+
+		history.undoOnce();
+		expect(doc.parts[1].getOligoById(other.id)!.name).not.toBe('renamed');
+		expect(doc.parts[0]).toBe(repeatPart);
+		expect(doc.parts[1]).toBe(plain);
+	});
+
+	it('records a mirror rebuild as a snapshot of that Part only', () => {
+		const { doc, history, part, plain, src } = twoParts();
+		moveOligoEndCmd({ part: part(), end: onlySegment(src).threePrime, toIdx: 6 }, history);
+		const redo = history.lastUndoEntry!.redo;
+		expect(redo.map((c) => c.kind)).toEqual(['partSnapshot']);
+		expect(range(mirrorsOf(part())[0])).toEqual([21, 27]);
+
+		history.undoOnce();
+		expect(range(mirrorsOf(part())[0])).toEqual([21, 30]);
+		expect(doc.parts[1]).toBe(plain);
+		history.redoOnce();
+		expect(range(mirrorsOf(part())[0])).toEqual([21, 27]);
+		expect(doc.parts[1]).toBe(plain);
+	});
+
+	it('keeps a rejected mirror edit from changing either Part', () => {
+		const { doc, history, part, plain } = twoParts();
+		const before = JSON.stringify(doc.snapshot());
+		const mirror = mirrorsOf(part())[0];
+		expect(() =>
+			moveOligoEndCmd({ part: part(), end: onlySegment(mirror).threePrime, toIdx: 32 }, history)
+		).toThrow(/Mirror oligos can't be edited/);
+		expect(JSON.stringify(doc.snapshot())).toBe(before);
+		expect(doc.parts[1]).toBe(plain);
+	});
+});

@@ -31,6 +31,7 @@
 		"lint:branch": "sh scripts/lint-changed.sh main",
 		"docs:check": "node scripts/docs-check.ts",
 		"docs:verify": "node scripts/docs-check.ts --verify",
+		"screenshots:capture": "node scripts/docs-screenshots.ts",
 		"screenshots:webp": "sh scripts/screenshots-to-webp.sh",
 		"test:unit": "vitest",
 		"test": "vitest run --changed",

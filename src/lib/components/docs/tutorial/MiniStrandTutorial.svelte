@@ -9,7 +9,7 @@
 
 	let StrandViewer: Component<{ part: Part }> | null = $state(null);
 	const editorViewContext = getEditorViewContext();
-	const part = $derived(editorViewContext.currentDoc.parts[0]);
+	const part = $derived(editorViewContext.activePart);
 
 	onMount(async () => {
 		if (!browser) return;

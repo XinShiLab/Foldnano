@@ -128,6 +128,12 @@ export function applyResult(opts: {
 // Strategies
 // ---------------------------------------------------------------------------
 
+/** A replace swaps the Part's content, not which Part it is: the assembly's occurrences and the
+ * editor's active Part refer to it by id. */
+function keepPartIdentity(json: PartJSON, current: Part): PartJSON {
+	return { ...json, id: current.id };
+}
+
 function applyReplacePart(
 	manifest: PluginManifest,
 	primaryArtifact: string,
@@ -135,8 +141,11 @@ function applyReplacePart(
 	partIndex: number,
 	historyStack: HistoryStack
 ): void {
-	historyStack.snapshotTx(`Plugin: ${manifest.name}`, () => {
-		const resultPartJson = JSON.parse(primaryArtifact) as PartJSON;
+	historyStack.partSnapshotTx(`Plugin: ${manifest.name}`, doc.parts[partIndex], () => {
+		const resultPartJson = keepPartIdentity(
+			JSON.parse(primaryArtifact) as PartJSON,
+			doc.parts[partIndex]
+		);
 		doc.parts[partIndex] = performReplacePart(resultPartJson);
 	});
 }
@@ -154,8 +163,11 @@ function applyReplacePartKeepAnnotations(
 			'The design from before the run is unavailable, so annotations cannot be preserved.'
 		);
 	}
-	historyStack.snapshotTx(`Plugin: ${manifest.name}`, () => {
-		const resultPartJson = JSON.parse(primaryArtifact) as PartJSON;
+	historyStack.partSnapshotTx(`Plugin: ${manifest.name}`, doc.parts[partIndex], () => {
+		const resultPartJson = keepPartIdentity(
+			JSON.parse(primaryArtifact) as PartJSON,
+			doc.parts[partIndex]
+		);
 		const { part: newPart, diagnostics } = performReplacePartKeepAnnotations(
 			resultPartJson,
 			preRunSnapshot
@@ -183,7 +195,7 @@ function applyReplayMutationLog(
 		}
 	}
 
-	historyStack.snapshotTx(`Plugin: ${manifest.name}`, () => {
+	historyStack.partSnapshotTx(`Plugin: ${manifest.name}`, part, () => {
 		try {
 			replayMutationLog(part, log, { activeRegionId });
 		} catch (err) {
@@ -210,8 +222,8 @@ function applyReplaceRegion(
 		);
 	}
 
-	historyStack.snapshotTx(`Plugin: ${manifest.name}`, () => {
-		const part = doc.parts[partIndex];
+	const part = doc.parts[partIndex];
+	historyStack.partSnapshotTx(`Plugin: ${manifest.name}`, part, () => {
 		const region = part.getRegionById(activeRegionId);
 		if (!region || !(region instanceof LatticedDesignRegion)) {
 			throw new Error(
@@ -246,8 +258,8 @@ function applyReplaceRegionKeepAnnotations(
 		);
 	}
 
-	historyStack.snapshotTx(`Plugin: ${manifest.name}`, () => {
-		const part = doc.parts[partIndex];
+	const part = doc.parts[partIndex];
+	historyStack.partSnapshotTx(`Plugin: ${manifest.name}`, part, () => {
 		const region = part.getRegionById(activeRegionId);
 		if (!region || !(region instanceof LatticedDesignRegion)) {
 			throw new Error(

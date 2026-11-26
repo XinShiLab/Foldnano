@@ -123,7 +123,8 @@ export function SelectTool(): Tool {
 				const handled = fn(evt, ctx, hit);
 				let selHandled = false;
 				let selHandler: HandlerInstance | null = null;
-				if (needSelectionHandler.includes(key)) {
+				// Dragging the selection moves strands: not on a read-only (linked) Part.
+				if (needSelectionHandler.includes(key) && ctx.editorCtx.canEditActivePart) {
 					selHandler = instances.get('WITH_SELECTION') || null;
 					const selFn = selHandler?.[type];
 					if (selFn) {

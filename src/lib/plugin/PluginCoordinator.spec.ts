@@ -932,7 +932,12 @@ describe('PluginCoordinator', () => {
 		expect(coordinator.pendingApply).toBeNull();
 		expect(plugin.status).toBe('active');
 		expect(doc.parts[0].name).toBe('From Plugin');
+		// The replaced Part keeps its id, so the assembly and the active Part still find it.
+		expect(doc.parts[0].id).toBe(originalPart.id);
 		expect(historyStack.numberOfUndos).toBe(1);
+		historyStack.undoOnce();
+		expect(doc.parts[0].name).toBe('Original Part');
+		expect(doc.parts[0].id).toBe(originalPart.id);
 	});
 
 	it.each([
@@ -1435,6 +1440,7 @@ function makePendingApply(pluginId: string, manifest: PluginManifest): PendingAp
 	return {
 		pluginId,
 		docId: 'doc-test',
+		partId: 'part-test',
 		partFingerprint: null,
 		manifest,
 		primaryArtifact: null,

@@ -24,6 +24,7 @@
 	import type { OverlayInstance } from '../View3D/overlayInstance';
 	import { OxDnaReplay } from '../View3D/replay/OxDnaReplay.svelte';
 	import type { ReplayFrameRenderer, VideoSize } from '../View3D/replay/replayVideoExport';
+	import type { SimulationExportRequest } from '$lib/model/io/assemblyNtModel';
 	import type { View3DToolPanelMode } from '../context/EditorViewContext.svelte';
 	import { clearOverlayPlacementCmd, setOverlayPlacementCmd } from '$lib/commands/overlays';
 	import { notify } from '$lib/notifications/notify.svelte';
@@ -98,8 +99,8 @@
 		onCreateReplayFrameRenderer: undefined as
 			((size: VideoSize | null) => ReplayFrameRenderer | null) | undefined,
 		onExportGlb: undefined as (() => void) | undefined,
-		onExportOxDna: undefined as ((opts?: { includeMirrors?: boolean }) => void) | undefined,
-		onExportMrdna: undefined as ((opts?: { includeMirrors?: boolean }) => void) | undefined,
+		onExportOxDna: undefined as ((request?: SimulationExportRequest) => void) | undefined,
+		onExportMrdna: undefined as ((request?: SimulationExportRequest) => void) | undefined,
 		onLoadOverlay,
 		onDuplicateOverlay,
 		onClearOverlay,
@@ -201,8 +202,17 @@
 
 	async function onLoadOverlay(file: File): Promise<void> {
 		const isPdb = /\.pdb$/i.test(file.name);
+		// The overlay belongs to the Part it was opened for; reading the file can outlast a switch.
+		const targetDoc = editorViewContext.currentDoc;
+		const targetPartId = part.id;
 		try {
 			const text = await file.text();
+			if (editorViewContext.currentDoc !== targetDoc || part.id !== targetPartId) {
+				notify.info('Overlay not added', {
+					description: `${file.name} was opened for another Part; open it again here.`,
+				});
+				return;
+			}
 			const data = isPdb ? parsePdbOverlay(text, file.name) : parseMrdnaOverlay(text, file.name);
 			const sourceKey = overlayPlacementKey(data) ?? '';
 
@@ -362,6 +372,34 @@
 				: liveFilteredSegments
 	);
 
+	// Part-scoped 3D state. A locked filter holds this Part's segment objects and mrDNA overlays
+	// were lined up with its frame, so another Part drops both (saved PDB placements follow the
+	// Part on their own). The same Part rebuilt by undo or a snapshot keeps its lock, rebound to
+	// the new segment objects.
+	let scopedPart: Part | null = null;
+	$effect(() => {
+		const current = part;
+		untrack(() => {
+			const previous = scopedPart;
+			scopedPart = current;
+			if (!previous || previous === current) return;
+			if (previous.id !== current.id) {
+				view3DToolbarController.lockSelection = false;
+				lockedSegments = null;
+				const overlays = view3DToolbarController.overlays;
+				const kept = overlays.filter((o) => o.sourceKey !== '');
+				if (kept.length !== overlays.length) view3DToolbarController.overlays = kept;
+				const activeId = view3DToolbarController.activeOverlayId;
+				if (activeId && !kept.some((o) => o.id === activeId)) {
+					view3DToolbarController.activeOverlayId = null;
+				}
+			} else if (lockedSegments) {
+				const rebound = [...lockedSegments].map((s) => current.segmentsLookup.get(s.id));
+				lockedSegments = new SvelteSet(rebound.filter((s): s is OligoSegment => !!s));
+			}
+		});
+	});
+
 	function onToggleLock() {
 		view3DToolbarController.lockSelection = !view3DToolbarController.lockSelection;
 		if (view3DToolbarController.lockSelection) {
@@ -411,10 +449,10 @@
 		((size: VideoSize | null) => ReplayFrameRenderer | null) | undefined
 	>(undefined);
 	let view3DExportGlbFn = $state<(() => void) | undefined>(undefined);
-	let view3DExportOxDnaFn = $state<((opts?: { includeMirrors?: boolean }) => void) | undefined>(
+	let view3DExportOxDnaFn = $state<((request?: SimulationExportRequest) => void) | undefined>(
 		undefined
 	);
-	let view3DExportMrdnaFn = $state<((opts?: { includeMirrors?: boolean }) => void) | undefined>(
+	let view3DExportMrdnaFn = $state<((request?: SimulationExportRequest) => void) | undefined>(
 		undefined
 	);
 	let view3DFrameOverlayFn = $state<((id: string) => void) | undefined>(undefined);
@@ -493,6 +531,9 @@
 	{/if}
 
 	{#if !show3D}
-		<HelixView {part} focusedSegments={liveFocusedSegments} bind:stageRef />
+		<!-- The plane view sets up Part-scoped state on mount. -->
+		{#key part.id}
+			<HelixView {part} focusedSegments={liveFocusedSegments} bind:stageRef />
+		{/key}
 	{/if}
 </div>

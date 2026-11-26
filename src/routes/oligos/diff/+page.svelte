@@ -14,6 +14,8 @@
 	} from '$lib/model/io/oligoReport';
 	import { exportPartSequencesToCSV } from '$lib/model/io/sequenceCSV';
 	import FoldnanoDocument from '$lib/model/document.svelte';
+	import type { Part } from '$lib/model/Part';
+	import { exportBaseName } from '$lib/model/io/designFileName';
 	import {
 		IndexedDbStorageProvider,
 		StorageManager,
@@ -30,7 +32,19 @@
 	let rightDocId = $state('');
 	let leftDoc = $state<FoldnanoDocument | null>(null);
 	let rightDoc = $state<FoldnanoDocument | null>(null);
-	let diff = $state<OligoDiffResult | null>(null);
+	// Each side compares one Part; a design with several Parts gets a picker (first Part by default).
+	let leftPartId = $state<string | null>(null);
+	let rightPartId = $state<string | null>(null);
+	const leftPart = $derived(pickPart(leftDoc, leftPartId));
+	const rightPart = $derived(pickPart(rightDoc, rightPartId));
+	const diff = $derived<OligoDiffResult | null>(
+		leftDoc && rightDoc
+			? diffOligoReportRows(
+					leftPart ? collectPartOligoReportRows(leftPart) : [],
+					rightPart ? collectPartOligoReportRows(rightPart) : []
+				)
+			: null
+	);
 	let loading = $state(true);
 	let error = $state('');
 
@@ -51,7 +65,8 @@
 		error = '';
 		leftDoc = null;
 		rightDoc = null;
-		diff = null;
+		leftPartId = null;
+		rightPartId = null;
 		try {
 			documents = await storageManager.getDocumentList();
 			if (!leftDocId || !rightDocId) return;
@@ -61,16 +76,15 @@
 			]);
 			leftDoc = loadedLeft;
 			rightDoc = loadedRight;
-			const leftRows = loadedLeft.parts[0] ? collectPartOligoReportRows(loadedLeft.parts[0]) : [];
-			const rightRows = loadedRight.parts[0]
-				? collectPartOligoReportRows(loadedRight.parts[0])
-				: [];
-			diff = diffOligoReportRows(leftRows, rightRows);
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to compare documents.';
 		} finally {
 			loading = false;
 		}
+	}
+
+	function pickPart(doc: FoldnanoDocument | null, partId: string | null): Part | null {
+		return doc?.parts.find((p) => p.id === partId) ?? doc?.parts[0] ?? null;
 	}
 
 	async function loadDoc(docId: string): Promise<FoldnanoDocument> {
@@ -90,10 +104,13 @@
 
 	function downloadCsv(which: 'left' | 'right'): void {
 		const doc = which === 'left' ? leftDoc : rightDoc;
-		const part = doc?.parts[0];
-		if (!part) return;
+		const part = which === 'left' ? leftPart : rightPart;
+		if (!doc || !part) return;
 		try {
-			exportPartSequencesToCSV(part, doc.name);
+			exportPartSequencesToCSV(
+				part,
+				doc.parts.length > 1 ? exportBaseName(doc.name, `.${part.name}`) : doc.name
+			);
 		} catch (e) {
 			notify.error('Cannot export oligo CSV', {
 				description: e instanceof Error ? e.message : 'The design cannot be exported.',
@@ -210,7 +227,8 @@
 			</div>
 		{:else if !diff}
 			<div class="border border-border p-10 text-center text-sm text-muted-foreground">
-				Select two saved documents to compare their oligo reports.
+				Select two saved documents to compare their oligo reports. For a design with several Parts,
+				pick the Part to compare on each side.
 			</div>
 		{:else}
 			<section class="grid gap-4">
@@ -218,6 +236,19 @@
 					<div class="border border-border bg-card p-4">
 						<p class="text-xs text-muted-foreground uppercase">Left</p>
 						<h2 class="truncate font-semibold">{leftDoc?.name ?? leftDocId}</h2>
+						{#if leftDoc && leftDoc.parts.length > 1}
+							<label class="mt-2 flex items-center gap-2 text-sm">
+								<span class="text-xs text-muted-foreground">Part</span>
+								<select
+									bind:value={() => leftPart?.id ?? '', (v) => (leftPartId = v || null)}
+									class="h-8 border border-input bg-background px-2 text-sm"
+								>
+									{#each leftDoc.parts as option (option.id)}
+										<option value={option.id}>{option.name}</option>
+									{/each}
+								</select>
+							</label>
+						{/if}
 						<Button class="mt-3" size="sm" variant="outline" onclick={() => downloadCsv('left')}>
 							<Download class="size-4" />
 							Download CSV
@@ -226,6 +257,19 @@
 					<div class="border border-border bg-card p-4">
 						<p class="text-xs text-muted-foreground uppercase">Right</p>
 						<h2 class="truncate font-semibold">{rightDoc?.name ?? rightDocId}</h2>
+						{#if rightDoc && rightDoc.parts.length > 1}
+							<label class="mt-2 flex items-center gap-2 text-sm">
+								<span class="text-xs text-muted-foreground">Part</span>
+								<select
+									bind:value={() => rightPart?.id ?? '', (v) => (rightPartId = v || null)}
+									class="h-8 border border-input bg-background px-2 text-sm"
+								>
+									{#each rightDoc.parts as option (option.id)}
+										<option value={option.id}>{option.name}</option>
+									{/each}
+								</select>
+							</label>
+						{/if}
 						<Button class="mt-3" size="sm" variant="outline" onclick={() => downloadCsv('right')}>
 							<Download class="size-4" />
 							Download CSV

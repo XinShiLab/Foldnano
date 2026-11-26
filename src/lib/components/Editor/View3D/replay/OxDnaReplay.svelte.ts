@@ -1,6 +1,6 @@
 import { SvelteMap } from 'svelte/reactivity';
 import type { Part } from '$lib/model/Part';
-import { computeSimulationFreshnessSignature } from '../view3dSimulationState';
+import { designLayoutSignature } from '../view3dSimulationState';
 import {
 	buildReplayReference,
 	poseFrame,
@@ -113,12 +113,9 @@ export class OxDnaReplay {
 		this._part = part;
 	}
 
-	/** True when the design changed (topology or planes) after the files were loaded. */
+	/** True when the design's layout changed after the files were loaded. */
 	isStale(part: Part): boolean {
-		return (
-			this.designSignature !== null &&
-			this.designSignature !== computeSimulationFreshnessSignature(part)
-		);
+		return this.designSignature !== null && this.designSignature !== designLayoutSignature(part);
 	}
 
 	/** Accepts the `.top` and the trajectory together or one at a time; loads once both are in. */
@@ -150,7 +147,7 @@ export class OxDnaReplay {
 		}
 		this.mapping = mapping;
 		this.reference = buildReplayReference(mapping.nucleotides);
-		this.designSignature = computeSimulationFreshnessSignature(this._part);
+		this.designSignature = designLayoutSignature(this._part);
 		this.status = 'indexing';
 
 		// Vite's worker import form; the URL is never mutated.

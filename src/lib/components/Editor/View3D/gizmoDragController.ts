@@ -10,6 +10,8 @@ import {
 import type { PlaneOverlayResult } from './planeOverlay';
 import { clonePlaneTransform } from './threeUtils';
 import type { OverlayTransform } from './overlayTransform';
+import type FoldnanoDocument from '$lib/model/document.svelte';
+import { transformOccurrenceCmd } from '$lib/commands/assembly';
 
 /**
  * What the gizmo edits. The drag math works in `PlaneTransform` (origin + u/v/normal
@@ -63,34 +65,112 @@ export class OverlayGizmoTarget implements GizmoTarget {
 	) {}
 
 	readTransform(): PlaneTransform {
-		const t = this.getTransform();
-		const q = new THREE.Quaternion(
-			t.quaternion[0],
-			t.quaternion[1],
-			t.quaternion[2],
-			t.quaternion[3]
-		);
-		const u = new THREE.Vector3(1, 0, 0).applyQuaternion(q);
-		const v = new THREE.Vector3(0, 1, 0).applyQuaternion(q);
-		const normal = new THREE.Vector3(0, 0, 1).applyQuaternion(q);
-		return {
-			origin: { ...t.position },
-			u: { x: u.x, y: u.y, z: u.z },
-			v: { x: v.x, y: v.y, z: v.z },
-			normal: { x: normal.x, y: normal.y, z: normal.z },
-		};
+		return poseToPlaneTransform(this.getTransform());
 	}
 
 	writeTransform(t: PlaneTransform): void {
-		const q = quaternionFromPlaneBasis(t.u, t.v, t.normal);
-		this.setTransform({
-			position: { x: t.origin.x, y: t.origin.y, z: t.origin.z },
-			quaternion: [q.x, q.y, q.z, q.w],
-		});
+		this.setTransform(planeTransformToPose(t));
 	}
 
 	commit(): void {
 		this.onCommit?.();
+	}
+}
+
+/** A pose (position + quaternion) as the gizmo's origin + u/v/normal basis. */
+export function poseToPlaneTransform(t: OverlayTransform): PlaneTransform {
+	const q = new THREE.Quaternion(
+		t.quaternion[0],
+		t.quaternion[1],
+		t.quaternion[2],
+		t.quaternion[3]
+	);
+	const u = new THREE.Vector3(1, 0, 0).applyQuaternion(q);
+	const v = new THREE.Vector3(0, 1, 0).applyQuaternion(q);
+	const normal = new THREE.Vector3(0, 0, 1).applyQuaternion(q);
+	return {
+		origin: { ...t.position },
+		u: { x: u.x, y: u.y, z: u.z },
+		v: { x: v.x, y: v.y, z: v.z },
+		normal: { x: normal.x, y: normal.y, z: normal.z },
+	};
+}
+
+export function planeTransformToPose(t: PlaneTransform): OverlayTransform {
+	const q = quaternionFromPlaneBasis(t.u, t.v, t.normal);
+	return {
+		position: { x: t.origin.x, y: t.origin.y, z: t.origin.z },
+		quaternion: [q.x, q.y, q.z, q.w],
+	};
+}
+
+/** `t` (in a frame) mapped by `m` (frame → world, rigid). */
+export function mapPlaneTransform(t: PlaneTransform, m: THREE.Matrix4): PlaneTransform {
+	const origin = new THREE.Vector3(t.origin.x, t.origin.y, t.origin.z).applyMatrix4(m);
+	const dir = (d: { x: number; y: number; z: number }) => {
+		const out = new THREE.Vector3(d.x, d.y, d.z).transformDirection(m);
+		return { x: out.x, y: out.y, z: out.z };
+	};
+	return {
+		origin: { x: origin.x, y: origin.y, z: origin.z },
+		u: dir(t.u),
+		v: dir(t.v),
+		normal: dir(t.normal),
+	};
+}
+
+/**
+ * A target that lives in the active Part's frame, seen by the gizmo in world space. The 3D view
+ * draws the active Part at its instance's transform, so planes and overlays (stored in Part space)
+ * go through this; `frame()` maps Part space to world.
+ */
+export class FramedGizmoTarget implements GizmoTarget {
+	constructor(
+		private inner: GizmoTarget,
+		private frame: () => THREE.Matrix4
+	) {}
+
+	readTransform(): PlaneTransform | null {
+		const t = this.inner.readTransform();
+		return t ? mapPlaneTransform(t, this.frame()) : null;
+	}
+
+	writeTransform(t: PlaneTransform): void {
+		this.inner.writeTransform(mapPlaneTransform(t, this.frame().clone().invert()));
+	}
+
+	commit(start: PlaneTransform, end: PlaneTransform): void {
+		const toPart = this.frame().clone().invert();
+		this.inner.commit(mapPlaneTransform(start, toPart), mapPlaneTransform(end, toPart));
+	}
+}
+
+/** One placement of a Part in the assembly; moves live, one undoable step on release. */
+export class OccurrenceGizmoTarget implements GizmoTarget {
+	constructor(
+		private doc: FoldnanoDocument,
+		private occurrenceId: string,
+		private historyStack: HistoryStack
+	) {}
+
+	readTransform(): PlaneTransform | null {
+		const occurrence = this.doc.assembly.getById(this.occurrenceId);
+		return occurrence ? poseToPlaneTransform(occurrence.transform) : null;
+	}
+
+	writeTransform(t: PlaneTransform): void {
+		const occurrence = this.doc.assembly.getById(this.occurrenceId);
+		if (occurrence) occurrence.transform = planeTransformToPose(t);
+	}
+
+	commit(start: PlaneTransform, end: PlaneTransform): void {
+		transformOccurrenceCmd(
+			this.historyStack,
+			this.doc,
+			this.occurrenceId,
+			planeTransformToPose(start),
+			planeTransformToPose(end)
+		);
 	}
 }
 
@@ -259,17 +339,26 @@ export class GizmoDragController {
 		this.releasePointer();
 	}
 
-	/** Commit the drag by recording a history command (if the target persists). */
+	/**
+	 * Commit the drag by recording a history command (if the target persists). A rejected commit
+	 * puts the target back where the drag started; the camera and pointer are released either way.
+	 */
 	commit(): void {
 		const ds = this.dragState;
 		if (!ds) return;
-		const end = ds.target.readTransform();
-		if (end) ds.target.commit(ds.startTransform, end);
-		this.gizmo.setActive(null);
-		this.setControlsEnabled(true);
 		this.dragState = null;
-		this.syncPose(ds.target);
-		this.releasePointer();
+		try {
+			const end = ds.target.readTransform();
+			if (end) ds.target.commit(ds.startTransform, end);
+		} catch (error) {
+			ds.target.writeTransform(ds.startTransform);
+			throw error;
+		} finally {
+			this.gizmo.setActive(null);
+			this.setControlsEnabled(true);
+			this.syncPose(ds.target);
+			this.releasePointer();
+		}
 	}
 
 	private raycastMeshes(

@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { APP_COMMIT, APP_VERSION } from '$lib/appInfo';
 import { Part } from './Part';
+import { Assembly, type AssemblyJSON } from './Assembly';
 import {
 	CURRENT_FORMAT_VERSION,
 	FOLDNANO_FORMAT,
@@ -12,6 +13,7 @@ export interface DocSnapshot extends DocumentFormatHeader {
 	id: string;
 	name: string;
 	parts: ReturnType<Part['toJSON']>[];
+	assembly: AssemblyJSON;
 }
 
 export type PartType = 'HONEYCOMB' | 'SQUARE' | 'FREEFORM' | 'WIREFRAME';
@@ -44,7 +46,9 @@ export default class FoldnanoDocument {
 	readonly id: string;
 
 	name: string = $state('Untitled Document');
+	/** Part definitions. Where (and how often) each is placed lives in `assembly`. */
 	parts = $state<Part[]>([]);
+	assembly: Assembly = $state(new Assembly());
 
 	constructor(id?: string, name?: string) {
 		this.id = id || uuidv4();
@@ -61,6 +65,7 @@ export default class FoldnanoDocument {
 			id: this.id,
 			name: this.name,
 			parts: this.parts.map((part) => part.toJSON()),
+			assembly: this.assembly.toJSON(),
 		};
 	}
 
@@ -78,19 +83,47 @@ export default class FoldnanoDocument {
 		for (const partJson of json.parts) {
 			doc.parts.push(Part.fromJSON(partJson));
 		}
+		doc.assembly = Assembly.fromJSON(json.assembly);
 		return doc;
 	}
 
 	restore(snapshot: DocSnapshot) {
 		const restored = FoldnanoDocument.fromJSON(snapshot);
 		this.parts = restored.parts;
+		this.assembly = restored.assembly;
+	}
+
+	/** Replaces the Part with id `partId` by one rebuilt from `json`, in the same slot. The other
+	 * Part objects are kept, so their views don't reset (unlike `restore`). */
+	replacePartFromJSON(partId: string, json: ReturnType<Part['toJSON']>): Part {
+		const index = this.parts.findIndex((part) => part.id === partId);
+		if (index < 0) throw new Error(`Cannot replace Part ${partId}: not in the document`);
+		const part = Part.fromJSON(json);
+		this.parts[index] = part;
+		return part;
 	}
 
 	addNewPart(type: PartType): Part {
 		const KNOWN_TYPES: PartType[] = ['HONEYCOMB', 'SQUARE', 'FREEFORM', 'WIREFRAME'];
 		if (!KNOWN_TYPES.includes(type)) throw new Error(`Part type "${type}" not implemented`);
-		const part = Part.forType(type, `Part ${this.parts.length + 1}`);
+		return this.addPart(Part.forType(type, `Part ${this.parts.length + 1}`));
+	}
+
+	/** Adds a Part definition and places it once, at the origin. */
+	addPart(part: Part): Part {
+		if (this.parts.some((p) => p.id === part.id)) {
+			throw new Error(`Part ${part.id} is already in the document`);
+		}
 		this.parts.push(part);
+		this.assembly.add(part.id, this.assembly.nextOccurrenceName(part.name));
 		return part;
+	}
+
+	/** Removes a Part definition and every occurrence of it. */
+	removePart(partId: string): void {
+		const index = this.parts.findIndex((part) => part.id === partId);
+		if (index < 0) return;
+		this.parts.splice(index, 1);
+		this.assembly.removeAllOf(partId);
 	}
 }

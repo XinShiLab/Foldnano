@@ -123,7 +123,7 @@ src/
 
 ## Cross-cutting Boundaries
 
-- **Mutations live in `commands/`.** UI/tool code never edits model fields directly. Wrap every mutation in `historyStack.tx(label, rec => ...)` (targeted patches) or `historyStack.snapshotTx(label, () => ...)` (full doc snapshot, structural edits).
+- **Mutations live in `commands/`.** UI/tool code never edits model fields directly. Wrap every mutation in `historyStack.tx(label, rec => ...)` (targeted patches) `historyStack.partSnapshotTx(label, part, () => ...)` (one Part's snapshot, structural edits) or `historyStack.snapshotTx(label, () => ...)` (full doc snapshot, only when Parts are added or removed).
 - **`Part` is the only mutation owner inside the model.** Don't poke at `VirtualHelix._length`, `OligoSegment.slots`, `StrandSet.segmentIds`, etc. — go through `part.*` methods.
 - **Reactive collections must be `SvelteSet`/`SvelteMap`.** Plain `Set`/`Map` are fine only for non-reactive internal caches.
 - **All GitHub API calls go through `/api/github/*`.** The browser never sees the OAuth token; never call `api.github.com` directly from client code.

@@ -4,7 +4,8 @@
  * Standard StorageProvider operations delegate to IndexedDB (working copy).
  * Additional methods: commitDocument(), pullDocument() for GitHub sync.
  */
-import type { DocSnapshot } from '$lib/model/document.svelte';
+import FoldnanoDocument, { type DocSnapshot } from '$lib/model/document.svelte';
+import { repairDocumentJson } from '$lib/model/documentRepair';
 import { migrateDocumentJson, stringifyDesignFile } from '$lib/model/documentFormat';
 import { designNameFromPath } from '$lib/model/io/designFileName';
 import { withoutExportStamp } from '$lib/model/exportStamp';
@@ -274,8 +275,10 @@ export class GitHubStorageProvider implements StorageProvider {
 
 		const file = await getFileContent(meta.owner, meta.repo, meta.path, meta.branch);
 		const content = atob(file.content.replace(/\s/g, ''));
-		// Validate before overwriting the working copy, so a file from a newer app is refused intact.
+		// Validate before overwriting the working copy, so a file from a newer app, or one that
+		// wouldn't open, is refused and the working copy stays intact.
 		const snapshot = migrateDocumentJson(JSON.parse(content));
+		FoldnanoDocument.fromJSON(repairDocumentJson(snapshot).snapshot);
 
 		// Stored under the local id even if GitHub's copy has a new one: a record's key and the id
 		// inside it must agree, or the design reopens without its GitHub link. The caller decides

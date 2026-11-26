@@ -56,9 +56,11 @@ Inside `Editor.svelte`:
 ## Oligo Report Routes
 
 `/oligos/[docId]` loads the saved document snapshot from IndexedDB and renders an
-oligo table for `document.parts[0]`. This mirrors the editor's current one-part
-working assumption; multi-part selection will be added with the broader editor
-multi-part workflow.
+oligo table for one Part: the first, or the one picked in the Part selector shown
+when the design has several. The all-Parts CSV download shows whenever
+`documentNeedsQuantities` (several Parts, or one placed more than once). The diff
+page (`/oligos/diff`) compares one Part per side: the first, or the one picked in
+that side's Part selector.
 
 Circular oligos are shown for inspection with `Circular` endpoint labels and
 segment positions, but the `Download CSV` action still uses the strict sequence

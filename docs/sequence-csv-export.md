@@ -22,7 +22,18 @@ The oligo report (`oligoReport.ts`) carries the same `name` column, so the diff 
 reports a rename as a `name` change.
 
 The CSV file is named after the document (`exportPartSequencesToCSV(part, docName)` →
-`exportBaseName`), not the Part; see `dna-model.md` § Names.
+`exportBaseName`), not the Part; see `dna-model.md` § Names. In a design with several
+Parts, a one-Part CSV is named `<doc>.<part>`.
+
+**Several Parts or placements.** `documentSequencesCSV(doc)` (toolbar **Export Oligos of
+all Parts as CSV, with quantities**, report page **All Parts CSV, with quantities**) keeps
+the plain format for a single Part placed once, and otherwise (`documentNeedsQuantities`:
+several Parts, or one Part placed more than once) prepends `Part,Quantity`
+(`assemblySequencesToCSV`): each Part's rows, with `Quantity` the number of instances the
+design places. Both formats go through one row serializer, so a quoted field with a line
+break stays one record. Hidden instances count, since this
+is an order list for what gets built, unlike the simulation exports, which follow the 3D
+view.
 
 The exporter is intentionally an endpoint-oriented format. Every exported oligo
 must have a concrete free 5' end and free 3' end. Circular DNA is rejected before
@@ -34,8 +45,8 @@ for inspection with `Circular` endpoint labels and segment positions. Its
 `Download CSV` action still uses this strict exporter, so circular oligos are
 rejected there the same way they are rejected from the editor toolbar.
 
-The report page currently reads `document.parts[0]`, matching the editor's
-current one-part working assumption.
+The report page shows one Part at a time, with a Part picker when the design has
+several.
 
 `collectPartOligoSequences` iterates `part.realOligos` (mirror oligos — repeat-unit copies, see
 `docs/repeat-units.md` — excluded), not `part.oligos`, so repeat mirrors never appear as CSV rows.

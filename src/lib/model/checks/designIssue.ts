@@ -1,6 +1,7 @@
 import type { IntegrityRule } from './integrity';
 import type { SimulationRule } from './simulation';
 import type { CadnanoRule } from './cadnano';
+import type { LinkRule } from './links';
 
 export type DesignIssueSeverity = 'error' | 'warning' | 'info';
 
@@ -18,7 +19,7 @@ export const SHAPE_RULES = [
 ] as const;
 export type ShapeRule = (typeof SHAPE_RULES)[number];
 
-export type DesignRule = ShapeRule | IntegrityRule | SimulationRule | CadnanoRule;
+export type DesignRule = ShapeRule | IntegrityRule | SimulationRule | CadnanoRule | LinkRule;
 
 /** Where an issue sits. Raw-JSON checks only know `vhIndex`; model checks also fill the ids. */
 export interface DesignIssueAnchor {

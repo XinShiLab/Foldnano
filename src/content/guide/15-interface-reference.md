@@ -31,7 +31,7 @@ Hover over any icon button in the app to see its name in a tooltip, and press `?
 
 ## Start Screen
 
-A new, empty document shows **Start a new design** with **Honeycomb**, **Square** and **Freeform** buttons. Each opens the **New Region** panel for that type, where you choose its base plane (see [Adding a region](#adding-a-region)). The **Wireframe** card, marked **Experimental**, starts a [wireframe region](/docs/guide/wireframe), and hovering it links to the current status of wireframe support.
+A new, empty document shows **Start a new design** with **Honeycomb**, **Square** and **Freeform** buttons. Each opens the **New Region** panel for that type, where you choose its base plane (see [Adding a region](#adding-a-region)). The **Wireframe** card, marked **Experimental**, starts a [wireframe region](/docs/guide/wireframe), and hovering it links to the current status of wireframe support. The **Assembly** card below them starts a design with no Part of its own: it opens **Insert Part from…** to link designs saved in this browser (see [Assemblies And Parts](/docs/guide/assemblies#starting-an-assembly)).
 
 Below it, **or load an existing design** lists the files you can drop anywhere on the start screen or pick with **Open file…**:
 
@@ -80,6 +80,7 @@ On narrower screens (such as an iPad), the toolbar buttons show only their icons
 | `Export as cadnano JSON — [region]` | Downloads the active lattice region as cadnano JSON (shown only for lattice regions), after listing anything cadnano can't hold. See [Exporting cadnano JSON](/docs/guide/simulation-export#exporting-cadnano-json) |
 | **Download as Foldnano JSON** | Downloads the full design as `.fn.json`, marked with the download time and a fingerprint of its content so that opening it again can compare it with your browser copy (see [Saving and GitHub](/docs/guide/saving-github)) |
 | **Export Oligos of this Part as CSV** | Downloads the oligo/sequence CSV |
+| **Export Oligos of all Parts as CSV, with quantities** | Shown when the design has several Parts or places one more than once: every Part's oligos with `Part` and `Quantity` columns (see [Assemblies And Parts](/docs/guide/assemblies#exporting-an-assembly)) |
 | **Other Save Options** | Placeholder, currently disabled |
 
 ### Save status
@@ -131,9 +132,14 @@ The narrow column on the far left opens side panels:
 | --- | --- |
 | Pull-request arrow | **Source Control** (GitHub files, changes, and history; see [Saving And GitHub](/docs/guide/saving-github)) |
 | Blocks | **Plugins** (see [Plugins For Users](/docs/guide/plugins-for-users)) |
+| Stacked boxes | **Assembly**: the Parts in the design and their instances (see [Several Parts](#several-parts)) |
 | Plugin icons | Panels added by enabled plugins, such as [Script Lab](/docs/guide/script-lab) |
 
 Click an active icon again to close its panel.
+
+### Several Parts
+
+A design can hold several **Parts**, each designed and folded on its own. The **Assembly** panel lists them with their instances (placements in 3D): click a Part to edit it, add a Part with **New Part**, or insert a read-only Part linked from another design with **New Part** › **Insert Part from…**. With more than one Part, a bar above the strand view shows the design, the active Part and the active region; click the Part name to switch Parts. See [Assemblies And Parts](/docs/guide/assemblies) for the whole story: instances, placing them in 3D, linked Parts and exports.
 
 ## Viewer Toolbar
 

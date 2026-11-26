@@ -74,10 +74,10 @@
 	const selectedModifications = $derived(
 		countModifications(strandCtx.selected.ends).map((m) => ({
 			...m,
-			color: getModificationColor(m.name, ctx.currentDoc?.parts[0]?.customModifications ?? []),
+			color: getModificationColor(m.name, ctx.activePart?.customModifications ?? []),
 		}))
 	);
-	const isReadOnly = $derived(!ctx.isTabOwner);
+	const isReadOnly = $derived(!ctx.canEditActivePart);
 	const MAX_SWATCHES = 12;
 
 	const at = (end: SegmentEnd | null | undefined) =>

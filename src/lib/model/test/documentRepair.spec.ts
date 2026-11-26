@@ -5,6 +5,7 @@ import { findDerivedStateMismatch } from '$lib/commands/historyVerification';
 import { createTestHistory } from '$lib/commands/test/undoRoundTrip';
 import { deleteLatticeVirtualHelicesCmd } from '$lib/commands/virtualHelix';
 import { addLatticeVh } from './testHelpers';
+import { checkDocumentIntegrity } from '$lib/model/checks/integrity';
 
 /** VH0 holds oligo A (6..21) and B (23..32); VH1 holds C (14..27); VH2 is empty. */
 function scene() {
@@ -157,5 +158,53 @@ describe('repairDocumentJson', () => {
 
 		const { repaired } = repairAndLoad(snapshot);
 		expect(partOf(repaired).oligos[0].segments[0].threePrime.connectedSegmentId).toBeNull();
+	});
+});
+
+describe('repairDocumentJson: assembly', () => {
+	const occurrenceIds = (snapshot: DocSnapshot) => snapshot.assembly.occurrences.map((o) => o.id);
+
+	it('places the Part a broken instance left unplaced, and keeps the broken instance', () => {
+		const snapshot = scene();
+		const partId = partOf(snapshot).id;
+		const brokenId = snapshot.assembly.occurrences[0].id;
+		snapshot.assembly.occurrences[0].partId = 'no-such-part';
+
+		const { snapshot: repaired, repairs } = repairDocumentJson(snapshot);
+		const doc = FoldnanoDocument.fromJSON(repaired);
+
+		expect(repairs).toEqual(['Placed 1 Part(s) that had no instance at the origin']);
+		expect(repaired.assembly.occurrences.map((o) => [o.partId, o.name])).toEqual([
+			['no-such-part', 'Part 1 1'],
+			[partId, 'Part 1 2'],
+		]);
+		expect(doc.assembly.getById(brokenId)?.partId).toBe('no-such-part');
+		expect(repairDocumentJson(repaired).repairs).toEqual([]);
+		expect(checkDocumentIntegrity(doc).map((issue) => issue.rule)).toEqual(['occurrence-part']);
+	});
+
+	it('leaves a Part that still has a good instance alone', () => {
+		const snapshot = scene();
+		snapshot.assembly.occurrences.push({
+			...snapshot.assembly.occurrences[0],
+			id: 'broken',
+			partId: 'gone',
+		});
+
+		expect(repairDocumentJson(snapshot).repairs).toEqual([]);
+	});
+
+	it('gives instances sharing an id distinct ids', () => {
+		const snapshot = scene();
+		snapshot.assembly.occurrences.push({ ...snapshot.assembly.occurrences[0], name: 'Twin' });
+
+		const { repaired } = repairAndLoad(snapshot);
+
+		expect(new Set(occurrenceIds(repaired)).size).toBe(2);
+	});
+
+	it('leaves a consistent assembly as the same object', () => {
+		const snapshot = scene();
+		expect(repairDocumentJson(snapshot).snapshot).toBe(snapshot);
 	});
 });

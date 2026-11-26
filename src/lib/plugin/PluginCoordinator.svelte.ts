@@ -47,6 +47,8 @@ type PartSnapshot = { oligos: unknown[] } & Record<string, unknown>;
 export type PendingApply = {
 	pluginId: string;
 	docId: string;
+	/** The Part the plugin ran on (the active Part at run time); Apply writes back to it. */
+	partId: string;
 	partFingerprint: string | null;
 	manifest: PluginManifest;
 	/** Present for replacePart* / replaceRegion* strategies; null for replayMutationLog* */
@@ -122,6 +124,7 @@ export class PluginCoordinator {
 	private getDoc: (() => FoldnanoDocument) | undefined;
 	private getHistory: (() => HistoryStack) | undefined;
 	private getActiveRegion: (() => DesignRegion | null) | undefined;
+	private getActivePart: (() => Part | null) | undefined;
 	/** False while another tab owns the document; see setEditGate. */
 	private canEditDoc: () => boolean = () => true;
 	/** Asks whether to run a cadnano_json plugin on input the export can't write faithfully. */
@@ -204,6 +207,18 @@ export class PluginCoordinator {
 	 */
 	setCadnanoInputReviewer(review: CadnanoInputReviewer): void {
 		this.reviewCadnanoInput = review;
+	}
+
+	/** Which Part a run reads and its result is applied to; without one, the first Part. */
+	setActivePartGetter(getActivePart: () => Part | null): void {
+		this.getActivePart = getActivePart;
+	}
+
+	#activePart(doc: FoldnanoDocument): Part | null {
+		const active = this.getActivePart?.();
+		if (active && doc.parts.includes(active)) return active;
+		// eslint-disable-next-line no-restricted-syntax -- documented fallback when no editor is attached
+		return doc.parts[0] ?? null;
 	}
 
 	setEditGate(canEdit: () => boolean): void {
@@ -771,7 +786,7 @@ export class PluginCoordinator {
 		// first region is created, and throwing after status = 'running' would
 		// strand the plugin in that state with nothing visible to the user.
 		const doc = this.getDoc?.();
-		const part = doc && doc.parts.length > 0 ? doc.parts[0] : null;
+		const part = doc ? this.#activePart(doc) : null;
 		if (!part) {
 			throw new Error(
 				`"${plugin.manifest.name}" requires an open design. Create or open a design first.`
@@ -909,6 +924,7 @@ export class PluginCoordinator {
 						this.pendingApply = {
 							pluginId: pluginId,
 							docId: doc.id,
+							partId: part.id,
 							partFingerprint: snapshot ? JSON.stringify(snapshot) : null,
 							manifest: plugin.manifest,
 							primaryArtifact: null,
@@ -962,6 +978,7 @@ export class PluginCoordinator {
 					this.pendingApply = {
 						pluginId: pluginId,
 						docId: doc.id,
+						partId: part.id,
 						partFingerprint: snapshot ? JSON.stringify(snapshot) : null,
 						manifest: plugin.manifest,
 						primaryArtifact: validatedArtifact,
@@ -1055,7 +1072,8 @@ export class PluginCoordinator {
 			this.#clearPending('failed');
 			return 'failed';
 		}
-		const mismatchesBefore = doc.parts[0]?.countMismatchedBasePairs() ?? 0;
+		const partIndex = doc.parts.findIndex((p) => p.id === pending.partId);
+		const mismatchesBefore = doc.parts[partIndex]?.countMismatchedBasePairs() ?? 0;
 		try {
 			applyResult({
 				manifest,
@@ -1065,7 +1083,7 @@ export class PluginCoordinator {
 					typeof applyResult
 				>[0]['preRunFoldnanoSnapshot'],
 				doc,
-				partIndex: 0,
+				partIndex,
 				historyStack,
 				activeRegionId,
 			});
@@ -1089,14 +1107,17 @@ export class PluginCoordinator {
 		warnNewMismatches(
 			manifest.name,
 			mismatchesBefore,
-			doc.parts[0]?.countMismatchedBasePairs() ?? 0
+			// Re-read: a replace strategy swaps the Part object at this index.
+			doc.parts[partIndex]?.countMismatchedBasePairs() ?? 0
 		);
 		return 'applied';
 	}
 
 	#isStale(pending: PendingApply, doc: FoldnanoDocument): boolean {
-		const currentFingerprint = doc.parts.length > 0 ? JSON.stringify(doc.parts[0].toJSON()) : null;
-		return doc.id !== pending.docId || currentFingerprint !== pending.partFingerprint;
+		if (doc.id !== pending.docId) return true;
+		const part = doc.parts.find((p) => p.id === pending.partId);
+		if (!part) return true;
+		return JSON.stringify(part.toJSON()) !== pending.partFingerprint;
 	}
 
 	/**
@@ -1111,6 +1132,7 @@ export class PluginCoordinator {
 		const doc = this.getDoc?.();
 		if (!doc || this.#isStale(pending, doc)) return 'stale';
 		const scratch = FoldnanoDocument.fromJSON(doc.snapshot());
+		const partIndex = scratch.parts.findIndex((p) => p.id === pending.partId);
 		const history = new HistoryStack(scratch, new StorageManager('memory'));
 		history.setAutoSaveConfig({ enabled: false });
 		try {
@@ -1122,14 +1144,14 @@ export class PluginCoordinator {
 					typeof applyResult
 				>[0]['preRunFoldnanoSnapshot'],
 				doc: scratch,
-				partIndex: 0,
+				partIndex,
 				historyStack: history,
 				activeRegionId: pending.activeRegionId,
 			});
 		} finally {
 			history.destroy();
 		}
-		return scratch.parts[0];
+		return scratch.parts[partIndex];
 	}
 
 	/**

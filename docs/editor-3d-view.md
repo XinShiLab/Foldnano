@@ -302,7 +302,13 @@ Live drag behavior:
 3. the plane overlay and scene update live
 4. pointer-up records one `transformPlaneCmd(...)`
 
-So plane motion is previewed live but committed as one undoable edit.
+So plane motion is previewed live but committed as one undoable edit. A read-only
+(linked) Part gets no plane gizmo at all (`makePlaneTarget` and the gizmo
+visibility check `canEditActivePart`), since the drag writes live. If a commit
+throws anyway, `GizmoDragController.commit` puts the target back where the drag
+started and still re-enables the camera and releases the pointer; `View3D`
+reports the error as a toast. An overlay on a linked Part still moves, but its
+placement isn't saved.
 
 ---
 
@@ -361,6 +367,83 @@ it as null and the mesh would reopen damaged. The overlay previews `scaledMeshDr
 in place of any mesh it would replace, and the camera frames the preview because a file's size is unknown
 in advance. Hidden meshes are `hiddenReferenceMeshRegionIds`: view state, not saved and not undoable.
 
+## Assembly
+
+A document can place several Parts (`docs/dna-model.md` § Assembly). The view
+still builds and edits only the active Part (`part` prop), but draws it inside
+`partFrame`, a group posed at its edited instance
+(`editorViewContext.activeOccurrence`). Everything stored in Part space goes
+under that group: the design, hover glow, cursor, coordinate axis, plane
+overlay and axes, plane selector, reference meshes, external overlays and the
+replay. So Part-space code needs no change; the few places that mix with world
+space go through `partFrameMatrix()`:
+
+- line picking and box select project Part-space pick points with
+  `updateViewProjection` (which includes the frame); the replay pick moves the
+  ray into Part space;
+- gizmo targets for planes and overlays are wrapped in `FramedGizmoTarget`
+  (`gizmoDragController.ts`), which shows a Part-space pose in world space and
+  writes back in Part space;
+- camera framing helpers transform the plane normal, overlay bounds and the
+  build's `center`.
+
+The transform gizmo, ViewCube and camera stay in world space.
+
+`assemblyRoot` holds lab-space copies (`assemblyScene.ts` `instanceCopy`, which
+shares geometry and materials and drops VH labels):
+
+- the active Part's other visible instances: clones of `currentGroup`, re-made
+  after each rebuild (`sceneVersion`), so edits and selection dimming show on
+  every instance;
+- every other Part: one `PartGhost.svelte` per Part builds it once with
+  `buildScene(part)` in its own effect (so it rebuilds only when that Part
+  changes), makes its own materials see-through (`ghostifyGroup`), and places a
+  copy per visible instance. Instances whose Part is missing are never drawn.
+
+Double-clicking a helix cylinder (`CYLINDERS_NAME`) calls `editOccurrence` for
+the instance it belongs to: the nearest shown cylinder of `currentGroup` and
+`assemblyRoot` wins (`traverseVisible`), so a click on the edited instance in
+front keeps it. **Fit** (`resetCameraFn`) and the view cube frame
+`designBounds()`: the visible geometry of `currentGroup` and `assemblyRoot`
+(`traverseVisible`, so hidden instances don't count), center and distance from
+the same box, with the distance from `fitDistance` (`cameraViews.ts`), which fits
+the pane's width as well as its height. Hiding the edited instance hides `currentGroup` and turns off
+3D picking (`activeDesignVisible` gates both). Switching Parts does **not**
+remount the view (only `HelixViewer`'s plane view is keyed by Part): the `part`
+prop changes, the camera stays, and the old Part's gizmo drag is cancelled and its
+simulation run abandoned (`RbsSimulation.cancel`, so a result already on its way
+is dropped). `HelixViewer` drops the locked selection filter and the session-only
+mrDNA overlays when the Part id changes, and rebinds the lock to the new segment
+objects when history rebuilds the same Part.
+Only a new document (another `doc.id`) refits the camera. Remounting it per Part
+left the view blank after a switch.
+
+Moving an instance: `movingOccurrenceId` takes the gizmo (after an active
+external overlay, before a selected plane) with `OccurrenceGizmoTarget`, which
+writes `occurrence.transform` live and commits one `transformOccurrenceCmd` on
+release. A bar at the top of the view switches translate/rotate, resets the
+placement and ends the move (`Esc` too). Moving the edited instance moves
+`partFrame`, so planes, cursor and gizmo follow.
+
+RBS runs on the active Part only, in Part space; other Parts never take part,
+so it doesn't see them bump into each other. Its result is per Part: switching
+away keeps it in `keptRelaxations` (`PartRelaxation`, with whether it was shown)
+and switching back restores it into the live sim state, while a run still going
+is cancelled. Another document clears them all. A kept result draws its Part's
+ghost relaxed (`keptRelaxedPoses`, only while it was shown and its freshness
+signature still matches, since no stale warning is on screen for it). The active
+Part's other instances copy `currentGroup`, so they show its relaxed layout.
+Replay, GLB export and the NT model cover only the active Part. oxDNA
+and mrDNA export follow one `SimulationExportScope` (`assemblyNtModel.ts`):
+`'assembly'` (every visible instance) or `'activePart'`. The Export menu offers
+**All visible instances** when `offersAssemblyExport` (more than one instance, or
+a moved or hidden one, so hiding instances never takes the choice away and a
+hidden single instance is never exported as the active Part);
+the mirror checkbox and the export guard read `simulationExportParts` for the
+chosen scope, and an assembly with nothing visible disables both exports. The
+menu sends a `SimulationExportRequest`; `View3D` builds and names the file from
+its scope (`docs/oxdna-export.md`).
+
 ## Hiding regions
 
 `View3DPanel` lists the part's regions with an eye toggle backed by `hidden3DRegionIds` on `EditorViewContext`: view
@@ -391,8 +474,17 @@ Important state:
 - `isSimStale`
 - `simDiagnostics`
 
-`isSimStale` tracks whether the topology changed since the last successful
+`isSimStale` tracks whether the design changed since the last successful
 simulation, so the toolbar can warn when the relaxed view is no longer current.
+It compares `computeSimulationFreshnessSignature`, the `solverInputSignature` of
+what `buildBlocksAndConstraints` would hand the solver now (block spans, rest
+centers and capsules; constraint blocks, attach points and rest lengths), with the
+signature `RbsSimulation` took of its own input when the run **started**, so an
+edit made during a run leaves its result stale. Deriving it from the solver input
+rather than a list of design fields catches every change the solver sees
+(welding a crossover, a twist offset, a helix move with every id kept). Building
+that input costs about as much as a small rebuild, so the effect computes it only
+while there is a result (`hasRelaxedPositions`).
 
 ---
 
@@ -466,6 +558,9 @@ change.
 ---
 
 ## Boundaries / Don'ts
+
+- **Don't add Part-space objects to `scene`.** Put them under `partFrame`, and convert world-space points, rays and poses with `partFrameMatrix()`, or they drift off as soon as the edited instance is moved.
+- **Don't change materials of `currentGroup` for instance copies.** Copies share them; only a `PartGhost` owns (and ghosts) its own build.
 
 - **Don't write a reference mesh outside history.** The overlay learns of changes from `historyStack.revision`.
 - **Don't apply a mesh draft's scale twice.** `scaledMeshDraft` is what gets stored; a stored mesh is already in nm and has no scale.

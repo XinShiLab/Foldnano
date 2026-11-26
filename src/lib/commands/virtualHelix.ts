@@ -65,7 +65,7 @@ export const addNewVirtualHelixCmd = (
 	},
 	history: HistoryStack
 ) => {
-	history.snapshotTx('Add virtual helix', () => {
+	history.partSnapshotTx('Add virtual helix', para.part, () => {
 		const { part, region, col, row } = para;
 		region.addVhAtCoords(part, col, row);
 	});
@@ -81,7 +81,7 @@ export const addFreeformVirtualHelixCmd = (
 	},
 	history: HistoryStack
 ) => {
-	history.snapshotTx('Add virtual helix', () => {
+	history.partSnapshotTx('Add virtual helix', para.part, () => {
 		const { part, x, y, z = 0, regionId } = para;
 		const region = regionId ? part.getRegionById(regionId) : part.getDefaultRegion();
 		if (!(region instanceof FreeformRegion)) {
@@ -99,7 +99,7 @@ export const fillFreeformVirtualHelixCmd = (
 	},
 	history: HistoryStack
 ) => {
-	history.snapshotTx('Fill virtual helix', () => {
+	history.partSnapshotTx('Fill virtual helix', para.part, () => {
 		const { part, vh, fillLengthBp = vh.length } = para;
 		fillBothStrandSets(part, vh, fillLengthBp);
 	});
@@ -115,7 +115,7 @@ export const addInPlaneFreeformVirtualHelixCmd = (
 	history: HistoryStack
 ): VirtualHelix | null => {
 	let created: VirtualHelix | null = null;
-	history.snapshotTx('Add in-plane virtual helix', () => {
+	history.partSnapshotTx('Add in-plane virtual helix', para.part, () => {
 		const { part, start, end, regionId } = para;
 		const dx = end.x - start.x;
 		const dy = end.y - start.y;
@@ -240,7 +240,7 @@ export const deleteLatticeVirtualHelicesCmd = (
 	});
 	if (vhIndices.length === 0) return;
 
-	history.snapshotTx('Delete virtual helices', () => {
+	history.partSnapshotTx('Delete virtual helices', part, () => {
 		part.removeVirtualHelicesByIndex(vhIndices);
 	});
 };

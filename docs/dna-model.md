@@ -1,6 +1,8 @@
 ---
 covers:
   - src/lib/model/Part/**
+  - src/lib/model/Assembly/**
+  - src/lib/components/Editor/Assembly/**
   - src/lib/model/Oligo/**
   - src/lib/model/VirtualHelix/**
   - src/lib/model/document.svelte.ts
@@ -23,7 +25,9 @@ owner of DNA topology and mutations.
 
 ```text
 FoldnanoDocument
-└── Part[]
+├── Assembly
+│   └── Occurrence[]   (partId + transform: where each Part is placed, possibly several times)
+└── Part[]             (definitions)
     ├── Plane[]
     ├── DesignRegion[]
     ├── VirtualHelix[]
@@ -58,7 +62,8 @@ Key fields:
 
 - `id`
 - `name`
-- `parts: Part[]`
+- `parts: Part[]`: Part definitions
+- `assembly: Assembly`: where they are placed (§ Assembly)
 
 Saved JSON (`DocSnapshot`) also carries a format header: `format: 'foldnano'`,
 `formatVersion`, and `savedWith: { app, commit }`. See "Serialization And Migration".
@@ -80,8 +85,50 @@ Key methods:
 - `restore(snapshot)`
 - `addNewPart('HONEYCOMB' | 'SQUARE' | 'FREEFORM')`
 
-The model supports multiple parts, although most editor flows still operate on
-the first active part.
+The model supports multiple parts. The editor works on one of them at a time:
+`EditorViewContext.activePart`, picked by `activePartId` and falling back to the
+first Part while that is unset or stale. Views, tools, toolbar actions, design
+checks and plugin runs all read `activePart`; `setActivePart(id)` switches it and
+drops everything scoped to the old Part (selections, active region, cross-section
+region, recent fill, pending plugin result). `activePartId` is saved with the
+editor context and reset when another document is adopted. An eslint rule bans
+`.parts[0]` under `components/Editor`, `plugin` and `canvasEditor`, so new editor
+code can't quietly assume the first Part. Standalone pages (`routes/oligos/*`,
+landing hero) still read `parts[0]`.
+
+The Assembly side panel (`components/Editor/Assembly/AssemblyBrowser.svelte`,
+built-in panel `'ASSEMBLY'`) lists the Parts with their instances and, for the
+active Part, its regions; it is the UI for the assembly commands, including
+linking or deleting a broken occurrence. **New Part** calls
+`EditorViewContext.startNewPart(kind)`: `addPartCmd`, make it active, then the
+usual plane picker for its first region. The picker keeps that draft Part's id and
+the history entry that added it: the plane preview writes only to the draft, and
+switching Parts while it is open cancels it. Confirm redoes the add with the chosen
+plane as one step (or, if something was committed meanwhile, records the plane on
+the draft as its own step); cancel undoes the add only if it is still the last
+entry, else deletes the draft Part, and returns to the previous Part. **Add Region** on an
+existing Part opens the same picker bound to that Part (`#regionTargetPartId`): confirming on
+another Part cancels instead, and adopting another document drops the picker without touching
+either document's history. With more than one Part, `PartBreadcrumb`
+above the strand view shows `document › Part › region` and switches Parts. The
+strand and tool panels are wrapped in `{#key activePart.id}` in `Editor.svelte`,
+and the plane view (`HelixView`) inside `HelixViewer`, because they set up
+Part-scoped state on mount. `HelixViewer` and the 3D view follow the `part` prop
+instead, so the camera and 3D toolbar state survive a switch.
+
+A Part with `source` set is a **linked Part**: a read-only cached copy of another
+design's Part, inserted with **Insert Part from…** and refreshed with **Update from
+source**. History refuses edits to it; `EditorViewContext.canEditActivePart` is false
+while one is active, so only Pan and Select stay enabled (`isModeEnabled`; Select
+selects but doesn't drag), and `PartBreadcrumb` shows "Linked, read-only". A plugin
+result aimed at it can be previewed, not applied. See `docs/linked-parts.md`.
+
+`EditorViewContext.activeOccurrence` is the instance of the active Part that the
+3D view edits in (`editedOccurrenceId`, else its first instance);
+`editOccurrence(id)` switches Part and instance together, and switching Part
+forgets the picked instance. `movingOccurrenceId` puts the 3D gizmo on any
+instance (`startMovingOccurrence` / `stopMovingOccurrence`). See
+`docs/editor-3d-view.md` § Assembly for how 3D draws them.
 
 ### Names
 
@@ -91,12 +138,16 @@ re-derives it on load; renaming the document renames the file). Files therefore 
 store it: `stringifyDesignFile` leaves the top-level `name` out of every written file,
 and only IndexedDB keeps it (`docs/storage-architecture.md` § The name stays out of files).
 What identifies a design across copies is `FoldnanoDocument.id`, not the name; the UI shows it
-as `shortDesignId(id)` (`#` plus the first 8 hex characters) through `DesignIdChip.svelte`. `Part.name` is
-internal while a document holds one Part:
+as `shortDesignId(id)` (`#` plus the first 8 hex characters) through `DesignIdChip.svelte`. `Part.name`
+names a Part within the document (it becomes visible once a document holds
+several; `renamePartCmd`), and occurrence names default to `<part name> <n>`
+(`Assembly.nextOccurrenceName`):
 
-- imports overwrite it with the document name (the `"name"` inside a cadnano
-  file is often a stale file name such as `Hilbert_FinalHC.json`);
-- `addNewPart` names parts `Part 1`, `Part 2`, ….
+- imports that create a new single-Part document overwrite it with the document
+  name (the `"name"` inside a cadnano file is often a stale file name such as
+  `Hilbert_FinalHC.json`);
+- `addNewPart` names parts `Part 1`, `Part 2`, …; `duplicatePartCmd` uses
+  `<name> copy`, numbered when taken.
 
 Names typed by the user (toolbar, explorer rename, New File, the name prompt) pass
 `validateDesignName`: letters of any script, digits, spaces, `-`, `_`, `.`, and
@@ -767,6 +818,57 @@ old tab from erasing data it doesn't know about. Then:
 The `??` backfills inside `Part.fromJSON()` / `Oligo.fromJSON()` / `DesignRegion.fromJSON()`
 predate versioning. Leave them in place for version 1; new format changes go in `MIGRATIONS`.
 
+### Assembly
+
+**Files:** `src/lib/model/Assembly/` (`Assembly`, `Occurrence`), commands in
+`src/lib/commands/assembly.ts`.
+
+A Part is a definition in its own coordinates. `FoldnanoDocument.assembly.occurrences`
+places them: each `Occurrence` is `{ id, partId, name, transform, visible }`, where
+`transform` (position in nm + quaternion `[x, y, z, w]`, the same shape as an overlay
+placement) maps the Part's lab frame (`part.getVirtualHelixFrame`) into the assembly.
+Several occurrences may share a Part (instancing: edit once, every copy changes).
+The 3D view draws every visible occurrence (the active Part's other instances as
+copies of its build, other Parts see-through). oxDNA/mrDNA export can write every
+visible one (`buildAssemblyNtModel`, each Part relaxed where it has a result), and
+the all-Parts oligo CSV counts every instance, hidden ones included, as a quantity.
+See `docs/editor-3d-view.md`, `docs/oxdna-export.md` and
+`docs/sequence-csv-export.md`.
+`migrateDocumentJson` refuses a file whose occurrence list holds something that isn't
+a well-formed occurrence (ids, name, visibility, finite transform, nonzero rotation);
+`Occurrence.fromJSON` scales a rotation that isn't unit length (`normalizedTransform`), so a
+placement can only move and turn a Part, never scale it.
+
+Invariants:
+
+- **Every Part is placed at least once.** `doc.addPart(part)` / `addNewPart` place
+  a new Part once, at the origin, and `doc.removePart(id)` drops its occurrences.
+  App code adds Parts only through them. `deleteOccurrenceCmd` refuses a Part's last
+  occurrence (delete the Part instead). On load, `repairDocumentJson` places any
+  Part a file leaves without an occurrence, at the origin.
+- **An occurrence whose Part is missing is kept, not repaired away.** It is the
+  user's placement (name, transform); the Assembly panel lists it under
+  "Instances with a missing Part", where **Link to…** places one of the design's
+  Parts there (`relinkOccurrenceCmd`). The `occurrence-part` integrity rule reports
+  it on every load until then.
+  Anything that walks occurrences (3D, exports) must skip one whose `partId` isn't
+  in `doc.parts`.
+- A Part keeps its id for life. Plugin `replacePart*` results take the replaced
+  Part's id (`keepPartIdentity` in `ResultApplicator.ts`), so occurrences and the
+  active Part still find it.
+- `partSnapshotTx` must not change the assembly (checked under the history
+  verifier); occurrence edits are their own targeted commands.
+
+`Part.source` (`PartSource`) marks a Part linked from another design; its content
+is then a read-only cached copy (`docs/linked-parts.md`).
+
+`remapPartIds(json, newId?)` (`Part/remapPartIds.ts`) copies Part JSON with every entity id
+replaced and every reference following, for `duplicatePartCmd` and linked copies. It rewrites
+only id fields (`id`, the `…Id` references, `vhOrder`, `segmentIds`, `vhMap`), never content
+such as sequences or names, which may equal an id in a file with short ids; a new id or
+reference field must be added to its lists. `stableIdsFor(copyPartId)` derives the ids of a
+linked copy, so an update keeps them.
+
 ### Part JSON
 
 Current persisted part JSON includes:
@@ -777,6 +879,7 @@ Current persisted part JSON includes:
 - `oligos` (with optional `repeatGroupId` / `mirrorOf`, written only when set)
 - optional `customModifications`
 - optional `repeatGroups`
+- optional `source` (linked Parts only)
 
 There is no backward-compat loader for pre-region documents: `Part.fromJSON()` throws (`'Document predates region schema; not supported'`) if `planes`, `regions`, or `virtualHelices` is missing from the JSON. Every `.fn.json` document on disk is expected to already carry the plane/region schema.
 
@@ -798,7 +901,7 @@ There is no backward-compat loader for pre-region documents: `Part.fromJSON()` t
 - **Don't branch on `savedWith`.** It is provenance only; `formatVersion` is the sole compatibility signal.
 
 - **Don't derive helices from `referenceGeometry` in the model, or keep the two in sync.** It's reference material; a router decides the helices.
-- **Don't mutate the model outside a command.** Wrap every mutation in `historyStack.tx(...)` (targeted patches) or `historyStack.snapshotTx(...)` (whole-doc snapshot). Direct mutations are reactive but won't undo.
+- **Don't mutate the model outside a command.** Wrap every mutation in `historyStack.tx(...)` (targeted patches), `historyStack.partSnapshotTx(...)` (one Part's snapshot) or `historyStack.snapshotTx(...)` (whole-doc snapshot, for edits that add or remove Parts). Direct mutations are reactive but won't undo.
 - **Don't bypass `Part`.** All segment create/connect/break/move/remove operations go through `Part` methods so `segmentsLookup` and `SpatialIndexService` stay in sync.
 - **Don't write to `vh.listRow` directly** — change region order or `vhOrder`, then `Part.syncListRows()` propagates.
 - **Don't write to `vh.latticeCoords` directly** — go through region helpers (`addVhAtCoords`, `moveLatticeVirtualHelicesCmd`). Lattice geometry is owned by `LatticedDesignRegion`.

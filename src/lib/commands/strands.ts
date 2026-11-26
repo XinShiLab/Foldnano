@@ -511,14 +511,16 @@ export const moveOligoEndCmd = (
 	});
 };
 
-/** Copies whole oligos `delta` bp along their own VHs as independent oligos. A snapshot tx:
- * the copy may grow a region, which touches every VH in it. */
+/** Copies whole oligos `delta` bp along their own VHs as independent oligos. A Part snapshot
+ * tx: the copy may grow a region, which touches every VH in it. */
 export const duplicateOligosCmd = (
 	{ part, oligos, delta }: { part: Part; oligos: Oligo[]; delta: number },
 	history: HistoryStack
 ): Oligo[] =>
-	history.snapshotTx(`Duplicate ${oligos.length} oligo${oligos.length === 1 ? '' : 's'}`, () =>
-		part.duplicateOligos(oligos, delta)
+	history.partSnapshotTx(
+		`Duplicate ${oligos.length} oligo${oligos.length === 1 ? '' : 's'}`,
+		part,
+		() => part.duplicateOligos(oligos, delta)
 	);
 
 type RemoveOligoParams = {
@@ -688,7 +690,7 @@ export const autoStapleCmd = (
 	},
 	history: HistoryStack
 ) => {
-	history.snapshotTx(`Auto staple — ${para.region.name}`, () => {
+	history.partSnapshotTx(`Auto staple — ${para.region.name}`, para.part, () => {
 		para.part.autoStapleRegion(para.region.id);
 	});
 };

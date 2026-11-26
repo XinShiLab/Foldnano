@@ -14,6 +14,7 @@
 	import { GitHubConflictError } from '$lib/services/github/api';
 	import { getEditorDocumentSession } from '../context/EditorDocumentSession.svelte';
 	import DiffDialog from '../GitHubDiff/DiffDialog.svelte';
+	import LocalOnlyLinksNotice from '../Assembly/LocalOnlyLinksNotice.svelte';
 	import { modKeySymbol } from '$lib/utils/platform';
 
 	const mod = modKeySymbol();
@@ -218,6 +219,8 @@
 					{/if}
 				</div>
 			{/if}
+
+			<LocalOnlyLinksNotice />
 
 			{#if error}
 				<p class="rounded bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>

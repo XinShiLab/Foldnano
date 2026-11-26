@@ -15,7 +15,7 @@
 	const ctx = getEditorViewContext();
 	const region = $derived(ctx.activeRegion);
 	const regionId = $derived(region?.id ?? null);
-	const isReadOnly = $derived(!ctx.isTabOwner);
+	const isReadOnly = $derived(!ctx.canEditActivePart);
 	// `referenceGeometry` is a plain field; a change to it always comes with a history revision.
 	const currentMesh = $derived.by(() => {
 		void ctx.historyStack.revision;

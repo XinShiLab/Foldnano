@@ -51,6 +51,21 @@ export default defineConfig(
 		},
 	},
 	{
+		// The editor works on the active Part (docs/dna-model.md § FoldnanoDocument), not the first one.
+		files: ['src/lib/components/Editor/**', 'src/lib/plugin/**', 'src/lib/canvasEditor/**'],
+		ignores: ['**/*.spec.ts'],
+		rules: {
+			'no-restricted-syntax': [
+				'error',
+				{
+					selector:
+						"MemberExpression[computed=true][property.value=0][object.type='MemberExpression'][object.property.name='parts']",
+					message: 'Use editorViewContext.activePart (or the Part you were given), not parts[0].',
+				},
+			],
+		},
+	},
+	{
 		files: ['src/lib/notifications/notify.svelte.ts'],
 		rules: { 'no-restricted-imports': 'off' },
 	},

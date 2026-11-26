@@ -7,6 +7,7 @@ import type {
 	StorageInfo,
 } from './types';
 import { reportError } from '$lib/errorReporting';
+import { announceDocSaved } from './docSavedChannel';
 
 /**
  * StorageManager - Facade for managing multiple storage providers
@@ -89,7 +90,10 @@ export class StorageManager {
 			return false;
 		}
 		try {
-			return await provider.saveDocument(docId, snapshot, options);
+			const saved = await provider.saveDocument(docId, snapshot, options);
+			// Tabs whose assemblies link this design compare their copies again (docs/linked-parts.md).
+			if (saved && this.primaryProvider !== 'memory') announceDocSaved(docId);
+			return saved;
 		} catch (e) {
 			reportError(e, 'storage:save', { notify: false });
 			return false;

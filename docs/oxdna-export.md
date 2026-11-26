@@ -204,6 +204,13 @@ The `.top` file requires a base letter (A/T/C/G) for every nucleotide. cadnano d
    - The user chooses what to fill remaining **ssDNA** positions with: A / **T** / C / G / Random. Default is **T**, a common ssDNA placeholder in oxDNA simulations.
 5. On confirm, `exportPartToOxDna` is called with the chosen `fallbackBase`.
 
+When the design places more than one instance or has moved or hidden its only one (`offersAssemblyExport`;
+see `docs/editor-3d-view.md` § Assembly for the shared export scope), the Export menu's **All
+visible instances** option (on by default) exports `exportAssemblyToOxDna(doc, …)` instead: the same formatting over
+`buildAssemblyNtModel` (`docs/simulation-nt-model.md` § Assembly Model), and the dialog check
+uses `assemblyHasUnassignedSequence`. A one-Part export of a design with several Parts is
+named `<doc>.<part>`. Replay only maps one Part, so it refuses an all-instances export.
+
 ### Base resolution rules (`resolveBase`)
 
 `resolveBase` and `buildBaseCache` now live in `simulationNtModel.ts` (shared with the mrDNA
@@ -311,6 +318,11 @@ are the same in both views.
 ## Relaxed Positions
 
 When the rigid-body simulation (RBS) has been run and the _Use relaxed positions_ toggle is on, `exportOxDnaFn` passes the current `simOverrides` (a `Map<segmentId, BlockTransformOverride>`) to `exportPartToOxDna`. Each override rotates and translates the segment's nucleotides from their flat-lattice positions into the relaxed 3D layout.
+
+An all-instances export instead passes `relaxedParts` (`relaxedPartPoses` in
+`view3dSimulationState.ts`): the active Part's result as above, plus each other Part's kept
+result while it was shown and still matches its design, so every instance of those Parts is
+relaxed.
 
 The stale-positions warning (yellow Export button) appears when the topology has changed since the last simulation run — the exported coordinates are then from a previous solve that may not match the current design.
 

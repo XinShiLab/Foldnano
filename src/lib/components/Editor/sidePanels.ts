@@ -1,5 +1,6 @@
 import {
 	Blocks,
+	Boxes,
 	FileCodeCorner,
 	FilePen,
 	GitPullRequestArrow,
@@ -10,11 +11,12 @@ import {
 import type { Component } from 'svelte';
 import type { PluginRegistry } from '$lib/plugin/PluginRegistry.svelte';
 import type { PluginSidePanelIcon, PythonPlugin } from '$lib/plugin/types';
+import AssemblyBrowser from './Assembly/AssemblyBrowser.svelte';
 import GitHubExplorer from './GitHubExplorer/GitHubExplorer.svelte';
 import PluginPanel from './Plugin/PluginPanel.svelte';
 import PluginSidePanelHost from './SidePanel/PluginSidePanelHost.svelte';
 
-export type BuiltInSidePanelId = 'GITHUB' | 'PLUGIN';
+export type BuiltInSidePanelId = 'GITHUB' | 'PLUGIN' | 'ASSEMBLY';
 export type PluginSidePanelId = `plugin:${string}`;
 export type SidePanelId = BuiltInSidePanelId | PluginSidePanelId;
 
@@ -67,6 +69,14 @@ export const builtInSidePanels: BuiltInSidePanelDescriptor[] = [
 		icon: Blocks,
 		component: PluginPanel,
 	},
+	{
+		kind: 'builtIn',
+		id: 'ASSEMBLY',
+		title: 'Assembly',
+		ariaLabel: 'Toggle Assembly panel',
+		icon: Boxes,
+		component: AssemblyBrowser,
+	},
 ];
 
 const builtInSidePanelMap = new Map<BuiltInSidePanelId, BuiltInSidePanelDescriptor>(
@@ -104,8 +114,8 @@ export function getSidePanelDescriptor(
 	registry: PluginRegistry,
 	openEditorIds: ReadonlySet<string> = new Set()
 ): SidePanelDescriptor {
-	if (id === 'GITHUB' || id === 'PLUGIN') {
-		return getBuiltInSidePanelDescriptor(id);
+	if (!id.startsWith('plugin:')) {
+		return getBuiltInSidePanelDescriptor(id as BuiltInSidePanelId);
 	}
 
 	const pluginId = id.slice('plugin:'.length);

@@ -18,6 +18,7 @@
 	import type { GitHubRepoContext } from '$lib/services/storage';
 	import * as ContextMenu from '$lib/components/ui/context-menu/index.js';
 	import { modKeySymbol } from '$lib/utils/platform';
+	import LocalOnlyLinksNotice from '../Assembly/LocalOnlyLinksNotice.svelte';
 
 	const mod = modKeySymbol();
 
@@ -369,6 +370,8 @@
 					</ul>
 				</div>
 			{/if}
+
+			<LocalOnlyLinksNotice />
 
 			<textarea
 				rows={3}

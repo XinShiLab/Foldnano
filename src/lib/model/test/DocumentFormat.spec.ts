@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { describe, it, expect } from 'vitest';
 import FoldnanoDocument from '$lib/model/document.svelte';
+import { Occurrence, type OccurrenceJSON } from '$lib/model/Assembly';
 import {
 	CURRENT_FORMAT_VERSION,
 	DocumentFormatError,
@@ -51,7 +52,48 @@ describe('document format versioning', () => {
 			const saved = FoldnanoDocument.fromJSON(raw).toJSON();
 
 			expect(saved.formatVersion).toBe(CURRENT_FORMAT_VERSION);
-			expect(withoutHeader(saved)).toEqual(withoutHeader(raw));
+			const { assembly, ...content } = withoutHeader(saved) as RawDocumentJson;
+			expect(content).toEqual(withoutHeader(raw));
+			expect((assembly as { occurrences: unknown[] }).occurrences).toHaveLength(
+				(raw.parts as unknown[]).length
+			);
+		});
+
+		it('places every Part of a version 2 file once, at the origin', () => {
+			const raw = readFixture('v2.fn.json');
+			const parts = raw.parts as { id: string; name: string }[];
+
+			const doc = FoldnanoDocument.fromJSON(raw);
+
+			expect(doc.assembly.occurrences.map((o) => o.toJSON())).toEqual(
+				parts.map((part) => ({
+					id: `occurrence-${part.id}`,
+					partId: part.id,
+					name: `${part.name} 1`,
+					transform: { position: { x: 0, y: 0, z: 0 }, quaternion: [0, 0, 0, 1] },
+					visible: true,
+				}))
+			);
+		});
+
+		it('gives a version 2 file the same occurrence ids on every load', () => {
+			const raw = readFixture('v2.fn.json');
+			expect(FoldnanoDocument.fromJSON(raw).toJSON().assembly).toEqual(
+				FoldnanoDocument.fromJSON(raw).toJSON().assembly
+			);
+		});
+
+		it('numbers occurrences of same-named Parts apart', () => {
+			const migrated = MIGRATIONS[2]({
+				parts: [
+					{ id: 'a', name: 'Brick' },
+					{ id: 'b', name: 'Brick' },
+				],
+			});
+			const names = (migrated.assembly as { occurrences: { name: string }[] }).occurrences.map(
+				(o) => o.name
+			);
+			expect(names).toEqual(['Brick 1', 'Brick 2']);
 		});
 
 		it('round-trips the current-version fixture', () => {
@@ -91,7 +133,12 @@ describe('document format versioning', () => {
 		});
 
 		it('names a file opened without a name after the file', () => {
-			const raw = { format: FOLDNANO_FORMAT, formatVersion: CURRENT_FORMAT_VERSION, parts: [] };
+			const raw = {
+				format: FOLDNANO_FORMAT,
+				formatVersion: CURRENT_FORMAT_VERSION,
+				parts: [],
+				assembly: { occurrences: [] },
+			};
 			const meta = { name: 'tile v2.fn.json', extension: 'json', size: 0, type: '' };
 
 			expect(foldnanojsonParser.parse(raw, meta).name).toBe('tile v2');
@@ -121,6 +168,47 @@ describe('document format versioning', () => {
 			['a fractional version', { formatVersion: 1.5, parts: [] }],
 			['a string version', { formatVersion: '1', parts: [] }],
 			['no parts list', { formatVersion: 1 }],
+			['a current file with no assembly', { formatVersion: CURRENT_FORMAT_VERSION, parts: [] }],
+			[
+				'an instance that is null',
+				{ formatVersion: CURRENT_FORMAT_VERSION, parts: [], assembly: { occurrences: [null] } },
+			],
+			[
+				'an instance with a non-finite placement',
+				{
+					formatVersion: CURRENT_FORMAT_VERSION,
+					parts: [],
+					assembly: {
+						occurrences: [
+							{
+								id: 'o',
+								partId: 'p',
+								name: 'P 1',
+								visible: true,
+								transform: { position: { x: 0, y: null, z: 0 }, quaternion: [0, 0, 0, 1] },
+							},
+						],
+					},
+				},
+			],
+			[
+				'an instance with a zero rotation',
+				{
+					formatVersion: CURRENT_FORMAT_VERSION,
+					parts: [],
+					assembly: {
+						occurrences: [
+							{
+								id: 'o',
+								partId: 'p',
+								name: 'P 1',
+								visible: true,
+								transform: { position: { x: 0, y: 0, z: 0 }, quaternion: [0, 0, 0, 0] },
+							},
+						],
+					},
+				},
+			],
 		])('refuses %s as malformed', (_label, raw) => {
 			expect(formatErrorOf(() => migrateDocumentJson(raw)).reason).toBe('malformed');
 		});
@@ -160,5 +248,41 @@ describe('document format versioning', () => {
 		it('throws when a migration step is missing', () => {
 			expect(() => applyMigrations({}, 1, 3, { 1: (raw) => raw })).toThrow(/from version 2/);
 		});
+	});
+});
+
+describe('instance rotations', () => {
+	it('scales a non-unit rotation to unit length on load', () => {
+		const occurrence = Occurrence.fromJSON({
+			id: 'o',
+			partId: 'p',
+			name: 'P 1',
+			visible: true,
+			transform: { position: { x: 1, y: 2, z: 3 }, quaternion: [0, 0, 2, 0] },
+		});
+		expect(occurrence.transform.quaternion).toEqual([0, 0, 1, 0]);
+		expect(occurrence.transform.position).toEqual({ x: 1, y: 2, z: 3 });
+	});
+
+	it('normalizes huge finite components without overflowing, and the result reopens', () => {
+		const huge = Number.MAX_VALUE;
+		const raw = {
+			id: 'o',
+			partId: 'p',
+			name: 'P 1',
+			visible: true,
+			transform: { position: { x: 0, y: 0, z: 0 }, quaternion: [huge, huge, 0, 0] },
+		};
+		const occurrence = Occurrence.fromJSON(raw as OccurrenceJSON);
+		const [x, y, z, w] = occurrence.transform.quaternion;
+		expect(x).toBeCloseTo(Math.SQRT1_2);
+		expect(y).toBeCloseTo(Math.SQRT1_2);
+		expect([z, w]).toEqual([0, 0]);
+		const file = {
+			formatVersion: CURRENT_FORMAT_VERSION,
+			parts: [],
+			assembly: { occurrences: [occurrence.toJSON()] },
+		};
+		expect(() => migrateDocumentJson(file)).not.toThrow();
 	});
 });

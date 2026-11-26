@@ -29,14 +29,18 @@
 	const coordinator = $derived(editorCtx.pluginCoordinator);
 	const currentDocId = $derived(session.currentDoc.id);
 	const currentPartFingerprint = $derived(
-		session.currentDoc.parts.length > 0
-			? JSON.stringify(session.currentDoc.parts[0].toJSON())
-			: null
+		editorCtx.activePart ? JSON.stringify(editorCtx.activePart.toJSON()) : null
 	);
 	const pluginResultJson = $derived(
 		plugin.pluginResult ? JSON.stringify(plugin.pluginResult, null, 2) : null
 	);
 	const isPending = $derived(coordinator.pendingApply?.pluginId === plugin.manifest.id);
+	// A linked Part is read-only: its result can be looked at but not applied.
+	const linkedPartName = $derived.by(() => {
+		const partId = coordinator.pendingApply?.partId;
+		const target = editorCtx.currentDoc.parts.find((p) => p.id === partId);
+		return target?.source ? target.name : null;
+	});
 	const isPendingStale = $derived(
 		Boolean(
 			isPending &&
@@ -193,6 +197,7 @@
 								onConfirm={() => coordinator.confirmApply(plugin.manifest.id)}
 								onCancel={() => coordinator.cancelApply(plugin.manifest.id)}
 								readOnly={!editorCtx.isTabOwner}
+								{linkedPartName}
 							/>
 						{/if}
 					</Tabs.Content>
@@ -260,6 +265,7 @@
 					onConfirm={() => coordinator.confirmApply(plugin.manifest.id)}
 					onCancel={() => coordinator.cancelApply(plugin.manifest.id)}
 					readOnly={!editorCtx.isTabOwner}
+					{linkedPartName}
 				/>
 			{/if}
 		{/if}

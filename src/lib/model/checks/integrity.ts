@@ -12,6 +12,7 @@ export const INTEGRITY_RULES = [
 	'asymmetric-skip-insert',
 	'skip-insert-on-crossover',
 	'freeform-frame',
+	'occurrence-part',
 ] as const;
 export type IntegrityRule = (typeof INTEGRITY_RULES)[number];
 
@@ -145,5 +146,23 @@ export function checkPartIntegrity(
 }
 
 export function checkDocumentIntegrity(doc: FoldnanoDocument): DesignIssue<IntegrityRule>[] {
-	return doc.parts.flatMap((part) => checkPartIntegrity(part));
+	const issues = doc.parts.flatMap((part) => checkPartIntegrity(part));
+	const partIds = new Set(doc.parts.map((part) => part.id));
+	for (const occurrence of doc.assembly.occurrences) {
+		if (partIds.has(occurrence.partId)) continue;
+		issues.push({
+			rule: 'occurrence-part',
+			severity: 'error',
+			message: `Instance "${occurrence.name}" places a Part this design doesn't have.`,
+		});
+	}
+	for (const part of doc.parts) {
+		if (doc.assembly.occurrencesOf(part.id).length > 0) continue;
+		issues.push({
+			rule: 'occurrence-part',
+			severity: 'error',
+			message: `Part "${part.name}" isn't placed anywhere in the design.`,
+		});
+	}
+	return issues;
 }

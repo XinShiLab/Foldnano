@@ -80,6 +80,20 @@ function buildFullDocument(): FoldnanoDocument {
 		},
 	};
 
+	// A second, moved and hidden instance of the lattice Part, and a linked Part's source.
+	doc.assembly.add(lattice.id, 'Lattice again', {
+		transform: { position: { x: 10, y: 0, z: 0 }, quaternion: [0, 0, 0, 1] },
+		visible: false,
+	});
+	freeform.source = {
+		repoPath: 'parts/freeform.fn.json',
+		docId: 'local-doc',
+		partId: 'source-part',
+		blobSha: 'abc123',
+		contentHash: 'sha256:00',
+		linkedAt: '2026-11-17T00:00:00.000Z',
+	};
+
 	return doc;
 }
 
@@ -108,6 +122,8 @@ describe('published .fn.json schema', () => {
 		expect(json.parts[0].repeatGroups).toHaveLength(1);
 		expect(json.parts[1].virtualHelices[0].localFrame).toBeDefined();
 		expect(json.parts[2].regions[0].referenceGeometry.mesh.faces).toHaveLength(1);
+		expect(json.assembly.occurrences).toHaveLength(4);
+		expect(json.parts[1].source.repoPath).toBe('parts/freeform.fn.json');
 		expectValid(CURRENT_FORMAT_VERSION, json);
 	});
 

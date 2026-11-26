@@ -32,8 +32,8 @@
 	};
 
 	const ctx = getEditorViewContext();
-	const part = $derived(ctx.currentDoc?.parts[0]);
-	const isReadOnly = $derived(!ctx.isTabOwner);
+	const part = $derived(ctx.activePart);
+	const isReadOnly = $derived(!ctx.canEditActivePart);
 
 	const vhs = $derived(
 		part

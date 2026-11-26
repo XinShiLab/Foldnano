@@ -60,6 +60,16 @@ States the editor doesn't create itself. They come from imported files or plugin
 | A helix whose number is even on an odd lattice position (or the reverse) | Warning | cadnano export and crossover positions assume they match. Recreate the helix in place if you need either. |
 | A freeform helix whose saved direction or roll is not a proper frame (not unit length, or roll not at a right angle to the helix) | Warning | The 3D view and exports would distort the helix. Select it and set its **Roll** in the Select panel, which rebuilds the frame. |
 
+## Linked Parts
+
+Checked while you edit, for a [linked Part](/docs/guide/assemblies#linked-parts) that is the active Part. Exports use the copy in either case.
+
+| Check | Level | What to do |
+| --- | --- | --- |
+| The source design changed since the copy was taken | Warning | Choose **Update from source** in the Part's **⋯** menu in the Assembly panel. |
+| The source design now holds a different Part than the one copied | Warning | Choose **Relink to its current Part…** in the Part's **⋯** menu to take it, or leave the copy as it is. |
+| The source design is no longer in this browser, or can't be linked any more (it now has several Parts or links of its own) | Warning | Nothing, if the copy is what you want. To edit it here, choose **Break link**. |
+
 ## Simulation Export
 
 What oxDNA and mrDNA export (and the 3D view's NT mode) refuse. Turn on **Simulation export** in the Design checks button to see them while you edit. See [Simulation And Export](/docs/guide/simulation-export#nt-model).

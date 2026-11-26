@@ -35,6 +35,8 @@ The **part** is the *mutation owner* inside the DNA model. Every topology edit, 
 
 For you as a user this mostly shows up indirectly. Almost every edit is undoable (`Ctrl/Cmd + Z`), and the document stays internally consistent even across complex multi-region edits.
 
+A document can hold several parts. Each one is designed and folded on its own, and the document records where each is placed (its **instances**). The editor works on one part at a time; switch between them in the **Assembly** panel (see [Assemblies And Parts](/docs/guide/assemblies)).
+
 ## Planes And Design Regions
 
 A **plane** is a coordinate frame used to place virtual helices. A **design region** is a workspace attached to a plane. It owns a set of virtual helices and the rules for how they may be positioned and connected.

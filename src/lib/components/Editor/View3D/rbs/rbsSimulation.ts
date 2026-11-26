@@ -8,7 +8,7 @@ import type {
 	SolverResult,
 } from '$lib/model/rbs/rbsTypes';
 import type { Part } from '$lib/model/Part';
-import { computeSimulationFreshnessSignature } from '../view3dSimulationState';
+import { solverInputSignature } from '../view3dSimulationState';
 import type { RbsWorkerRequest, RbsWorkerResponse } from './rbsWorker';
 
 export type RbsDiagnostics = Pick<
@@ -39,8 +39,11 @@ export class RbsSimulation {
 	private worker: Worker | null = null;
 	private workerTimer: ReturnType<typeof setTimeout> | null = null;
 	private localStop = false;
-	private currentPart: Part | null = null;
+	/** The run's input, stamped when it starts: an edit during the run must leave results stale. */
+	private startSignature = '';
 	private currentSolverParams: SolverParams = DEFAULT_SOLVER_PARAMS;
+	/** Bumped by `cancel`: a local run started under an older generation reports nothing more. */
+	private generation = 0;
 
 	constructor(private cb: RbsCallbacks) {
 		this.worker = this.createWorker();
@@ -54,7 +57,6 @@ export class RbsSimulation {
 			return;
 		}
 
-		this.currentPart = part;
 		this.currentSolverParams = solverParams;
 		this.running = true;
 		this.localStop = false;
@@ -62,7 +64,9 @@ export class RbsSimulation {
 		this.cb.onProgress(0, Math.max(1, solverParams.iterations));
 		this.cb.onDiagnostics(null);
 
-		const { blocks, constraints, segmentToBlockId } = buildBlocksAndConstraints(part);
+		const input = buildBlocksAndConstraints(part);
+		const { blocks, constraints, segmentToBlockId } = input;
+		this.startSignature = solverInputSignature(input);
 		this.segmentToBlockId = segmentToBlockId;
 		this.blocks = this.cloneBlocks(blocks);
 		this.constraints = this.cloneConstraints(constraints);
@@ -103,6 +107,22 @@ export class RbsSimulation {
 		this.worker?.postMessage({ type: 'stop' } satisfies RbsWorkerRequest);
 	}
 
+	/**
+	 * Abandon the current run: nothing it computed reaches the callbacks any more. Used when its
+	 * results no longer apply (another Part, or the results were cleared). The worker is replaced,
+	 * so a progress or done message already on its way is dropped.
+	 */
+	cancel(): void {
+		this.clearTimer();
+		this.generation++;
+		this.localStop = true;
+		if (!this.running) return;
+		this.worker?.terminate();
+		this.worker = this.createWorker();
+		this.running = false;
+		this.cb.onRunning(false);
+	}
+
 	dispose(): void {
 		this.clearTimer();
 		this.localStop = true;
@@ -114,15 +134,17 @@ export class RbsSimulation {
 		try {
 			const w = new Worker(new URL('./rbsWorker.ts', import.meta.url), { type: 'module' });
 			w.onmessage = (event: MessageEvent<RbsWorkerResponse>) => {
-				this.handleWorkerMessage(event.data);
+				if (w === this.worker) this.handleWorkerMessage(event.data);
 			};
 			w.onerror = (event) => {
+				if (w !== this.worker) return;
 				this.clearTimer();
 				console.error('[RBS worker] startup/runtime error', event.message);
 				// Worker failed — the caller's simulate() already stored blocks; run locally
 				if (this.running) void this.runLocal(this.currentSolverParams);
 			};
 			w.onmessageerror = () => {
+				if (w !== this.worker) return;
 				this.clearTimer();
 				console.error('[RBS worker] message could not be cloned');
 				if (this.running) void this.runLocal(this.currentSolverParams);
@@ -164,8 +186,7 @@ export class RbsSimulation {
 	): void {
 		const blockTransforms = new Map<string, BlockTransformOverride>(transforms);
 		const overrides = buildSegmentBlockOverrides(this.segmentToBlockId, blockTransforms);
-		const sig = this.currentPart ? computeSimulationFreshnessSignature(this.currentPart) : '';
-		this.cb.onResults(overrides, new Map(rawStressMap), sig);
+		this.cb.onResults(overrides, new Map(rawStressMap), this.startSignature);
 	}
 
 	private async runLocal(solverParams: SolverParams): Promise<void> {
@@ -180,12 +201,13 @@ export class RbsSimulation {
 		this.worker = this.createWorker();
 
 		this.localStop = false;
+		const generation = this.generation;
 		const runner = new SimulationRunner(this.blocks, this.constraints, solverParams);
 		const totalSteps = Math.max(1, Math.round(solverParams.iterations));
 		const chunkSize = 50;
 		let step = 0;
 
-		while (step < totalSteps && !this.localStop) {
+		while (step < totalSteps && !this.localStop && generation === this.generation) {
 			const steps = Math.min(chunkSize, totalSteps - step);
 			runner.runSteps(steps);
 			step += steps;
@@ -200,6 +222,7 @@ export class RbsSimulation {
 			await new Promise<void>((resolve) => setTimeout(resolve, 0));
 		}
 
+		if (generation !== this.generation) return;
 		this.running = false;
 		this.cb.onRunning(false);
 	}

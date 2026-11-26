@@ -2,10 +2,13 @@ import type { Part } from '$lib/model/Part';
 import { applyTransform, rotateVec } from '$lib/model/geometry3d/dnaGeometry';
 import type { Vec3 } from '$lib/model/geometry3d/types';
 import type { BlockTransformOverride } from '$lib/model/rbs/rbsTypes';
+import type FoldnanoDocument from '$lib/model/document.svelte';
 import {
 	buildSimulationNtModel,
 	type SimulationFallbackBase,
+	type SimulationNucleotide,
 } from '$lib/model/io/simulationNtModel';
+import { buildAssemblyNtModel, type AssemblyNtOptions } from './assemblyNtModel';
 
 import { OXDNA_NM } from './oxdnaConstants';
 
@@ -85,7 +88,14 @@ export function collectOxDnaNucleotides(
 	includeMirrors = false
 ): OxDnaNucleotide[] {
 	const model = buildSimulationNtModel(part, { fallbackBase, includeMirrors });
-	return model.nucleotides.map((nt) => {
+	return oxDnaNucleotidesFromModel(model.nucleotides, segPositionOverrides);
+}
+
+function oxDnaNucleotidesFromModel(
+	nucleotides: SimulationNucleotide[],
+	segPositionOverrides?: Map<string, BlockTransformOverride>
+): OxDnaNucleotide[] {
+	return nucleotides.map((nt) => {
 		const frame = transformNmFrame(
 			nt.positionNm,
 			nt.a1,
@@ -241,7 +251,24 @@ export function exportPartToOxDna(
 	fallbackBase: OxDnaFallbackBase = 'T',
 	includeMirrors = false
 ): OxDnaExportResult {
-	const nts = collectOxDnaNucleotides(part, segPositionOverrides, fallbackBase, includeMirrors);
+	return formatOxDnaExport(
+		collectOxDnaNucleotides(part, segPositionOverrides, fallbackBase, includeMirrors)
+	);
+}
+
+/**
+ * Every visible instance of the design in one configuration (`buildAssemblyNtModel`), each
+ * Part relaxed where `relaxedParts` has a result for it.
+ */
+export function exportAssemblyToOxDna(
+	doc: FoldnanoDocument,
+	options: AssemblyNtOptions = {}
+): OxDnaExportResult {
+	const model = buildAssemblyNtModel(doc, { fallbackBase: 'T', ...options });
+	return formatOxDnaExport(oxDnaNucleotidesFromModel(model.nucleotides));
+}
+
+function formatOxDnaExport(nts: OxDnaNucleotide[]): OxDnaExportResult {
 	const strandCount = new Set(nts.map((nt) => nt.strandId)).size;
 	return {
 		dat: formatDat(nts),
