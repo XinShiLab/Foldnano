@@ -19,6 +19,7 @@ import {
 	validateDesignName,
 } from '$lib/model/io/designFileName';
 import { HistoryStack } from '$lib/commands/history.svelte';
+import { followDesignRenameCmd } from '$lib/commands/assembly';
 import {
 	StorageManager,
 	IndexedDbStorageProvider,
@@ -499,13 +500,20 @@ export class EditorDocumentSession {
 		};
 		githubMetadataStore.setFileMetadata(this.#currentDoc.id, updated);
 		this.#currentFileMetadata = updated;
-		this.#currentDoc.name = designNameFromPath(newPath);
+		this.#setCurrentDocName(designNameFromPath(newPath));
+	}
+
+	/** Renames the open design; its only Part follows (`followDesignRenameCmd`). */
+	#setCurrentDocName(name: string): void {
+		const oldName = this.#currentDoc.name;
+		this.#currentDoc.name = name;
+		if (this.isTabOwner) followDesignRenameCmd(this.#historyStack, this.#currentDoc, oldName, name);
 	}
 
 	/** Local-only files have no GitHub metadata to derive the name from, so the explorer pushes it here. */
 	async syncCurrentDocName(name: string): Promise<void> {
 		if (this.#currentDoc.name === name) return;
-		this.#currentDoc.name = name;
+		this.#setCurrentDocName(name);
 		await this.saveDocumentToLocalStorage({ force: true });
 	}
 
@@ -731,7 +739,7 @@ export class EditorDocumentSession {
 		const meta = this.#currentFileMetadata;
 
 		if (!repoCtx) {
-			this.#currentDoc.name = trimmed;
+			this.#setCurrentDocName(trimmed);
 			await this.saveDocumentToLocalStorage({ force: true });
 			return { kind: 'doc-only-renamed' };
 		}
@@ -747,7 +755,7 @@ export class EditorDocumentSession {
 					: e
 			);
 			saveLocalOnlyEntries(repoCtx, updated);
-			this.#currentDoc.name = trimmed;
+			this.#setCurrentDocName(trimmed);
 			if (meta?.path === localOnlyEntry.path) {
 				this.applyExternalCurrentFileRename(localOnlyEntry.path, newPath);
 			}
@@ -765,7 +773,7 @@ export class EditorDocumentSession {
 			const oldName = this.#currentDoc.name;
 			const oldMeta = meta;
 
-			this.#currentDoc.name = trimmed;
+			this.#setCurrentDocName(trimmed);
 			this.applyExternalCurrentFileRename(meta.path, newPath, { clearSha: true });
 
 			const docId = this.#currentDoc.id;
@@ -794,7 +802,7 @@ export class EditorDocumentSession {
 				this.#currentFileMetadata = githubMetadataStore.getFileMetadata(docId);
 				await this.hooks.savePersistedContext();
 			} catch (e) {
-				this.#currentDoc.name = oldName;
+				this.#setCurrentDocName(oldName);
 				githubMetadataStore.setFileMetadata(docId, oldMeta);
 				this.#currentFileMetadata = oldMeta;
 				await this.saveDocumentToLocalStorage({ force: true });
@@ -808,7 +816,7 @@ export class EditorDocumentSession {
 			};
 		}
 
-		this.#currentDoc.name = trimmed;
+		this.#setCurrentDocName(trimmed);
 		await this.saveDocumentToLocalStorage({ force: true });
 		return { kind: 'doc-only-renamed' };
 	}

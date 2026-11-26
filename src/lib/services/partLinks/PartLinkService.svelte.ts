@@ -23,6 +23,8 @@ export interface PartLinkStatus {
 	localOnly: boolean;
 	/** Why the source can't be linked any more (`unlinkable` only). */
 	reason?: string;
+	/** The source design's current name, when this browser has it; the copy keeps its own name. */
+	sourceName?: string;
 }
 
 /** Outcome of `update`: `ok`, or why nothing changed. */
@@ -132,14 +134,15 @@ export class PartLinkService {
 			return { state: source.repoPath ? 'notLocal' : 'missing', sourceDocId: null, localOnly };
 		}
 		const sourceDocId = loaded.docId;
+		const sourceName = loaded.doc.name;
 		const match = matchLinkSource(loaded.doc, source);
 		if (match.kind === 'unlinkable') {
-			return { state: 'unlinkable', sourceDocId, localOnly, reason: match.reason };
+			return { state: 'unlinkable', sourceDocId, sourceName, localOnly, reason: match.reason };
 		}
-		if (match.kind === 'replaced') return { state: 'replaced', sourceDocId, localOnly };
+		if (match.kind === 'replaced') return { state: 'replaced', sourceDocId, sourceName, localOnly };
 		const hash = await partContentHash(match.part.snapshot());
 		const state = hash === source.contentHash ? 'upToDate' : 'outdated';
-		return { state, sourceDocId, localOnly };
+		return { state, sourceDocId, sourceName, localOnly };
 	}
 
 	#queueRefresh(): void {

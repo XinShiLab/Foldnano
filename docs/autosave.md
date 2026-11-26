@@ -6,6 +6,7 @@ covers:
   - src/lib/components/Editor/SaveFailedBanner.svelte
   - src/lib/components/Editor/SaveFromUrlDialog.svelte
   - src/lib/components/Editor/NameDesignDialog.svelte
+  - src/lib/components/Editor/blankDocument.ts
 ---
 
 # Autosave And Local Persistence
@@ -219,7 +220,9 @@ See `docs/routes-guide.md` § "Loading a Design from an External URL".
 
 Blank documents with no user edits do not create IndexedDB entries. The `isPristineUnsavedBlankDocument()` check prevents housekeeping saves from persisting an untouched default blank document during file-switch flows.
 
-`New Document` (local-only) calls `startBlankDocument()`, which saves the current document and swaps in a blank one without persisting it. The toolbar shallow-routes to `/editor`, and `Editor.svelte` replaces that URL with `/editor/<id>` once `lastLocalPersistAt` is set, so a reload reopens the saved document.
+Renaming the open design goes through `#setCurrentDocName`, so its only Part can follow the new name (`followDesignRenameCmd`, see `docs/dna-model.md` § Names) before the forced save writes both.
+
+`New Document` (local-only) and the Assembly panel's **New assembly** call `openBlankDocument()` (`Editor/blankDocument.ts`): `startBlankDocument()` saves the current document and swaps in a blank one without persisting it, then it shallow-routes to `/editor`, and `Editor.svelte` replaces that URL with `/editor/<id>` once `lastLocalPersistAt` is set, so a reload reopens the saved document.
 
 ### Reserved blank name
 

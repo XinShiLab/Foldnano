@@ -1,7 +1,9 @@
 <script lang="ts">
 	import {
+		ChevronDown,
 		Copy,
 		Ellipsis,
+		FilePlusCorner,
 		ExternalLink,
 		Eye,
 		EyeOff,
@@ -45,6 +47,7 @@
 	import type { Part } from '$lib/model/Part';
 	import type { Occurrence } from '$lib/model/Assembly';
 	import { getEditorViewContext } from '../context/EditorViewContext.svelte';
+	import { openBlankDocument } from '../blankDocument';
 
 	const ctx = getEditorViewContext();
 	const doc = $derived(ctx.currentDoc);
@@ -87,10 +90,25 @@
 		}
 	}
 
+	let renameInputEl: HTMLInputElement | null = null;
+
 	const focusAndSelect: Attachment<HTMLInputElement> = (input) => {
+		renameInputEl = input;
 		input.focus();
 		input.select();
+		return () => {
+			if (renameInputEl === input) renameInputEl = null;
+		};
 	};
+
+	// Rename in a ⋯ menu shows the field while the menu closes; the menu would hand focus back to
+	// its button, leaving the field unfocused.
+	function keepRenameFocus(event: Event) {
+		if (!renameInputEl) return;
+		event.preventDefault();
+		renameInputEl.focus();
+		renameInputEl.select();
+	}
 
 	function onRenameKeydown(event: KeyboardEvent) {
 		if (event.key === 'Enter') commitRename();
@@ -113,12 +131,31 @@
 		if (copy) ctx.setActivePart(copy.id);
 	}
 
+	/**
+	 * Starts a new, empty design and opens Link Part from… on it, with the design this one was
+	 * started from listed first: the workflow the guide recommends over native Parts.
+	 */
+	async function startNewAssembly() {
+		const fromId = doc.id;
+		await openBlankDocument(ctx.session);
+		ctx.insertLinkedPartFromDocId = fromId;
+		ctx.insertLinkedPartDialogOpen = true;
+	}
+
+	// In an empty design or an assembly file linking is the next step; anywhere else, starting an
+	// assembly file is (native Parts are the exception).
+	const isAssemblyFile = $derived(doc.parts.length === 0 || doc.isAssembly);
+
 	// --- Linked Parts ---
 
 	const partLinks = $derived(ctx.session.partLinks);
 
 	function linkTitle(part: Part, status: PartLinkStatus | null): string {
-		const from = part.source?.repoPath ?? 'a design in this browser';
+		const repoPath = part.source?.repoPath;
+		const name = status?.sourceName && `"${status.sourceName}"`;
+		const from = name
+			? `${name}${repoPath ? ` (${repoPath})` : ' in this browser'}`
+			: (repoPath ?? 'a design in this browser');
 		switch (status?.state) {
 			case 'upToDate':
 				return `Linked from ${from}, up to date. Read-only here: open the source to change it.`;
@@ -224,42 +261,105 @@
 >
 	<div class="flex h-9 items-center justify-between border-b border-border px-3 py-2">
 		<span class="text-xs font-semibold tracking-wide uppercase">Assembly</span>
-		<DropdownMenu.Root>
-			<DropdownMenu.Trigger disabled={readOnly || ctx.planeSelectionMode}>
-				{#snippet child({ props })}
-					<Button
-						{...props}
-						variant="ghost"
-						size="sm"
-						class="h-6 gap-1 px-2 text-xs"
-						title="Add a new Part to this design"
-						{@attach help({
-							title: 'New Part',
-							text: 'Adds an independent Part, folded separately from the others, and switches to it. Pick its first region and plane as usual.',
-						})}
-					>
-						<Plus size={13} />
-						New Part
-					</Button>
-				{/snippet}
-			</DropdownMenu.Trigger>
-			<DropdownMenu.Content align="end" class="w-44">
-				{#each REGION_KINDS as kind (kind.value)}
-					<DropdownMenu.Item onclick={() => ctx.startNewPart(kind.value)}>
-						<kind.icon size={12} class={kind.color} />
-						{kind.label}
-					</DropdownMenu.Item>
-				{/each}
-				<DropdownMenu.Separator />
+		<div class="flex items-center">
+			{#snippet newAssemblyItem()}
+				<DropdownMenu.Item onclick={() => void startNewAssembly()}>
+					<FilePlusCorner size={12} />
+					<span class="flex min-w-0 flex-col">
+						<span>New assembly file</span>
+						<span class="text-[11px] text-muted-foreground">
+							A new design to link this one and other Parts into
+						</span>
+					</span>
+				</DropdownMenu.Item>
+			{/snippet}
+			{#snippet linkPartItem()}
 				<DropdownMenu.Item
+					disabled={readOnly}
 					onclick={() => (ctx.insertLinkedPartDialogOpen = true)}
-					title="Add a read-only copy of another design that follows it"
 				>
 					<Link2 size={12} />
-					Insert Part from…
+					<span class="flex min-w-0 flex-col">
+						<span>Link Part into this design</span>
+						<span class="text-[11px] text-muted-foreground">
+							A read-only copy of another design that follows it
+						</span>
+					</span>
 				</DropdownMenu.Item>
-			</DropdownMenu.Content>
-		</DropdownMenu.Root>
+			{/snippet}
+			{#if isAssemblyFile}
+				<Button
+					variant="ghost"
+					size="sm"
+					class="h-6 gap-1 rounded-r-none px-2 text-xs"
+					disabled={readOnly || ctx.planeSelectionMode}
+					onclick={() => (ctx.insertLinkedPartDialogOpen = true)}
+					title="Link a Part from another design: a read-only copy that follows it"
+					{@attach help({
+						title: 'Link Part',
+						text: 'Adds the Part of another design as a read-only copy that follows it. Edit the source design, then update the copy here.',
+						doc: 'assemblies',
+					})}
+				>
+					<Link2 size={13} />
+					Link Part
+				</Button>
+			{:else}
+				<Button
+					variant="ghost"
+					size="sm"
+					class="h-6 gap-1 rounded-r-none px-2 text-xs"
+					disabled={ctx.planeSelectionMode}
+					onclick={() => void startNewAssembly()}
+					title="Start a new assembly file and link this design into it"
+					{@attach help({
+						title: 'New assembly',
+						text: 'Saves this design, starts a new assembly file and offers to link this design into it first. Link more designs there, then place their instances.',
+						doc: 'assemblies',
+					})}
+				>
+					<FilePlusCorner size={13} />
+					New assembly
+				</Button>
+			{/if}
+			<DropdownMenu.Root>
+				<DropdownMenu.Trigger disabled={ctx.planeSelectionMode}>
+					{#snippet child({ props })}
+						<Button
+							{...props}
+							variant="ghost"
+							size="icon"
+							class="size-6 rounded-l-none"
+							title="More ways to add a Part"
+							aria-label="More ways to add a Part"
+						>
+							<ChevronDown size={12} />
+						</Button>
+					{/snippet}
+				</DropdownMenu.Trigger>
+				<DropdownMenu.Content align="end" class="w-64">
+					{@render (isAssemblyFile ? newAssemblyItem : linkPartItem)()}
+					<DropdownMenu.Separator />
+					<DropdownMenu.Sub>
+						<DropdownMenu.SubTrigger disabled={readOnly}>
+							<Plus size={12} />
+							New Part in this design
+						</DropdownMenu.SubTrigger>
+						<!-- Portaled: inside the menu its scroll box clips the submenu. -->
+						<DropdownMenu.Portal>
+							<DropdownMenu.SubContent class="z-50 w-40">
+								{#each REGION_KINDS as kind (kind.value)}
+									<DropdownMenu.Item onclick={() => ctx.startNewPart(kind.value)}>
+										<kind.icon size={12} class={kind.color} />
+										{kind.label}
+									</DropdownMenu.Item>
+								{/each}
+							</DropdownMenu.SubContent>
+						</DropdownMenu.Portal>
+					</DropdownMenu.Sub>
+				</DropdownMenu.Content>
+			</DropdownMenu.Root>
+		</div>
 	</div>
 
 	<div class="min-h-0 flex-1 overflow-y-auto p-2">
@@ -322,7 +422,7 @@
 					</span>
 					<DropdownMenu.Root>
 						{@render menuButton(`Actions for ${part.name}`)}
-						<DropdownMenu.Content align="end" class="w-44">
+						<DropdownMenu.Content align="end" class="w-44" onCloseAutoFocus={keepRenameFocus}>
 							<DropdownMenu.Item onclick={() => startRename('part', part.id, part.name)}>
 								<Pencil size={12} />
 								Rename
@@ -445,7 +545,7 @@
 							{/if}
 							<DropdownMenu.Root>
 								{@render menuButton(`Actions for ${occurrence.name}`)}
-								<DropdownMenu.Content align="end" class="w-44">
+								<DropdownMenu.Content align="end" class="w-44" onCloseAutoFocus={keepRenameFocus}>
 									<DropdownMenu.Item
 										onclick={() => startRename('occurrence', occurrence.id, occurrence.name)}
 									>

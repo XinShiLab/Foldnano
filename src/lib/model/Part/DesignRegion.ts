@@ -228,6 +228,13 @@ export class DesignRegion {
 		this.maxBase += deltaLength;
 	}
 
+	/** Shortens the region and its helices to `maxBase`. The caller makes sure no strand lies
+	 * at or past it. */
+	truncateVhsTo(maxBase: number): void {
+		for (const vh of this.getRegionVirtualHelices()) vh.length = Math.min(vh.length, maxBase);
+		this.maxBase = Math.min(this.maxBase, maxBase);
+	}
+
 	toJSON(): DesignRegionJSON {
 		return {
 			id: this.id,
@@ -416,6 +423,11 @@ export abstract class LatticedDesignRegion extends DesignRegion {
 
 	override increaseVhsLengthBy(deltaLength: number): void {
 		super.increaseVhsLengthBy(deltaLength);
+		this._xoverCache.clear();
+	}
+
+	override truncateVhsTo(maxBase: number): void {
+		super.truncateVhsTo(maxBase);
 		this._xoverCache.clear();
 	}
 

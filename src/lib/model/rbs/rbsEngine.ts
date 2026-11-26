@@ -7,6 +7,7 @@
  * bodies from overlapping. No oxView code is used (oxView is GPL-3.0).
  */
 
+import { bestFitRigid } from '$lib/model/oxdnaReplay/framePose';
 import type {
 	BlockBody,
 	BlockTransformOverride,
@@ -25,6 +26,9 @@ export const DEFAULT_SOLVER_PARAMS: SolverParams = {
 	damping: 0.25,
 	collisionPasses: 2,
 };
+
+/** Spacing of the points the result is fitted back onto the design with, in bp. */
+const ALIGN_SAMPLE_SPACING_BP = 8;
 
 function add(a: Vec3, b: Vec3): Vec3 {
 	return { x: a.x + b.x, y: a.y + b.y, z: a.z + b.z };
@@ -57,6 +61,15 @@ function length(a: Vec3): number {
 function normalizeOrFallback(v: Vec3, fallback: Vec3): Vec3 {
 	const len = length(v);
 	return len > 1e-9 ? scale(v, 1 / len) : fallback;
+}
+
+function mulQuat(a: Quat, b: Quat): Quat {
+	return {
+		w: a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z,
+		x: a.w * b.x + a.x * b.w + a.y * b.z - a.z * b.y,
+		y: a.w * b.y - a.x * b.z + a.y * b.w + a.z * b.x,
+		z: a.w * b.z + a.x * b.y - a.y * b.x + a.z * b.w,
+	};
 }
 
 function rotateVec(q: Quat, v: Vec3): Vec3 {
@@ -117,6 +130,8 @@ interface WorkingBody {
 	angularVelocity: Vec3;
 	force: Vec3;
 	torque: Vec3;
+	/** Block-local points spread evenly over its helices, for fitting the result onto the design. */
+	alignSamples: Vec3[];
 }
 
 function zero(): Vec3 {
@@ -188,7 +203,49 @@ function createWorkingBodies(blocks: BlockBody[]): WorkingBody[] {
 		angularVelocity: zero(),
 		force: zero(),
 		torque: zero(),
+		alignSamples: alignSamplesFor(block),
 	}));
+}
+
+function alignSamplesFor(block: BlockBody): Vec3[] {
+	const samples: Vec3[] = [];
+	for (const cap of block.collisionCapsules) {
+		const steps = Math.max(1, Math.round((cap.hi - cap.lo) / ALIGN_SAMPLE_SPACING_BP));
+		const span = sub(cap.localEnd, cap.localStart);
+		for (let i = 0; i <= steps; i++) samples.push(add(cap.localStart, scale(span, i / steps)));
+	}
+	return samples;
+}
+
+/**
+ * The relaxed layout's pose as a whole is arbitrary: the solver only fixes where blocks sit
+ * relative to each other, and the run drifts and spins freely. Fitting it back onto the design
+ * (least squares over every block's helices) keeps the result where the design was drawn.
+ */
+function alignToDesign(
+	bodies: WorkingBody[]
+): (position: Vec3, quaternion: Quat) => { position: Vec3; quaternion: Quat } {
+	const moving: number[] = [];
+	const reference: number[] = [];
+	for (const body of bodies) {
+		for (const local of body.alignSamples) {
+			const m = worldPoint(body, local);
+			const r = add(body.block.originalCenter, local);
+			moving.push(m.x, m.y, m.z);
+			reference.push(r.x, r.y, r.z);
+		}
+	}
+	const count = moving.length / 3;
+	if (count < 3) return (position, quaternion) => ({ position, quaternion });
+	const fit = bestFitRigid(moving, reference, count);
+	const [w, x, y, z] = fit.rotation;
+	const rotation: Quat = { w, x, y, z };
+	const [fx, fy, fz] = fit.fromCenter;
+	const to: Vec3 = { x: fit.toCenter[0], y: fit.toCenter[1], z: fit.toCenter[2] };
+	return (position, quaternion) => ({
+		position: add(to, rotateVec(rotation, sub(position, { x: fx, y: fy, z: fz }))),
+		quaternion: normalizeQuat(mulQuat(rotation, quaternion)),
+	});
 }
 
 function simulateSteps(
@@ -311,12 +368,12 @@ function buildSolverResult(bodies: WorkingBody[], constraints: DistanceConstrain
 	}
 	maxOverlap = Math.max(0, maxOverlap);
 
+	const align = alignToDesign(bodies);
 	const transforms = new Map<string, BlockTransformOverride>();
 	for (const body of bodies) {
 		transforms.set(body.block.blockId, {
 			originalCenter: { ...body.block.originalCenter },
-			position: { ...body.position },
-			quaternion: { ...body.quaternion },
+			...align(body.position, body.quaternion),
 		});
 	}
 

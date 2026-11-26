@@ -28,7 +28,7 @@ src/lib/components/Editor/StrandView/
 ├── RecentFillMarkers.svelte       # transient tint on cells the last Sequence-tool fill assigned
 ├── DesignIssueMarkers.svelte      # design-check issue frames (editorViewContext.designIssues)
 ├── DesignIssuesMenu.svelte        # toolbar popover: check toggles + issue list (jump-to)
-├── Accessories.svelte             # region headers, VH tags, crossovers, skips, inserts
+├── Accessories.svelte             # region headers, VH tags, crossovers, skips, inserts, split preview
 ├── Highlights.svelte              # dimming / hiding overlays
 ├── CrossSectionSelector.svelte    # region-scoped cursor column
 ├── OligoSegmentInPart.svelte      # segment renderer + culling

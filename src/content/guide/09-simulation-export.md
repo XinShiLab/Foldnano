@@ -29,6 +29,8 @@ Typical flow:
 3. Toggle **relaxed positions** to view the relaxed geometry.
 4. Enable **stress coloring** to spot strained connections (for example crossovers pulled out of place).
 
+The relaxed structure is kept as close as possible to where the design was drawn: after the blocks settle, the whole layout is rotated and shifted as one piece to best overlap the original helices. Individual blocks still move and turn relative to each other, but the structure as a whole no longer drifts or spins away between runs.
+
 While it runs, the button reads **Stop** and an *RBS running* chip appears. **Clear relaxed layout** discards the result.
 
 **Params** opens the solver settings: **Spring k** (connection stiffness), **Repulsion C** (how strongly blocks push apart), **Friction**, **Steps**, and **Collisions** (collision passes per step). After a run, the **3D View Inspector** panel shows **Simulation Diagnostics**: block and constraint counts, RMS constraint error, and maximum overlap (the same block count and RMS error appear as a toolbar chip).

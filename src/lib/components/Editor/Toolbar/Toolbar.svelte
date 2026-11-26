@@ -20,6 +20,7 @@
 	import {
 		// BadgeCheckIcon,
 		Bolt,
+		Boxes,
 		BookOpen,
 		Bug,
 		Check,
@@ -79,7 +80,8 @@
 	import { exportBaseName } from '$lib/model/io/designFileName';
 	import { help } from '$lib/components/help/help';
 	import { modKeySymbol } from '$lib/utils/platform';
-	import { goto, pushState, replaceState } from '$app/navigation';
+	import { goto } from '$app/navigation';
+	import { openBlankDocument } from '../blankDocument';
 	import SaveStatusIndicator from '../SaveStatusIndicator.svelte';
 	import DesignIdChip from '../DesignIdChip.svelte';
 	import { serverClockOffset } from '$lib/services/serverClock';
@@ -311,7 +313,7 @@
 
 	const onDuplicateRegion = () => {
 		addPartMenuOpen = false;
-		const part = foldnanoDoc.parts[0];
+		const part = editorViewContext.activePart;
 		const region = editorViewContext.activeRegion;
 		if (!part || !region) return;
 		try {
@@ -330,6 +332,9 @@
 	const redo = () => {
 		history.redoOnce();
 	};
+
+	// A linked Part is read-only: its regions take no new regions or staples.
+	const activePartLinked = $derived(!!editorViewContext.activePart?.source);
 
 	const activeLatticeRegion = $derived(
 		editorViewContext.activeRegion instanceof LatticedDesignRegion
@@ -439,14 +444,7 @@
 		editorViewContext.newFileDialogOpen = true;
 	};
 
-	// Shallow-routed so the editor (and its plugin worker) isn't remounted; Editor.svelte moves the
-	// URL to /editor/<id> once the blank document is first saved.
-	const createLocalOnlyDocument = async () => {
-		await session.startBlankDocument();
-		const editorPath = resolve('/editor');
-		if (window.location.pathname === editorPath) replaceState(editorPath, {});
-		else pushState(editorPath, {});
-	};
+	const createLocalOnlyDocument = () => openBlankDocument(session);
 </script>
 
 <div class="mb-2 flex flex-col gap-2 pl-2">
@@ -749,75 +747,77 @@
 					</DropdownMenu.Root>
 				</ButtonGroup.Root>
 
-				<ButtonGroup.Root>
-					<Button
-						variant="outline"
-						size="sm"
-						onclick={() => startAddRegion('HONEYCOMB')}
-						title="Add Region"
-						aria-label="Add Region"
-						{@attach help({
-							title: 'Add Region',
-							text: 'Add another region, on its own plane, to this part. The arrow menu picks the lattice or imports a cadnano design as a region.',
-							doc: 'creating-a-design',
-							newVsCadnano: true,
-						})}><Bolt /><span class="hidden xl:inline">Add Region</span></Button
-					>
-					<DropdownMenu.Root bind:open={addPartMenuOpen}>
-						<DropdownMenu.Trigger>
-							{#snippet child({ props })}
-								<Button
-									{...props}
-									variant="outline"
-									size="sm"
-									class="!pl-2"
-									{@attach help({
-										title: 'Region types',
-										text: 'Add a honeycomb, square or freeform region, load a cadnano design as a new region of this part, or duplicate the active region.',
-										doc: 'creating-a-design',
-									})}
-								>
-									<ChevronDown />
-								</Button>
-							{/snippet}
-						</DropdownMenu.Trigger>
-						<DropdownMenu.Content align="end" class="min-w-50 [--radius:1rem]">
-							<DropdownMenu.Group>
-								<DropdownMenu.Item onclick={() => startAddRegion('HONEYCOMB')}>
-									<Hexagon />Add Honeycomb Region
-								</DropdownMenu.Item>
-								<DropdownMenu.Item onclick={() => startAddRegion('SQUARE')}>
-									<Square />Add Square Region
-								</DropdownMenu.Item>
-								<DropdownMenu.Item onclick={() => startAddRegion('FREEFORM')}>
-									<LineSquiggle />Add Freeform Region
-								</DropdownMenu.Item>
-								<DropdownMenu.Item onclick={() => startAddRegion('WIREFRAME')}>
-									<Pyramid />Add Wireframe Region
-								</DropdownMenu.Item>
-								<DropdownMenu.Separator />
-								<DropdownMenu.Item
-									onclick={() => {
-										addPartMenuOpen = false;
-										loadCadnanoRegionDialogOpen = true;
-									}}
-								>
-									<FileBracesCorner />Load Cadnano Design as a Region
-								</DropdownMenu.Item>
-								{#if editorViewContext.activeRegion}
-									<DropdownMenu.Separator />
-									<DropdownMenu.Item onclick={onDuplicateRegion}>
-										<CopyPlus />Duplicate {editorViewContext.activeRegion.name}
+				{#if !activePartLinked}
+					<ButtonGroup.Root>
+						<Button
+							variant="outline"
+							size="sm"
+							onclick={() => startAddRegion('HONEYCOMB')}
+							title="Add Region"
+							aria-label="Add Region"
+							{@attach help({
+								title: 'Add Region',
+								text: 'Add another region, on its own plane, to this part. The arrow menu picks the lattice or imports a cadnano design as a region.',
+								doc: 'creating-a-design',
+								newVsCadnano: true,
+							})}><Bolt /><span class="hidden xl:inline">Add Region</span></Button
+						>
+						<DropdownMenu.Root bind:open={addPartMenuOpen}>
+							<DropdownMenu.Trigger>
+								{#snippet child({ props })}
+									<Button
+										{...props}
+										variant="outline"
+										size="sm"
+										class="!pl-2"
+										{@attach help({
+											title: 'Region types',
+											text: 'Add a honeycomb, square or freeform region, load a cadnano design as a new region of this part, or duplicate the active region.',
+											doc: 'creating-a-design',
+										})}
+									>
+										<ChevronDown />
+									</Button>
+								{/snippet}
+							</DropdownMenu.Trigger>
+							<DropdownMenu.Content align="end" class="min-w-50 [--radius:1rem]">
+								<DropdownMenu.Group>
+									<DropdownMenu.Item onclick={() => startAddRegion('HONEYCOMB')}>
+										<Hexagon />Add Honeycomb Region
 									</DropdownMenu.Item>
-								{/if}
-							</DropdownMenu.Group>
-						</DropdownMenu.Content>
-					</DropdownMenu.Root>
-				</ButtonGroup.Root>
+									<DropdownMenu.Item onclick={() => startAddRegion('SQUARE')}>
+										<Square />Add Square Region
+									</DropdownMenu.Item>
+									<DropdownMenu.Item onclick={() => startAddRegion('FREEFORM')}>
+										<LineSquiggle />Add Freeform Region
+									</DropdownMenu.Item>
+									<DropdownMenu.Item onclick={() => startAddRegion('WIREFRAME')}>
+										<Pyramid />Add Wireframe Region
+									</DropdownMenu.Item>
+									<DropdownMenu.Separator />
+									<DropdownMenu.Item
+										onclick={() => {
+											addPartMenuOpen = false;
+											loadCadnanoRegionDialogOpen = true;
+										}}
+									>
+										<FileBracesCorner />Load Cadnano Design as a Region
+									</DropdownMenu.Item>
+									{#if editorViewContext.activeRegion}
+										<DropdownMenu.Separator />
+										<DropdownMenu.Item onclick={onDuplicateRegion}>
+											<CopyPlus />Duplicate {editorViewContext.activeRegion.name}
+										</DropdownMenu.Item>
+									{/if}
+								</DropdownMenu.Group>
+							</DropdownMenu.Content>
+						</DropdownMenu.Root>
+					</ButtonGroup.Root>
+				{/if}
 
 				<LoadCadnanoAsRegionDialog bind:open={loadCadnanoRegionDialogOpen} />
 
-				{#if activeLatticeRegion?.supportsLatticeAutoStaple}
+				{#if activeLatticeRegion?.supportsLatticeAutoStaple && !activePartLinked}
 					<ButtonGroup.Root>
 						<Button
 							variant="outline"
@@ -846,6 +846,19 @@
 						text: 'Click to edit the name, then Rename (or Enter) to rename this design, or Save as a copy to keep it and save a new design under the typed name. Esc cancels. Next to it: the design ID and whether the latest changes are saved.',
 					})}
 				>
+					{#if session.currentDoc.isAssembly}
+						<button
+							type="button"
+							class="my-auto ml-2 hidden shrink-0 cursor-pointer items-center gap-1 rounded border border-teal-600/40 bg-teal-50 px-1.5 py-0.5 text-xs text-teal-800 hover:bg-teal-100 lg:flex dark:border-teal-400/40 dark:bg-teal-950 dark:text-teal-200 dark:hover:bg-teal-900"
+							onclick={() => editorViewContext.openSidePanel('ASSEMBLY')}
+							title="An assembly file: it places Parts linked from other designs. Click to open the Assembly panel."
+							{@attach help({
+								title: 'Assembly file',
+								text: 'Every Part here is linked from another design: this file only places them. Edit a Part in its own design, then update it in the Assembly panel.',
+								doc: 'assemblies',
+							})}><Boxes size={12} />Assembly</button
+						>
+					{/if}
 					<Input
 						type="text"
 						placeholder="Untitled Document"

@@ -31,14 +31,20 @@
 
 	$effect(() => {
 		if (open) void loadCandidates();
+		// The design a new assembly was started from is listed first only for that opening.
+		else ctx.insertLinkedPartFromDocId = null;
 	});
 
 	async function loadCandidates() {
 		candidates = null;
 		const currentId = ctx.currentDoc.id;
+		const fromId = ctx.insertLinkedPartFromDocId;
 		const list = (await session.getDocumentList())
 			.filter((meta) => meta.id !== currentId)
-			.sort((a, b) => b.lastModified - a.lastModified);
+			.sort(
+				(a, b) =>
+					Number(b.id === fromId) - Number(a.id === fromId) || b.lastModified - a.lastModified
+			);
 		candidates = await Promise.all(
 			list.map(async (meta) => {
 				return {
@@ -96,7 +102,7 @@
 <Dialog.Root bind:open>
 	<Dialog.Content class="sm:max-w-md">
 		<Dialog.Header>
-			<Dialog.Title>Insert Part from…</Dialog.Title>
+			<Dialog.Title>Link Part from…</Dialog.Title>
 			<Dialog.Description>
 				Adds a read-only copy of another design that follows it: when the design changes, update the
 				copy from the Assembly panel. Designs with one Part and no links of their own can be linked.
@@ -131,6 +137,9 @@
 								{candidate.reason
 									? `Can't be linked: it ${candidate.reason}`
 									: (candidate.repoPath ?? 'Only in this browser')}
+								{#if candidate.docId === ctx.insertLinkedPartFromDocId}
+									· the design you came from
+								{/if}
 							</span>
 						</span>
 					</button>

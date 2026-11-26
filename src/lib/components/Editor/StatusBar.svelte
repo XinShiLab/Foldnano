@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { GitBranch, HardDrive, History } from '@lucide/svelte';
+	import { Boxes, GitBranch, HardDrive, History } from '@lucide/svelte';
 	import { getEditorViewContext } from './context/EditorViewContext.svelte';
 	import NotificationHistory from './NotificationHistory.svelte';
 
@@ -9,6 +9,9 @@
 	const repoCtx = $derived(session.currentRepoContext);
 	const notCommitted = $derived(fileMeta !== null && session.hasUncommittedGitHubChanges);
 	const region = $derived(ctx.activeRegion);
+	// An assembly file gets its own bar color (teal, as on the start screen's Assembly card), at the
+	// lightness of the usual blue so the text and the amber notes keep their contrast.
+	const isAssembly = $derived(session.currentDoc.isAssembly);
 
 	let backupCount = $state(0);
 	// Backups are kept when a save replaces the stored copy, so recount after each save and
@@ -32,10 +35,23 @@
 {/snippet}
 
 <div
-	class="-mr-2 flex h-7 shrink-0 items-center justify-between gap-4 bg-primary px-3 text-sm text-primary-foreground/80"
+	class="-mr-2 flex h-7 shrink-0 items-center justify-between gap-4 px-3 text-sm text-primary-foreground/80 {isAssembly
+		? 'bg-teal-700 dark:bg-teal-800'
+		: 'bg-primary'}"
 >
-	<!-- Left: where the design lives, its sync state, backups -->
+	<!-- Left: assembly file, where the design lives, its sync state, backups -->
 	<div class="flex min-w-0 items-center gap-2 overflow-hidden">
+		{#if isAssembly}
+			<button
+				class="flex shrink-0 items-center gap-1 font-semibold text-primary-foreground hover:underline"
+				title="An assembly file: every Part in it is linked from another design. Click to open the Assembly panel."
+				onclick={() => ctx.openSidePanel('ASSEMBLY')}
+			>
+				<Boxes class="size-3" />
+				Assembly file
+			</button>
+			{@render divider()}
+		{/if}
 		{#if fileMeta && repoCtx}
 			<span class="flex shrink-0 items-center gap-1 font-semibold text-primary-foreground">
 				<GitBranch class="size-3" />

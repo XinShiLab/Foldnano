@@ -120,6 +120,16 @@ The solver returns a transform per block:
 }
 ```
 
+Before a result is returned (progress snapshots included), the whole layout is
+fitted back onto the design pose: a least-squares rigid fit (Horn's quaternion
+method, `bestFitRigid` from `oxdnaReplay/framePose.ts`) over points sampled every
+8 bp along every block's helices, applied to all block transforms alike. The
+solver only fixes where blocks sit relative to each other; without the fit the
+run drifts and spins freely and the result lands at an arbitrary orientation.
+The fit leaves crossover stress, overlap and diagnostics unchanged (they are
+invariant under a common rigid motion). Working bodies stay unaligned; only the
+output is fitted.
+
 The renderer applies this transform as:
 
 ```ts
@@ -290,6 +300,7 @@ The RBS tests cover:
 - Off-center spring attachments produce rotation.
 - Overlapping block capsules are separated.
 - Repeated runs are deterministic.
+- The relaxed layout is fitted onto the design pose (no residual spin or drift).
 - Insert/skip physical-coordinate helpers emit the correct rendered/exported
   nucleotide counts and endpoint indices.
 - oxDNA export emits inserted nts, omits skipped nts, preserves topology
@@ -370,6 +381,7 @@ Worker messages (`View3D/rbs/rbsWorker.ts`):
 - **Don't persist `BlockTransformOverride`.** It is render-time only. Saving it into the model would invalidate any future topology change.
 - **Don't run the solver on the main thread by default.** `View3D` first tries the worker; main-thread chunked simulation is a fallback after a 1500 ms watchdog.
 - **Don't bypass `buildBlocksAndConstraints`.** The block partition (union-find over complementary VH spans + constrained crossovers) is what makes the solver tractable; ad-hoc block construction will tear at crossovers.
+- **Don't drop the design-pose fit from `buildSolverResult`.** Without it each run (and each progress frame) lands at an arbitrary orientation. If the sampling changes, keep it uniform along the helices: the fit of a folded shape onto a flat lattice is sensitive to weighting.
 - **Don't treat `getStressMap()` as an absolute force value.** It is a relative residual map for visualization, not a physical Newton.
 - **Don't keep stale `simOverrides` after a topology edit.** The 3D effect already invalidates via `isSimStale`; preserve that flag when adding new triggers.
 - **Don't stamp results with the live Part.** `RbsSimulation` takes `solverInputSignature` of the input it builds when a run starts and hands that to `onResults`; signing at delivery would make a result computed before an edit look fresh. Don't hand-pick design fields for freshness either: compare solver inputs (`computeSimulationFreshnessSignature`), so anything new the solver reads is covered (see `docs/editor-3d-view.md` § `isSimStale`).

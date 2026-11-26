@@ -5,7 +5,59 @@ import FoldnanoDocument from '$lib/model/document.svelte';
 import { makeHoneycombPart, addLatticeVh } from '$lib/model/test/testHelpers';
 import { buildBlocksAndConstraints, UNCONSTRAINED_CROSSOVER_REST_LENGTH_NM } from './buildBlocks';
 import { solveBlockLayout } from './rbsEngine';
-import type { BlockBody } from './rbsTypes';
+import { bestFitRigid } from '$lib/model/oxdnaReplay/framePose';
+import type { BlockBody, BlockTransformOverride, Vec3 } from './rbsTypes';
+
+function loadTetrahedral() {
+	const raw = JSON.parse(
+		readFileSync(
+			join(process.cwd(), 'test_files/internal_cadnano_designs/test_tetrahedral2.fn.json'),
+			'utf8'
+		)
+	);
+	return FoldnanoDocument.fromJSON(raw).parts[0];
+}
+
+/** Points every 8 bp along each block's helices: as designed, and as placed by `transforms`. */
+function designAndPlacedPoints(
+	blocks: BlockBody[],
+	transforms: Map<string, BlockTransformOverride>
+): { design: number[]; placed: number[] } {
+	const rotate = (q: BlockTransformOverride['quaternion'], v: Vec3): Vec3 => {
+		const tx = 2 * (q.y * v.z - q.z * v.y);
+		const ty = 2 * (q.z * v.x - q.x * v.z);
+		const tz = 2 * (q.x * v.y - q.y * v.x);
+		return {
+			x: v.x + q.w * tx + (q.y * tz - q.z * ty),
+			y: v.y + q.w * ty + (q.z * tx - q.x * tz),
+			z: v.z + q.w * tz + (q.x * ty - q.y * tx),
+		};
+	};
+	const design: number[] = [];
+	const placed: number[] = [];
+	for (const block of blocks) {
+		const t = transforms.get(block.blockId)!;
+		for (const cap of block.collisionCapsules) {
+			const steps = Math.max(1, Math.round((cap.hi - cap.lo) / 8));
+			for (let i = 0; i <= steps; i++) {
+				const f = i / steps;
+				const local = {
+					x: cap.localStart.x + (cap.localEnd.x - cap.localStart.x) * f,
+					y: cap.localStart.y + (cap.localEnd.y - cap.localStart.y) * f,
+					z: cap.localStart.z + (cap.localEnd.z - cap.localStart.z) * f,
+				};
+				const r = rotate(t.quaternion, local);
+				design.push(
+					block.originalCenter.x + local.x,
+					block.originalCenter.y + local.y,
+					block.originalCenter.z + local.z
+				);
+				placed.push(t.position.x + r.x, t.position.y + r.y, t.position.z + r.z);
+			}
+		}
+	}
+	return { design, placed };
+}
 
 describe('block-based RBS topology', () => {
 	it('assigns the tetrahedral fixture into 6 blocks', () => {
@@ -15,8 +67,7 @@ describe('block-based RBS topology', () => {
 				'utf8'
 			)
 		);
-		const doc = FoldnanoDocument.fromJSON(raw);
-		const result = buildBlocksAndConstraints(doc.parts[0]);
+		const result = buildBlocksAndConstraints(FoldnanoDocument.fromJSON(raw).parts[0]);
 
 		expect(result.blocks).toHaveLength(6);
 	});
@@ -175,5 +226,23 @@ describe('block-based RBS solver', () => {
 		const second = solveBlockLayout(built.blocks, built.constraints).transforms;
 
 		expect(first).toEqual(second);
+	});
+
+	it('fits the relaxed layout back onto the design pose', () => {
+		const built = buildBlocksAndConstraints(loadTetrahedral());
+		const solved = solveBlockLayout(built.blocks, built.constraints);
+		const { design, placed } = designAndPlacedPoints(built.blocks, solved.transforms);
+
+		// A further fit has nothing left to correct: no residual spin or drift.
+		const residual = bestFitRigid(placed, design, design.length / 3);
+		const [w] = residual.rotation;
+		expect(2 * Math.acos(Math.min(1, Math.abs(w)))).toBeLessThan(1e-3);
+		for (let k = 0; k < 3; k++) {
+			expect(residual.fromCenter[k]).toBeCloseTo(residual.toCenter[k], 6);
+		}
+		// The relaxation itself still happened: the shape changed, not just its pose.
+		let sumSq = 0;
+		for (let i = 0; i < design.length; i++) sumSq += (placed[i] - design[i]) ** 2;
+		expect(Math.sqrt(sumSq / (design.length / 3))).toBeGreaterThan(1);
 	});
 });

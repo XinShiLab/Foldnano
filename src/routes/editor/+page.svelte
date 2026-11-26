@@ -17,7 +17,8 @@
 </script>
 
 <svelte:head>
-	<title>Foldnano - Editor</title>
+	<!-- Shown while the Editor chunk loads; the Editor then titles the tab with the design name. -->
+	<title>Editor · Foldnano</title>
 </svelte:head>
 
 <div class="h-dvh w-full overflow-hidden">

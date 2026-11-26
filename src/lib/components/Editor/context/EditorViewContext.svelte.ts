@@ -70,6 +70,27 @@ import type { SimulationExportRequest } from '$lib/model/io/assemblyNtModel';
 
 export type ActiveViewer = 'STRAND' | 'HELIX' | 'VIEW3D';
 
+/** What the Split region tool would do on click: split between helix rows, or along the helix
+ * axis just before bp `cut` (`ok` false carries the reason it can't). */
+export type SplitPreview =
+	| {
+			kind: 'rows';
+			gapAfterVhId: string;
+			regionId: string;
+			newRegionName: string;
+			gapDisplayRow: number;
+	  }
+	| {
+			kind: 'bp';
+			regionId: string;
+			cut: number;
+			newRegionName: string;
+			ok: boolean;
+			shift: number;
+			reason: string;
+			blockingSegmentIds: string[];
+	  };
+
 /** Placement state of an in-progress Duplicate (DUPLICATE mode). `anchorBp` is the pointer bp
  * at which `baseDelta` was last pinned; null until the pointer next moves. `linked` places
  * mirror copies: a new repeat group, or another instance of `groupId`. */
@@ -292,12 +313,7 @@ class StrandViewContext {
 	showBlocks: boolean = $state(false);
 	csCursorIdx: number = $state(0);
 	activeCsRegionId: string | null = $state(null);
-	splitPreviewState: {
-		gapAfterVhId: string;
-		regionId: string;
-		newRegionName: string;
-		gapDisplayRow: number;
-	} | null = $state(null);
+	splitPreviewState: SplitPreview | null = $state.raw(null);
 	// Raw: holds live Oligo instances, and every update replaces the whole object.
 	duplicateState: DuplicateState | null = $state.raw(null);
 	contextMenu: ContextMenuInfo = $state({
@@ -370,8 +386,10 @@ export class EditorViewContext {
 	/** Owned plugins whose editor panel has a sidebar icon; open editors stay mounted off-tab. */
 	pluginEditorIds: SvelteSet<string> = new SvelteSet();
 	newFileDialogOpen: boolean = $state(false);
-	/** Insert Part from… (linked Parts); opened from the Assembly panel and the start screen. */
+	/** Link Part from… (linked Parts); opened from the Assembly panel and the start screen. */
 	insertLinkedPartDialogOpen: boolean = $state(false);
+	/** Design listed first in Link Part from…: the one a new assembly was started from. */
+	insertLinkedPartFromDocId: string | null = $state(null);
 	publishToGitHubDialogOpen: boolean = $state(false);
 	activeGitHubTab: 'files' | 'changes' | 'graph' = $state('files');
 	localOnlyEntriesVersion: number = $state(0);

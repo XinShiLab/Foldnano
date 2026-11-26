@@ -23,13 +23,13 @@ A design can hold several **Parts**: structures that are folded separately and c
 For anything beyond a quick sketch, keep each Part in a design of its own and build the assembly only from links to them:
 
 1. Make each Part as its own design. Draw, staple and relax it there, where every tool works on it.
-2. Start the assembly from the **Assembly** card on the start screen, and link each Part with **Insert Part from…**.
+2. Start the assembly with **New assembly** at the top of the Assembly panel in one of those designs (or the **Assembly** card on the start screen), and link each Part with **Link Part**.
 3. In the assembly, add instances and place them in 3D. Apart from the linked copies, that is all the assembly holds.
 4. To change a Part, choose **Open source** in its **⋯** menu, edit and save the source, then choose **Update from source** in the assembly.
 
 ![Assembly panel listing a linked Base Part placed once and a linked Arm Part placed twice, its link icon marked as changed, next to the 3D view showing the base with the two arms placed above it in a V](/screenshots/guide/assemblies/01-assembly-3d.webp)
 
-This keeps every Part reusable: the same arm can be linked into several assemblies, and each one picks up a change to it with **Update from source**. The assembly itself only changes when you place something or update a link. Editable Parts made with **New Part** inside the assembly still work, for a quick test or a small piece that only this assembly needs.
+This keeps every Part reusable: the same arm can be linked into several assemblies, and each one picks up a change to it with **Update from source**. The assembly itself only changes when you place something or update a link. Editable Parts made with **New Part in this design** still work, for a quick test or a small piece that only this assembly needs.
 
 ## Parts, Regions And Instances
 
@@ -51,17 +51,20 @@ A design started from a region card has one Part, placed once. Nothing about Par
 
 Open the **Assembly** panel from the stacked-boxes icon in the left sidebar. It lists every Part with its instances:
 
+- The button at the top suggests the next step. In an assembly file (every Part linked) or an empty design it is **Link Part**; anywhere else it is **New assembly**, which starts a new assembly file (see [Linked Parts](#linked-parts)). The arrow next to it holds the other one and **New Part in this design**.
+
 - The round marker shows the **active** Part, the one the plane and strand views edit. Click a Part to make it active; its regions are listed under it.
 - **×N** is how many instances the Part has.
 - A Part's **⋯** menu renames it, adds an instance, duplicates it as a new, independent Part, or deletes it.
 - Each instance has an eye button to hide or show it, and a **⋯** menu to rename, move, reset or delete it. A Part keeps at least one instance; to remove the last one, delete the Part.
 - Double-click a Part or instance name to rename it.
+- In a design with only one Part, renaming the design renames that Part (and its instances) too, as long as you haven't given the Part a name of its own.
 
 With more than one Part, or when the active Part is linked, a bar above the strand view shows the design, the active Part and the active region. Click the Part name there to switch Parts, or double-click another Part on a helix in the 3D view.
 
 ## Adding A Part
 
-Choose **New Part** at the top of the Assembly panel and pick the kind of its first region (honeycomb, square, freeform or wireframe). The editor switches to the new Part and opens the plane picker, as for a new design. Cancel the picker to drop the new Part again.
+Open the arrow at the top of the Assembly panel, choose **New Part in this design** and pick the kind of its first region (honeycomb, square, freeform or wireframe). The editor switches to the new Part and opens the plane picker, as for a new design. Cancel the picker to drop the new Part again.
 
 **Duplicate as new Part** copies a Part into a new one that you can change on its own. To place the same Part again and keep the copies identical, use **Add instance** instead.
 
@@ -69,7 +72,17 @@ Undo and redo cover the whole design: adding, deleting or renaming a Part and mo
 
 ## Starting An Assembly
 
-To build a design only from Parts you keep in other designs, start a new document and choose the **Assembly** card on the start screen, below the region cards. It opens **Insert Part from…** (see [Linked Parts](#linked-parts)) without first adding an empty Part. After the first Part is linked, the Assembly panel opens so you can link more Parts, add instances and place them. An assembly is an ordinary design: you can still add editable Parts to it with **New Part**.
+To build a design only from Parts you keep in other designs, open one of them and choose **New assembly** at the top of its Assembly panel. This saves it, starts a new document and opens **Link Part from…** (see [Linked Parts](#linked-parts)) with the design you came from listed first. From an empty document, the **Assembly** card on the start screen, below the region cards, opens the same dialog. Neither adds an empty Part first. After the first Part is linked, the Assembly panel opens so you can link more Parts, add instances and place them. While every Part in it is linked, it is marked as an assembly file: a teal **Assembly** badge before the design's name in the toolbar, and a teal status bar that starts with **Assembly file**. Click either to open the Assembly panel. An assembly is still an ordinary design: you can add editable Parts to it with **New Part in this design** (it is then no longer marked as an assembly).
+
+## What An Assembly File Is
+
+An assembly file is a Foldnano design whose Parts are all linked from other designs. It is not a special file type: it is saved, backed up, downloaded and committed exactly like any other design, as the same `.fn.json` format. Nothing in the file says it is an assembly; Foldnano only notices that every Part in it is linked and marks it with the teal badge and status bar so you can tell it apart from the designs its Parts come from.
+
+<Callout type="note" title="Nothing is lost in an assembly file">
+
+An assembly file holds a **complete copy** of every linked Part: its helices, strands, sequences and regions, plus where each instance is placed. It is not a list of references that only works next to its sources. So the file opens, shows in 3D and exports on its own, even on another computer or after a source design was deleted; the link then only reports that it can't check the source any more. **Update from source** replaces a copy only when you choose it, and undo brings the previous copy back.
+
+</Callout>
 
 ## Placing Instances In 3D
 
@@ -92,13 +105,13 @@ Hiding an instance with its eye button hides it in 3D and leaves it out of the s
 
 A Part can come from another design: a hinge you keep in its own file, for example, used in several assemblies. The assembly holds a **read-only copy** that follows the source design.
 
-To link one, choose **New Part** › **Insert Part from…** and pick a design saved in this browser. Only designs with exactly one Part and no linked Parts of their own can be linked. A link always follows the source as it is saved in this browser: the same design you see when you open it. Linking a design that is already linked adds another instance of it.
+To link one, choose **Link Part** at the top of the Assembly panel (in a design without linked Parts it is under the arrow, as **Link Part into this design**) and pick a design saved in this browser. Only designs with exactly one Part and no linked Parts of their own can be linked. A link always follows the source as it is saved in this browser: the same design you see when you open it. Linking a design that is already linked adds another instance of it.
 
-![Insert Part from dialog listing the designs Arm and Base, each marked Only in this browser](/screenshots/guide/assemblies/03-insert-part-dialog.webp)
+![Link Part from dialog listing the designs Arm and Base, each marked Only in this browser](/screenshots/guide/assemblies/03-insert-part-dialog.webp)
 
 ### Working with a linked Part
 
-You can view a linked Part, select strands in it, place and move its instances, rename it and export it. While it is the active Part, only **Pan** and **Select** are available, Select does not move anything, its planes can't be moved in 3D, and the bar above the strand view says **Linked, read-only**. Plugins can run on it, but their results can't be applied.
+You can view a linked Part, select strands in it, place and move its instances, rename it and export it. While it is the active Part, only **Pan** and **Select** are available, Select does not move anything, its planes can't be moved in 3D, the bar above the strand view says **Linked, read-only**, and the toolbar hides **Add Region** and **Auto Staple**. Plugins can run on it, but their results can't be applied.
 
 To change it, edit the source: **Open source** in its **⋯** menu opens the source design in a new tab. Save it there, and the assembly notices the change.
 
@@ -106,7 +119,7 @@ To change it, edit the source: **Open source** in its **⋯** menu opens the sou
 
 ### Keeping it up to date
 
-The link icon next to the Part's name shows its state:
+A linked Part is named after its source design when you link it, and keeps that name: renaming the source doesn't change it or mark the link as changed, and you can rename the copy freely. Hover the link icon to see the source's current name. The icon also shows the link's state:
 
 | Icon | Meaning | What to do |
 | --- | --- | --- |

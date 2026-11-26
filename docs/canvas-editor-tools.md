@@ -188,8 +188,16 @@ The SELECT tool uses **handler capture**: on `down`, whichever sub-handler claim
 | MODIFICATION | `modification.ts`  | Click a slot to attach a custom modification                   |
 | SEQUENCE     | `sequence.ts`      | Click oligo/segment to assign or clear sequence                |
 | DUPLICATE    | `duplicate.ts`     | Place copies of selected oligos; see `docs/repeat-units.md`    |
+| SPLIT_REGION | `splitRegion.ts`   | Split a region between rows, or along the helix axis           |
 
 PAN mode is handled at the Konva stage level, not via a Tool object.
+
+SPLIT_REGION picks its split from where the pointer is: on a helix's strand band
+(`getHitGridByXY` hits) it previews a cut along the helix axis at the nearest bp boundary
+(`analyzeBpSplit`, then `splitRegionAtBpCmd` on click; a refused cut shows its reason in red
+and highlights the blocking strands; a cut on a `step` boundary draws solid and thicker); between rows it snaps to the nearest row gap
+(`splitRegionCmd`). Both write `strandViewContext.splitPreviewState` (`SplitPreview`, a
+`rows` / `bp` union) for the overlay in `Accessories.svelte`.
 
 DUPLICATE is transient (like SPLIT_REGION): it has no toolbar toggle and is entered only
 through `startDuplicate` (`strandActions.ts`, `Cmd/Ctrl+D` or the Edit toolbar button),
