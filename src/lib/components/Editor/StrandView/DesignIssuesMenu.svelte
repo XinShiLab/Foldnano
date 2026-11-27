@@ -22,6 +22,11 @@
 		{ key: 'integrity', label: 'Editor rules', hint: "States the editor wouldn't create itself" },
 		{ key: 'simulation', label: 'Simulation export', hint: 'What oxDNA / mrDNA export refuses' },
 		{ key: 'cadnano', label: 'Cadnano export', hint: 'What cadnano JSON loses, active region' },
+		{
+			key: 'stickyPairs',
+			label: 'Sticky-end pairs',
+			hint: 'Saved pairs that broke or lost a side',
+		},
 	];
 
 	const DOT = { error: 'bg-destructive', warning: 'bg-amber-500', info: 'bg-muted-foreground' };

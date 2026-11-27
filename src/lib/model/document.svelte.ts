@@ -128,11 +128,12 @@ export default class FoldnanoDocument {
 		return part;
 	}
 
-	/** Removes a Part definition and every occurrence of it. */
+	/** Removes a Part definition, every occurrence of it, and the sticky-end pairs reaching it. */
 	removePart(partId: string): void {
 		const index = this.parts.findIndex((part) => part.id === partId);
 		if (index < 0) return;
 		this.parts.splice(index, 1);
 		this.assembly.removeAllOf(partId);
+		this.assembly.stickyRecords.removeAllOf(partId);
 	}
 }

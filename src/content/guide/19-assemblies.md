@@ -8,6 +8,9 @@ covers:
   - src/lib/components/Editor/Assembly/**
   - src/lib/model/partLinks.ts
   - src/lib/services/partLinks/**
+  - src/lib/components/Editor/ToolPanel/StickyEndsPanel.svelte
+  - src/lib/components/Editor/StrandView/StickyEndMarkers.svelte
+  - src/lib/components/Editor/View3D/stickyEndOverlay.ts
 ---
 
 <script>
@@ -135,6 +138,39 @@ A linked Part is named after its source design when you link it, and keeps that 
 ### If You Use GitHub
 
 Linked Parts work the same without GitHub. For assemblies kept in a repository, see [Assemblies with linked Parts](/docs/guide/saving-github#assemblies-with-linked-parts).
+
+## Sticky Ends
+
+Parts often join through **sticky ends**: a single-stranded overhang on one Part whose sequence is complementary to an overhang on another. Foldnano finds these from the sequences, so there is nothing to mark. It works the same in a one-Part design, for overhangs meant to bind within that Part.
+
+Click the **Sticky Ends** button (a magnet) in the strand-view toolbar to open the Sticky Ends panel. It lists every pair of single-stranded stretches that are exact complements over at least the **Shortest match** length (7 nt to start with, never under 5). Each match gets its own color:
+
+- In the **strand view**, the matched bases are shaded in that color. A side whose partner is in another Part carries a small badge with that Part's name, since the strand view shows one Part at a time.
+- In the **3D view**, the matched stretches are drawn in that color on every instance, and dashed lines join the two sides. By default every pair of instances that could bind is joined. When a Part is placed more than once, the panel's **One line per instance** switch joins each instance only to the nearest instance of its partner instead, which keeps a large assembly readable. A match within one Part can join two stretches of the same instance, and a self-complementary stretch is only joined to other instances. Pointing at a match in the panel fades the others.
+- Pointing at a match in the panel emphasizes it in both views. Clicking it shows that stretch in the strand view, switching to its Part if needed.
+
+![Sticky Ends panel listing matches in their colors, next to the 3D view where the matched stretches are drawn in the same colors and dashed lines join the partners across instances](/screenshots/guide/assemblies/04-sticky-ends.webp)
+
+*Each match has one color in the panel and in both views; dashed lines in 3D join the two sides.*
+
+The **Show in the views** switch (also the **sticky end matches** highlight) turns the colors on or off without closing the panel. Stretches without an assigned sequence never match, and a stretch that is its own complement is listed as **self-complementary**, since it can bind another copy of the same strand.
+
+### Pairing And Ignoring Matches
+
+New matches are listed under **New**. Each row has two buttons:
+
+- **Pair** (chain link) says you meant these two stretches to bind. The match moves to **Paired**, and from then on the design checks warn if an edit breaks it: a changed sequence, a deleted strand, or a strand shortened past the stretch. The row shows how the pair stands: matching, partly matching, no longer matching, a side gone, or no sequence yet.
+- **Ignore** (crossed eye) says the match is a coincidence. It moves to **Ignored** and is no longer colored in the views.
+
+**Unpair** and **Stop ignoring** put a match back under **New**. Every one of these is a design edit, so it is saved with the design and **Undo** reverts it.
+
+A pair is kept by its position along each strand, counted from the nearer end, so moving or lengthening a strand at its other end keeps the pair. Pairs within one Part are saved with that Part; pairs between two Parts are saved with the assembly. A linked Part brings its own pairs along, read-only: pair or unpair them in the source design, then update the link. Pairs between a linked Part and another Part can be made in the assembly. A circular strand has no ends, so its matches can't be paired or ignored.
+
+<Callout type="note">
+
+A short match can be a coincidence, so raise **Shortest match** if the list shows pairs you didn't design, or ignore them one by one.
+
+</Callout>
 
 ## Exporting An Assembly
 

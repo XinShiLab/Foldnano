@@ -70,6 +70,15 @@ Checked while you edit, for a [linked Part](/docs/guide/assemblies#linked-parts)
 | The source design now holds a different Part than the one copied | Warning | Choose **Relink to its current Part…** in the Part's **⋯** menu to take it, or leave the copy as it is. |
 | The source design is no longer in this browser, or can't be linked any more (it now has several Parts or links of its own) | Warning | Nothing, if the copy is what you want. To edit it here, choose **Break link**. |
 
+## Sticky-End Pairs
+
+Checked while you edit, for the sticky ends you **paired** in the [Sticky Ends panel](/docs/guide/assemblies#sticky-ends). Matches you never paired, or chose to ignore, are never reported. Turn off **Sticky-end pairs** in the Design checks button to hide these.
+
+| Check | Level | What to do |
+| --- | --- | --- |
+| Paired sticky ends are no longer complementary, or match over only part of their length | Warning | Fix the sequence of either side, or **Unpair** them if the change was meant. |
+| A side of a pair is gone: its strand was deleted, made circular, or shortened past the paired stretch | Warning | Redraw the strand, or **Unpair** them. |
+
 ## Simulation Export
 
 What oxDNA and mrDNA export (and the 3D view's NT mode) refuse. Turn on **Simulation export** in the Design checks button to see them while you edit. See [Simulation And Export](/docs/guide/simulation-export#nt-model).

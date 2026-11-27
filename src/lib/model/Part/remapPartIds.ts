@@ -14,6 +14,8 @@ const ID_FIELDS = new Set([
 	'groupId',
 	'instanceId',
 	'sourceOligoId',
+	// Sticky-end anchors (`Part.stickyRecords`).
+	'oligoId',
 ]);
 /** Fields holding a list of entity ids. */
 const ID_LIST_FIELDS = new Set(['vhOrder', 'segmentIds']);

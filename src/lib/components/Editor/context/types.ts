@@ -31,7 +31,8 @@ export type CanHighlight =
 	// | 'free_end'
 	| 'modification_site'
 	| 'longer_than_90'
-	| 'shorter_than_15';
+	| 'shorter_than_15'
+	| 'sticky_end_matches';
 
 export type CanWarn = 'mismatch';
 

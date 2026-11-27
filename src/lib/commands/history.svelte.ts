@@ -693,6 +693,9 @@ function changedPartId(change: AtomicChange): string | null {
 		case 'occurrenceSet':
 		case 'occurrenceRemove':
 			return null;
+		case 'stickyRecordSet':
+		case 'stickyRecordRemove':
+			return change.home.kind === 'part' ? change.home.partId : null;
 		default:
 			return change.partId;
 	}

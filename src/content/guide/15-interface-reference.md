@@ -160,6 +160,7 @@ The toolbar row below the top toolbar belongs to whichever viewer you last worke
 | **Highlight strands** (highlighter) | Highlight and Warnings menu (see [Selection](/docs/guide/selection#highlighting-and-hiding)) |
 | **Hide strands** (crossed eye) | Hide all crossovers, only unconstrained crossovers, or sequence. Hidden crossovers leave [labeled marks](/docs/guide/selection#highlighting-and-hiding) |
 | **Circular Scaffold Map** | Opens the [Circular Scaffold Map](#circular-scaffold-map) panel. Disabled until an oligo is marked as scaffold. |
+| **Sticky Ends** (magnet) | Opens the [Sticky Ends](#sticky-ends) panel and turns on the **sticky end matches** highlight |
 | **Show / Hide RBS blocks** | Shades the rigid blocks that [rigid-body simulation](/docs/guide/simulation-export) treats as single bodies |
 | **PNG** | Downloads the strand view as a PNG image |
 | **SVG** | Downloads the strand view as an SVG, including sequences |
@@ -229,7 +230,7 @@ The **view cube** in the top-right corner of the 3D view (not on the toolbar) tu
 
 ## Tool Panel
 
-A floating panel on the right shows the options of the current tool or view. Its heading names it: **Selection Tool**, **Paint Tool**, **Modification Tool**, **Sequence Tool**, **Skip Tool**, **Insert Tool**, **New Region**, **Circular Scaffold Map**, **3D View Inspector**, **3D Overlays**, **oxDNA Replay**, or **Reference Mesh**.
+A floating panel on the right shows the options of the current tool or view. Its heading names it: **Selection Tool**, **Paint Tool**, **Modification Tool**, **Sequence Tool**, **Skip Tool**, **Insert Tool**, **New Region**, **Circular Scaffold Map**, **Sticky Ends**, **3D View Inspector**, **3D Overlays**, **oxDNA Replay**, or **Reference Mesh**.
 
 - **Drag** the heading to move the panel between the top and bottom of the window, or **double-click** it to flip position.
 - The **›** button collapses it to a small tab; **‹** expands it again.
@@ -249,6 +250,20 @@ A QC view of how staples bind the scaffold (explained in [Selection And Highligh
 | Histogram **max count shown** | Caps the y-axis so small bars stay visible; reset returns to auto-scale |
 | **Download SVG** | Downloads the map |
 | **Copy histogram data** | Copies the histogram values as tab-separated text, ready to paste into a spreadsheet |
+
+### Sticky Ends
+
+Complementary single-stranded stretches, in this Part or between Parts (explained in [Assemblies](/docs/guide/assemblies#sticky-ends)). It stays open over the 3D panels; close it with **×** in its heading.
+
+| Control | What it does |
+| --- | --- |
+| **Shortest match** | The fewest bases a match needs, 5 to 40 nt |
+| **Show in the views** | Colors the matches in the strand and 3D views (the **sticky end matches** highlight) |
+| **One line per instance** | Shown when a Part is placed more than once. Off (default): a 3D line between every pair of instances that could bind. On: one line from each instance to the nearest instance of its partner |
+| **New** | Matches not yet paired or ignored. Hover to emphasize one in both views; click to show it in the strand view, switching Part if needed |
+| **Pair** (chain link) / **Ignore** (crossed eye) | Saves a new match as paired (checked by the design checks) or ignored (hidden from the views). Undoable |
+| **Paired** | Saved pairs with how they stand now; **Unpair** returns one to **New**. A linked Part's own pairs show a link icon instead: change them in the source design |
+| **Ignored** | Ignored matches; **Stop ignoring** returns one to **New** |
 
 ### 3D View Inspector
 

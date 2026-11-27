@@ -1,6 +1,7 @@
 import { Occurrence, type OccurrenceJSON, type OccurrenceTransform } from './Occurrence.svelte';
+import { StickyRecords, type StickyRecordsJSON } from '../stickyEnds/StickyRecords.svelte';
 
-export interface AssemblyJSON {
+export interface AssemblyJSON extends StickyRecordsJSON {
 	occurrences: OccurrenceJSON[];
 }
 
@@ -10,6 +11,8 @@ export interface AssemblyJSON {
  */
 export class Assembly {
 	occurrences: Occurrence[] = $state([]);
+	/** Sticky-end pairs and ignored matches whose ends are in two different Parts. */
+	readonly stickyRecords = new StickyRecords(true);
 
 	getById(id: string): Occurrence | undefined {
 		return this.occurrences.find((occurrence) => occurrence.id === id);
@@ -71,12 +74,16 @@ export class Assembly {
 	}
 
 	toJSON(): AssemblyJSON {
-		return { occurrences: this.occurrences.map((occurrence) => occurrence.toJSON()) };
+		return {
+			occurrences: this.occurrences.map((occurrence) => occurrence.toJSON()),
+			...this.stickyRecords.toJSON(),
+		};
 	}
 
 	static fromJSON(json: AssemblyJSON): Assembly {
 		const assembly = new Assembly();
 		assembly.occurrences = json.occurrences.map((occurrence) => Occurrence.fromJSON(occurrence));
+		assembly.stickyRecords.load(json);
 		return assembly;
 	}
 }

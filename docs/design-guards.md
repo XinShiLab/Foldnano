@@ -80,6 +80,14 @@ comes from `PartLinkService` (async, so the caller passes it in); `collectDesign
 as an optional argument and always runs this check. Exports use the cached copy either way. See
 `docs/linked-parts.md`.
 
+**Sticky-end pairs** (`checkStickyPairs(doc, part)`, `stickyPairs.ts`) warn about a pair the
+user saved that no longer matches (`sticky-pair-broken`, also for a partial match) or lost a side
+(`sticky-pair-missing`): the Part's own pairs and the assembly's pairs touching it.
+`collectDesignIssues` takes the document as an optional last argument for the assembly's pairs;
+`DesignCheckSelection.stickyPairs` toggles it and defaults on (absent counts as on, so saved view
+contexts from before it keep working). Unpaired matches are never an issue. See
+`docs/sticky-ends.md`.
+
 It also includes the region's integrity issues that matter to cadnano (`helix-cell-parity`,
 `negative-cell`, `shared-cell`, and `asymmetric-skip-insert`, because cadnano's `loop`/`skip` are
 per base, not per strand). `skip-insert-on-crossover` is left out: cadnano allows it.
@@ -145,8 +153,9 @@ which strand's skip is right, or which helix owns a shared cell, isn't knowable.
   for `replaceRegion*` strategies, where applying the result would make the loss permanent; a
   read-only plugin just sees a lossy copy.
 
-- **Editor overlay.** `collectDesignIssues(part, activeRegion, selection)` (`collect.ts`) runs the
-  selected checks (integrity on all regions, simulation on the part, cadnano on the active region),
+- **Editor overlay.** `collectDesignIssues(part, activeRegion, selection, linkState, doc)`
+  (`collect.ts`) runs the selected checks (integrity on all regions, simulation on the part, cadnano
+  on the active region, saved sticky-end pairs),
   drops duplicates (the profiles repeat integrity rules) and sorts errors first.
   `EditorViewContext.designIssues` feeds it to the strand view's markers and issue list; see
   `editor-strand-viewer.md` § Design Check Overlay.

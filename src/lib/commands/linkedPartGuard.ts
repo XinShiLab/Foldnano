@@ -34,6 +34,9 @@ function partIdOf(change: AtomicChange): string | null {
 		case 'overlayPlacementSet':
 		case 'overlayPlacementRemove':
 			return change.partId;
+		case 'stickyRecordSet':
+		case 'stickyRecordRemove':
+			return change.home.kind === 'part' ? change.home.partId : null;
 		default:
 			return null;
 	}

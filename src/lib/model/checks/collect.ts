@@ -6,6 +6,8 @@ import { checkPartIntegrity } from './integrity';
 import { checkSimulationProfile } from './simulation';
 import { checkPartLink } from './links';
 import type { PartLinkState } from '../partLinks';
+import type FoldnanoDocument from '../document.svelte';
+import { checkStickyPairs } from './stickyPairs';
 
 /** Which checks the editor's issue overlay runs. */
 export interface DesignCheckSelection {
@@ -13,6 +15,8 @@ export interface DesignCheckSelection {
 	simulation: boolean;
 	/** Runs on the active region only: cadnano export is region-scoped. */
 	cadnano: boolean;
+	/** Saved sticky-end pairs that broke or lost a side; on unless turned off. */
+	stickyPairs?: boolean;
 }
 
 const SEVERITY_ORDER: Record<DesignIssueSeverity, number> = { error: 0, warning: 1, info: 2 };
@@ -31,13 +35,16 @@ export function collectDesignIssues(
 	activeRegion: DesignRegion | null,
 	selection: DesignCheckSelection,
 	/** The Part's link status, when it is a linked Part; always checked. */
-	linkState?: PartLinkState | null
+	linkState?: PartLinkState | null,
+	/** The document holding `part`, for sticky-end pairs joining it to other Parts. */
+	doc?: FoldnanoDocument
 ): DesignIssue[] {
 	if (!part) return [];
 	const issues: DesignIssue[] = [...checkPartLink(part, linkState)];
 	if (selection.integrity) issues.push(...checkPartIntegrity(part));
 	if (selection.simulation) issues.push(...checkSimulationProfile(part));
 	if (selection.cadnano && activeRegion) issues.push(...checkCadnanoProfile(part, activeRegion));
+	if (selection.stickyPairs !== false) issues.push(...checkStickyPairs(doc, part));
 	const seen = new Set<string>();
 	return issues
 		.filter((issue) => {
