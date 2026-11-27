@@ -4,7 +4,7 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
-	import { APP_COMMIT, APP_VERSION } from '$lib/appInfo';
+	import { APP_COMMIT, displayVersion } from '$lib/appInfo';
 	import { guideHref } from '$lib/components/help/help';
 	import { PYODIDE_PYTHON_VERSION, PYODIDE_VERSION } from '$lib/plugin/worker/pyodideConfig';
 	import {
@@ -90,7 +90,7 @@
 			<div class="flex flex-wrap items-baseline gap-x-2">
 				<Dialog.Title class="text-xl font-bold">Foldnano</Dialog.Title>
 				<span class="text-xs font-medium text-muted-foreground" title="Build commit">
-					v{APP_VERSION} · {APP_COMMIT}
+					v{displayVersion()} · {APP_COMMIT}
 				</span>
 				<span
 					class="text-xs text-muted-foreground"

@@ -3,6 +3,7 @@ covers:
   - src/lib/whats-new/**
   - scripts/whats-new-draft.ts
   - src/lib/components/Editor/Toolbar/AboutDialog.svelte
+  - src/lib/appInfo.ts
   - src/lib/components/AnnouncementCard.svelte
   - src/lib/server/announcements.ts
   - src/lib/remote/announcements.remote.ts
@@ -60,8 +61,9 @@ interface WhatsNewEntry {
 
 ## Display (`AboutDialog.svelte`)
 
-- Header: `v{APP_VERSION} · {APP_COMMIT}` (`package.json` version + short build commit, both
-  injected by `vite.config.ts` `define`).
+- Header: `v{displayVersion()} · {APP_COMMIT}` (`package.json` version + short build commit, both
+  injected by `vite.config.ts` `define`). `displayVersion` (`appInfo.ts`) adds ` (beta)` to any
+  0.x version; saved files and error reports keep the plain `APP_VERSION`.
   Next to it, the plugin runtime: `Pyodide {PYODIDE_VERSION} · Python {PYODIDE_PYTHON_VERSION}`
   from `pyodideConfig.ts`, so bug reports carry the same runtime as a run's `[env]` stamp.
 - **Recent updates**: "Last updated {newest date}. Showing the last 3 months." then the `recent`

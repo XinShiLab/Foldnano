@@ -1,7 +1,7 @@
 {
 	"name": "foldnano",
 	"private": true,
-	"version": "0.10.0-beta.1",
+	"version": "0.11.0",
 	"license": "MIT",
 	"author": "Xin Shi (KU Leuven)",
 	"homepage": "https://fold.xinshilab.com",
