@@ -51,6 +51,7 @@ On narrower screens (such as an iPad), the toolbar buttons show only their icons
 | **Foldnano** (with *beta* badge) | Opens the **About** dialog: the version and build, **What's New** (the last 3 months of changes, some with a **Learn more** link to the guide, and **Show earlier updates** for older ones), the author, the licenses (MIT for the code, CC BY 4.0 for this documentation), and third-party licenses. A small blue dot before the name means What's New has entries you haven't opened yet, and inside What's New those entries carry the same dot and darker text until you next reload; some major changes are also announced once in a card at the bottom right |
 | **New** | Creates a new, empty document. With a GitHub repository connected, it asks whether to create a **New File** in that repository or a **Local-Only Design** kept in this browser |
 | **Open** | Opens the **Open file** dialog (see [Open dialog](#open-dialog)) |
+| Documents icon next to Open | Saves, then opens the Saved Documents page (`/toc`): every design saved in this browser |
 | **⌄** next to Open | **Open File…** (the same dialog), your five most recently changed designs saved in this browser (click one to open it), and **All Saved Documents…** (the Saved Documents page). The design you have open saves first |
 | **Save** | Saves the working copy to browser storage now |
 | Download arrow next to Save | Downloads the whole design as a `.fn.json` file, same as **Download as Foldnano JSON** in the Save menu |
@@ -119,7 +120,7 @@ The **ⓘ** next to it (*Storage info*) explains that designs are saved in this 
 - **cadnano `.json`**: **Open** creates a **new `.fn.json` document** from it; the original `.json` isn't changed. When a GitHub repository is connected, **Add original to current repo folder** also stores the original file there. If the file could be either lattice, you're asked whether it is honeycomb or square.
 - **Local plugin `.zip`**: shows the plugin's details and an **Install** button (see [Plugins For Users](/docs/guide/plugins-for-users)). A plugin manifest on its own (`fplugin.json`) is refused; install the plugin's `.zip` instead.
 
-Designs you already worked on in this browser aren't files: open them from the **Saved Documents** link at the bottom of the dialog, or from the **⌄** next to Open.
+Designs you already worked on in this browser aren't files: open them from the **Saved Documents** link at the bottom of the dialog, the documents icon next to Open, or the **⌄** beside it.
 
 ### Loading from a URL
 

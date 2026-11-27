@@ -30,19 +30,25 @@ export interface WhatsNewEntry {
  * Author date of the newest commit already considered for this list. `pnpm whats-new:draft`
  * only drafts commits authored after it (author dates survive rebases; hashes don't).
  */
-export const WHATS_NEW_REVIEWED_THROUGH = '2026-11-15T23:39:51+01:00';
+export const WHATS_NEW_REVIEWED_THROUGH = '2026-11-27T12:37:16+01:00';
 
 // Newest first. Edit freely; the draft script only inserts new entries at the top.
 export const WHATS_NEW: readonly WhatsNewEntry[] = [
 	{
+		date: '2026-11-26',
+		area: 'Regions',
+		text: "Duplicate a region from the Add Region menu: its helices and strands are copied into a new region placed beside it in 3D. The Split region tool can also cut a lattice region across its helices at a base column, moving everything past the cut into a new region without moving anything in 3D, and regions can be moved up or down with the buttons on the active region's header.",
+		link: 'editing-tools#split-region',
+	},
+	{
 		date: '2026-11-17',
 		area: 'Assemblies',
-		text: 'A design can now hold several Parts, each folded on its own, and place them in 3D: add Parts and instances in the new Assembly panel, move instances with a gizmo, and export every visible instance to oxDNA or mrDNA in one file. A Part can also be linked from another design as a read-only copy that you update when its source changes.',
+		text: 'A design can now hold several Parts, each folded on its own, and place them in 3D: add Parts and instances in the new Assembly panel, move instances with a gizmo, and export every visible instance to oxDNA or mrDNA in one file. A Part can also be linked from another design as a read-only copy that you update when its source changes; start an assembly of linked Parts from the Assembly card on the start screen. The Sticky Ends panel finds complementary overhangs within and between Parts and shows them in 2D and 3D; pair the ones you designed and the design checks warn when an edit breaks them.',
 		link: 'assemblies',
 		announce: {
 			id: '2026-11-17-assemblies',
 			title: 'Several Parts in one design',
-			body: 'Build assemblies from separately folded Parts, place them in 3D, and link Parts from your other designs. Existing designs open as one Part and work as before.',
+			body: 'Build assemblies from separately folded Parts, place them in 3D, link Parts from your other designs, and find the sticky ends that join them. Existing designs open as one Part and work as before.',
 		},
 	},
 	{

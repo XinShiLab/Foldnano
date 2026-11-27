@@ -34,6 +34,7 @@
 		FileBracesCorner,
 		FilePlusCorner,
 		FileSpreadsheet,
+		Files,
 		FolderOpen,
 		GitBranch,
 		GitCommitHorizontal,
@@ -570,6 +571,24 @@
 							</p>
 						</Dialog.Content>
 					</Dialog.Root>
+					<Button
+						variant="outline"
+						size="sm"
+						class="!px-2"
+						onclick={() => {
+							if (holdForNameDraft()) return;
+							void viewSavedDocuments();
+						}}
+						title="Saved Documents in this browser"
+						aria-label="Saved Documents"
+						{@attach help({
+							title: 'Saved Documents',
+							text: 'Every design saved in this browser: open or delete one, or download them all as a zip.',
+							doc: 'saving-github',
+						})}
+					>
+						<Files />
+					</Button>
 					<DropdownMenu.Root
 						bind:open={
 							() => openMenuOpen,
@@ -632,7 +651,7 @@
 							<DropdownMenu.Separator />
 							<DropdownMenu.Group>
 								<DropdownMenu.Item onclick={viewSavedDocuments}>
-									<Database />All Saved Documents…
+									<Files />All Saved Documents…
 								</DropdownMenu.Item>
 							</DropdownMenu.Group>
 						</DropdownMenu.Content>
@@ -703,7 +722,7 @@
 						<DropdownMenu.Content align="end" class="min-w-60 [--radius:1rem]">
 							<DropdownMenu.Group>
 								<DropdownMenu.Item onclick={viewSavedDocuments}>
-									<Database />View Saved Documents
+									<Files />View Saved Documents
 								</DropdownMenu.Item>
 								<DropdownMenu.Item
 									onclick={async () => {
