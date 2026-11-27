@@ -70,6 +70,7 @@ once to returning users as a bottom-right card (rarely; major changes only). See
 | External structure overlay (mrDNA `.txt` / PDB `.pdb` into 3D)    | `docs/editor-3d-external-overlay.md`                            |
 | Repeat units (duplicate selection, linked mirror oligos)          | `docs/repeat-units.md`                                          |
 | Linked Parts (read-only copies of other designs, update, guard)   | `docs/linked-parts.md`                                          |
+| Sticky ends (complementary overhangs found by sequence, 2D/3D)    | `docs/sticky-ends.md`                                           |
 | Rigid-body simulation (transient, render-only)                    | `docs/rigid-body-simulation.md`                                 |
 | Design guards (shared shape / integrity / export checks)          | `docs/design-guards.md`                                         |
 | Commands, undo/redo, history mementos                             | `docs/commands-and-history.md`                                  |

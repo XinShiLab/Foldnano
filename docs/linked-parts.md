@@ -70,7 +70,10 @@ and dangerous (an Update could bring in geometry nobody reviewed). So, on purpos
   copy is left as it was whenever it returns `ok: false`.
 - **Change detection hashes the source, never the copy.** `canonicalPartJson` is the Part's JSON
   with sorted keys and without `id`, `name` and `source`; both sides are read through
-  `Part.fromJSON` first, so load-time normalisation can't make them differ.
+  `Part.fromJSON` first, so load-time normalisation can't make them differ. A Part's own saved
+  sticky-end pairs are in that JSON, so pairing in the source makes the copy outdated; their
+  `oligoId` anchors are remapped with the rest (`ID_FIELDS`). Pairs that join the copy to another
+  Part live in the assembly and may be made on linked Parts (`docs/sticky-ends.md`).
 - **Names belong to the assembly.** A copy is named after the source design when linked, and
   neither renaming the source nor updating changes it or makes the link outdated. The status
   carries the source's current name (`PartLinkStatus.sourceName`) so the link icon's tooltip
@@ -137,6 +140,11 @@ assembly's (`PartLinkStorage.otherRepoOf`, from the source's GitHub metadata; a 
 in the wrong repo). Either way others can't follow the link; the notice offers to embed the
 copies (break the links). A source in another repo is flagged whether or not its link has a path,
 since `resolveDocId` would match the path against the assembly's repo.
+
+## Sticky ends across links
+
+Matching overhangs between Parts (`docs/sticky-ends.md`) are found from the copies' sequences, so
+they work on linked Parts like on any other; nothing about them is stored on the link.
 
 ## Not done yet
 

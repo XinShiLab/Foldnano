@@ -6,6 +6,8 @@ import OligoClass, { type OligoSegment, type SegmentEnd } from '$lib/model/Oligo
 import type { Part } from '$lib/model/Part';
 
 import type { OccurrenceJSON } from '$lib/model/Assembly';
+import type { StickyList, StickyRecord } from '$lib/model/stickyEnds/stickyPairs';
+import type { StickyRecordState } from '$lib/model/stickyEnds/StickyRecords.svelte';
 
 type PartJSON = ReturnType<Part['toJSON']>;
 import { DesignRegion } from '$lib/model/Part';
@@ -83,6 +85,25 @@ export type OccurrenceRemoveChange = {
 	id: string;
 };
 
+/** Where a sticky-end record lives: a Part (both ends in it) or the assembly (two Parts). */
+export type StickyRecordHome = { kind: 'part'; partId: string } | { kind: 'assembly' };
+
+/** Puts one sticky-end pair or ignored match back as `record`, at list position `index`. */
+export type StickyRecordSetChange = {
+	kind: 'stickyRecordSet';
+	home: StickyRecordHome;
+	list: StickyList;
+	record: StickyRecord;
+	index: number;
+};
+
+export type StickyRecordRemoveChange = {
+	kind: 'stickyRecordRemove';
+	home: StickyRecordHome;
+	list: StickyList;
+	id: string;
+};
+
 export type PlaneTransformChange = {
 	kind: 'planeTransform';
 	partId: string;
@@ -150,6 +171,8 @@ export type AtomicChange =
 	| PartSnapshotChange
 	| OccurrenceSetChange
 	| OccurrenceRemoveChange
+	| StickyRecordSetChange
+	| StickyRecordRemoveChange
 	| PlaneTransformChange
 	| PlaneAddChange
 	| PlaneRemoveChange
@@ -231,6 +254,14 @@ type OverlayPlacementPatchDraft = {
 	id: string;
 	before: OverlayPlacement | undefined;
 	after: OverlayPlacement | undefined;
+};
+
+type StickyRecordPatchDraft = {
+	home: StickyRecordHome;
+	list: StickyList;
+	id: string;
+	before: StickyRecordState | null;
+	after: StickyRecordState | null;
 };
 
 const stableStringify = (value: unknown) => JSON.stringify(value);
@@ -333,6 +364,12 @@ function applyAtomicChange(doc: FoldnanoDocument, change: AtomicChange): void {
 		case 'occurrenceRemove':
 			doc.assembly.remove(change.id);
 			break;
+		case 'stickyRecordSet':
+			stickyRecordsAt(doc, change.home).put(change.list, change.record, change.index);
+			break;
+		case 'stickyRecordRemove':
+			stickyRecordsAt(doc, change.home).remove(change.list, change.id);
+			break;
 		case 'planeTransform':
 			resolvePart(doc, change.partId).setPlaneTransform(change.planeId, {
 				origin: change.origin,
@@ -414,6 +451,12 @@ function resolveRef(doc: FoldnanoDocument, ref: ModelRef): unknown {
 	}
 }
 
+export function stickyRecordsAt(doc: FoldnanoDocument, home: StickyRecordHome) {
+	return home.kind === 'assembly'
+		? doc.assembly.stickyRecords
+		: resolvePart(doc, home.partId).stickyRecords;
+}
+
 function resolvePart(doc: FoldnanoDocument, partId: string): Part {
 	const part = doc.parts.find((candidate) => candidate.id === partId);
 	if (!part) throw new Error(`Part ${partId} not found in document ${doc.id}`);
@@ -468,6 +511,7 @@ export class HistoryRecorder {
 	#regionReferenceGeometries: RegionReferenceGeometryPatchDraft[] = [];
 	#regionOrders: RegionOrderPatchDraft[] = [];
 	#overlayPlacements: OverlayPlacementPatchDraft[] = [];
+	#stickyRecords: StickyRecordPatchDraft[] = [];
 
 	#openScopes = new Set<PartScopeCapture>();
 	#rollbackSteps: (() => void)[] = [];
@@ -576,6 +620,18 @@ export class HistoryRecorder {
 
 	regionOrder(part: Part, before: string[], after: string[]): void {
 		this.#regionOrders.push({ partId: part.id, before: [...before], after: [...after] });
+	}
+
+	/** Targeted patch for one sticky-end pair or ignored match: add (`before` null), change, or
+	 * remove. */
+	stickyRecord(
+		home: StickyRecordHome,
+		list: StickyList,
+		id: string,
+		before: StickyRecordState | null,
+		after: StickyRecordState | null
+	): void {
+		this.#stickyRecords.push({ home, list, id, before, after });
 	}
 
 	/** Targeted patch for one overlay-placement entry (set/update/clear). */
@@ -705,6 +761,18 @@ export class HistoryRecorder {
 					: { kind: 'overlayPlacementRemove', partId: patch.partId, id: patch.id }
 			);
 		}
+
+		const stickyChange = (
+			patch: StickyRecordPatchDraft,
+			state: StickyRecordState | null
+		): AtomicChange =>
+			state
+				? { kind: 'stickyRecordSet', home: patch.home, list: patch.list, ...state }
+				: { kind: 'stickyRecordRemove', home: patch.home, list: patch.list, id: patch.id };
+		const stickyPatches = this.#stickyRecords.filter((p) => !sameValue(p.before, p.after));
+		// List positions are only right when patches unwind in reverse.
+		for (const patch of stickyPatches) redo.push(stickyChange(patch, patch.after));
+		for (const patch of [...stickyPatches].reverse()) undo.push(stickyChange(patch, patch.before));
 
 		return undo.length || redo.length ? { label, undo, redo } : null;
 	}

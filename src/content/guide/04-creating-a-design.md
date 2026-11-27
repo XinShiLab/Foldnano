@@ -151,6 +151,7 @@ The **Design checks** button in the strand view toolbar (the shield, next to the
 | **Editor rules** | on | Things the editor wouldn't create itself, usually from an imported file or a plugin: a skip on one strand and an insert on the other at the same base, a skip or insert on a crossover site (cadnano import already moves skips off crossover sites, so from a cadnano file this is usually an insert; Foldnano files and plugin results aren't changed on the way in), helices sharing or outside the lattice, a helix number that doesn't match its lattice position. |
 | **Simulation export** | off | What oxDNA and mrDNA export would refuse, such as a skip or insert on a base where only one strand exists. See [Simulation And Export](/docs/guide/simulation-export#nt-model). |
 | **Cadnano export** | off | What cadnano JSON can't hold for the **active region**, such as a connection from a cadnano scaffold path to a staple path. See [Exporting cadnano JSON](/docs/guide/simulation-export#exporting-cadnano-json). |
+| **Sticky-end pairs** | on | Sticky ends you paired that no longer match, or lost a side. See [Sticky Ends](/docs/guide/assemblies#sticky-ends). |
 
 ![Design checks popover open from the shield button in the strand view toolbar, with the Editor rules, Simulation export and Cadnano export switches above a list of issues, and a red frame around the matching base on the canvas](/screenshots/guide/creating-a-design/06-design-checks-menu.webp)
 

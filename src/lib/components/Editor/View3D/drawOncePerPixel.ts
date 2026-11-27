@@ -6,12 +6,14 @@ import * as THREE from 'three';
 
 /** Reserved for the hover glow, so its world-width and pixel-width layers merge into one. */
 export const GLOW_STENCIL_REF = 255;
-const MAX_SHARED_REF = 254;
+/** Reserved for the sticky-end sleeves, so every colour and the hovered match merge into one. */
+export const STICKY_STENCIL_REF = 254;
+const MAX_SHARED_REF = 253;
 
 let nextRef = 0;
 
 /**
- * Next stencil mark for a translucent object. Marks cycle through 1–254; two objects sharing one
+ * Next stencil mark for a translucent object. Marks cycle through 1–253; two objects sharing one
  * only merge where they overlap, which a handful of dimmed colour buckets never reaches.
  */
 export function nextStencilRef(): number {

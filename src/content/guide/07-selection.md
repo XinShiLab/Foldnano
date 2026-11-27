@@ -214,6 +214,7 @@ The strand-viewer toolbar includes **highlight** and **hide** menus. Highlights 
 | with modifications | oligos carrying a terminal modification |
 | longer than 90 | oligos over 90 nt |
 | shorter than 15 | oligos under 15 nt |
+| sticky end matches | single-stranded stretches that can bind each other, each match in its own color (see [Sticky Ends](/docs/guide/assemblies#sticky-ends)) |
 
 <Callout type="tip">
 

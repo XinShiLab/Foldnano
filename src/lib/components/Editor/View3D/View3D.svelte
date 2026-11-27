@@ -89,6 +89,11 @@
 	} from './transformGizmo';
 	import { createPlaneOverlay, type PlaneOverlayResult } from './planeOverlay';
 	import {
+		createStickyEndOverlay,
+		stickyEndGeometry,
+		type StickyEndOverlay,
+	} from './stickyEndOverlay';
+	import {
 		BASIS_PLANE_TRANSFORMS,
 		getEditorViewContext,
 	} from '$lib/components/Editor/context/EditorViewContext.svelte';
@@ -200,6 +205,7 @@
 			modification_site: false,
 			longer_than_90: false,
 			shorter_than_15: false,
+			sticky_end_matches: false,
 		},
 		hideContext = { crossovers: false, unconstrained_crossovers: false, sequence: false },
 		filterSegments = null,
@@ -287,6 +293,7 @@
 	let cursor: CursorResult | undefined;
 	let planeSelector: PlaneSelectorResult | undefined;
 	let referenceMeshOverlay: ReferenceMeshOverlay | undefined;
+	let stickyEndOverlay = $state.raw<StickyEndOverlay | undefined>(undefined);
 
 	// ── RBS simulation state (drives geometry rebuild + bindable props) ────────
 	let simOverrides = $state<Map<string, BlockTransformOverride> | null>(null);
@@ -1475,6 +1482,25 @@
 		_markDirty?.();
 	});
 
+	// Sticky-end matches on every visible instance, with links from the edited instance.
+	$effect(() => {
+		const overlay = stickyEndOverlay;
+		if (!threeRenderer || !overlay) return;
+		const shown = highlightContext.sticky_end_matches && designVisible;
+		overlay.group.visible = shown;
+		overlay.update(
+			shown
+				? stickyEndGeometry(editorViewContext.stickyEnds.shown, {
+						parts: doc.parts,
+						occurrencesOf: (partId) => doc.assembly.occurrencesOf(partId),
+						linkMode: editorViewContext.strandViewContext.stickyEndLinkMode,
+						hoveredKey: editorViewContext.stickyEnds.hoveredKey,
+					})
+				: { pieces: [], links: [], anyHovered: false }
+		);
+		_markDirty?.();
+	});
+
 	// Reconcile one THREE.Group per overlay instance. Rebuilds a group only when its
 	// instance's `ghost` (or data) changes; transform + visibility are handled in the
 	// next effect so a drag or Hide/Show never rebuilds GPU buffers.
@@ -1800,6 +1826,8 @@
 		partFrame.add(planeSelector.group);
 		referenceMeshOverlay = createReferenceMeshOverlay();
 		partFrame.add(referenceMeshOverlay.group);
+		stickyEndOverlay = createStickyEndOverlay();
+		scene.add(stickyEndOverlay.group);
 
 		// ── Expose scene-dependent functions to parent ─────────────────────────
 		downloadFn = () => downloadScreenshot(renderer, localScene, camera, `${exportFileBase}.png`);
@@ -1997,6 +2025,11 @@
 				referenceMeshOverlay.dispose();
 				scene!.remove(referenceMeshOverlay.group);
 				referenceMeshOverlay = undefined;
+			}
+			if (stickyEndOverlay) {
+				stickyEndOverlay.dispose();
+				scene!.remove(stickyEndOverlay.group);
+				stickyEndOverlay = undefined;
 			}
 
 			if (currentGroup) {

@@ -451,10 +451,18 @@ run when another change arrives. The markers and the list show the previous resu
 - `DesignIssueMarkers` frames each `error` (red) / `warning` (amber) issue that names a helix: the
   base column when the anchor has a `bp`, else a frame just left of the helix's first base.
   Region-wide issues (cut cross-region links, metadata) have no spot and only appear in the list.
-- `DesignIssuesMenu` (strand toolbar, next to the scaffold indicator) holds the three toggles
-  (editor rules on by default; simulation and cadnano export opt-in, saved with the strand view
-  context) and the issue list. Clicking an issue calls `strandToolbarController.centerOn(vhId, bp)`,
+- `DesignIssuesMenu` (strand toolbar, next to the scaffold indicator) holds the four toggles
+  (editor rules and sticky-end pairs on by default; simulation and cadnano export opt-in, saved
+  with the strand view context) and the issue list. Clicking an issue calls `strandToolbarController.centerOn(vhId, bp)`,
   which expands the helix's region if collapsed and centers the stage on that base.
+
+## Sticky-End Markers
+
+`StickyEndMarkers` is mounted twice: `layer="under"` (colour bands, right after
+`MismatchMarkers`) and `layer="over"` (partner badges and the hover line, after
+`DesignIssueMarkers`). Both are `listening={false}` and draw `matcher.shown` (ignored matches
+left out). The Magnet button in `StrandViewerTools`
+opens the Sticky Ends panel. Detection and the rest: `sticky-ends.md`.
 
 ## Boundaries / Don'ts
 

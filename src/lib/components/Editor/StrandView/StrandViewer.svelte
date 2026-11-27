@@ -25,6 +25,7 @@
 	import XoverSitesAround from './CrossoverSite/XoverSitesAround.svelte';
 	import Highlights from './Highlights.svelte';
 	import MismatchMarkers from './MismatchMarkers.svelte';
+	import StickyEndMarkers from './StickyEndMarkers.svelte';
 	import RecentFillMarkers from './RecentFillMarkers.svelte';
 	import DesignIssueMarkers from './DesignIssueMarkers.svelte';
 	import { SkipTool } from '$lib/canvasEditor/tools/skip';
@@ -533,9 +534,11 @@
 				{#if part}
 					<Grid {part} />
 					<MismatchMarkers {part} />
+					<StickyEndMarkers {part} layer="under" />
 					<RecentFillMarkers />
 					<StrandRoutes {part} />
 					<DesignIssueMarkers />
+					<StickyEndMarkers {part} layer="over" />
 					{#if editorViewContext.strandViewContext.showBlocks}
 						<BlockLayer {part} />
 					{/if}

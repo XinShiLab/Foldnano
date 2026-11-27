@@ -129,6 +129,11 @@ while one is active, so only Pan and Select stay enabled (`isModeEnabled`; Selec
 selects but doesn't drag), and `PartBreadcrumb` shows "Linked, read-only". A plugin
 result aimed at it can be previewed, not applied. See `docs/linked-parts.md`.
 
+Saved sticky-end pairs and ignored matches (`StickyRecords`) sit on the Part
+(`Part.stickyRecords`, both sides in that Part) or on the assembly
+(`Assembly.stickyRecords`, sides in two Parts), saved as the optional
+`stickyPairs` / `ignoredMatches` fields of each. See `docs/sticky-ends.md` § Saved pairs.
+
 `EditorViewContext.activeOccurrence` is the instance of the active Part that the
 3D view edits in (`editedOccurrenceId`, else its first instance);
 `editOccurrence(id)` switches Part and instance together, and switching Part
@@ -934,3 +939,4 @@ There is no backward-compat loader for pre-region documents: `Part.fromJSON()` t
 - `reactivity-patterns.md` — runes inside classes, snapshot semantics
 - `commands-and-history.md` — how mutations get into the model
 - `cadnano-import.md` — the lattice-only import path
+- `sticky-ends.md` — single-stranded runs and complementary matches, derived from the sequences

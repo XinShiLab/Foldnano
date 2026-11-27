@@ -47,6 +47,12 @@ import { addPartCmd, deletePartCmd } from '$lib/commands/assembly';
 import { transformPlaneCmd } from '$lib/commands/planes';
 import type { HistoryEntry } from '$lib/commands/historyChanges';
 import { BUILTIN_MODIFICATIONS } from '$lib/model/modifications';
+import {
+	DEFAULT_STICKY_LENGTH,
+	MIN_STICKY_LENGTH,
+	type StickyLinkMode,
+} from '$lib/model/stickyEnds/stickyEnds';
+import { StickyEndMatcher } from '$lib/services/stickyEnds/StickyEndMatcher.svelte';
 import FoldnanoDocument from '$lib/model/document.svelte';
 import { CadnanoJSON } from '$lib/model/io/cadnanoJSON';
 import type {
@@ -255,6 +261,7 @@ const DEFAULT_DESIGN_CHECKS: DesignCheckSelection = {
 	integrity: true,
 	simulation: false,
 	cadnano: false,
+	stickyPairs: true,
 };
 
 class StrandViewContext {
@@ -298,7 +305,12 @@ class StrandViewContext {
 		modification_site: false,
 		longer_than_90: false,
 		shorter_than_15: false,
+		sticky_end_matches: false,
 	});
+	/** Shortest complementary run that counts as a sticky-end match (`MIN_STICKY_LENGTH` up). */
+	stickyEndMinLength: number = $state(DEFAULT_STICKY_LENGTH);
+	/** 3D sticky-end lines between instances: every possible binding, or nearest per instance. */
+	stickyEndLinkMode: StickyLinkMode = $state('all');
 	warningContext: Record<CanWarn, boolean> = $state({
 		mismatch: true,
 	});
@@ -351,6 +363,8 @@ export interface SerializableStrandViewContext {
 	modificationContext: ModificationContext;
 	hideContext: Record<CanHide, boolean>;
 	highlightContext: Record<CanHighlight, boolean>;
+	stickyEndMinLength?: number;
+	stickyEndLinkMode?: StickyLinkMode;
 	warningContext?: Record<CanWarn, boolean>;
 	designChecks?: DesignCheckSelection;
 	selectionToggles: SelectionToggle[];
@@ -379,6 +393,17 @@ export class EditorViewContext {
 	aboutDialogOpen: boolean = $state(false);
 	showBackups: boolean = $state(false);
 	showScaffoldMap: boolean = $state(false);
+	/** The Sticky Ends tool panel; opening it shows the matches too. */
+	showStickyEndsPanel: boolean = $state(false);
+	/** Sticky-end matches of the open design, computed while the highlight or panel shows them. */
+	readonly stickyEnds = new StickyEndMatcher(
+		() => this.currentDoc,
+		() => ({
+			enabled:
+				this.strandViewContext.highlightContext.sticky_end_matches || this.showStickyEndsPanel,
+			minLength: this.strandViewContext.stickyEndMinLength,
+		})
+	);
 	showSidePanel: boolean = $state(false);
 	sidePanelTab: SidePanelId = $state('GITHUB');
 	/** Plugin ids whose code editor is in a pop-out window; their panel stays mounted off-tab. */
@@ -597,14 +622,21 @@ export class EditorViewContext {
 	#startDesignChecks(): void {
 		this.#stopDesignChecks = $effect.root(() => {
 			$effect(() => {
-				const { integrity, simulation, cadnano } = this.strandViewContext.designChecks;
+				const { integrity, simulation, cadnano, stickyPairs } = this.strandViewContext.designChecks;
+				const doc = this.currentDoc;
 				void this.historyStack.revision;
 				const part = this.activePart ?? undefined;
 				const region = this.activeRegion;
 				const linkState = part ? this.session.partLinks.statusOf(part)?.state : null;
 				const run = () => {
 					this.#designIssues = untrack(() =>
-						collectDesignIssues(part, region, { integrity, simulation, cadnano }, linkState)
+						collectDesignIssues(
+							part,
+							region,
+							{ integrity, simulation, cadnano, stickyPairs },
+							linkState,
+							doc
+						)
 					);
 				};
 				if (typeof window === 'undefined') return run();
@@ -1211,6 +1243,8 @@ export class EditorViewContext {
 			modificationContext: this.strandViewContext.modificationContext,
 			hideContext: this.strandViewContext.hideContext,
 			highlightContext: this.strandViewContext.highlightContext,
+			stickyEndMinLength: this.strandViewContext.stickyEndMinLength,
+			stickyEndLinkMode: this.strandViewContext.stickyEndLinkMode,
 			warningContext: this.strandViewContext.warningContext,
 			designChecks: this.strandViewContext.designChecks,
 			selectionToggles: this.strandViewContext.selectionToggles,
@@ -1238,7 +1272,17 @@ export class EditorViewContext {
 			unconstrained_crossovers: data.hideContext.unconstrained_crossovers ?? false,
 			sequence: data.hideContext.sequence,
 		};
-		this.strandViewContext.highlightContext = data.highlightContext;
+		// Merged over the defaults: contexts saved before a highlight existed lack its key.
+		this.strandViewContext.highlightContext = {
+			...this.strandViewContext.highlightContext,
+			...data.highlightContext,
+		};
+		this.strandViewContext.stickyEndMinLength = Math.max(
+			MIN_STICKY_LENGTH,
+			data.stickyEndMinLength ?? DEFAULT_STICKY_LENGTH
+		);
+		this.strandViewContext.stickyEndLinkMode =
+			data.stickyEndLinkMode === 'nearest' ? 'nearest' : 'all';
 		this.strandViewContext.warningContext = data.warningContext ?? { mismatch: true };
 		this.strandViewContext.designChecks = { ...DEFAULT_DESIGN_CHECKS, ...data.designChecks };
 		this.strandViewContext.selectionToggles = data.selectionToggles;

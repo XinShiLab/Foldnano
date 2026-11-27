@@ -131,8 +131,8 @@ Optional simulation overlays:
 **Translucent fat lines blend once per pixel.** Strands and arcs are `LineSegments2`: separate quads
 that overlap where pieces meet. Translucent (dimmed buckets, NT-mode arcs, the hover glow), those
 overlaps blended twice and showed as dots. `drawOncePerPixel.ts` gives each translucent object a
-stencil mark (`nextStencilRef`, cycling 1–254; the glow uses the reserved `GLOW_STENCIL_REF` across
-all its layers) with `NotEqual` / `Replace`, so a pixel blends once per object while different
+stencil mark (`nextStencilRef`, cycling 1–253; the glow uses the reserved `GLOW_STENCIL_REF` across
+all its layers, the sticky-end sleeves `STICKY_STENCIL_REF` across all their colours) with `NotEqual` / `Replace`, so a pixel blends once per object while different
 objects still blend over each other. Every renderer that draws this scene is created with
 `stencil: true` (three defaults to false): the live view, PNG export, replay video export, and the
 landing hero.
@@ -443,6 +443,14 @@ the mirror checkbox and the export guard read `simulationExportParts` for the
 chosen scope, and an assembly with nothing visible disables both exports. The
 menu sends a `SimulationExportRequest`; `View3D` builds and names the file from
 its scope (`docs/oxdna-export.md`).
+
+## Sticky ends
+
+`stickyEndOverlay.ts` draws the sticky-end matches (`sticky-ends.md`) in lab space, added to the
+scene outside `partFrame`: colour sleeves over matched stretches on every visible instance and dashed links between instances (every possible pair, or nearest per instance:
+`stickyEndLinkMode`). An effect
+in `View3D` rebuilds it from `editorViewContext.stickyEnds.shown` (ignored matches left out), the hovered key, the
+instances and the `sticky_end_matches` highlight; it doesn't touch the scene rebuild.
 
 ## Hiding regions
 

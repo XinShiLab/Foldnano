@@ -320,7 +320,7 @@ function addNtModelGeometry(
 	segPositionOverrides?: Map<string, BlockTransformOverride>
 ): Map<string, THREE.Vector3> {
 	const endpointPositions = new Map<string, THREE.Vector3>();
-	const anyHighlightActive = Object.values(highlightContext).some(Boolean);
+	const anyHighlightActive = anyOligoHighlight(highlightContext);
 	const anyFocusActive = (focusedSegments?.size ?? 0) > 0;
 	const segmentVisuals = new Map<
 		string,
@@ -469,7 +469,13 @@ const DEFAULT_HIGHLIGHT_CONTEXT: Record<CanHighlight, boolean> = {
 	modification_site: false,
 	longer_than_90: false,
 	shorter_than_15: false,
+	sticky_end_matches: false,
 };
+
+// Sticky-end matches mark bases, not oligos (their own 3D overlay), so they never dim the rest.
+function anyOligoHighlight(h: Record<CanHighlight, boolean>): boolean {
+	return Object.entries(h).some(([key, on]) => on && key !== 'sticky_end_matches');
+}
 
 function isOligoHighlighted(oligo: Oligo, h: Record<CanHighlight, boolean>): boolean {
 	if (h.scaffold && oligo.isScaffold) return true;
@@ -570,7 +576,7 @@ export function buildScene(
 	group.add(labels);
 
 	// ── Step 2: draw strands as twisted colored lines ─────────────────────
-	const anyHighlightActive = Object.values(highlightContext).some(Boolean);
+	const anyHighlightActive = anyOligoHighlight(highlightContext);
 	const anyFocusActive = (focusedSegments?.size ?? 0) > 0;
 
 	const ntEndpointPositions = showNtModel
@@ -980,7 +986,7 @@ export function buildExportScene(
 		}
 	}
 
-	const anyHighlightActive = Object.values(highlightContext).some(Boolean);
+	const anyHighlightActive = anyOligoHighlight(highlightContext);
 	const anyFocusActive = (focusedSegments?.size ?? 0) > 0;
 
 	// ── Strand tubes ──────────────────────────────────────────────────────

@@ -12,8 +12,9 @@
 	import ReferenceMeshPanel from './ReferenceMeshPanel.svelte';
 	import RegionCreationPanel from './RegionCreationPanel.svelte';
 	import CircularScaffoldMapPanel from './CircularScaffoldMapPanel.svelte';
+	import StickyEndsPanel from './StickyEndsPanel.svelte';
 	import { getEditorViewContext } from '../context/EditorViewContext.svelte';
-	import { ChevronLeft, ChevronRight, GripVertical } from '@lucide/svelte';
+	import { ChevronLeft, ChevronRight, GripVertical, X } from '@lucide/svelte';
 	import type { Part } from '$lib/model/Part';
 	import { help, type HelpSpec } from '$lib/components/help/help';
 
@@ -51,43 +52,50 @@
 	let isMeshPanel = $derived(
 		view3DToolPanelMode === 'mesh' && !!editorViewContext.activeRegion?.supportsReferenceGeometry
 	);
+	// Sticky ends highlight the 2D and 3D views alike, so the panel shows over either.
+	let isStickyEndsPanel = $derived(!isRegionCreationMode && editorViewContext.showStickyEndsPanel);
 	let isScaffoldMapPanel = $derived(
 		!isRegionCreationMode && !isView3DPanel && editorViewContext.showScaffoldMap
 	);
 	let PanelToRender = $derived(
 		(isRegionCreationMode
 			? RegionCreationPanel
-			: isView3DPanel
-				? isMeshPanel
-					? ReferenceMeshPanel
-					: view3DToolPanelMode === 'overlays'
-						? View3DOverlayPanel
-						: view3DToolPanelMode === 'replay'
-							? OxDnaReplayPanel
-							: View3DPanel
-				: isScaffoldMapPanel
-					? CircularScaffoldMapPanel
-					: mapModeToPanel[editorViewContext.editorMode]) as import('svelte').Component<{
+			: isStickyEndsPanel
+				? StickyEndsPanel
+				: isView3DPanel
+					? isMeshPanel
+						? ReferenceMeshPanel
+						: view3DToolPanelMode === 'overlays'
+							? View3DOverlayPanel
+							: view3DToolPanelMode === 'replay'
+								? OxDnaReplayPanel
+								: View3DPanel
+					: isScaffoldMapPanel
+						? CircularScaffoldMapPanel
+						: mapModeToPanel[editorViewContext.editorMode]) as import('svelte').Component<{
 			part: Part;
 		}>
 	);
 	let panelHeading = $derived(
 		isRegionCreationMode
 			? 'New Region'
-			: isView3DPanel
-				? isMeshPanel
-					? 'Reference Mesh'
-					: view3DToolPanelMode === 'overlays'
-						? '3D Overlays'
-						: view3DToolPanelMode === 'replay'
-							? 'oxDNA Replay'
-							: '3D View Inspector'
-				: isScaffoldMapPanel
-					? 'Circular Scaffold Map'
-					: mapModeToHeading[editorViewContext.editorMode]
+			: isStickyEndsPanel
+				? 'Sticky Ends'
+				: isView3DPanel
+					? isMeshPanel
+						? 'Reference Mesh'
+						: view3DToolPanelMode === 'overlays'
+							? '3D Overlays'
+							: view3DToolPanelMode === 'replay'
+								? 'oxDNA Replay'
+								: '3D View Inspector'
+					: isScaffoldMapPanel
+						? 'Circular Scaffold Map'
+						: mapModeToHeading[editorViewContext.editorMode]
 	);
 	let shouldShowPanel = $derived(
 		isRegionCreationMode ||
+			isStickyEndsPanel ||
 			isView3DPanel ||
 			isScaffoldMapPanel ||
 			availablePanels.some((mode) => mode === editorViewContext.editorMode)
@@ -133,6 +141,10 @@
 		'Reference Mesh': {
 			text: "Add, replace or remove the active wireframe region's reference mesh, or hide it in the 3D view. The mesh never changes helices.",
 			doc: 'wireframe',
+		},
+		'Sticky Ends': {
+			text: 'Single-stranded stretches whose sequences can bind each other, in this Part or between Parts. Each match has its own colour in the strand and 3D views.',
+			doc: 'assemblies',
 		},
 		'Circular Scaffold Map': {
 			text: 'How staples bind the scaffold: each scaffold as a circle, each staple as an arc between the positions it binds.',
@@ -256,9 +268,21 @@
 					ondblclick={togglePosition}
 				>
 					<GripVertical size={12} />{panelHeading}
-					<button class="bg-muted p-1 hover:bg-accent" onclick={() => (isMinimal = !isMinimal)}>
-						<ChevronRight size={12} />
-					</button>
+					<span class="flex items-center gap-1">
+						{#if isStickyEndsPanel}
+							<button
+								class="bg-muted p-1 hover:bg-accent"
+								aria-label="Close Sticky Ends"
+								title="Close (the views keep showing matches until you turn that off)"
+								onclick={() => (editorViewContext.showStickyEndsPanel = false)}
+							>
+								<X size={12} />
+							</button>
+						{/if}
+						<button class="bg-muted p-1 hover:bg-accent" onclick={() => (isMinimal = !isMinimal)}>
+							<ChevronRight size={12} />
+						</button>
+					</span>
 				</div>
 
 				<!-- overflow-x-hidden: shadcn Switch's enlarged hit area (after:-inset-x-3) pokes past a flush-right edge.

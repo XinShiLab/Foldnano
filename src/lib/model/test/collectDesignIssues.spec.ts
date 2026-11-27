@@ -1,9 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { collectDesignIssues } from '../checks/collect';
+import { collectDesignIssues, type DesignCheckSelection } from '../checks/collect';
 import type { Part } from '../Part';
 import { makeHoneycombPart, addLatticeVh } from './testHelpers';
 
-const ALL = { integrity: true, simulation: true, cadnano: true };
+const ALL: DesignCheckSelection = {
+	integrity: true,
+	simulation: true,
+	cadnano: true,
+	stickyPairs: true,
+};
 
 /** A per-strand insert mismatch (integrity, simulation and cadnano all flag it) plus a lone skip. */
 function partWithIssues(): Part {

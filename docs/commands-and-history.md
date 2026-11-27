@@ -201,6 +201,7 @@ The recorder emits targeted patch kinds, including:
 | `RegionReferenceGeometryChange`              | Undoable set / clear of a wireframe region's `referenceGeometry`                                                    |
 | `RegionOrderChange`                          | Undoable reorder of `part.regions` (`moveRegionCmd`); replays via `Part.setRegionOrder`, which resyncs listRows     |
 | `OverlayPlacementSet`/`Remove`               | Undoable upsert / clear of one external-structure overlay placement (`Part.overlayPlacements`); see `overlays.ts`   |
+| `StickyRecordSet`/`StickyRecordRemove`       | Put back / remove one saved sticky-end pair or ignored match at its list position, on a Part or the assembly        |
 
 ### `PartScopeCapture`
 
@@ -361,6 +362,12 @@ be deleted; relinking refuses to move a Part's last placement away.
 Part add/remove/duplicate change the Part list, so they take the whole-document
 snapshot; occurrence edits record `OccurrenceSet`/`OccurrenceRemove` through
 `rec.occurrence(id, before, after)` with `assembly.stateOf(id)`.
+
+**Sticky ends** (`stickyEnds.ts`): `saveStickyMatchCmd(history, doc, match, list)` (Pair /
+Ignore) and `removeStickyRecordCmd(history, doc, home, list, id)` record
+`StickyRecordSet`/`StickyRecordRemove` through `rec.stickyRecord(home, list, id, before, after)`.
+A Part home carries its `partId`, so the linked-Part guard and `changedPartId` see it; an
+assembly home is document-level. See `docs/sticky-ends.md` § Saved pairs.
 
 ### Strand / Oligo Commands
 

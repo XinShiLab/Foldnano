@@ -15,6 +15,7 @@
 		EyeOff,
 		LayoutPanelTop,
 		Diameter,
+		Magnet,
 	} from '@lucide/svelte/icons';
 	import * as Kbd from '$lib/components/ui/kbd/index.js';
 	import * as ButtonGroup from '$lib/components/ui/button-group/index.js';
@@ -65,6 +66,7 @@
 
 	const HIGHLIGHT_LABELS: Partial<Record<CanHighlight, string>> = {
 		modification_site: 'with modifications',
+		sticky_end_matches: 'sticky end matches',
 	};
 	const highlightLabel = (type: CanHighlight) =>
 		HIGHLIGHT_LABELS[type] ?? type.replaceAll('_', ' ');
@@ -326,6 +328,22 @@
 					})}
 				>
 					<Diameter />
+				</Button>
+				<Button
+					variant={ctx.showStickyEndsPanel ? 'default' : 'outline'}
+					size="icon-sm"
+					title="Sticky Ends"
+					aria-label="Sticky Ends"
+					onclick={() => {
+						ctx.showStickyEndsPanel = !ctx.showStickyEndsPanel;
+						if (ctx.showStickyEndsPanel) strandCtx.highlightContext.sticky_end_matches = true;
+					}}
+					{@attach help({
+						text: 'Find single-stranded stretches whose sequences can bind each other, here or in other Parts, and show each match in its own colour.',
+						doc: 'assemblies',
+					})}
+				>
+					<Magnet />
 				</Button>
 				<Button
 					variant={strandCtx.showBlocks ? 'default' : 'outline'}

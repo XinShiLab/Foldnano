@@ -1,4 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
+import { StickyRecords } from '../stickyEnds/StickyRecords.svelte';
 import Oligo, { type SegmentEnd } from '../Oligo';
 import type OligoSegment from '../Oligo/OligoSegment.svelte';
 import { mirroredSkipInsertSeq } from '../Oligo/OligoSegment.svelte';
@@ -155,6 +156,8 @@ export class Part {
 
 	customModifications: ModificationDef[] = $state([]);
 	overlayPlacements = $state<OverlayPlacement[]>([]);
+	/** Sticky-end pairs and ignored matches with both ends in this Part (docs/sticky-ends.md). */
+	readonly stickyRecords = new StickyRecords(false);
 	repeatGroups = $state<RepeatGroup[]>([]);
 	/** Set on a linked Part only; kept through load and save so no app version drops it. */
 	source: PartSource | null = $state.raw(null);
@@ -375,6 +378,7 @@ export class Part {
 							instances: g.instances.map((i) => ({ ...i })),
 						}))
 					: undefined,
+			...this.stickyRecords.toJSON(),
 			source: this.source ? { ...this.source } : undefined,
 		};
 	}
@@ -434,6 +438,7 @@ export class Part {
 			}));
 		}
 		if (json.repeatGroups) part.repeatGroups = json.repeatGroups;
+		part.stickyRecords.load(json);
 		if (json.source) part.source = { ...json.source };
 		part.rebuildRspCaches();
 		part.normalizeVhLengthsToRegion();
